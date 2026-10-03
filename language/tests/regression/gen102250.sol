@@ -7,7 +7,7 @@ println(xs1.size)
 println(xs1.get(0))
 
 class Box2<T> {
-    var value: T
+    mutable val value: T
     Box2(value: T) {
         this.value = value
     }

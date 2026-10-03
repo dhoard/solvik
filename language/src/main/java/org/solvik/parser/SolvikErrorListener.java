@@ -17,6 +17,7 @@ package org.solvik.parser;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.antlr.v4.runtime.BaseErrorListener;
 import org.antlr.v4.runtime.RecognitionException;
@@ -43,11 +44,29 @@ import org.solvik.source.SourceSpan;
  * DiagnosticCode#PARSER_UNSUPPORTED_LEGACY_SYNTAX}) so removal regressions can assert why a
  * program was rejected. Classification inspects only the offending token spelling plus the
  * expectation set ANTLR reports; it never relies on an alternate parse path.
+ *
+ * <p>Keywords that a Solvik revision removed are classified a third way ({@link
+ * DiagnosticCode#PARSER_UNSUPPORTED_REMOVED_SYNTAX}) with the replacement named, so an old program is
+ * told what to write rather than handed a bare unexpected-token error. Those spellings stay reserved
+ * tokens that appear in no grammar production, which places the error on the keyword itself: they can
+ * never be reintegrated as identifiers, which would silently change what an existing program means.
  */
 final class SolvikErrorListener extends BaseErrorListener {
 
     /** Spellings that exist only in SimpleLanguage syntax and are never valid Solvik tokens. */
     private static final Set<String> LEGACY_KEYWORDS = Set.of("function");
+
+    /**
+     * Spellings reserved by an earlier Solvik revision and removed by a later one, each mapped to the
+     * syntax that replaced it. They are still lexer tokens so they cannot become identifiers, and each
+     * appears in no parser production, so a program written against the old revision fails here with the
+     * replacement named rather than being reinterpreted. {@code var} became {@code mutable val},
+     * {@code open} became {@code mutable}, and {@code sealed} became {@code abstract}
+     * (docs/LANGUAGE_SPEC.md, "Lexical basics").
+     */
+    private static final Map<String, String> REMOVED_KEYWORDS = Map.of("var", "'mutable val'", //
+                    "open", "'mutable'", //
+                    "sealed", "'abstract'");
 
     private final List<Diagnostic> collected = new ArrayList<>();
     private final SourceFile source;
@@ -100,6 +119,17 @@ final class SolvikErrorListener extends BaseErrorListener {
                     describe(legacy)));
             return;
         }
+        Token removed = removedToken(recognizer, token);
+        if (removed != null) {
+            String replacement = REMOVED_KEYWORDS.get(removed.getText());
+            collected.add(Diagnostic.expectedFound(
+                    DiagnosticCode.PARSER_UNSUPPORTED_REMOVED_SYNTAX,
+                    spanOf(removed),
+                    "the '" + removed.getText() + "' keyword was removed in 2026.11-draft; use " + replacement,
+                    replacement,
+                    describe(removed)));
+            return;
+        }
         boolean atEof = token == null || token.getType() == Token.EOF;
         DiagnosticCode code = atEof ? DiagnosticCode.PARSER_INCOMPLETE_INPUT : DiagnosticCode.PARSER_UNEXPECTED_TOKEN;
         String message = (atEof ? "incomplete input: " : "unexpected input: ") + msg;
@@ -126,6 +156,31 @@ final class SolvikErrorListener extends BaseErrorListener {
         if (recognizer instanceof org.antlr.v4.runtime.Parser parser && token.getTokenIndex() > 0) {
             Token previous = parser.getInputStream().get(token.getTokenIndex() - 1);
             if (previous != null && previous.getChannel() == Token.DEFAULT_CHANNEL && LEGACY_KEYWORDS.contains(previous.getText())) {
+                return previous;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Returns the removed-keyword token this error should be attributed to, or {@code null}.
+     *
+     * <p>Removed keywords are still reserved tokens and appear in no production, so at a declaration or
+     * statement position the offending token normally <em>is</em> the removed keyword and the first check
+     * settles it. The previous-token fallback is kept for the case an alternative parse reports one token
+     * later, which is the same shape {@link #legacyToken} needs; unlike {@code function}, a removed keyword
+     * can never be a legal identifier, so the fallback can never misattribute an unrelated error.
+     */
+    private static Token removedToken(Recognizer<?, ?> recognizer, Token token) {
+        if (token == null) {
+            return null;
+        }
+        if (REMOVED_KEYWORDS.containsKey(token.getText())) {
+            return token;
+        }
+        if (recognizer instanceof org.antlr.v4.runtime.Parser parser && token.getTokenIndex() > 0) {
+            Token previous = parser.getInputStream().get(token.getTokenIndex() - 1);
+            if (previous != null && previous.getChannel() == Token.DEFAULT_CHANNEL && REMOVED_KEYWORDS.containsKey(previous.getText())) {
                 return previous;
             }
         }

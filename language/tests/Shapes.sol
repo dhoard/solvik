@@ -1,5 +1,5 @@
-// Solvik sealed types and exhaustive match over a closed subtype set.
-sealed class Shape {
+// Solvik abstract classes and match over a class type, which needs a wildcard branch.
+abstract class Shape {
 }
 
 class Circle extends Shape {
@@ -22,6 +22,7 @@ func area(shape: Shape): Integer {
     return match shape {
         circle: Circle => 3 * circle.radius * circle.radius
         square: Square => square.side * square.side
+        _ => 0
     }
 }
 

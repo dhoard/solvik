@@ -57,7 +57,7 @@ What each requirement asserts, and why it needs the tests it has:
     analyzer reaches by different routes, so each is its own program with a body written not to introduce a
     second root cause -- a passing match is then about the placement under test rather than about an unrelated
     report. SOL-TCK-0457 and SOL-TCK-0458 are the mutable pair the revision distinguishes by span, and that
-    pair is the whole content of the sentence: a host that silently captured the unlisted `var` fails 0458, and
+    pair is the whole content of the sentence: a host that silently captured the unlisted `mutable val` fails 0458, and
     one that reported the item-side case with the unlisted code, or with none, fails 0457.
 
   * REQ-3322 -- the boundary. An anonymous function introduces a function boundary and a lexical scope holding
@@ -96,10 +96,10 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SPEC = open(os.path.join(ROOT, "docs/LANGUAGE_SPEC.md"), encoding="utf-8").read()
 
-CORPUS = os.path.join(ROOT, "tck/corpus/2026.10-draft")
+CORPUS = os.path.join(ROOT, "tck/corpus/2026.11-draft")
 REQUIREMENTS = os.path.join(ROOT, "tck/requirements/requirements.json")
 PROFILE = os.path.join(ROOT, "tck/profiles/full-language.profile.json")
-SPEC_VERSION = "2026.10-draft"
+SPEC_VERSION = "2026.11-draft"
 
 
 def norm(t):
@@ -147,7 +147,7 @@ ITEM_ELIGIBLE = ("A capture item is an identifier or `this`. It must resolve at 
 CAPTURED_AT_CREATION = ("Each listed binding's value is captured when evaluation reaches the "
                         "anonymous-function expression.")
 REFERENCE_NOT_GRAPH = ("Capturing an object copies the reference, not the reachable object graph, so later "
-                       "mutation of that object's `var` properties remains observable through the captured "
+                       "mutation of that object's `mutable val` properties remains observable through the captured "
                        "reference.")
 TRANSITIVE = "Capture is transitive only through explicit values."
 NO_FLATTEN = ("A closure that captures another closure lists that function-valued binding and stores the "
@@ -159,10 +159,10 @@ GLOBALS = ("Top-level and module-qualified function declarations are globally re
 TOP_RECURSION = "Recursion through named top-level functions needs no capture."
 
 # --- REQ-3321: capture diagnostics
-NO_VAR_CAPTURE = ("A closure must not list or otherwise capture a `var` local. Naming a `var` in a capture "
+NO_VAR_CAPTURE = ("A closure must not list or otherwise capture a `mutable val` local. Naming a `mutable val` in a capture "
                   "list is `SEM_MUTABLE_CAPTURE` (`SOLV-SEM-057`), reported on that capture item, and a read "
                   "or write of that captured name in the body is reported with the same code.")
-UNLISTED_VAR = ("Referencing the same outer `var` without listing it remains `SEM_UNLISTED_CAPTURE` at the "
+UNLISTED_VAR = ("Referencing the same outer `mutable val` without listing it remains `SEM_UNLISTED_CAPTURE` at the "
                 "body reference; the compiler never silently converts it into a capture.")
 UNLISTED_BODY = ("An outer local or parameter referenced by the body but omitted from the capture list is "
                  "`SEM_UNLISTED_CAPTURE` (`SOLV-SEM-058`), reported on the body reference. This applies to "
@@ -266,7 +266,7 @@ REQS_SPEC = {
     "REQ-3321": dict(
         section="6. Functions (Explicit immutable closure capture; required diagnostics)",
         kind="compile-time",
-        summary=("A `var` named in a capture list is `SOLV-SEM-057`, an unlisted outer local or uncaptured "
+        summary=("A `mutable val` named in a capture list is `SOLV-SEM-057`, an unlisted outer local or uncaptured "
                  "`this` is `SOLV-SEM-058` at the body reference, an unknown item is `SOLV-RESOL-001`, `this` "
                  "with no receiver is `SOLV-RESOL-005`, and a duplicate item or item colliding with a "
                  "parameter is `SOLV-RESOL-002`"),
@@ -274,8 +274,8 @@ REQS_SPEC = {
         oracle=(
             "Each report is a program of its own with the body written not to introduce a second root cause. "
             "SOL-TCK-0457 and SOL-TCK-0458 are the two mutable-state halves the revision distinguishes by span "
-            "-- `SOLV-SEM-057` at the item that names a `var`, plain `SOLV-SEM-058` at a body reference to the "
-            "*same kind* of outer `var` that was never listed. That pair is the whole content of the sentence: "
+            "-- `SOLV-SEM-057` at the item that names a `mutable val`, plain `SOLV-SEM-058` at a body reference to the "
+            "*same kind* of outer `mutable val` that was never listed. That pair is the whole content of the sentence: "
             "a host that silently captured the unlisted variable fails 0458, and one that reported the "
             "item-side case with the unlisted code, or with none, fails 0457. SOL-TCK-0459 and SOL-TCK-0460 "
             "assert the body-reference code for an omitted `val` and for `this` used without `[this]`. "
@@ -490,7 +490,7 @@ print("EXECUTED-INVALID")
              "closure reaches the inner captured value, and each creation binds the value that existed at "
              "that moment",
         src="""class Cell {
-    var n: Integer = 0
+    mutable val n: Integer = 0
 
     func bump() {
         this.n = this.n + 1
@@ -537,7 +537,7 @@ print(run())
         note="A receiver is captured by `[this]` and every intervening closure must list and forward it "
              "itself, so a value reaches a body only through the written path",
         src="""class Adder {
-    var base: Integer = 40
+    mutable val base: Integer = 40
 
     func adder(): func(Integer): Integer {
         return func [this](value: Integer): Integer {
@@ -597,9 +597,9 @@ print(run())
     dict(
         tid="SOL-TCK-0457", req="REQ-3321", cat="objects", outcome="COMPILE_ERROR",
         exp={"diagnostic": {"code": "SOLV-SEM-057"}},
-        note="A `var` named in a capture list is rejected at the capture item, which capture cannot bind",
+        note="A `mutable val` named in a capture list is rejected at the capture item, which capture cannot bind",
         src="""func run(): func(Integer): Integer {
-    var total = 0
+    mutable val total = 0
     return func [total](value: Integer): Integer {
         return total + value
     }
@@ -611,10 +611,10 @@ print("EXECUTED-INVALID")
     dict(
         tid="SOL-TCK-0458", req="REQ-3321", cat="objects", outcome="COMPILE_ERROR",
         exp={"diagnostic": {"code": "SOLV-SEM-058"}},
-        note="An unlisted outer `var` read by the body is an unlisted-capture diagnostic at the reference: "
+        note="An unlisted outer `mutable val` read by the body is an unlisted-capture diagnostic at the reference: "
              "the compiler never silently converts it into a capture",
         src="""func run(): func(Integer): Integer {
-    var offset = 100
+    mutable val offset = 100
     return func(value: Integer): Integer {
         return value + offset
     }
@@ -644,7 +644,7 @@ print("EXECUTED-INVALID")
         note="The unlisted-capture rule applies to the receiver too: a body may use `this` only when `[this]` "
              "is written",
         src="""class Holder {
-    var n: Integer = 1
+    mutable val n: Integer = 1
 
     func read(): func(): Integer {
         return func(): Integer {

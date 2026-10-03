@@ -162,7 +162,7 @@ public final class SolvikSemanticNegativeTest {
         assertThat(initializer.expected().orElseThrow()).isEqualTo("Integer");
         assertThat(initializer.found().orElseThrow()).isEqualTo("Any");
 
-        Diagnostic assignment = first(checkFails("func f(source: Any): Unit {\n    var n: Integer = 0\n    n = source\n}\n"));
+        Diagnostic assignment = first(checkFails("func f(source: Any): Unit {\n    mutable val n: Integer = 0\n    n = source\n}\n"));
         assertThat(assignment.code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
         assertThat(assignment.expected().orElseThrow()).isEqualTo("Integer");
         assertThat(assignment.found().orElseThrow()).isEqualTo("Any");
@@ -188,7 +188,7 @@ public final class SolvikSemanticNegativeTest {
 
     @Test
     public void assignmentValueTypeIsChecked() {
-        Diagnostic diagnostic = first(checkFails("func f(): Unit {\n    var x = 1\n    x = \"s\"\n}\n"));
+        Diagnostic diagnostic = first(checkFails("func f(): Unit {\n    mutable val x = 1\n    x = \"s\"\n}\n"));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
 

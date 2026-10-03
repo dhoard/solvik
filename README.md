@@ -31,13 +31,13 @@ Solvik is a strongly and statically typed, nominally typed, object-oriented lang
 Its design combines a familiar Java/TypeScript/Kotlin-style surface with stricter and more explicit
 semantics:
 
-- immutable-by-default bindings with `val` and explicit mutation with `var`;
+- immutable-by-default bindings with `val` and explicit mutation with `mutable val`;
 - non-null types by default, nullable `T?`, safe access, coalescing, and flow narrowing;
 - classes that are final by default, controlled single inheritance, and explicit `override`;
 - multiple interfaces with default methods;
 - composition through statically resolved delegation;
 - nominal generics with compile-time checking;
-- value-carrying enums and sealed types with exhaustive `match`;
+- value-carrying enums and abstract classes, with exhaustive `match` over enum variants;
 - non-fallthrough `switch`;
 - first-class function values, including anonymous functions, explicit capture, and bound method references;
 - first-class `Regex`;
@@ -195,13 +195,14 @@ The comparison is about design direction, not source compatibility or feature eq
 
 ```solvik
 val name = "Solvik"
-var count = 0
+mutable val count = 0
 
 count = count + 1
 name = "Other" // compile error
 ```
 
-`val` freezes the binding, not the entire reachable object graph.
+`val` freezes the binding, not the entire reachable object graph. `mutable val` is the only
+writable binding form, and `val` is the only binding keyword.
 
 ### Null safety
 
@@ -226,11 +227,12 @@ func describe(value: String?): String {
 
 ### Controlled inheritance
 
-Classes and overridable members are final unless explicitly opened.
+A class is extendable only when declared `mutable` or `abstract`, and a method is overridable only
+when declared `mutable`.
 
 ```solvik
-open class Animal {
-    open func speak(): String {
+mutable class Animal {
+    mutable func speak(): String {
         return "..."
     }
 }
@@ -264,11 +266,13 @@ class Service implements Logger {
 
 Delegated implementations are resolved statically.
 
-### Sealed types and exhaustive `match`
+### Enums, abstract classes, and exhaustive `match`
 
-Solvik supports value-carrying enums, sealed type hierarchies, and exhaustive pattern matching.
+Solvik supports value-carrying enums and `abstract` classes, which cannot be constructed and exist
+to be extended.
 
-The compiler verifies that all known variants are covered before lowering the program.
+`match` is exhaustive over the closed variant set of an `enum` or `error` type. No class type has a
+knowable subtype set, so a `match` over one always requires a wildcard branch.
 
 ### Non-fallthrough `switch`
 

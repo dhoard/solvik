@@ -134,7 +134,7 @@ public final class SolvikExceptionExecutionTest {
     @Test
     public void rootExceptionHandlerCatchesATransitivelyDerivedClass() {
         Result result = evaluate(
-                "open class ParseError extends RuntimeException { }\n"
+                "mutable class ParseError extends RuntimeException { }\n"
                         + "class DeepError extends ParseError { }\n"
                         + "try {\n"
                         + "  throw DeepError(\"deep\")\n"
@@ -317,7 +317,7 @@ public final class SolvikExceptionExecutionTest {
         // The finally clause runs when the try body exits via break, and the break still takes effect.
         Result result = evaluate(
                 "class AppError extends RuntimeException { }\n"
-                        + "var i: Integer = 0\n"
+                        + "mutable val i: Integer = 0\n"
                         + "while (true) {\n"
                         + "  i = i + 1\n"
                         + "  try {\n"
@@ -337,7 +337,7 @@ public final class SolvikExceptionExecutionTest {
     public void finallyRunsOnContinueExit() {
         Result result = evaluate(
                 "class AppError extends RuntimeException { }\n"
-                        + "var i: Integer = 0\n"
+                        + "mutable val i: Integer = 0\n"
                         + "while (i < 2) {\n"
                         + "  i = i + 1\n"
                         + "  try {\n"
@@ -396,7 +396,7 @@ public final class SolvikExceptionExecutionTest {
         // A pending break is discarded when the finally block throws; the throw escapes to the handler.
         Result result = evaluate(
                 "class AppError extends RuntimeException { }\n"
-                        + "var i: Integer = 0\n"
+                        + "mutable val i: Integer = 0\n"
                         + "try {\n"
                         + "  while (true) {\n"
                         + "    i = i + 1\n"
@@ -580,7 +580,7 @@ public final class SolvikExceptionExecutionTest {
         // overwrite the outer value: rethrowing the outer binding still delivers the original
         // Sub instance, not the Fatal one caught in between.
         Result result = evaluate(
-                "open class Boom extends RuntimeException { }\n"
+                "mutable class Boom extends RuntimeException { }\n"
                         + "class Sub extends Boom { }\n"
                         + "class Fatal extends RuntimeException { }\n"
                         + "func raise(): Integer {\n"
@@ -662,7 +662,7 @@ public final class SolvikExceptionExecutionTest {
         // The message is a trailing optional argument rather than a declared constructor parameter, so a
         // subclass keeps its own parameters and its super(...) forwarding unchanged.
         Result result = evaluate(
-                "open class BaseError extends RuntimeException {\n"
+                "mutable class BaseError extends RuntimeException {\n"
                         + "  val code: Integer\n"
                         + "  BaseError(code: Integer) {\n"
                         + "    this.code = code\n"

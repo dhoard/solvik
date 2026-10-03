@@ -55,7 +55,7 @@ public final class SolvikClassExecutionTest {
         assertThat(run("""
                 class User {
                     val id: Integer
-                    var name: String
+                    mutable val name: String
 
                     User(id: Integer, name: String) {
                         this.id = id
@@ -78,7 +78,7 @@ public final class SolvikClassExecutionTest {
     public void declarationInitializersRunWithoutAConstructor() {
         assertThat(run("""
                 class Counter {
-                    var count: Integer = 0
+                    mutable val count: Integer = 0
                     val label: String = "c"
 
                     func increment(): Unit {
@@ -102,7 +102,7 @@ public final class SolvikClassExecutionTest {
     public void mutablePropertiesCanBeWrittenAfterConstruction() {
         assertThat(run("""
                 class Box {
-                    var value: Integer
+                    mutable val value: Integer
 
                     Box(start: Integer) {
                         this.value = start
@@ -192,7 +192,7 @@ public final class SolvikClassExecutionTest {
     public void initIsAnOrdinaryIdentifier() {
         assertThat(run("""
                 class Engine {
-                    var value: Integer = 0
+                    mutable val value: Integer = 0
 
                     Engine(init: Integer) {
                         this.value = init
@@ -212,7 +212,7 @@ public final class SolvikClassExecutionTest {
                 }
 
                 class Slot {
-                    var init: Integer = 3
+                    mutable val init: Integer = 3
                 }
 
                     println(Engine(10).bump())
@@ -229,7 +229,7 @@ public final class SolvikClassExecutionTest {
         // the property write inside the method is the qualified one.
         assertThat(run("""
                 class Counter {
-                    var total: Integer = 0
+                    mutable val total: Integer = 0
 
                     func add(amount: Integer): Integer {
                         val total = amount * 2
@@ -242,7 +242,7 @@ public final class SolvikClassExecutionTest {
                     }
                 }
 
-                var counter: Counter = Counter();
+                mutable val counter: Counter = Counter();
                 println(counter.add(4));
                 println(counter.sum());
                 println(counter.add(1));
@@ -264,7 +264,7 @@ public final class SolvikClassExecutionTest {
                     }
 
                     func hit(key: String): Integer {
-                        var next: Integer = 1;
+                        mutable val next: Integer = 1;
                         if (this.counts.containsKey(key)) {
                             next = this.counts.get(key) + 1;
                         }
@@ -277,7 +277,7 @@ public final class SolvikClassExecutionTest {
                     }
                 }
 
-                var bag: Bag = Bag();
+                mutable val bag: Bag = Bag();
                 bag.add(1);
                 bag.add(2);
                 bag.add(1);
@@ -291,12 +291,12 @@ public final class SolvikClassExecutionTest {
     @Test
     public void inheritedPropertiesAreReachableThroughThisInASubclass() {
         assertThat(run("""
-                open class Base {
+                mutable class Base {
                     val id: Integer = 5
                 }
 
                 class Derived extends Base {
-                    var extra: Integer = 2
+                    mutable val extra: Integer = 2
 
                     func show(): Integer {
                         return this.id + this.extra;
@@ -313,7 +313,7 @@ public final class SolvikClassExecutionTest {
         // `var x = 1` then `x = 2` must produce 2, exercising the lowering-time slot reuse.
         assertThat(run("""
                 func tally(): Integer {
-                    var counter = 5
+                    mutable val counter = 5
                     counter = counter + 1
                     counter = counter * 7
                     return counter

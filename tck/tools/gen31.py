@@ -2,7 +2,7 @@
 """Generate the variables, scope-block, switch-default, range, and include-identity batch.
 
 Closes the remaining testable obligations in sections 2, 6, 13, 17, and 20 that
-earlier batches did not enumerate: `var` mutability, top-level bindings being
+earlier batches did not enumerate: `mutable val` mutability, top-level bindings being
 locals of the implicit main, scope-block independence and abrupt exits, the
 optional statement `switch` default, the range loop variable's immutability and
 scope, literal (unexpanded) include paths, and canonical include identity through
@@ -16,10 +16,10 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SPEC = open(os.path.join(ROOT, "docs/LANGUAGE_SPEC.md"), encoding="utf-8").read()
-CORPUS = os.path.join(ROOT, "tck/corpus/2026.10-draft")
+CORPUS = os.path.join(ROOT, "tck/corpus/2026.11-draft")
 REQUIREMENTS = os.path.join(ROOT, "tck/requirements/requirements.json")
 PROFILE = os.path.join(ROOT, "tck/profiles/full-language.profile.json")
-SPEC_VERSION = "2026.10-draft"
+SPEC_VERSION = "2026.11-draft"
 
 
 def norm(t):
@@ -33,19 +33,19 @@ SPEC_N = norm(SPEC)
 REQS_SPEC = {
     "REQ-2900": dict(
         section="2. Variables and Mutability",
-        summary="`var` declares a mutable binding or property, so a local declared with `var` may "
+        summary="`mutable val` declares a mutable binding or property, so a local declared `mutable val` may "
                 "be reassigned and the new value is observed",
         kind="runtime",
-        quotes=["`var` declares a mutable binding/property."],
-        note="A `var` local is reassigned and printed, so the observed bytes are the assigned "
+        quotes=["`mutable val` declares a mutable binding/property."],
+        note="A `mutable val` local is reassigned and printed, so the observed bytes are the assigned "
              "value; this is the positive counterpart to the `val` immutability covered by "
              "REQ-0300/REQ-0301."),
     "REQ-2901": dict(
         section="6. Functions",
-        summary="A top-level `val`/`var` is a local of the implicit main, not a global, so it is "
+        summary="A top-level `val`, mutable or not, is a local of the implicit main, not a global, so it is "
                 "not visible to a user-declared function",
         kind="compile-time",
-        quotes=["a top-level `val`/`var` is therefore a local of the implicit main, not a global."],
+        quotes=["a top-level `val`, whether or not it is `mutable`, is therefore a local of the implicit main, not a global."],
         note="A top-level binding is referenced from a declared function, which is not the implicit "
              "main. The reference is resolved against function locals and parameters only, so it is "
              "an unresolvable-name error. The section names no code, so the rejection is bare."),
@@ -151,9 +151,9 @@ def BAD(tid, cat, req, src, diag, note, libs=None):
 
 
 OK("SOL-TCK-0390", "types", "REQ-2900",
-   'var x: Integer = 1\nx = 2\nprint("var" .. x)\n',
+   'mutable val x: Integer = 1\nx = 2\nprint("var" .. x)\n',
    "var2",
-   "The var local is reassigned and the assigned value is observed.")
+   "The `mutable val` local is reassigned and the assigned value is observed.")
 BAD("SOL-TCK-0391", "names", "REQ-2901",
     'val x = 1\nfunc f(): Integer {\n    return x\n}\nprint("EXECUTED-INVALID")\n', {},
     "A declared function cannot see the implicit main's top-level local.")

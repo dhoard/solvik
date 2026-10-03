@@ -96,7 +96,7 @@ public final class SolvikStaticMemberSemanticTest {
         ClassSymbol counter = check("""
                 class Counter {
                     static val limit: Integer = 10
-                    static var attempts: String = "none"
+                    static mutable val attempts: String = "none"
                 }
                 """).classSymbol("Counter").orElseThrow();
 
@@ -229,7 +229,7 @@ public final class SolvikStaticMemberSemanticTest {
         // Statics are reached through the declaring class's name, so a base and a derived class sharing
         // a static name are two independent members rather than a shadowing conflict.
         CheckedProgram program = check("""
-                open class Base {
+                mutable class Base {
                     static val label: String = "base"
                 }
                 class Derived extends Base {

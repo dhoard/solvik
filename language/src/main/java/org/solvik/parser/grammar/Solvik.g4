@@ -17,7 +17,7 @@
 // Generated sources are produced by generate_parser.sh; do not edit generated files by hand.
 //
 // Phase 1 supported constructs: top-level `func` declarations with typed parameters and explicit
-// return types; blocks; `val`/`var` locals with initializers and `;` termination;
+// return types; blocks; `val` and `mutable val` locals with initializers and `;` termination;
 // call-expression statements; integer, Boolean, and normal-string literals; name references,
 // ordinary member access, calls, parentheses, and `+`, `-`, `*`, `/`; `if`/`else`; `return`.
 // SimpleLanguage `function` is intentionally not accepted.
@@ -75,10 +75,13 @@
 //
 // Phase 7 adds the root type hierarchy and single inheritance (docs/LANGUAGE_SPEC.md sections 4
 // and 7):
-//   * `classDecl` accepts an optional leading `open` and an optional `extends typeRef`; the
-//     grammar itself already enforces at most one superclass, so multiple inheritance is a parse
-//     error.
-//   * `methodDecl` is a class-only method declaration with optional `open`/`override` modifiers;
+//   * `classDecl` accepts at most one leading class modifier — `mutable` to open the class for
+//     extension, or `abstract` to make it non-constructible and extendable — and an optional
+//     `extends typeRef`; the grammar itself already enforces at most one superclass, so multiple
+//     inheritance is a parse error. The `(ABSTRACT | MUTABLE)?` alternation is what makes
+//     `mutable abstract class` and `abstract mutable class` parse errors rather than semantic ones:
+//     `abstract` already grants extension, so no bit remains for `mutable` to flip.
+//   * `methodDecl` is a class-only method declaration with optional `mutable`/`override` modifiers;
 //     a top-level `functionDecl` accepts no modifiers because top-level functions are never
 //     overridable.
 //   * `superExpr` joins `primary` so `super(arguments)` and `super.member(...)` parse through the
@@ -96,7 +99,7 @@
 //   * `classDecl` accepts `implements typeRef, ...` (after its optional `extends`), which is the
 //     multiple-interface surface of nominal conformance. `implements` is not part of `interfaceDecl`
 //     because an interface extends interfaces; it never implements them.
-//   * interface members carry no `open`/`override` modifiers: an interface method is inherited by
+//   * interface members carry no `mutable`/`override` modifiers: an interface method is inherited by
 //     every implementor, and a class implementing method needs no modifier.
 //
 // Phase 9 adds composition through delegation (docs/LANGUAGE_SPEC.md section 9):
@@ -107,7 +110,7 @@
 //   * a delegate's declared type must be an interface, because delegation forwards interface
 //     members; the semantic layer, not the grammar, decides which members a delegate supplies and
 //     rejects a non-interface, class-typed, or ambiguous delegate.
-//   * `delegate` is not a semicolon-insertion terminator (like `class`, `implements`, and `var`):
+//   * `delegate` is not a semicolon-insertion terminator (like `class`, `implements`, and `mutable`):
 //     a delegate declaration always ends in `;`, which is the token that terminates it.
 // Phase 11 adds nominal generics (docs/LANGUAGE_SPEC.md section 11):
 //   * `classDecl`, `interfaceDecl`, `functionDecl`, `methodDecl`, `signatureDecl`, and
@@ -123,16 +126,19 @@
 //   * Call sites that omit explicit type arguments still infer them from value arguments.
 //   * Enums, regex, and switch remain absent and are rejected by the parser.
 //
-// Phase 12 adds enums and sealed types (docs/LANGUAGE_SPEC.md section 12):
+// Phase 12 adds enums and exhaustive match, and the 2026.11-draft revision's `abstract` classes
+// (docs/LANGUAGE_SPEC.md section 12):
 //   * `enumDecl` joins the top-level declarations: `enum Name<T, ...> { Variant(Type, ...) ... }`.
 //     Each `enumVariant` is a positional, value-carrying nested constructor name terminated by a
 //     real or inserted SEMI, exactly like an interface signature. A variant with no values omits the
 //     parentheses.
-//   * `classDecl` accepts an optional leading `sealed` modifier. A sealed class is abstract (never
-//     constructible) and is the only declaration kind besides `open` that a subclass may extend,
-//     because its complete same-file subtype set is closed for exhaustiveness analysis.
-//   * `enum`, `sealed`, and a variant name are not semicolon-insertion terminators: `enum` and
-//     `sealed` open a construct, and a variant already ends in `)` or an identifier, both of which
+//   * `classDecl` accepts an optional leading `abstract` modifier. An abstract class is never
+//     constructible (SOLV-SEM-028) and, with `mutable`, is one of the two declaration kinds a
+//     subclass may extend. Unlike the `sealed` keyword it replaced, it carries no closed subtype set
+//     and no same-file extension boundary: an abstract class may be extended from any file, so no
+//     class type has a knowable subtype set and `match` over a class type requires a wildcard.
+//   * `enum`, `abstract`, and a variant name are not semicolon-insertion terminators: `enum` and
+//     `abstract` open a construct, and a variant already ends in `)` or an identifier, both of which
 //     are terminators already.
 //
 // Phase 10 adds null safety (docs/LANGUAGE_SPEC.md sections 5 and 18):
@@ -155,7 +161,7 @@
 //     after a branch result already insert a SEMI because a result ends in an identifier, literal,
 //     or `)`, so the branch list tolerates stand-alone SEMI tokens exactly like a block.
 //   * `pattern` is `Identifier (':' typeRef | '(' patternList? ')')?`. The semantic layer interprets
-//     a colon form as a sealed-subtype binding, a parenthesized form as an enum variant pattern,
+//     a colon form as a subtype binding, a parenthesized form as an enum variant pattern,
 //     and a bare name as a value-less variant at the top level or a binding inside a variant. The
 //     wildcard `_` is the bare name `_`, matching the specification's identifier grammar rather
 //     than reserving a new keyword.
@@ -241,7 +247,7 @@ grammar Solvik;
 // with declarations. Those statements, in source order, form the body of an implicit
 // `func main()`; a file that also declares `main` is a duplicate-declaration error, and a file
 // with neither top-level statements nor an explicit `main` is still valid and does nothing. A
-// top-level `val`/`var` is therefore a local of the implicit main, not a global.
+// top-level `val`, mutable or not, is therefore a local of the implicit main, not a global.
 // Phase 16 adds compile-time `include` (docs/LANGUAGE_SPEC.md section 20): a top-level-only
 // directive `include <string literal>` whose target file is parsed and spliced into the program
 // before semantic analysis. `include` is reserved so it can no longer be an identifier.
@@ -266,7 +272,7 @@ includeDecl: INCLUDE (stringLiteral | rawStringLiteral) (ALIAS Identifier)? SEMI
 // remain mandatory.
 functionDecl: FUNC Identifier typeParameterList? LPAREN parameterList? RPAREN (COLON typeRef)? block ;
 
-classDecl: SEALED? OPEN? CLASS Identifier typeParameterList? (EXTENDS typeRef)? (IMPLEMENTS typeRefList)? LBRACE (classMember | SEMI)* RBRACE ;
+classDecl: (ABSTRACT | MUTABLE)? CLASS Identifier typeParameterList? (EXTENDS typeRef)? (IMPLEMENTS typeRefList)? LBRACE (classMember | SEMI)* RBRACE ;
 
 interfaceDecl: INTERFACE Identifier typeParameterList? (EXTENDS typeRefList)? LBRACE (interfaceMember | SEMI)* RBRACE ;
 
@@ -298,9 +304,9 @@ classMember: propertyDecl | delegateDecl | constructorDecl | methodDecl | static
 // A static member (docs/LANGUAGE_SPEC.md section 7, "Static members and class initialization"):
 // the reserved `static` keyword applied to a property or a method declaration. The grammar admits
 // exactly those two forms, so `static delegate ...` and a static constructor are parse errors
-// rather than semantic ones. Method modifiers remain grammatical after `static` so `open` and
+// rather than semantic ones. Method modifiers remain grammatical after `static` so `mutable` and
 // `override` on a static member are reported by the semantic pass as SOLV-SEM-047; the modifier
-// order `open static` is a parse error because `static` always leads.
+// order `mutable static` is a parse error because `static` always leads.
 //
 // These two productions sit inside `classMember` rather than beside it, so the AST builder's single
 // member loop necessarily covers them and a static member can never parse and then be discarded.
@@ -319,7 +325,7 @@ delegateDecl: DELEGATE VAL Identifier COLON typeRef (ASSIGN expression)? SEMI ;
 
 methodDecl: methodModifier* FUNC Identifier typeParameterList? LPAREN parameterList? RPAREN (COLON typeRef)? block ;
 
-methodModifier: OPEN | OVERRIDE ;
+methodModifier: MUTABLE | OVERRIDE ;
 
 propertyDecl: bindingKind Identifier COLON typeRef (ASSIGN expression)? SEMI ;
 
@@ -361,7 +367,7 @@ statement: localDecl | ifStmt | whileStmt | forStmt | forInStmt | switchStmt | b
 
 localDecl: bindingKind Identifier (COLON typeRef)? ASSIGN expression SEMI ;
 
-bindingKind: VAL | VAR ;
+bindingKind: MUTABLE? VAL ;
 
 ifStmt: IF LPAREN expression RPAREN block elseBranch? ;
 
@@ -582,23 +588,33 @@ MODULE: 'module' ;
 ALIAS: 'alias' ;
 CLASS: 'class' ;
 INTERFACE: 'interface' ;
-// Phase 12: `enum` introduces a closed set of value-carrying variants, and `sealed` marks a class
-// whose same-file subtype set is complete for exhaustiveness analysis.
+// Phase 12: `enum` introduces a closed set of value-carrying variants. `abstract` marks a class that
+// cannot be constructed and exists to be extended (docs/LANGUAGE_SPEC.md section 12). The 2026.11-draft
+// revision removes the keyword `sealed` it replaced; `SEALED` below stays a reserved token.
 ENUM: 'enum' ;
 // Error-handling phases: `error` introduces a closed nominal value-carrying error type. Like an
 // enum it opens a construct, so it terminates no line for semicolon insertion; its variants already
 // end in an identifier or a closing paren, both of which terminate.
+// `mutable` is the language's single unlock marker (docs/LANGUAGE_SPEC.md section 1.1 of
+// KEYWORD_CHANGES.md): `mutable val` for a writable binding, `mutable class` for an extendable class,
+// and `mutable func` for an overridable method. It opens a construct and is never a newline terminator.
+MUTABLE: 'mutable' ;
+ABSTRACT: 'abstract' ;
+// Reserved tokens with no parser production (docs/LANGUAGE_SPEC.md, "Lexical basics"). They are the
+// keywords removed by 2026.11-draft, kept reserved so a program written against the old revision fails
+// with SOLV-PARS-006 at the keyword itself rather than silently reinterpreting it as an identifier.
+// `SolvikErrorListener#REMOVED_KEYWORDS` maps each to its replacement. They are not dead code and must
+// not be deleted: removing a token here would make the spelling a legal identifier.
 SEALED: 'sealed' ;
-// Phase 9: `delegate` introduces a forwarding property; it is reserved so it cannot be an identifier.
+OPEN: 'open' ;
+VAR: 'var' ;
 DELEGATE: 'delegate' ;
 IMPLEMENTS: 'implements' ;
-OPEN: 'open' ;
 EXTENDS: 'extends' ;
 OVERRIDE: 'override' ;
 THIS: 'this' ;
 SUPER: 'super' ;
 VAL: 'val' ;
-VAR: 'var' ;
 IF: 'if' ;
 ELSE: 'else' ;
 WHILE: 'while' ;

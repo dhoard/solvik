@@ -136,7 +136,7 @@ public final class SolvikRegexExecutionTest {
                     val re = Regex(r#"\\d+"#)
                     val matches = re.findAll("a1b22c333")
                     println(matches.size)
-                    var i = 0
+                    mutable val i = 0
                     while (i < matches.size) {
                         val m: RegexMatch = matches.get(i)
                         println(m.value)
@@ -157,8 +157,8 @@ public final class SolvikRegexExecutionTest {
     @Test
     public void constantPatternsWorkInsideLoops() {
         assertThat(run("""
-                    var i = 0
-                    var count = 0
+                    mutable val i = 0
+                    mutable val count = 0
                     while (i < 3) {
                         val re = Regex(r#"^\\d+$"#)
                         if (re.matches("123")) {

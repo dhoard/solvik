@@ -12,7 +12,7 @@
   "properties": {
     "schemaVersion": { "const": 1 },
     "tckVersion": { "type": "string", "minLength": 1, "maxLength": 64 },
-    "specVersion": { "type": "string", "enum": ["2026.10-draft"] },
+    "specVersion": { "type": "string", "enum": ["2026.11-draft"] },
     "protocolVersion": { "const": "1" },
     "schemaIds": {
       "type": "object",

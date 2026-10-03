@@ -1,0 +1,18 @@
+{
+  "manifestSchemaVersion": 1,
+  "specVersion": "2026.11-draft",
+  "testId": "SOL-TCK-0010",
+  "category": "types",
+  "profile": "full-language",
+  "status": "required",
+  "requirements": [
+    "REQ-0300"
+  ],
+  "entryPoint": "main.sol",
+  "outcome": "COMPILE_ERROR",
+  "expectation": {
+    "diagnostic": {
+      "family": "TYPE"
+    }
+  }
+}

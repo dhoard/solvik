@@ -13,8 +13,8 @@ val advance: func(Integer): Integer = func [delta](value: Integer): Integer {
     return value + delta
 }
 
-var total = 0
-var i = 0
+mutable val total = 0
+mutable val i = 0
 while (i < 20000000) {
     total = advance(total)
     i = i + 1

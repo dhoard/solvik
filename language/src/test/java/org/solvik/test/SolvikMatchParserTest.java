@@ -113,7 +113,7 @@ public final class SolvikMatchParserTest {
     @Test
     public void sealedSubtypeBindingPatternRecordsItsWrittenType() {
         CompilationUnitNode unit = parseOk("m.sol", """
-                sealed class Shape {
+                abstract class Shape {
                 }
                 class Circle extends Shape {
                 }

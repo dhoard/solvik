@@ -17,10 +17,10 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SPEC = open(os.path.join(ROOT, "docs/LANGUAGE_SPEC.md"), encoding="utf-8").read()
-CORPUS = os.path.join(ROOT, "tck/corpus/2026.10-draft")
+CORPUS = os.path.join(ROOT, "tck/corpus/2026.11-draft")
 REQUIREMENTS = os.path.join(ROOT, "tck/requirements/requirements.json")
 PROFILE = os.path.join(ROOT, "tck/profiles/full-language.profile.json")
-SPEC_VERSION = "2026.10-draft"
+SPEC_VERSION = "2026.11-draft"
 
 
 def norm(t):
@@ -137,7 +137,7 @@ def BAD(tid, cat, req, src, diag, note):
 
 
 OK("SOL-TCK-0353", "control", "REQ-2400",
-   'var i: Integer = 0\nwhile (i < 3) {\n    print(i)\n    i = i + 1\n}\n',
+   'mutable val i: Integer = 0\nwhile (i < 3) {\n    print(i)\n    i = i + 1\n}\n',
    "012",
    "The pre-test loop prints 0, 1, and 2; the condition is checked before each body run.")
 BAD("SOL-TCK-0354", "control", "REQ-2401",

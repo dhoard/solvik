@@ -72,77 +72,77 @@ public class SolvikHashKindCoverageTest {
                 Four(Scalar)
             }
 
-            var boolSeen: Set<Boolean> = Set();
+            mutable val boolSeen: Set<Boolean> = Set();
             println(true.hashCode() == false.hashCode());
             boolSeen.add(true);
             boolSeen.add(true);
             boolSeen.add(false);
             println(boolSeen.size);
 
-            var charSeen: Set<Character> = Set();
+            mutable val charSeen: Set<Character> = Set();
             println('a'.hashCode() == 'a'.hashCode());
             charSeen.add('a');
             charSeen.add('b');
             println(charSeen.size);
 
-            var intSeen: Set<Integer> = Set();
+            mutable val intSeen: Set<Integer> = Set();
             println((7).hashCode() == (7).hashCode());
             intSeen.add(7);
             intSeen.add(7);
             intSeen.add(8);
             println(intSeen.size);
 
-            var longSeen: Set<Long> = Set();
+            mutable val longSeen: Set<Long> = Set();
             println(9L.hashCode() == 9L.hashCode());
             longSeen.add(9L);
             longSeen.add(9L);
             longSeen.add(10L);
             println(longSeen.size);
 
-            var byteSeen: Set<Byte> = Set();
+            mutable val byteSeen: Set<Byte> = Set();
             println(Byte(3).hashCode() == Byte(3).hashCode());
             byteSeen.add(Byte(3));
             byteSeen.add(Byte(3));
             println(byteSeen.size);
 
-            var shortSeen: Set<Short> = Set();
+            mutable val shortSeen: Set<Short> = Set();
             println(Short(4).hashCode() == Short(4).hashCode());
             shortSeen.add(Short(4));
             shortSeen.add(Short(4));
             println(shortSeen.size);
 
-            var doubleSeen: Set<Double> = Set();
+            mutable val doubleSeen: Set<Double> = Set();
             println(1.5.hashCode() == 1.5.hashCode());
             doubleSeen.add(1.5);
             doubleSeen.add(1.5);
             doubleSeen.add(2.5);
             println(doubleSeen.size);
 
-            var zeroSeen: Set<Double> = Set();
+            mutable val zeroSeen: Set<Double> = Set();
             println(0.0.hashCode() == -0.0.hashCode());
             zeroSeen.add(0.0);
             zeroSeen.add(-0.0);
             println(zeroSeen.size);
 
-            var floatSeen: Set<Float> = Set();
+            mutable val floatSeen: Set<Float> = Set();
             println(Float(1.5).hashCode() == Float(1.5).hashCode());
             floatSeen.add(Float(1.5));
             floatSeen.add(Float(1.5));
             println(floatSeen.size);
 
-            var stringSeen: Set<String> = Set();
+            mutable val stringSeen: Set<String> = Set();
             println("ab".hashCode() == "ab".hashCode());
             stringSeen.add("ab");
             stringSeen.add("ab");
             stringSeen.add("cd");
             println(stringSeen.size);
 
-            var unitSeen: Set<Unit> = Set();
-            var unitValue: Unit = println("");
+            mutable val unitSeen: Set<Unit> = Set();
+            mutable val unitValue: Unit = println("");
             unitSeen.add(unitValue);
             println(unitSeen.size);
 
-            var enumSeen: Set<Payload> = Set();
+            mutable val enumSeen: Set<Payload> = Set();
             println(Payload.One.hashCode() == Payload.One.hashCode());
             enumSeen.add(Payload.One);
             enumSeen.add(Payload.One);
@@ -151,23 +151,23 @@ public class SolvikHashKindCoverageTest {
             enumSeen.add(Payload.Three(1, "x"));
             println(enumSeen.size);
 
-            var payloadSeen: Set<Payload> = Set();
+            mutable val payloadSeen: Set<Payload> = Set();
             payloadSeen.add(Payload.Four(Scalar(3)));
             payloadSeen.add(Payload.Four(Scalar(3)));
             println(payloadSeen.size);
             println(Payload.Four(Scalar(3)).hashCode() == Payload.Four(Scalar(3)).hashCode());
 
-            var regexSeen: Set<Regex> = Set();
-            var pattern: Regex = Regex("a+");
+            mutable val regexSeen: Set<Regex> = Set();
+            mutable val pattern: Regex = Regex("a+");
             regexSeen.add(pattern);
             regexSeen.add(Regex("a+"));
             println(regexSeen.size);
 
-            var maybeFound: RegexMatch? = pattern.find("aaa");
+            mutable val maybeFound: RegexMatch? = pattern.find("aaa");
             if (maybeFound != null) {
-                var found: RegexMatch = maybeFound;
-                var maybeAgain: RegexMatch? = pattern.find("aaa");
-                var matchSeen: Set<RegexMatch> = Set(found);
+                mutable val found: RegexMatch = maybeFound;
+                mutable val maybeAgain: RegexMatch? = pattern.find("aaa");
+                mutable val matchSeen: Set<RegexMatch> = Set(found);
                 if (maybeAgain != null) {
                     matchSeen.add(maybeAgain);
                 }
@@ -176,33 +176,33 @@ public class SolvikHashKindCoverageTest {
                 println(found.value.hashCode() == "aaa".hashCode());
             }
 
-            var listOne: List<Integer> = List(1, 2);
-            var listTwo: List<Integer> = List(1, 2);
-            var listSeen: Set<List<Integer>> = Set(listOne);
+            mutable val listOne: List<Integer> = List(1, 2);
+            mutable val listTwo: List<Integer> = List(1, 2);
+            mutable val listSeen: Set<List<Integer>> = Set(listOne);
             listSeen.add(listOne);
             listSeen.add(listTwo);
             println(listSeen.size);
 
-            var innerList: List<Integer> = List(1);
-            var innerSet: Set<Integer> = Set(1);
-            var innerMap: Map<Integer, Integer> = Map();
-            var innerStack: Stack<Integer> = Stack();
-            var mixedSeen: Set<Any> = Set(innerSet, innerMap, innerStack);
+            mutable val innerList: List<Integer> = List(1);
+            mutable val innerSet: Set<Integer> = Set(1);
+            mutable val innerMap: Map<Integer, Integer> = Map();
+            mutable val innerStack: Stack<Integer> = Stack();
+            mutable val mixedSeen: Set<Any> = Set(innerSet, innerMap, innerStack);
             println(mixedSeen.size);
 
-            var scalarSeen: Set<Scalar> = Set();
+            mutable val scalarSeen: Set<Scalar> = Set();
             scalarSeen.add(Scalar(1));
             scalarSeen.add(Scalar(1));
             println(scalarSeen.size);
 
-            var nothing: Any? = null;
+            mutable val nothing: Any? = null;
             println(nothing?.hashCode() == null);
-            var nullSeen: Set<Any?> = Set();
+            mutable val nullSeen: Set<Any?> = Set();
             nullSeen.add(null);
             nullSeen.add(null);
             println(nullSeen.size);
 
-            var keys: Map<Any?, Integer> = Map();
+            mutable val keys: Map<Any?, Integer> = Map();
             keys.put(1, 1);
             keys.put("one", 2);
             keys.put(Scalar(5), 3);
@@ -212,8 +212,8 @@ public class SolvikHashKindCoverageTest {
             println(keys.get(Scalar(5)));
             println(keys.get(null));
 
-            var deepKey: List<Integer> = List(1, 2);
-            var deep: Map<List<Integer>, Integer> = Map(deepKey: 6);
+            mutable val deepKey: List<Integer> = List(1, 2);
+            mutable val deep: Map<List<Integer>, Integer> = Map(deepKey: 6);
             // Collections key by reference identity, so only the same instance finds the entry.
             println(deep.get(deepKey));
             println(deep.size);

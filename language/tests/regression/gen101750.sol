@@ -37,7 +37,7 @@ println(kind3(52))
 println(kind3(52) is String)
 
 class Box4<T> {
-    var value: T
+    mutable val value: T
     Box4(value: T) {
         this.value = value
     }

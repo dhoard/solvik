@@ -15,20 +15,23 @@
  */
 package org.solvik.ast.statement;
 
-/** Local declaration binding kinds. */
+/**
+ * Local and property binding kinds.
+ *
+ * <p>There is one binding keyword, {@code val}; {@code mutable} is a modifier that makes the binding
+ * writable (docs/LANGUAGE_SPEC.md section 2). The kinds therefore record the presence or absence of
+ * that modifier rather than two spellings. The superseded {@code VAL}/{@code VAR} pair was resolved by
+ * comparing token text, and the two spellings were one transposition apart, so typing {@code var} where
+ * {@code val} was meant compiled and silently dropped the immutability guarantee.
+ */
 public enum BindingKind {
-    /** Immutable binding. */
-    VAL("val"),
-    /** Mutable binding. */
-    VAR("var");
+    /** Immutable binding: a plain {@code val}. */
+    IMMUTABLE,
+    /** Writable binding: a {@code mutable val}. */
+    MUTABLE;
 
-    private final String keyword;
-
-    BindingKind(String keyword) {
-        this.keyword = keyword;
-    }
-
-    public String keyword() {
-        return keyword;
+    /** The kind denoted by a declaration that does, or does not, carry the {@code mutable} modifier. */
+    public static BindingKind fromMutable(boolean mutable) {
+        return mutable ? MUTABLE : IMMUTABLE;
     }
 }

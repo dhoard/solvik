@@ -195,7 +195,7 @@ public final class SolvikNullSafetySemanticTest {
     public void aVarNarrowsTheSameWayUntilItIsWritten() {
         CheckedProgram program = check(BOX + """
                 func f(): Integer {
-                    var box: Box? = Box(1)
+                    mutable val box: Box? = Box(1)
                     if (box != null) {
                         return box.value
                     }
@@ -227,7 +227,7 @@ public final class SolvikNullSafetySemanticTest {
     public void aWhileConditionNarrowsItsBody() {
         CheckedProgram program = check(BOX + """
                 func f(box: Box?): Integer {
-                    var total: Integer = 0
+                    mutable val total: Integer = 0
                     while (box != null) {
                         total = total + box.value
                     }
@@ -265,7 +265,7 @@ public final class SolvikNullSafetySemanticTest {
     public void nullablePropertiesAreStoredAndRead() {
         CheckedProgram program = check("""
                 class Holder {
-                    var name: String?
+                    mutable val name: String?
 
                     Holder(name: String?) {
                         this.name = name

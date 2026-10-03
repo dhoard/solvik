@@ -97,8 +97,9 @@ public final class SymbolTable {
      * "Explicit immutable closure capture"). Returns false when no function boundary encloses the
      * current scope, so ordinary code is unaffected.
      *
-     * <p>A top-level {@code val}/{@code var} counts, because the specification makes it one: "a
-     * top-level `val`/`var` is therefore a local of the implicit main, not a global". A top-level
+     * <p>A top-level binding counts, because the specification makes it one: "a top-level
+     * `val`, whether or not it is `mutable`, is therefore a local of the implicit main, not a
+     * global". A top-level
      * {@code func} does not, because it is declared in the root scope this walk stops at, which is what
      * makes the spec's "Recursion through named top-level functions needs no capture" hold.
      */

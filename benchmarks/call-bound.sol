@@ -15,8 +15,8 @@ val stepper = Stepper()
 
 val advance: func(Integer): Integer = stepper.step
 
-var total = 0
-var i = 0
+mutable val total = 0
+mutable val i = 0
 while (i < 20000000) {
     total = advance(total)
     i = i + 1

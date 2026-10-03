@@ -135,8 +135,8 @@ public final class SolvikEnumExecutionTest {
     @Test
     public void sealedHierarchyDispatchesThroughTheSealedType() {
         assertThat(run("""
-                sealed class Shape {
-                    open func name(): String {
+                abstract class Shape {
+                    mutable func name(): String {
                         return "shape"
                     }
                 }

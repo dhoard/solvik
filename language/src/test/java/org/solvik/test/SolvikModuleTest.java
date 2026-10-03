@@ -315,7 +315,7 @@ public final class SolvikModuleTest {
     public void crossModuleExtendsResolves() {
         SemanticResult result = analyze(resolve("root.sol", Map.of( //
                         "root.sol", "include \"base.sol\" alias base\nclass Derived extends base::Base {\n}\n", //
-                        "base.sol", "module base_mod\nopen class Base {\n}\n")));
+                        "base.sol", "module base_mod\nmutable class Base {\n}\n")));
         assertThat(result.isSuccess()).as("expected success but got " + result.diagnostics().all()).isTrue();
     }
 
@@ -331,7 +331,7 @@ public final class SolvikModuleTest {
     public void crossModuleSealedPatternResolves() {
         SemanticResult result = analyze(resolve("root.sol", Map.of( //
                         "root.sol", "include \"m.sol\" alias m\nfunc describe(s: m::Shape): String {\n    return match s {\n        c: m::Circle => \"circle\"\n        _ => \"other\"\n    }\n}\n", //
-                        "m.sol", "module shape_mod\nsealed class Shape {\n}\nclass Circle extends Shape {\n}\n")));
+                        "m.sol", "module shape_mod\nabstract class Shape {\n}\nclass Circle extends Shape {\n}\n")));
         assertThat(result.isSuccess()).as("expected success but got " + result.diagnostics().all()).isTrue();
     }
 

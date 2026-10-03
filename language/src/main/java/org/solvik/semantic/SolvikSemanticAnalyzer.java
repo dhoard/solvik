@@ -331,20 +331,20 @@ public final class SolvikSemanticAnalyzer {
     private CapturedValue currentBoundaryReceiver;
     /**
      * The capture item names that the anonymous function whose body is being checked rejected as
-     * {@code var}s, so a body read or write of one reports the mutable-capture code the specification
+     * {@code mutable val}s, so a body read or write of one reports the mutable-capture code the specification
      * assigns it. Empty outside an anonymous function body, and read only by
      * {@link #reportCapturedMutableUse}.
      */
     private Set<String> currentRejectedCaptures = Set.of();
     /**
      * The capture item names this closure's capture list reported and bound nothing for, other than the
-     * {@code var} names carried by {@link #currentRejectedCaptures}: an unknown name, the binding under
+     * {@code mutable val} names carried by {@link #currentRejectedCaptures}: an unknown name, the binding under
      * initialization, and an item naming something capture cannot bind. A body reference to one of these
      * names is reported nowhere, because the item already reported the one root cause.
      *
      * <p>"After an invalid capture item is reported, body checking must not cascade the same root cause
      * into an unlisted-capture or unknown-name diagnostic" (docs/LANGUAGE_SPEC.md section 6). The
-     * {@code var} case needs the opposite treatment -- it earns the same code again at each body use -- so
+     * {@code mutable val} case needs the opposite treatment -- it earns the same code again at each body use -- so
      * the two sets are deliberately separate rather than one "rejected names" set.
      */
     private Set<String> suppressedCaptureNames = Set.of();
@@ -465,10 +465,10 @@ public final class SolvikSemanticAnalyzer {
      * capture entry" — and that same passage keeps a genuine typo an unknown name, because a name no
      * enclosing function declares is hidden by nothing.
      *
-     * <p>A {@code var} that the capture list <em>does</em> name never reaches here: the item is rejected as
+     * <p>A {@code mutable val} that the capture list <em>does</em> name never reaches here: the item is rejected as
      * a mutable capture and its name is recorded so the body reports the mutable-capture code for it, as
-     * the specification requires. An unlisted {@code var} does reach here, and stays this diagnostic —
-     * "Referencing the same outer `var` without listing it remains `SEM_UNLISTED_CAPTURE` at the body
+     * the specification requires. An unlisted {@code mutable val} does reach here, and stays this diagnostic —
+     * "Referencing the same outer `mutable val` without listing it remains `SEM_UNLISTED_CAPTURE` at the body
      * reference; the compiler never silently converts it into a capture".
      */
     private boolean reportUnlistedCapture(String name, SourceSpan span) {
@@ -481,10 +481,10 @@ public final class SolvikSemanticAnalyzer {
     }
 
     /**
-     * Reports a body reference to a {@code var} that this closure's capture list names, and returns true
+     * Reports a body reference to a {@code mutable val} that this closure's capture list names, and returns true
      * when it did. Such a name is deliberately not bound in the body's scope — binding a mirror of it
      * would be exactly the silent conversion the specification forbids — so a use of it resolves to
-     * nothing and has to be classified here rather than by resolution. "Naming a `var` in a capture list
+     * nothing and has to be classified here rather than by resolution. "Naming a `mutable val` in a capture list
      * is {@code SEM_MUTABLE_CAPTURE} ({@code SOLV-SEM-057}), reported on that capture item, and a read or
      * write of that captured name in the body is reported with the same code": one code, two placements,
      * and the program is already rejected by the item report that precedes this one.
@@ -493,7 +493,7 @@ public final class SolvikSemanticAnalyzer {
         if (!currentRejectedCaptures.contains(name)) {
             return false;
         }
-        error(DiagnosticCode.SEM_MUTABLE_CAPTURE, span, "an anonymous function body uses capture item '" + name + "' which names a mutable 'var' binding");
+        error(DiagnosticCode.SEM_MUTABLE_CAPTURE, span, "an anonymous function body uses capture item '" + name + "' which names a mutable 'mutable val' binding");
         return true;
     }
 
@@ -505,7 +505,7 @@ public final class SolvikSemanticAnalyzer {
      * initialization, or an item naming something capture cannot bind -- and resolving the same spelling in
      * the body finds nothing only because that item bound nothing. Reporting it again as an unknown name
      * would restate the item's defect as a second, unrelated one, which the specification forbids. A
-     * {@code var} named by the list is handled by {@link #reportCapturedMutableUse} instead, because the
+     * {@code mutable val} named by the list is handled by {@link #reportCapturedMutableUse} instead, because the
      * specification assigns that case a code at <em>both</em> placements.
      */
     private boolean suppressesCascade(String name) {
@@ -631,8 +631,6 @@ public final class SolvikSemanticAnalyzer {
                 collectEnum(enumDeclaration, enumTypes.get(enumDeclaration));
             }
         }
-        // Pass F: the closed subtype set of every sealed class, once all classes exist.
-        resolveSealedSubtypes(unit);
         // (The guest exception graph was already built before Pass D, so exception classification is
         // available both to member-reservation checks and to throw/catch validation in checkBodies.)
         collectImplicitMain(unit);
@@ -950,54 +948,6 @@ public final class SolvikSemanticAnalyzer {
         order.add(classDeclaration);
     }
 
-    /**
-     * Installs every sealed class's permitted subtype metadata (docs/LANGUAGE_SPEC.md section 12):
-     * its direct subtypes (the hierarchy's variants) and the complete transitive closure, which the
-     * specification guarantees is closed because a sealed class may only be extended by declarations
-     * in the same source file. A sealed class that is never extended has an empty set.
-     */
-    private void resolveSealedSubtypes(CompilationUnitNode unit) {
-        Map<ClassDeclNode, List<ClassSymbol>> directSubtypes = new IdentityHashMap<>();
-        for (DeclarationNode declaration : unit.declarations()) {
-            if (!(declaration instanceof ClassDeclNode classDeclaration)) {
-                continue;
-            }
-            ClassSymbol subclass = declaredClasses.get(classDeclaration);
-            ClassDeclNode superDeclaration = superDeclarations.get(classDeclaration);
-            ClassSymbol superSymbol = superDeclaration == null ? null : declaredClasses.get(superDeclaration);
-            if (subclass != null && superSymbol != null) {
-                directSubtypes.computeIfAbsent(superDeclaration, key -> new ArrayList<>()).add(subclass);
-            }
-        }
-        for (DeclarationNode declaration : unit.declarations()) {
-            if (declaration instanceof ClassDeclNode classDeclaration) {
-                ClassSymbol classSymbol = declaredClasses.get(classDeclaration);
-                if (classSymbol != null && classSymbol.isSealed()) {
-                    List<ClassSymbol> direct = List.copyOf(directSubtypes.getOrDefault(classDeclaration, List.of()));
-                    classSymbol.resolvePermittedSubtypes(direct, transitiveSubtypes(classDeclaration, directSubtypes));
-                }
-            }
-        }
-    }
-
-    /** The transitive closure of direct subclasses, cycle-safe for a malformed hierarchy. */
-    private static List<ClassSymbol> transitiveSubtypes(ClassDeclNode root, Map<ClassDeclNode, List<ClassSymbol>> directSubtypes) {
-        List<ClassSymbol> closure = new ArrayList<>();
-        Set<ClassSymbol> visited = Collections.newSetFromMap(new IdentityHashMap<>());
-        Deque<ClassDeclNode> frontier = new ArrayDeque<>();
-        frontier.add(root);
-        while (!frontier.isEmpty()) {
-            ClassDeclNode current = frontier.removeFirst();
-            for (ClassSymbol direct : directSubtypes.getOrDefault(current, List.of())) {
-                if (visited.add(direct)) {
-                    closure.add(direct);
-                    frontier.addLast(direct.declaration());
-                }
-            }
-        }
-        return List.copyOf(closure);
-    }
-
     private void declareBuiltins() {
         // print/println accept every value INCLUDING null, so the parameter is the nullable top type.
         // A null argument renders as "null" (docs/LANGUAGE_SPEC.md section 6).
@@ -1157,16 +1107,9 @@ public final class SolvikSemanticAnalyzer {
         typeParameterScope = scopeOf(classTypeParameters.getOrDefault(declaration, List.of()));
         ClassDeclNode superDeclaration = superDeclarations.get(declaration);
         ClassSymbol superSymbol = superDeclaration == null ? null : declaredClasses.get(superDeclaration);
-        if (superDeclaration != null && !superDeclaration.isSealed() && !superDeclaration.isOpen()) {
+        if (superDeclaration != null && !superDeclaration.isAbstract() && !superDeclaration.isMutable()) {
             errorExpected(DiagnosticCode.SEM_EXTEND_FINAL, declaration.superClass().orElseThrow().span(), //
-                            "class '" + declaration.name() + "' cannot extend final class", "an open or sealed class", superDeclaration.name());
-        }
-        if (superDeclaration != null && superDeclaration.isSealed() //
-                        && superDeclaration.span().sourceId() != declaration.span().sourceId()) {
-            // A sealed class's subtype set is closed only within its own physical source file; an
-            // include splices items into one program but does not erase that file boundary.
-            error(DiagnosticCode.SEM_SEALED_SUBTYPE_OUTSIDE_FILE, declaration.span(), //
-                            "sealed class '" + superDeclaration.name() + "' may be extended only in its own source file");
+                            "class '" + declaration.name() + "' cannot extend final class", "a mutable or abstract class", superDeclaration.name());
         }
 
         // A guest exception type carries a compiler-synthesized private message field and a getMessage()
@@ -1209,7 +1152,7 @@ public final class SolvikSemanticAnalyzer {
                 }
                 if (propertyNames.add(property.name())) {
                     properties.add(new PropertySymbol(property.name(), property.span(), propertyType != null ? propertyType : AnyType.INSTANCE, //
-                                    property.bindingKind() == BindingKind.VAR, property.initializer().isPresent(), index));
+                                    property.bindingKind() == BindingKind.MUTABLE, property.initializer().isPresent(), index));
                 } else {
                     error(DiagnosticCode.RESOL_DUPLICATE_NAME, property.span(), "property '" + property.name() + "' is already declared");
                 }
@@ -1267,7 +1210,7 @@ public final class SolvikSemanticAnalyzer {
                 error(DiagnosticCode.SEM_RESERVED_MEMBER, method.span(), "method '" + method.name() + "' is reserved by the synthesized exception message");
             }
             FunctionSymbol symbol = FunctionSymbol.declaredMethod(method.name(), method.span(), parameters, methodTypeParameters, //
-                            returnType != null ? returnType : AnyType.INSTANCE, returnType != null, method, declaration, method.isOpen(), method.isOverride());
+                            returnType != null ? returnType : AnyType.INSTANCE, returnType != null, method, declaration, method.isMutable(), method.isOverride());
             methods.add(symbol);
             if (propertyNames.contains(method.name())) {
                 error(DiagnosticCode.RESOL_DUPLICATE_NAME, method.span(), "member '" + method.name() + "' is already declared");
@@ -1283,7 +1226,7 @@ public final class SolvikSemanticAnalyzer {
         // members so a name shared with an instance member is detected against the complete instance
         // namespace, and are never added to `properties`, `methods`, `propertyNames`, or `methodNames`:
         // class-level storage has no instance slot and a static method never enters the virtual table.
-        // A static member cannot be `open` or `override`, so `validateOverride` never runs for one.
+        // A static member cannot be `mutable` or `override`, so `validateOverride` never runs for one.
         List<PropertySymbol> staticProperties = new ArrayList<>();
         List<FunctionSymbol> staticMethods = new ArrayList<>();
         boolean previousStaticMember = checkingStaticMember;
@@ -1303,13 +1246,13 @@ public final class SolvikSemanticAnalyzer {
             }
             Type propertyType = resolveType(property.declaredType().orElseThrow());
             staticProperties.add(new PropertySymbol(property.name(), property.span(), propertyType != null ? propertyType : AnyType.INSTANCE, //
-                            property.bindingKind() == BindingKind.VAR, property.initializer().isPresent(), PropertySymbol.STATIC_SLOT));
+                            property.bindingKind() == BindingKind.MUTABLE, property.initializer().isPresent(), PropertySymbol.STATIC_SLOT));
         }
         for (FunctionDeclNode method : declaration.staticMethods()) {
-            if (method.isOpen() || method.isOverride()) {
+            if (method.isMutable() || method.isOverride()) {
                 // A static member has no receiver, so there is nothing to specialize or replace; the
                 // modifiers are rejected rather than silently ignored.
-                error(DiagnosticCode.SEM_INVALID_STATIC_MODIFIER, method.span(), "static member '" + method.name() + "' cannot be declared open or override");
+                error(DiagnosticCode.SEM_INVALID_STATIC_MODIFIER, method.span(), "static member '" + method.name() + "' cannot be declared mutable or override");
             }
             List<TypeParameterType> methodTypeParameters = declareTypeParameters(method.typeParameters());
             // The method's own type parameters are legal in its signature; only the class's are forbidden.
@@ -1393,7 +1336,7 @@ public final class SolvikSemanticAnalyzer {
             }
         }
         Map<InterfaceDeclNode, Map<TypeParameterType, Type>> interfaceBindings = collectInterfaceBindings(type.interfaceTypes());
-        ClassSymbol classSymbol = new ClassSymbol(declaration, type, declaration.isOpen(), declaration.isSealed(), superSymbol, implementedInterfaces, delegateBindings, properties, methods, constructor, interfaceBindings, staticProperties, staticMethods, staticBlock);
+        ClassSymbol classSymbol = new ClassSymbol(declaration, type, declaration.isAbstract(), declaration.isMutable(), superSymbol, implementedInterfaces, delegateBindings, properties, methods, constructor, interfaceBindings, staticProperties, staticMethods, staticBlock);
         reportInterfaceConformance(classSymbol);
         declaredClasses.put(declaration, classSymbol);
         symbolsByType.put(type, classSymbol);
@@ -1533,7 +1476,7 @@ public final class SolvikSemanticAnalyzer {
                                 "method '" + method.name() + "' is marked override but no inherited method matches");
                 return;
             }
-            if (!inherited.isOpen()) {
+            if (!inherited.isMutable()) {
                 error(DiagnosticCode.SEM_OVERRIDE_FINAL, method.declarationSpan(), //
                                 "method '" + method.name() + "' cannot override a final method");
                 return;
@@ -1553,7 +1496,7 @@ public final class SolvikSemanticAnalyzer {
      * {@code Any.toString(): String} (docs/LANGUAGE_SPEC.md sections 4 and 7). Because every class
      * inherits the built-in member, an override is always {@code override}, takes no arguments, and
      * returns exactly {@code String}; overloading it is impossible. A further override follows the
-     * ordinary {@code open}/{@code final} rules, so a non-{@code open} user override is final.
+     * ordinary {@code mutable}/final rules, so a user override without {@code mutable} is final.
      */
     private void validateToStringOverride(ClassSymbol superSymbol, FunctionSymbol method) {
         if (!method.parameters().isEmpty()) {
@@ -1569,10 +1512,10 @@ public final class SolvikSemanticAnalyzer {
             errorExpected(DiagnosticCode.SEM_OVERRIDE_SIGNATURE, method.declarationSpan(), //
                             "override of 'toString' must keep the inherited parameter types and a covariant return type", "String", method.returnType().name());
         }
-        // A further override requires the inherited override to be open. The universal root member is
-        // always open, so only a user override declared without `open` is final.
+        // A further override requires the inherited override to be mutable. The universal root member
+        // is always mutable, so only a user override declared without `mutable` is final.
         FunctionSymbol inherited = superSymbol == null ? null : superSymbol.nearestDeclaredClassMethod("toString").orElse(null);
-        if (inherited != null && !inherited.isOpen()) {
+        if (inherited != null && !inherited.isMutable()) {
             error(DiagnosticCode.SEM_OVERRIDE_FINAL, method.declarationSpan(), "method 'toString' cannot override a final method");
         }
     }
@@ -1599,7 +1542,7 @@ public final class SolvikSemanticAnalyzer {
                             "override of 'hashCode' must keep the inherited parameter types and a covariant return type", "Integer", method.returnType().name());
         }
         FunctionSymbol inherited = superSymbol == null ? null : superSymbol.nearestDeclaredClassMethod("hashCode").orElse(null);
-        if (inherited != null && !inherited.isOpen()) {
+        if (inherited != null && !inherited.isMutable()) {
             error(DiagnosticCode.SEM_OVERRIDE_FINAL, method.declarationSpan(), "method 'hashCode' cannot override a final method");
         }
     }
@@ -1628,10 +1571,10 @@ public final class SolvikSemanticAnalyzer {
             errorExpected(DiagnosticCode.SEM_OVERRIDE_SIGNATURE, method.declarationSpan(), //
                             "override of 'equals' must keep the inherited parameter types and a covariant return type", "(Any?) -> Boolean", method.returnType().name());
         }
-        // A further override requires the inherited override to be open. The universal root member is
-        // always open, so only a user override declared without `open` is final.
+        // A further override requires the inherited override to be mutable. The universal root member
+        // is always mutable, so only a user override declared without `mutable` is final.
         FunctionSymbol inherited = superSymbol == null ? null : superSymbol.nearestDeclaredClassMethod("equals").orElse(null);
-        if (inherited != null && !inherited.isOpen()) {
+        if (inherited != null && !inherited.isMutable()) {
             error(DiagnosticCode.SEM_OVERRIDE_FINAL, method.declarationSpan(), "method 'equals' cannot override a final method");
         }
     }
@@ -1937,7 +1880,7 @@ public final class SolvikSemanticAnalyzer {
             typeParameterScope = Map.of();
             symbols.enterFunctionBoundaryScope();
             enclosingReceiverAvailable = previousClass != null || previousInterface != null || previousReceiverAvailable;
-            // The names this closure's capture list named as `var`s. The item check rejected each of them
+            // The names this closure's capture list named as `mutable val`s. The item check rejected each of them
             // and bound none of them, so a body use has to be classified from this set rather than by
             // resolution -- binding a mirror would be the silent conversion the specification forbids.
             currentRejectedCaptures = function.rejectedCaptureNames();
@@ -2128,7 +2071,7 @@ public final class SolvikSemanticAnalyzer {
         } else {
             variableType = initializerType != null ? initializerType : AnyType.INSTANCE;
         }
-        boolean mutable = declaration.bindingKind() == BindingKind.VAR;
+        boolean mutable = declaration.bindingKind() == BindingKind.MUTABLE;
         VariableSymbol symbol = new VariableSymbol(declaration.name(), declaration.span(), variableType, mutable, false);
         symbol.markInitialized();
         if (!symbols.declare(symbol)) {
@@ -2658,7 +2601,7 @@ public final class SolvikSemanticAnalyzer {
             checkMemberAssign(member, value, valueType, genericReferenceValue);
             return;
         }
-        error(DiagnosticCode.TYPE_INVALID_ASSIGNMENT_TARGET, target.span(), "assignment target must be a mutable local or a var property");
+        error(DiagnosticCode.TYPE_INVALID_ASSIGNMENT_TARGET, target.span(), "assignment target must be a mutable local or a mutable val property");
     }
 
     /**
@@ -3478,9 +3421,9 @@ public final class SolvikSemanticAnalyzer {
      * convert node. Widening never fires for a nominal, nullable, generic, or narrowing target.
      *
      * <p>Coercion boundary (docs/LANGUAGE_SPEC.md section 4). Widening is applied ONLY where a value
-     * flows into a typed slot: {@code val}/{@code var} initializer, property initializer, return,
+     * flows into a typed slot: binding initializer, property initializer, return,
      * argument, property/static assignment, and collection element/key/value. Sites below are
-     * intentionally NOT widened: subtyping checks (override, interface, sealed, narrowing, type test,
+     * intentionally NOT widened: subtyping checks (override, interface, narrowing, type test,
      * cast), nominal identity/equality (which compares by `Any` value equality, not numeric
      * equivalence), `for-in` range bounds (exactly {@code Integer}), `case` labels (constants of the
      * scrutinee type; widening a constant would change the case), `is`/`as`, generics inference
@@ -3643,7 +3586,7 @@ public final class SolvikSemanticAnalyzer {
                 }
                 // An unqualified call whose target resolves to nothing still has to be classified the way a
                 // plain name reference is: an outer function-valued binding the capture list omitted is an
-                // unlisted capture, a captured `var` is the mutable-capture code, and a name an already
+                // unlisted capture, a captured `mutable val` is the mutable-capture code, and a name an already
                 // reported capture item named earns no further report. Only after none of those apply is this
                 // genuinely an unknown name (docs/LANGUAGE_SPEC.md section 6).
                 if (reportCapturedMutableUse(name.name(), name.span()) || suppressesCascade(name.name()) || reportUnlistedCapture(name.name(), name.span())) {
@@ -4016,14 +3959,14 @@ public final class SolvikSemanticAnalyzer {
      * checked. Inference failure is reported and leaves no usable construction type.
      */
     private Type checkConstruction(CallExprNode call, ClassSymbol classSymbol) {
-        if (classSymbol.isSealed()) {
-            // A sealed class is abstract: it exists only to close a hierarchy, so no value of the
-            // sealed type itself can be constructed (docs/LANGUAGE_SPEC.md section 12).
+        if (classSymbol.isAbstract()) {
+            // An abstract class exists only to be extended, so no value of the abstract type itself can
+            // be constructed (docs/LANGUAGE_SPEC.md section 12).
             for (ExpressionNode argument : call.arguments()) {
                 checkExpression(argument);
             }
-            error(DiagnosticCode.SEM_CANNOT_CONSTRUCT_SEALED, call.span(), //
-                            "sealed class '" + classSymbol.name() + "' is abstract and cannot be constructed; construct one of its subtypes");
+            error(DiagnosticCode.SEM_CANNOT_CONSTRUCT_ABSTRACT, call.span(), //
+                            "abstract class '" + classSymbol.name() + "' cannot be constructed; construct one of its subtypes");
             return classSymbol.type();
         }
         List<VariableSymbol> parameters = classSymbol.constructor().map(FunctionSymbol::parameters).orElseGet(List::of);
@@ -4973,7 +4916,7 @@ public final class SolvikSemanticAnalyzer {
         Type constructed;
         if (typeArguments.isEmpty()) {
             // Infer the type parameters from the enclosing declaration's expected type, so
-            // {@code var l: List<Integer> = List(1, 2)} resolves T from the left-hand side. A
+            // {@code mutable val l: List<Integer> = List(1, 2)} resolves T from the left-hand side. A
             // construction with no enclosing expected type has no evidence for the element type.
             Type expected = expectedTypes.isEmpty() ? null : expectedTypes.peek();
             if (!(expected instanceof ParameterizedType parameterized) || parameterized.base() != collection) {
@@ -5489,10 +5432,17 @@ public final class SolvikSemanticAnalyzer {
     // Exhaustive match (docs/LANGUAGE_SPEC.md section 12)
     // ---------------------------------------------------------------------------------------------
 
-    /** Tracks the variants and sealed subtypes a match's earlier branches already cover. */
+    /** Tracks the variants and binding types a match's earlier branches already cover. */
     private static final class MatchCoverage {
         private final Set<EnumVariantSymbol> exhaustedVariants = Collections.newSetFromMap(new IdentityHashMap<>());
-        private final Set<ClassSymbol> sealedSubtypes = Collections.newSetFromMap(new IdentityHashMap<>());
+        /**
+         * The declared types of earlier typed binding patterns, in branch order. Reachability between
+         * binding patterns is decided by subsumption rather than by a closed subtype set: a binding of
+         * type {@code B} also matches every value of a subtype of {@code B}, so a later binding of a
+         * subtype adds nothing. Subsumption needs no knowledge of the complete subtype set, which is
+         * why it survives the removal of sealed hierarchies that exhaustiveness needed.
+         */
+        private final List<Type> boundTypes = new ArrayList<>();
         private final Set<String> seenPatterns = new HashSet<>();
         private boolean catchAll;
     }
@@ -5509,7 +5459,7 @@ public final class SolvikSemanticAnalyzer {
      * <p>The capture list is resolved in the enclosing scope <em>before</em> the body is checked, because a
      * capture item names a binding of the enclosing function and so must resolve where the expression is
      * written and not where its body is. {@link #resolveCaptures} produces both the values to bind in the
-     * body and the rejected {@code var} names the body has to report, from that one resolution pass.
+     * body and the rejected {@code mutable val} names the body has to report, from that one resolution pass.
      */
     private Type checkAnonymousFunction(AnonymousFunctionExprNode expression) {
         Map<String, TypeParameterType> previousScope = typeParameterScope;
@@ -5530,7 +5480,7 @@ public final class SolvikSemanticAnalyzer {
      * Resolves one anonymous function's capture items against the closure-creation site (docs/LANGUAGE_SPEC.md
      * section 6, "Explicit immutable closure capture") in a single pass, producing both the values to bind
      * in the body — in source order, which the specification uses as environment order — and the names it
-     * rejected as {@code var}s.
+     * rejected as {@code mutable val}s.
      *
      * <p>One pass over one resolution is the point: the rejected names have to reach the body so it can
      * report the mutable-capture code for each use, and a second lookup could disagree with the first
@@ -5546,7 +5496,7 @@ public final class SolvikSemanticAnalyzer {
      * <p>An item that resolves to an immutable local or parameter is recorded directly, with the enclosing
      * binding as its source: lowering gives it a slot of its own in the closure's frame, so the value is
      * copied at creation and a later reassignment of the enclosing binding is invisible through the
-     * closure. An item that names a {@code var} is reported and its name recorded, never bound — binding a
+     * closure. An item that names a {@code mutable val} is reported and its name recorded, never bound — binding a
      * mirror of it would be the silent conversion the specification forbids. An item naming {@code this} is
      * recorded with no source binding and becomes the receiver of the created value.
      */
@@ -5597,7 +5547,7 @@ public final class SolvikSemanticAnalyzer {
                 continue;
             }
             if (binding.isMutable()) {
-                error(DiagnosticCode.SEM_MUTABLE_CAPTURE, item.span(), "capture item '" + item.name() + "' names a mutable 'var' binding, which capture cannot bind");
+                error(DiagnosticCode.SEM_MUTABLE_CAPTURE, item.span(), "capture item '" + item.name() + "' names a mutable 'mutable val' binding, which capture cannot bind");
                 rejected.add(item.name());
                 continue;
             }
@@ -5608,7 +5558,7 @@ public final class SolvikSemanticAnalyzer {
 
     /**
      * What one capture list resolved to: the values its accepted items bind in the body, the names its
-     * rejected {@code var} items leave unbound so the body can still report them, and the names its other
+     * rejected {@code mutable val} items leave unbound so the body can still report them, and the names its other
      * reported items leave unbound so the body reports them no further.
      */
     private record Captures(List<CapturedValue> bound, Set<String> rejected, Set<String> suppressed) {
@@ -5684,6 +5634,11 @@ public final class SolvikSemanticAnalyzer {
      * verifies exhaustiveness for a known closed variant set, and computes the nearest common
      * declared supertype of the branch results. A pattern form incompatible with the scrutinee and
      * a non-exhaustive match are compile-time errors, so a malformed match never lowers.
+     *
+     * <p>A closed variant set exists only for {@code enum} and {@code error} types. No class type has
+     * one — a {@code mutable} or {@code abstract} class may be extended from any file — so a match on
+     * a class type is exhaustive only through a wildcard branch. Branch reachability is unaffected:
+     * it is decided by subsumption, which does not require a closed set.
      */
     private Type checkMatch(MatchExprNode expression) {
         Type scrutineeType = checkExpression(expression.scrutinee());
@@ -6026,21 +5981,17 @@ public final class SolvikSemanticAnalyzer {
         return flow;
     }
 
-    /** The class symbol behind a type when it names a sealed class, or {@code null}. */
-    private ClassSymbol sealedClassSymbol(Type type) {
-        ClassSymbol symbol = classSymbolFor(type);
-        return symbol != null && symbol.isSealed() ? symbol : null;
-    }
-
-    /** The concrete (constructible) subtypes of a sealed class, in declaration order. */
-    private static List<ClassSymbol> concreteSubtypes(ClassSymbol sealed) {
-        List<ClassSymbol> concrete = new ArrayList<>();
-        for (ClassSymbol subtype : sealed.allSubtypes()) {
-            if (!subtype.isSealed()) {
-                concrete.add(subtype);
+    /**
+     * Whether an earlier typed binding already matches every value this typed binding matches, which
+     * holds when the earlier binding's declared type is a supertype of this one's.
+     */
+    private static boolean subsumedByEarlierBinding(MatchCoverage coverage, Type declared) {
+        for (Type earlier : coverage.boundTypes) {
+            if (earlier != declared && declared.isAssignableTo(earlier)) {
+                return true;
             }
         }
-        return concrete;
+        return false;
     }
 
     /** Checks one pattern against the type of the value it matches. */
@@ -6141,16 +6092,7 @@ public final class SolvikSemanticAnalyzer {
                 // A bare binding matches every value, so it is a duplicate only after a catch-all.
                 return false;
             }
-            ClassSymbol sealed = sealedClassSymbol(matchedType);
-            if (sealed == null) {
-                return false;
-            }
-            for (ClassSymbol subtype : concreteSubtypes(sealed)) {
-                if (subtype.type().isAssignableTo(declared) && !coverage.sealedSubtypes.contains(subtype)) {
-                    return false;
-                }
-            }
-            return true;
+            return subsumedByEarlierBinding(coverage, declared);
         }
         EnumPatternNode enumPattern = (EnumPatternNode) pattern;
         EnumVariantSymbol variant = enumPatterns.get(enumPattern);
@@ -6169,17 +6111,7 @@ public final class SolvikSemanticAnalyzer {
                 coverage.catchAll = true;
                 return;
             }
-            ClassSymbol sealed = sealedClassSymbol(matchedType);
-            if (sealed == null) {
-                // A typed binding covers only the non-null values it names, so it never makes a
-                // later wildcard unreachable; duplicates are caught by the signature check instead.
-                return;
-            }
-            for (ClassSymbol subtype : concreteSubtypes(sealed)) {
-                if (subtype.type().isAssignableTo(declared)) {
-                    coverage.sealedSubtypes.add(subtype);
-                }
-            }
+            coverage.boundTypes.add(declared);
             return;
         }
         EnumPatternNode enumPattern = (EnumPatternNode) pattern;
@@ -6252,9 +6184,10 @@ public final class SolvikSemanticAnalyzer {
     }
 
     /**
-     * Reports a match that leaves a known variant, sealed subtype, or null case uncovered. The
-     * check is recursive so nested variant patterns such as {@code Wrap(Some(x))} contribute to the
-     * coverage of their outer variant instead of being treated as opaque.
+     * Reports a match that leaves a known variant or the null case uncovered. The check is recursive so
+     * nested variant patterns such as {@code Wrap(Some(x))} contribute to the coverage of their outer
+     * variant instead of being treated as opaque. Only an {@code enum} or {@code error} type has a known
+     * variant set; any other matched type requires a wildcard, reported as the missing wildcard.
      */
     private void reportMatchExhaustiveness(MatchExprNode expression, Type matchedType, boolean nullable) {
         List<PatternNode> patterns = new ArrayList<>();
@@ -6277,14 +6210,6 @@ public final class SolvikSemanticAnalyzer {
                     }
                 }
             }
-        } else if (sealedClassSymbol(matchedType) != null) {
-            if (!valueCatchAll) {
-                for (ClassSymbol subtype : concreteSubtypes(sealedClassSymbol(matchedType))) {
-                    if (!subtypeCovered(patterns, subtype)) {
-                        missing.add(subtype.name());
-                    }
-                }
-            }
         } else if (!valueCatchAll) {
             missing.add("a wildcard pattern");
         }
@@ -6297,7 +6222,7 @@ public final class SolvikSemanticAnalyzer {
     /**
      * Whether a set of patterns covers every value of {@code matchedType}, and {@code null} when the
      * type is nullable. A catch-all covers everything; otherwise a closed enum needs every variant
-     * covered and a sealed class needs every concrete subtype covered.
+     * covered and any other type needs a catch-all, because no class type has a knowable subtype set.
      */
     private boolean patternsCover(List<PatternNode> patterns, Type matchedType, boolean nullable) {
         if (hasNullCatchAll(patterns)) {
@@ -6320,16 +6245,8 @@ public final class SolvikSemanticAnalyzer {
             }
             return true;
         }
-        ClassSymbol sealed = sealedClassSymbol(matchedType);
-        if (sealed != null) {
-            for (ClassSymbol subtype : concreteSubtypes(sealed)) {
-                if (!subtypeCovered(patterns, subtype)) {
-                    return false;
-                }
-            }
-            return true;
-        }
-        // A non-closed type has no known variant set, so only a catch-all makes a match exhaustive.
+        // No class type has a known subtype set: a `mutable` or `abstract` class may be extended from
+        // any file. Only a catch-all therefore makes a match over a class type exhaustive.
         return false;
     }
 
@@ -6384,19 +6301,6 @@ public final class SolvikSemanticAnalyzer {
             }
         }
         return true;
-    }
-
-    /** Whether a typed binding pattern covers a concrete sealed subtype. */
-    private boolean subtypeCovered(List<PatternNode> patterns, ClassSymbol subtype) {
-        for (PatternNode pattern : patterns) {
-            if (pattern instanceof BindingPatternNode binding) {
-                Type declared = patternBindingTypes.get(binding);
-                if (declared != null && subtype.type().isAssignableTo(declared)) {
-                    return true;
-                }
-            }
-        }
-        return false;
     }
 
     /**

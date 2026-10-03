@@ -15,8 +15,8 @@ println(kind1('z'))
 
 println(kind1('z') is String)
 
-open class A2 {
-    open func v4(): Integer {
+mutable class A2 {
+    mutable func v4(): Integer {
         return 20
     }
 }

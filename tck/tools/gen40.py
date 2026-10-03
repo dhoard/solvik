@@ -125,10 +125,10 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SPEC = open(os.path.join(ROOT, "docs/LANGUAGE_SPEC.md"), encoding="utf-8").read()
 
-CORPUS = os.path.join(ROOT, "tck/corpus/2026.10-draft")
+CORPUS = os.path.join(ROOT, "tck/corpus/2026.11-draft")
 REQUIREMENTS = os.path.join(ROOT, "tck/requirements/requirements.json")
 PROFILE = os.path.join(ROOT, "tck/profiles/full-language.profile.json")
-SPEC_VERSION = "2026.10-draft"
+SPEC_VERSION = "2026.11-draft"
 
 
 def norm(t):
@@ -443,14 +443,14 @@ print(thrice(operationOf(Adder(3)), 10))
         exp=out("base|leaf"),
         note="Both references are written through a `Base`-typed receiver, so the printed texts can only "
              "come from the runtime class of each receiver",
-        src="""open class Base {
-    open func name(): String {
+        src="""mutable class Base {
+    mutable func name(): String {
         return "base"
     }
 }
 
-open class Mid extends Base {
-    override open func name(): String {
+mutable class Mid extends Base {
+    override mutable func name(): String {
         return "mid"
     }
 }
@@ -475,8 +475,8 @@ print(fromLeaf())
         exp=out("generic|meow"),
         note="`sound` is declared only on the superclass, so the inherited instance method route is the one "
              "under test and both receivers resolve through it",
-        src="""open class Animal {
-    open func sound(): String {
+        src="""mutable class Animal {
+    mutable func sound(): String {
         return "generic"
     }
 }
@@ -592,7 +592,7 @@ print(formatter.format())
              "retained receiver's own state is what the calls observe, and a copy keeps the value's identity",
         src="""class Wrapper {
     val inner: Target
-    var evaluations: Integer = 0
+    mutable val evaluations: Integer = 0
     Wrapper(inner: Target) {
         this.inner = inner
     }
@@ -637,8 +637,8 @@ print(wrapper.evaluations - baseline)
         exp=out("leaf|base"),
         note="`this.greet` is read inside a superclass helper, so the current receiver -- the subclass "
              "instance or the base instance -- is what selects the implementation",
-        src="""open class Base {
-    open func greet(): String {
+        src="""mutable class Base {
+    mutable func greet(): String {
         return "base"
     }
     func viaThis(): func(): String {
@@ -701,13 +701,13 @@ print("EXECUTED-INVALID")
         exp=out("base|mid"),
         note="`super.greet` is bound from a class that overrides `greet`, so the value prints the immediate "
              "superclass text while the immediate call on the same receiver prints the override",
-        src="""open class Base {
-    open func greet(): String {
+        src="""mutable class Base {
+    mutable func greet(): String {
         return "base"
     }
 }
 
-open class Mid extends Base {
+mutable class Mid extends Base {
     override func greet(): String {
         return "mid"
     }
@@ -833,12 +833,12 @@ print(fromString("s"))
         exp=out("swapped|1"),
         note="The generic method sits on a generic class read through `Cell(Integer)`, so the receiver's own "
              "type arguments are already closed and only the method's parameter is inferred",
-        src="""open class Cell<T> {
+        src="""mutable class Cell<T> {
     val stored: T
     Cell(stored: T) {
         this.stored = stored
     }
-    open func swap<E>(value: E): E {
+    mutable func swap<E>(value: E): E {
         return value
     }
 }
@@ -901,11 +901,11 @@ print("EXECUTED-INVALID")
         exp={"diagnostic": {"family": "TYPE"}},
         note="The same rejection holds through `super`, the path that resolves through a superclass's "
              "dispatch table and so could otherwise bind an inherited override",
-        src="""open class Base {
-    override open func equals(other: Any?): Boolean {
+        src="""mutable class Base {
+    override mutable func equals(other: Any?): Boolean {
         return true
     }
-    override open func hashCode(): Integer {
+    override mutable func hashCode(): Integer {
         return 1
     }
 }
@@ -946,7 +946,7 @@ print("EXECUTED-INVALID")
         note="A function-typed property reads the stored value while a same-shaped method read creates a "
              "bound value, and the two different results show member resolution chose correctly",
         src="""class Holder {
-    var stored: func(): Integer
+    mutable val stored: func(): Integer
     func storedMethod(): Integer {
         return 4
     }

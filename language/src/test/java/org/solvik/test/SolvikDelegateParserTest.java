@@ -78,7 +78,7 @@ public final class SolvikDelegateParserTest {
                 class C implements Named {
                     val before: Integer
                     delegate val shared: Named
-                    var after: Integer
+                    mutable val after: Integer
 
                     C(shared: Named) {
                         this.before = 1
@@ -130,13 +130,14 @@ public final class SolvikDelegateParserTest {
     }
 
     @Test
-    public void delegateVarIsRejected() {
-        parseFails("delegatevar.sol", """
+    public void delegateMutableBindingIsRejected() {
+        parseFails("delegatemutable.sol", """
                 interface Named {
                     func name(): String
                 }
                 class C implements Named {
-                    delegate var shared: Named
+                    // A delegate may bind only an immutable binding. // solvik-keyword: var
+                    delegate mutable val shared: Named
                 }
                 """);
     }

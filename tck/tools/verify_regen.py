@@ -51,7 +51,7 @@ import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
-SPEC_VERSION = "2026.10-draft"
+SPEC_VERSION = "2026.11-draft"
 
 # Every generator that writes both sources and manifests. Run order is the slice
 # order; each is idempotent against an already-populated inventory, so a fresh

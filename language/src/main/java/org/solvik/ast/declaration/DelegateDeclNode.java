@@ -32,7 +32,7 @@ import org.solvik.source.SourceSpan;
  *
  * <p>A delegate is structurally an immutable, explicitly typed property, so the node carries the
  * same surface as a {@link PropertyDeclNode}: a required type reference and an optional declaration
- * initializer. It never carries {@code var}, and its declared type must be an interface; the
+ * initializer. It never carries {@code mutable}, and its declared type must be an interface; the
  * semantic layer rejects both violations, so the type reference is modelled as required here.
  */
 public final class DelegateDeclNode extends AstNode {

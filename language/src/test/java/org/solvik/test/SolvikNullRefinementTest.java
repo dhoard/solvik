@@ -105,7 +105,7 @@ public final class SolvikNullRefinementTest {
     public void negatedNullCheckNarrowsAWhileBody() {
         check(PRELUDE + """
                 func loop(b: Box?): Integer {
-                    var total: Integer = 0
+                    mutable val total: Integer = 0
                     while (!(b == null)) {
                         total = total + b.value
                     }
@@ -118,7 +118,7 @@ public final class SolvikNullRefinementTest {
     public void nullCheckNarrowsAForConditionBody() {
         assertThat(run(PRELUDE + """
                     func loop(b: Box?): Integer {
-                        var total: Integer = 0
+                        mutable val total: Integer = 0
                         for (; b != null; ) {
                             total = total + b.value
                         }
@@ -198,7 +198,7 @@ public final class SolvikNullRefinementTest {
     public void identityNarrowingIsInvalidatedByAWrite() {
         CompilationUnitNode unit = parseOk("refine.sol", PRELUDE + """
                 func f(b: Box?): Integer {
-                    var current = b
+                    mutable val current = b
                     if (current !== null) {
                         current = null
                         return current.value

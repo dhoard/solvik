@@ -47,7 +47,7 @@ public final class SolvikControlFlowParserTest {
 
     @Test
     public void assignmentStatementShapeAndSpan() {
-        String src = "func f(): Integer {\n    var x = 1;\n    x = x + 1;\n    return x;\n}\n";
+        String src = "func f(): Integer {\n    mutable val x = 1;\n    x = x + 1;\n    return x;\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("assign.sol", src));
         AssignStmtNode assign = (AssignStmtNode) body(fn).statements().get(1);
         assertNode(assign, AstKind.ASSIGN_STMT, src, "x = x + 1;");
@@ -67,13 +67,13 @@ public final class SolvikControlFlowParserTest {
 
     @Test
     public void forLoopShapeWithAllClauses() {
-        String src = "func f(limit: Integer): Integer {\n    var total = 0;\n    for (var i = 0; i < limit; i = i + 1) {\n        total = total + i;\n    }\n    return total;\n}\n";
+        String src = "func f(limit: Integer): Integer {\n    mutable val total = 0;\n    for (mutable val i = 0; i < limit; i = i + 1) {\n        total = total + i;\n    }\n    return total;\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("for.sol", src));
         ForStmtNode loop = (ForStmtNode) body(fn).statements().get(1);
         assertNode(loop, AstKind.FOR_STMT, src, //
-                "for (var i = 0; i < limit; i = i + 1) {\n        total = total + i;\n    }");
+                "for (mutable val i = 0; i < limit; i = i + 1) {\n        total = total + i;\n    }");
         LocalDeclNode initializer = (LocalDeclNode) loop.initializer().orElseThrow();
-        assertNode(initializer, AstKind.LOCAL_DECL, src, "var i = 0");
+        assertNode(initializer, AstKind.LOCAL_DECL, src, "mutable val i = 0");
         assertThat(initializer.name()).isEqualTo("i");
         assertNode(loop.condition().orElseThrow(), AstKind.BINARY_EXPR, src, "i < limit");
         AssignStmtNode update = (AssignStmtNode) loop.update().orElseThrow();
@@ -94,7 +94,7 @@ public final class SolvikControlFlowParserTest {
 
     @Test
     public void forLoopAcceptsAnAssignmentInitializer() {
-        String src = "func f(): Unit {\n    var i = 0;\n    for (i = 0; ; ) {\n        continue;\n    }\n}\n";
+        String src = "func f(): Unit {\n    mutable val i = 0;\n    for (i = 0; ; ) {\n        continue;\n    }\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("forassign.sol", src));
         ForStmtNode loop = (ForStmtNode) body(fn).statements().get(1);
         assertNode(loop.initializer().orElseThrow(), AstKind.ASSIGN_STMT, src, "i = 0");
@@ -150,13 +150,13 @@ public final class SolvikControlFlowParserTest {
 
     @Test
     public void statementListKeepsDeclarationsLoopsAssignmentsAndReturnsOrdered() {
-        String src = "func f(n: Integer): Integer {\n    var total = 0;\n    while (n > 0) {\n        total = total + n;\n        n = n - 1;\n    }\n    return total;\n}\n";
+        String src = "func f(n: Integer): Integer {\n    mutable val total = 0;\n    while (n > 0) {\n        total = total + n;\n        n = n - 1;\n    }\n    return total;\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("mixed.sol", src));
         assertThat(body(fn).statements().size()).isEqualTo(3);
         assertThat(body(fn).statements().get(0).kind()).isEqualTo(AstKind.LOCAL_DECL);
         assertThat(body(fn).statements().get(1).kind()).isEqualTo(AstKind.WHILE_STMT);
         assertThat(body(fn).statements().get(2).kind()).isEqualTo(AstKind.RETURN_STMT);
-        assertNode(local(fn, 0), AstKind.LOCAL_DECL, src, "var total = 0;");
+        assertNode(local(fn, 0), AstKind.LOCAL_DECL, src, "mutable val total = 0;");
     }
 
     @Test

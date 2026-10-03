@@ -52,7 +52,7 @@ public final class SolvikClassParserTest {
         String src = """
                 class User {
                     val id: Integer
-                    var name: String
+                    mutable val name: String
 
                     User(id: Integer, name: String) {
                         this.id = id
@@ -71,14 +71,14 @@ public final class SolvikClassParserTest {
 
         PropertyDeclNode id = user.properties().get(0);
         assertNode(id, AstKind.PROPERTY_DECL, src, "val id: Integer");
-        assertThat(id.bindingKind()).isEqualTo(BindingKind.VAL);
+        assertThat(id.bindingKind()).isEqualTo(BindingKind.IMMUTABLE);
         assertThat(id.name()).isEqualTo("id");
         assertThat(id.declaredType().orElseThrow().name()).isEqualTo("Integer");
         assertThat(id.initializer().isEmpty()).isTrue();
 
         PropertyDeclNode name = user.properties().get(1);
-        assertNode(name, AstKind.PROPERTY_DECL, src, "var name: String");
-        assertThat(name.bindingKind()).isEqualTo(BindingKind.VAR);
+        assertNode(name, AstKind.PROPERTY_DECL, src, "mutable val name: String");
+        assertThat(name.bindingKind()).isEqualTo(BindingKind.MUTABLE);
         assertThat(name.declaredType().orElseThrow().name()).isEqualTo("String");
 
         assertThat(user.constructors().size()).isEqualTo(1);
@@ -109,10 +109,10 @@ public final class SolvikClassParserTest {
 
     @Test
     public void propertyInitializerIsParsedAndSpanned() {
-        String src = "class Counter {\n    var count: Integer = 0\n}\n";
+        String src = "class Counter {\n    mutable val count: Integer = 0\n}\n";
         ClassDeclNode counter = onlyClass(parseOk("counter.sol", src));
         PropertyDeclNode property = counter.properties().get(0);
-        assertNode(property, AstKind.PROPERTY_DECL, src, "var count: Integer = 0");
+        assertNode(property, AstKind.PROPERTY_DECL, src, "mutable val count: Integer = 0");
         assertThat(property.initializer().isPresent()).isTrue();
         assertNode(property.initializer().get(), AstKind.INTEGER_LITERAL, src, "0");
     }

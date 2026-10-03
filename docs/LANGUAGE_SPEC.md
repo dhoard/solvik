@@ -1,6 +1,6 @@
 # Solvik Language Specification
 
-Specification version: `2026.10-draft` (pre-1.0 development baseline; see "Versioning" below).
+Specification version: `2026.11-draft` (pre-1.0 development baseline; see "Versioning" below).
 
 Status: normative implementation baseline.
 
@@ -14,6 +14,24 @@ reports can be bound to a durable semantic identity. The identifier `2026.10-dra
 not yet declared stable. A source-control commit hash may identify audit input but is not a semantic
 version and grants no compatibility promise. A new specification revision is declared only when the
 normative semantics change; released revisions are immutable.
+Revision `2026.11-draft` changes the vocabulary of declaration and closure. `var` is removed and its
+meaning is carried by `mutable val`; `open` is removed and replaced by `mutable`; `sealed` is removed
+and replaced by `abstract`. The three now obey one rule: no marker means locked, `mutable` unlocks, and
+`abstract` locks construction while opening extension. `val`, `override`, and every other keyword are
+unchanged, and `final` remains a prose term for the default state rather than a keyword, which is what
+it has always been. `mutable` is rejected on an `abstract` class by the grammar, because `abstract`
+already grants extension and no bit remains for `mutable` to flip. The revision retires closed class
+subtype hierarchies: `abstract` classes are extendable from any file, so no class type has a knowable
+subtype set, `match` over a class type requires a wildcard branch, and the `2026.10-draft` sealed-prose
+sections that required a closed transitive subtype set and a same-file extension boundary are
+superseded. Exhaustiveness over `enum` and `error` variants is unchanged and remains the closed
+sum-type mechanism. `override` is retained deliberately: `mutable` grants permission downward and
+`override` asserts intent upward, and only the assertion can invalidate a stale signature, which is
+what keeps a renamed or drifted supertype method from becoming a silent non-override. The removed
+keywords are not reused as identifiers: a program that writes `var`, `open`, or `sealed` is reported as
+`SOLV-PARS-006` naming its replacement. See `KEYWORD_CHANGES.md` for the migration and the retired
+`SOLV-SEM-039`.
+
 Revision `2026.10-draft` adds first-class function values: function types, named function
 references, anonymous functions, explicit immutable closure capture, contextually instantiated
 generic function values, and bound method references (section 6). It supersedes the `2026.09-draft`
@@ -48,6 +66,12 @@ Solvik should be:
 
 Identifiers use `[A-Za-z_][A-Za-z0-9_]*`; keywords are reserved and `$` is not an identifier character. `//` starts a line comment. `/* ... */` is a non-nesting block comment. Comments are otherwise whitespace, but their physical newlines remain visible to semicolon insertion.
 
+`mutable` and `abstract` are keywords and each opens a construct, so neither ever terminates a line for
+semicolon insertion (section 16). The keywords removed by this revision — `var`, `open`, and `sealed` —
+are not identifiers: a program that writes one is reported as `SOLV-PARS-006` on that token, naming the
+replacement. Reserving them keeps a removed keyword from silently changing what an existing program
+means, which is what would happen if `var x = 1` became an assignment to a variable named `var`.
+
 Decimal integer literals contain ASCII digits and have type `Integer` in the initial typed core. A literal outside the signed 32-bit range is a compile-time error until additional literal forms are specified.
 
 Phase 7 adds `L`-suffixed `Long` literals and decimal floating-point literals with an optional exponent. Floating-point literals have type `Double`; an `F` suffix selects `Float`. `Byte` and `Short` values use explicit conversion.
@@ -70,18 +94,24 @@ val count = 1
 count = 2 // compile error
 ```
 
-`var` declares a mutable binding/property.
+`mutable val` declares a mutable binding/property.
 
 ```solvik
-var count: Integer = 0
+mutable val count: Integer = 0
 count = count + 1
 ```
 
-`val` freezes the binding, not the complete reachable object graph.
+No other marker declares a binding, and `val` is the only binding keyword: a binding is immutable
+unless `mutable` precedes it. `mutable` is a modifier on the declaration, never a binding kind of its
+own, so `mutable val` is the complete form and a bare `mutable` is a compile-time error.
+
+`val` freezes the binding, not the complete reachable object graph, and neither form is a compile-time
+constant: the initializer is an ordinary runtime expression. That is why the writable form is not
+named `const`, which is reserved for future compile-time constants.
 
 ```solvik
 class User {
-    var name: String
+    mutable val name: String
 
     User(name: String) {
         this.name = name
@@ -120,7 +150,7 @@ val n: Integer = x // compile error
 
 A checked cast or type refinement is required.
 
-Assignments are statements, not value-producing expressions. The target must be a mutable local or `var` property. Calls require exact arity, and each argument must be assignable to its declared parameter type.
+Assignments are statements, not value-producing expressions. The target must be a `mutable val` local or a `mutable val` property. Calls require exact arity, and each argument must be assignable to its declared parameter type.
 
 Operator precedence, from lowest to highest, is:
 
@@ -167,7 +197,7 @@ call `equals` explicitly.
 Every non-null value has the built-in member:
 
 ```solvik
-open func equals(other: Any?): Boolean
+mutable func equals(other: Any?): Boolean
 ```
 
 It is a language-defined universal member, not operator overloading, and its explicit call and `==`
@@ -185,8 +215,8 @@ override func equals(other: Any?): Boolean
 ```
 
 The compiler requires `override`, exactly one explicit parameter typed exactly `Any?`, and return
-type exactly `Boolean`. The inherited root member is open, and an override follows the ordinary
-`open`/`final` rules for further subclasses. An interface cannot redeclare `equals`, and a property
+type exactly `Boolean`. The inherited root member is mutable, and an override follows the ordinary
+`mutable`/final rules for further subclasses. An interface cannot redeclare `equals`, and a property
 or delegate cannot use the reserved name `equals`. A direct call on a nullable receiver follows
 ordinary nullable-member rules: `value?.equals(other)` is safe and has result `Boolean?`, while
 `value.equals(other)` is an error when `value` may be null. Built-in scalar, `Unit`, enum, and
@@ -251,7 +281,7 @@ repair these properties.
 `Any` declares:
 
 ```solvik
-open func hashCode(): Integer
+mutable func hashCode(): Integer
 ```
 
 It is the hash companion of `equals` and follows the same structural rules: a language-defined
@@ -326,7 +356,7 @@ guest method, or Java `Object.equals`. `!==` is its exact logical negation.
 
 The identity-bearing static types are exactly:
 
-- user-defined class types, including sealed classes and parameterized class applications;
+- user-defined class types, including abstract classes and parameterized class applications;
 - interface types, including parameterized interface applications;
 - `List<T>`, `Set<T>`, `Map<K, V>`, and `Stack<T>`;
 - function types (section 6);
@@ -402,13 +432,13 @@ Phase 4 implements `Integer` as the initial numeric type. `Byte`, `Short`, `Long
 
 No other conversion is implicit. `Integer` does not widen to `Float` (the 24-bit `Float` significand cannot hold every `Integer`), and `Long` widens to neither `Float` nor `Double` (64 bits exceed the 53-bit significand). No narrowing is implicit. Every other conversion, including all narrowing and every precision-losing conversion, uses an explicit built-in type call such as `Long(value)`; an out-of-range integral conversion raises a Solvik runtime arithmetic error and an out-of-range constant conversion is a compile-time error. Because a widening never overflows or loses precision, an implicit widening introduces no new runtime arithmetic error.
 
-Widening is a coercion applied at conversion sites, not a subtype relation: numeric types remain siblings under `Number`, nominal assignment, generics, hashing, type tests, and casts are unchanged, and a widening never appears in a type join (section 21.7). A widening is applied where an expression must match a declared target type (a `val`/`var` or property initializer, a function or method argument, a `return`, an assignment, or a collection element/key/value) and, for arithmetic, ordering, and equality operators, by widening each operand to the least common widened numeric type of the two operands — the unique minimal type both operands can widen or stay to. When two numeric operands have no such common type (for example `Long` and `Float`) the operator is ill-typed. Widening never applies to identity operators (`===`/`!==`), which remain governed by section 3.
+Widening is a coercion applied at conversion sites, not a subtype relation: numeric types remain siblings under `Number`, nominal assignment, generics, hashing, type tests, and casts are unchanged, and a widening never appears in a type join (section 21.7). A widening is applied where an expression must match a declared target type (a `val` or property initializer, a function or method argument, a `return`, an assignment, or a collection element/key/value) and, for arithmetic, ordering, and equality operators, by widening each operand to the least common widened numeric type of the two operands — the unique minimal type both operands can widen or stay to. When two numeric operands have no such common type (for example `Long` and `Float`) the operator is ill-typed. Widening never applies to identity operators (`===`/`!==`), which remain governed by section 3.
 
 Integral arithmetic is checked and raises a Solvik runtime arithmetic error on overflow. `Float` and `Double` follow IEEE 754 arithmetic. Arithmetic operands are widened as described above and produce their common widened type; operands of the same type produce that type.
 
 `Any` is the sole top type for every non-null Solvik value, including every class, interface, and enum value. `Nothing` is a subtype of every type.
 
-`Any` declares the universal members `func toString(): String`, `open func equals(other: Any?): Boolean`, and `open func hashCode(): Integer` (section 3). They are available on every non-null value. Built-in scalars provide fixed, non-overridable implementations: `Integer`, `Long`, `Byte`, and `Short` render in decimal, `Float` and `Double` use Java-style floating-point text, `Boolean` renders `true` or `false`, `Character` renders its character, `String` renders its contents, and `Unit` renders `Unit`. A built-in scalar cannot be extended and its `toString` cannot be overridden. A user-defined class inherits the default representation (its class name) and may declare `override func toString(): String` for a class-specific representation (section 7).
+`Any` declares the universal members `func toString(): String`, `mutable func equals(other: Any?): Boolean`, and `mutable func hashCode(): Integer` (section 3). They are available on every non-null value. Built-in scalars provide fixed, non-overridable implementations: `Integer`, `Long`, `Byte`, and `Short` render in decimal, `Float` and `Double` use Java-style floating-point text, `Boolean` renders `true` or `false`, `Character` renders its character, `String` renders its contents, and `Unit` renders `Unit`. A built-in scalar cannot be extended and its `toString` cannot be overridden. A user-defined class inherits the default representation (its class name) and may declare `override func toString(): String` for a class-specific representation (section 7).
 
 `Unit` has one value and is the result of a function that returns normally without a value. `Nothing` is the bottom type and has no values.
 
@@ -467,7 +497,7 @@ if (name != null) {
 
 The reference-identity null tests `name === null` and `name !== null` narrow the same way.
 
-Narrowing is permitted only when the analyzed value cannot be written or invalidated along that control-flow path. A write to a `var` invalidates its prior narrowing.
+Narrowing is permitted only when the analyzed value cannot be written or invalidated along that control-flow path. A write to a `mutable val` invalidates its prior narrowing.
 
 ## 6. Functions
 
@@ -483,7 +513,7 @@ Parameter types must be explicit in the initial implementation. A function's ret
 
 A function that returns normally without a value has return type `Unit`, whether that type is omitted or written explicitly. `Nothing` remains the bottom type for computations that never complete normally.
 
-The program scope contains declarations and executable statements, which may be interleaved freely. When the root source uses compile-time inclusion (section 20), the declarations and statements of every expanded file participate in this one program; a file that declares a `module` places its top-level declarations in that module's namespace, and an included module may be referenced through a namespace prefix (section 20). The top-level statements, in include-expansion order, form the body of an implicit `func main()`; a top-level `val`/`var` is therefore a local of the implicit main, not a global. Declaration lookup remains order-independent within a module, so a declaration may be referenced from a physically earlier file or statement. The entry point is always implicit: declaring a function named `main` explicitly, in the root or in any included file, is a compile-time error. A program with no executable top-level statements has no entry point and does nothing. A call may be used as a statement. Other value-producing expressions cannot stand alone as statements. `return;` is valid only in a function declared without a return type; `return value` requires the value to be assignable to the declared return type.
+The program scope contains declarations and executable statements, which may be interleaved freely. When the root source uses compile-time inclusion (section 20), the declarations and statements of every expanded file participate in this one program; a file that declares a `module` places its top-level declarations in that module's namespace, and an included module may be referenced through a namespace prefix (section 20). The top-level statements, in include-expansion order, form the body of an implicit `func main()`; a top-level `val`, whether or not it is `mutable`, is therefore a local of the implicit main, not a global. Declaration lookup remains order-independent within a module, so a declaration may be referenced from a physically earlier file or statement. The entry point is always implicit: declaring a function named `main` explicitly, in the root or in any included file, is a compile-time error. A program with no executable top-level statements has no entry point and does nothing. A call may be used as a statement. Other value-producing expressions cannot stand alone as statements. `return;` is valid only in a function declared without a return type; `return value` requires the value to be assignable to the declared return type.
 
 Functions are not overloaded in the initial language: two functions with the same name in one scope are a compile-time error. The executable entry point is the implicit `main` formed by the program's executable top-level statements. Command-line argument binding is deferred. A program that reaches the end of its entry point exits with status `0`; the predeclared `exit(code: Integer)` function terminates the program immediately with the given status.
 
@@ -613,7 +643,7 @@ the target exactly when:
 2. for every parameter position `i`, `Ti` is assignable to `Si`; and
 3. `SR` is assignable to `TR`.
 
-Given `open class Animal` and `class Dog extends Animal`, a value of type `func(Animal): Dog` is
+Given `mutable class Animal` and `class Dog extends Animal`, a value of type `func(Animal): Dog` is
 assignable to `func(Dog): Animal`, and a value of type `func(Dog): Animal` is not assignable to
 `func(Animal): Dog`.
 
@@ -751,7 +781,7 @@ capture list is a parse error, because a non-capturing anonymous function is wri
 
 Each listed binding's value is captured when evaluation reaches the anonymous-function expression.
 Capturing an object copies the reference, not the reachable object graph, so later mutation of that
-object's `var` properties remains observable through the captured reference.
+object's `mutable val` properties remains observable through the captured reference.
 
 An outer local or parameter referenced by the body but omitted from the capture list is
 `SEM_UNLISTED_CAPTURE` (`SOLV-SEM-058`), reported on the body reference. This applies to `this` as
@@ -760,16 +790,16 @@ remains `SOLV-RESOL-001`, and `this` where no instance receiver exists remains `
 Top-level and module-qualified function declarations are globally resolved declarations rather than
 local state and need no capture entry; there are no globals to capture.
 
-A closure must not list or otherwise capture a `var` local. Naming a `var` in a capture list is
-`SEM_MUTABLE_CAPTURE` (`SOLV-SEM-057`), reported on that capture item, and a read or write of that
-captured name in the body is reported with the same code. Referencing the same outer `var` without
-listing it remains `SEM_UNLISTED_CAPTURE` at the body reference; the compiler never silently
-converts it into a capture. A capture item that resolves to something other than an eligible
-immutable local, parameter, or `this` is `SEM_INVALID_CAPTURE` (`SOLV-SEM-059`), reported on the
-capture item.
+A closure must not list or otherwise capture a `mutable val` local. Naming a `mutable val` in a capture
+list is `SEM_MUTABLE_CAPTURE` (`SOLV-SEM-057`), reported on that capture item, and a read or write of
+that captured name in the body is reported with the same code. Referencing the same outer
+`mutable val` without listing it remains `SEM_UNLISTED_CAPTURE` at the body reference; the compiler
+never silently converts it into a capture. A capture item that resolves to something other than an
+eligible immutable local, parameter, or `this` is `SEM_INVALID_CAPTURE` (`SOLV-SEM-059`), reported on
+the capture item.
 
 ```solvik
-var total = 0
+mutable val total = 0
 val add = func [total](value: Integer) {
     total = total + value // rejected at [total]: SEM_MUTABLE_CAPTURE
 }
@@ -779,7 +809,7 @@ Mutable state may be shared explicitly through a captured immutable object refer
 
 ```solvik
 class Counter {
-    var value: Integer = 0
+    mutable val value: Integer = 0
 
     func increment() {
         this.value = this.value + 1
@@ -945,7 +975,7 @@ Function values add an indirect call path; they do not replace direct calls, and
 
 | Code name | Stable code | Trigger and primary span |
 |---|---|---|
-| `SEM_MUTABLE_CAPTURE` | `SOLV-SEM-057` | an anonymous function lists or otherwise reads or writes a captured `var` local; the captured name reference |
+| `SEM_MUTABLE_CAPTURE` | `SOLV-SEM-057` | an anonymous function lists or otherwise reads or writes a captured `mutable val` local; the captured name reference |
 | `SEM_UNLISTED_CAPTURE` | `SOLV-SEM-058` | an anonymous-function body uses an eligible outer local, parameter, or `this` that its capture list omits; the body reference |
 | `SEM_INVALID_CAPTURE` | `SOLV-SEM-059` | a capture item resolves to something other than an eligible immutable local, parameter, or `this`; the capture item |
 
@@ -965,12 +995,14 @@ both. Section 3 and section 23.4 retain their existing bare-member-read rejectio
 
 ## 7. Classes
 
-Classes are final by default.
+Classes are final by default. A class that is not declared `mutable` or `abstract` cannot be extended,
+and a method that is not declared `mutable` cannot be overridden: `mutable` unlocks, and no marker
+means locked.
 
 ```solvik
 class User {
     val id: Long
-    var name: String
+    mutable val name: String
 
     User(id: Long, name: String) {
         this.id = id
@@ -985,15 +1017,30 @@ the reference is `SOLV-RESOL-001`. `this.name` resolves against the enclosing cl
 inherited ones, and a local may shadow a property name without either reference becoming ambiguous.
 `this` outside an instance method or constructor is `SOLV-RESOL-005`.
 
-A class must explicitly opt into inheritance:
+A class must explicitly opt into inheritance. `mutable` opens a class for extension by anyone:
 
 ```solvik
-open class Animal {
-    open func speak(): String {
+mutable class Animal {
+    mutable func speak(): String {
         return "..."
     }
 }
 ```
+
+An `abstract` class (section 12) is also extendable, and is the other way a subclass may legally name a
+superclass:
+
+```solvik
+abstract class Shape {
+    Shape() {
+    }
+}
+
+class Square extends Shape {
+}
+```
+
+Extending a class that is neither `mutable` nor `abstract` is `SOLV-SEM-008`.
 
 Single inheritance only:
 
@@ -1020,7 +1067,7 @@ A class declares its constructor as a class member whose name is the class name,
 ```solvik
 class User {
     val id: Long
-    var name: String
+    mutable val name: String
 
     User(id: Long, name: String) {
         this.id = id
@@ -1031,13 +1078,13 @@ class User {
 
 Calling the class name invokes its constructor. A class has at most one constructor declaration. Every property without a declaration initializer must be assigned exactly once on every successful constructor path before it is read; a `val` property cannot be assigned afterward.
 
-A constructor is not a method. It is not inherited, cannot carry `open` or `override`, is not declared by an interface, is not forwarded by a `delegate`, and cannot be invoked as `this.User(...)`. For a generic class `Box<T>`, the constructor is named `Box`, not `Box<T>`. A class member declaration other than the constructor cannot have the same name as its class.
+A constructor is not a method. It is not inherited, cannot carry `mutable` or `override`, is not declared by an interface, is not forwarded by a `delegate`, and cannot be invoked as `this.User(...)`. For a generic class `Box<T>`, the constructor is named `Box`, not `Box<T>`. A class member declaration other than the constructor cannot have the same name as its class.
 
 A class with no explicit constructor has an implicit zero-argument initializer only when all properties have declaration initializers. A subclass constructor must invoke `super(arguments)` as its first statement when the superclass has no zero-argument initializer; otherwise `super()` is implicit. `super.member` accesses the immediate superclass implementation.
 
-An overriding method must have exactly the inherited parameter types and may return a subtype of the inherited return type. An `open` member may be overridden; all other members are final.
+An overriding method must have exactly the inherited parameter types and may return a subtype of the inherited return type. A `mutable` member may be overridden; all other members are final. An override of a `mutable` member is itself final unless it is declared `mutable` as well, which is how an override re-opens the chain for one more level.
 
-The inherited `Any.toString()` is an open member, so a class may declare `override func toString(): String` for a class-specific string representation. Because the built-in member is always inherited, declaring `toString` without `override`, changing its parameter list, or returning a type other than `String` is a compile-time error, and a stored member may not reuse the reserved name `toString`.
+The inherited `Any.toString()` is a mutable member, so a class may declare `override func toString(): String` for a class-specific string representation. Because the built-in member is always inherited, declaring `toString` without `override`, changing its parameter list, or returning a type other than `String` is a compile-time error, and a stored member may not reuse the reserved name `toString`.
 
 ### Static members and class initialization
 
@@ -1050,7 +1097,7 @@ enum are parse errors rather than semantic ones.
 ```solvik
 class Counter {
     static val limit: Integer = 10
-    static var attempts: Integer = 0
+    static mutable val attempts: Integer = 0
 
     static func reset() {
         Counter.attempts = 0
@@ -1079,7 +1126,7 @@ A static member is **not inherited** and is **not overridable**. It is reached o
 the class that declares it, so a superclass and a subclass may each declare a static member of the same
 name as two independent members, and a subclass does not expose its superclass's static members. A
 static member never enters the virtual dispatch table and never participates in `delegate` forwarding or
-interface conformance. Declaring `open` or `override` on a static member is `SOLV-SEM-047`.
+interface conformance. Declaring `mutable` or `override` on a static member is `SOLV-SEM-047`.
 
 A static member has no receiver. `this` and every `super` form are rejected inside a static method body
 and inside a class initializer block: `this` is `SOLV-RESOL-005` and `super` is `SOLV-RESOL-006`. An
@@ -1143,7 +1190,7 @@ variable type are not. After the first active use, the guard is a single boolean
 | Code name | Stable code | Reported for |
 |---|---|---|
 | `SEM_DUPLICATE_STATIC_BLOCK` | `SOLV-SEM-046` | a class declares more than one class initializer block |
-| `SEM_INVALID_STATIC_MODIFIER` | `SOLV-SEM-047` | a static member declared `open` or `override` |
+| `SEM_INVALID_STATIC_MODIFIER` | `SOLV-SEM-047` | a static member declared `mutable` or `override` |
 | `SEM_TYPE_PARAMETER_IN_STATIC_MEMBER` | `SOLV-SEM-048` | a static member mentions a type parameter of its class |
 
 ## 8. Interfaces
@@ -1226,7 +1273,7 @@ Solvik supports nominal generics.
 
 ```solvik
 class Box<T> {
-    var value: T
+    mutable val value: T
 }
 
 val names: List<String>
@@ -1261,7 +1308,7 @@ construction, and a positional value is not valid in a `Map` construction.
 Collection literals beyond a constructor call, iteration protocols, and collection variance remain
 deferred.
 
-## 12. Enums, Sealed Types, and Exhaustive Match
+## 12. Enums, Abstract Classes, and Exhaustive Match
 
 Enums may carry values.
 
@@ -1292,13 +1339,28 @@ val message = match result {
 }
 ```
 
-Missing a known enum/sealed variant is a compile-time error unless a wildcard pattern handles it.
+Missing a known enum variant is a compile-time error unless a wildcard pattern handles it.
 
-`sealed` types define a closed hierarchy usable for exhaustiveness analysis.
+`abstract` declares a class that cannot be constructed and exists to be extended.
 
-A `sealed class` is abstract and may be extended only by declarations in the same physical source file. Its complete transitive subtype set is closed when the program is compiled. An `include` splices declarations into one program but does not erase the physical file boundary, so a subclass written in a different included file is a compile-time error.
+An `abstract class` is not constructible: naming it as a constructor is `SOLV-SEM-028`, and a program
+must construct one of its subtypes instead. It may declare a constructor, which a subclass reaches
+through `super(...)`. `abstract` grants extension, so `mutable` has no bit left to flip on it and
+`mutable abstract class` and `abstract mutable class` are both parse errors rather than semantic ones.
+An `abstract` class may be extended from any file, including a file brought in by `include`.
 
-Initial `match` patterns are enum variant patterns, sealed-subtype binding patterns of the form `name: Type`, and wildcard `_`. Branches are checked in source order, duplicate or unreachable branches are errors, and every known variant must be covered unless `_` is present. The result type is the nearest common declared supertype to which every branch result is assignable; if none exists, the match is ill-typed.
+A closed variant set is known only for `enum` and `error` types. A class type — `abstract`, `mutable`,
+or otherwise — has no knowable subtype set, so a `match` whose matched type is a class type is
+exhaustive only when it has a wildcard branch. `match` over an `abstract` class type is therefore legal
+and useful, and it always requires `_`.
+
+Initial `match` patterns are enum variant patterns, binding patterns of the form `name: Type`, and
+wildcard `_`. Branches are checked in source order, duplicate or unreachable branches are errors, and
+every known variant must be covered unless `_` is present. Branch reachability is decided by type
+subsumption and is independent of exhaustiveness: a branch whose type is a supertype of an earlier
+branch's type is unreachable even when a wildcard makes the match exhaustive. The result type is the
+nearest common declared supertype to which every branch result is assignable; if none exists, the match
+is ill-typed.
 
 ## 13. switch
 
@@ -1553,7 +1615,7 @@ while (condition) {
     ...
 }
 
-for (var i: Integer = 0; i < limit; i = i + 1) {
+for (mutable val i: Integer = 0; i < limit; i = i + 1) {
     ...
 }
 ```
@@ -1687,7 +1749,7 @@ Unqualified name resolution within a file is, innermost first: lexical locals an
 file's own module, the implicit default module, and the built-in prelude. Built-in types and
 functions are always visible unqualified and cannot be shadowed by a module or alias name.
 
-Top-level `val`/`var` declarations and executable statements are not part of any module namespace:
+Top-level `val` declarations, mutable or not, and executable statements are not part of any module namespace:
 they remain locals and statements of the single implicit `main` (section 6) and are not reachable as
 `p::name`. A qualified reference does not change the single-`main` execution model.
 
@@ -1742,14 +1804,14 @@ of every file that declares that module and rejects a duplicate within it. Redec
 function or type is rejected by the existing declaration checks.
 
 The expanded executable top-level statements, in expansion order, form the one implicit `main`. A
-top-level `val`/`var` remains a local of that implicit main, so its visibility and definite
+top-level `val`, mutable or not, remains a local of that implicit main, so its visibility and definite
 initialization follow statement order across file boundaries. An explicit `func main` in any
 participating file remains `SOLV-SEM-001`. A fully expanded program with no executable top-level
 statements has no entry point and does nothing.
 
 Module resolution, include resolution, and file reads finish before semantic analysis and lowering.
 There is no runtime module or include node and no runtime file I/O. Physical file identity is
-preserved: a sealed class may still be extended only in its own physical source file (section 12),
+preserved: an `abstract` class may be extended from any included file (section 12),
 and parser, semantic, instrumentation, and runtime locations identify the file that supplied the
 code.
 
@@ -1766,7 +1828,6 @@ code.
 | `RESOL_ALIAS_DUPLICATE` | `SOLV-RESOL-013` | include directive |
 | `RESOL_ALIAS_DEFAULT_MODULE` | `SOLV-RESOL-014` | include directive |
 | `RESOL_UNKNOWN_MODULE` | `SOLV-RESOL-015` | qualified reference |
-| `SEM_SEALED_SUBTYPE_OUTSIDE_FILE` | `SOLV-SEM-039` | illegal subclass declaration |
 
 Messages for path failures include the written path and, when one exists, the resolved candidate.
 Denied access and other I/O failures become `SOLV-RESOL-010` and never escape as host errors.
@@ -1901,7 +1962,7 @@ val message = switch (status) {
 
 The scrutinee is evaluated exactly once. Case labels are tested in source order, only the first
 matching body executes, and there is no implicit fallthrough. Every expression `switch` must contain
-exactly one `default`, and it must remain last. `switch` does not gain enum or sealed exhaustiveness;
+exactly one `default`, and it must remain last. `switch` does not gain enum exhaustiveness;
 that remains the responsibility of `match`. Requiring `default` makes value production explicit for
 `Integer`, `String`, and regex dispatch, while a statement `switch` may still omit `default` and do
 nothing when no label matches.
@@ -1967,7 +2028,7 @@ assignment right-hand sides, call arguments, explicit `return` values, operands 
 constructs, and `match` branch results:
 
 ```solvik
-var score: Integer = 0
+mutable val score: Integer = 0
 score = if (enabled) { 10 } else { 0 }
 
 println(if (debug) { "debug" } else { "normal" })

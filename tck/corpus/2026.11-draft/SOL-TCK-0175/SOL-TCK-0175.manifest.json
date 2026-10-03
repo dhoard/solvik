@@ -1,0 +1,17 @@
+{
+  "manifestSchemaVersion": 1,
+  "specVersion": "2026.11-draft",
+  "testId": "SOL-TCK-0175",
+  "category": "lexical",
+  "profile": "full-language",
+  "status": "required",
+  "requirements": [
+    "REQ-1405"
+  ],
+  "entryPoint": "main.sol",
+  "outcome": "SUCCESS",
+  "expectation": {
+    "languageExit": 0,
+    "stdoutBase64": "MjE0NzQ4MzY0Nw=="
+  }
+}

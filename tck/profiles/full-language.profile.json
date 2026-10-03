@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "specVersion": "2026.10-draft",
+  "specVersion": "2026.11-draft",
   "name": "full-language",
   "kind": "full",
   "requirements": [

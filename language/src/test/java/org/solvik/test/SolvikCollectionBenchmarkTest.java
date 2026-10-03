@@ -97,7 +97,7 @@ public final class SolvikCollectionBenchmarkTest {
     @Test
     public void integralListPreservesEveryDocumentedListMember() {
         assertThat(run("""
-                var nums: List<Integer> = List<Integer>(10, 20, 30)
+                mutable val nums: List<Integer> = List<Integer>(10, 20, 30)
                 println(nums.size)
                 println(nums.isEmpty)
                 nums.add(40)
@@ -117,8 +117,8 @@ public final class SolvikCollectionBenchmarkTest {
     public void integralListGrowsPastItsInitialStorage() {
         // The primitive storage starts small and must double without losing or reordering elements.
         assertThat(run("""
-                var nums: List<Integer> = List<Integer>()
-                var i = 0
+                mutable val nums: List<Integer> = List<Integer>()
+                mutable val i = 0
                 while (i < 5000) {
                     nums.add(i)
                     i = i + 1
@@ -133,7 +133,7 @@ public final class SolvikCollectionBenchmarkTest {
     @Test
     public void integralListRemoveAtShiftsTheTail() {
         assertThat(run("""
-                var nums: List<Integer> = List(1, 2, 3, 4, 5)
+                mutable val nums: List<Integer> = List(1, 2, 3, 4, 5)
                 println(nums.removeAt(1))
                 println(nums.size)
                 println(nums.get(1))
@@ -147,7 +147,7 @@ public final class SolvikCollectionBenchmarkTest {
     @Test
     public void integralListClearsAndRefills() {
         assertThat(run("""
-                var nums: List<Integer> = List(1, 2, 3)
+                mutable val nums: List<Integer> = List(1, 2, 3)
                 nums.clear()
                 nums.add(9)
                 nums.add(8)
@@ -161,19 +161,19 @@ public final class SolvikCollectionBenchmarkTest {
     public void integralListBoundsErrorsMatchTheErasedList() {
         // The two storages must fail identically for identical misuse of every positional member.
         assertThat(runtimeFailure("""
-                var nums: List<Integer> = List(1, 2, 3)
+                mutable val nums: List<Integer> = List(1, 2, 3)
                 println(nums.get(3))
                 """)).isEqualTo("bounds error: index 3 is out of range for list of size 3");
         assertThat(runtimeFailure("""
-                var nums: List<Integer> = List(1, 2, 3)
+                mutable val nums: List<Integer> = List(1, 2, 3)
                 println(nums.removeAt(-1))
                 """)).isEqualTo("bounds error: index -1 is out of range for list of size 3");
         assertThat(runtimeFailure("""
-                var erased: List<Any> = List(1, 2, 3)
+                mutable val erased: List<Any> = List(1, 2, 3)
                 println(erased.get(3))
                 """)).isEqualTo("bounds error: index 3 is out of range for list of size 3");
         assertThat(runtimeFailure("""
-                var nums: List<Integer> = List(1, 2, 3)
+                mutable val nums: List<Integer> = List(1, 2, 3)
                 nums.set(5, 0)
                 """)).isEqualTo("bounds error: index 5 is out of range for list of size 3");
     }
@@ -183,8 +183,8 @@ public final class SolvikCollectionBenchmarkTest {
         // The element storage is an implementation choice: an element leaves the list as an erased
         // value either way, so an integral list and a structurally identical erased list agree.
         assertThat(run("""
-                var integral: List<Integer> = List(1, 2, 3)
-                var erased: List<Any> = List(1, 2, 3)
+                mutable val integral: List<Integer> = List(1, 2, 3)
+                mutable val erased: List<Any> = List(1, 2, 3)
                 println(integral.get(0) == erased.get(0))
                 println(integral.get(2) == erased.get(2))
                 println(integral.size == erased.size)
@@ -198,7 +198,7 @@ public final class SolvikCollectionBenchmarkTest {
     @Test
     public void setMembershipUsesValueEqualityForScalars() {
         assertThat(run("""
-                var s: Set<Integer> = Set<Integer>()
+                mutable val s: Set<Integer> = Set<Integer>()
                 println(s.add(7))
                 println(s.add(7))
                 println(s.contains(7))
@@ -210,7 +210,7 @@ public final class SolvikCollectionBenchmarkTest {
     @Test
     public void mapKeysUseValueEquality() {
         assertThat(run("""
-                var m: Map<Integer, String> = Map<Integer, String>()
+                mutable val m: Map<Integer, String> = Map<Integer, String>()
                 m.put(3, "three")
                 println(m.get(3))
                 println(m.containsKey(3))
@@ -223,8 +223,8 @@ public final class SolvikCollectionBenchmarkTest {
     @Test
     public void collectionsCompareByIdentityNotByContent() {
         assertThat(run("""
-                var left: Set<Integer> = Set(1, 2)
-                var right: Set<Integer> = Set(1, 2)
+                mutable val left: Set<Integer> = Set(1, 2)
+                mutable val right: Set<Integer> = Set(1, 2)
                 println(left == right)
                 println(left.equals(right))
                 println(left == left)
@@ -234,10 +234,10 @@ public final class SolvikCollectionBenchmarkTest {
     @Test
     public void equalityForStringsAndBooleansHoldsAcrossCollections() {
         assertThat(run("""
-                var s: Set<String> = Set("a", "b")
+                mutable val s: Set<String> = Set("a", "b")
                 println(s.contains("a"))
                 println(s.contains("c"))
-                var b: Set<Boolean> = Set(true)
+                mutable val b: Set<Boolean> = Set(true)
                 println(b.contains(true))
                 println(b.contains(false))
                 """)).isEqualTo("true\nfalse\ntrue\nfalse\n");
@@ -248,7 +248,7 @@ public final class SolvikCollectionBenchmarkTest {
     @Test
     public void stackPushPopPeekStayPositional() {
         assertThat(run("""
-                var st: Stack<Integer> = Stack<Integer>()
+                mutable val st: Stack<Integer> = Stack<Integer>()
                 println(st.isEmpty)
                 st.push(1)
                 st.push(2)

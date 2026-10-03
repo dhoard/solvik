@@ -113,7 +113,7 @@ public final class SolvikIdentityTest {
     @Test
     public void identityAcrossASuperclassAndSubclass() {
         assertThat(run("""
-                    open class Base {
+                    mutable class Base {
                     }
 
                     class Derived extends Base {
@@ -180,7 +180,7 @@ public final class SolvikIdentityTest {
                     }
 
                     class Counter {
-                        var calls: Integer
+                        mutable val calls: Integer
 
                         Counter() {
                             this.calls = 0
@@ -205,7 +205,7 @@ public final class SolvikIdentityTest {
                     }
 
                     class Counter {
-                        var calls: Integer
+                        mutable val calls: Integer
 
                         Counter() {
                             this.calls = 0

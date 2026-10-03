@@ -1,0 +1,18 @@
+{
+  "manifestSchemaVersion": 1,
+  "specVersion": "2026.11-draft",
+  "testId": "SOL-TCK-0024",
+  "category": "lexical",
+  "profile": "full-language",
+  "status": "required",
+  "requirements": [
+    "REQ-0401"
+  ],
+  "entryPoint": "main.sol",
+  "outcome": "COMPILE_ERROR",
+  "expectation": {
+    "diagnostic": {
+      "family": "LEX"
+    }
+  }
+}

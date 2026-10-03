@@ -125,12 +125,12 @@ public final class SolvikEnumNegativeTest {
     @Test
     public void aSealedClassCannotBeConstructed() {
         assertThat(first(checkFails("""
-                sealed class Shape {
+                abstract class Shape {
                 }
                 func f(): Shape {
                     return Shape()
                 }
-                """)).code()).isEqualTo(DiagnosticCode.SEM_CANNOT_CONSTRUCT_SEALED);
+                """)).code()).isEqualTo(DiagnosticCode.SEM_CANNOT_CONSTRUCT_ABSTRACT);
     }
 
     @Test

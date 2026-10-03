@@ -59,7 +59,7 @@ Response adds `implementation`:
 
 ```json
 {"name":..., "version":..., "fingerprint":"<sha256hex>",
- "specVersions":["2026.10-draft"], "profiles":["full-language"],
+ "specVersions":["2026.11-draft"], "profiles":["full-language"],
  "capabilities":["compile-only"],
  "limits":{"maxRequestBytes":...,"maxResponseBytes":...,"maxCapturedOutputBytes":...,
            "maxSourceTreeBytes":...,"maxDiagnostics":...,"maxArtifacts":...,"cancelGraceMs":...}}

@@ -97,7 +97,7 @@ println(offsetByTen.toString())
 println(attach.toString())
 
 // A nullable function type holds a function value and refines like any other nullable value.
-var optional: (func(Integer): Integer)? = plusOne
+mutable val optional: (func(Integer): Integer)? = plusOne
 if (optional != null) {
     println(optional(4))
 }

@@ -223,7 +223,7 @@ public final class SolvikCaptureTest {
     public void aCapturedObjectReferenceObservesLaterMutation() {
         assertThat(run("""
             class Cell {
-                var n: Integer = 0
+                mutable val n: Integer = 0
             }
             func demo(): Integer {
                 val cell = Cell()
@@ -248,7 +248,7 @@ public final class SolvikCaptureTest {
     public void aCapturedObjectIsTheSameObjectTheBodyReceives() {
         assertThat(run("""
             class Box {
-                var n: Integer = 1
+                mutable val n: Integer = 1
             }
             func demo(): Boolean {
                 val box = Box()
@@ -459,7 +459,7 @@ public final class SolvikCaptureTest {
     public void aClosureCapturesTheReceiverToUseIt() {
         assertThat(run("""
             class Adder {
-                var base: Integer = 0
+                mutable val base: Integer = 0
 
                 func set(value: Integer) {
                     this.base = value
@@ -489,7 +489,7 @@ public final class SolvikCaptureTest {
     public void aCapturedReceiverObeysReferenceSemantics() {
         assertThat(run("""
             class Adder {
-                var base: Integer = 0
+                mutable val base: Integer = 0
 
                 func set(value: Integer) {
                     this.base = value
@@ -521,7 +521,7 @@ public final class SolvikCaptureTest {
     public void aReceiverIsForwardedThroughNestedClosures() {
         assertThat(run("""
             class Holder {
-                var n: Integer = 0
+                mutable val n: Integer = 0
 
                 func set(value: Integer) {
                     this.n = value
@@ -553,7 +553,7 @@ public final class SolvikCaptureTest {
     public void aClosureBodyMayNotUseThisWithoutCapturingIt() {
         String source = """
             class Holder {
-                var n: Integer = 0
+                mutable val n: Integer = 0
 
                 func leaks(): func(): Integer {
                     return func(): Integer {
@@ -601,7 +601,7 @@ public final class SolvikCaptureTest {
     public void aCaptureListMayNotWriteThisTwice() {
         String source = """
             class Holder {
-                var n: Integer = 0
+                mutable val n: Integer = 0
 
                 func leaks(): func(): Integer {
                     return func [this, this](): Integer {
@@ -619,18 +619,18 @@ public final class SolvikCaptureTest {
     // ---------------------------------------------------------------------------------------------
 
     /**
-     * A capture item naming a {@code var} is rejected at the item.
+     * A capture item naming a {@code mutable val} is rejected at the item.
      *
-     * <p>"Naming a {@code var} in a capture list is {@code SEM_MUTABLE_CAPTURE}
+     * <p>"Naming a {@code mutable val} in a capture list is {@code SEM_MUTABLE_CAPTURE}
      * ({@code SOLV-SEM-057}), reported on that capture item" (section 6). The specification's own
      * example is {@code func [total](value: Integer) { total = total + value }} over
-     * {@code var total = 0}.
+     * {@code mutable val total = 0}.
      */
     @Test
     public void aCaptureItemNamingAVarIsRejected() {
         String source = """
             func demo(): func(Integer): Unit {
-                var total: Integer = 0
+                mutable val total: Integer = 0
                 val add: func(Integer): Unit = func [total](value: Integer): Unit {
                     total = value
                 }
@@ -643,7 +643,7 @@ public final class SolvikCaptureTest {
     }
 
     /**
-     * A body read of a {@code var} that its own capture list named is rejected with the same code.
+     * A body read of a {@code mutable val} that its own capture list named is rejected with the same code.
      *
      * <p>"and a read or write of that captured name in the body is reported with the same code"
      * (section 6). Two diagnostics therefore appear for one closure: one on the item and one on the
@@ -654,7 +654,7 @@ public final class SolvikCaptureTest {
     public void aBodyReadOfACapturedVarNameIsRejectedToo() {
         String source = """
             func demo(): func(): Integer {
-                var total: Integer = 0
+                mutable val total: Integer = 0
                 return func [total](): Integer {
                     return total
                 }
@@ -666,7 +666,7 @@ public final class SolvikCaptureTest {
     }
 
     /**
-     * A body write of a {@code var} that its own capture list named is rejected as well.
+     * A body write of a {@code mutable val} that its own capture list named is rejected as well.
      *
      * <p>"a read or write of that captured name in the body is reported with the same code"
      * (section 6) — a write is no different, since the binding it would assign lives in a frame the
@@ -676,7 +676,7 @@ public final class SolvikCaptureTest {
     public void aBodyWriteToACapturedVarNameIsRejectedToo() {
         String source = """
             func demo(): func(Integer): Unit {
-                var total: Integer = 0
+                mutable val total: Integer = 0
                 return func [total](value: Integer): Unit {
                     total = value
                 }
@@ -762,7 +762,7 @@ public final class SolvikCaptureTest {
     }
 
     /**
-     * The {@code var} case is deliberately <em>not</em> suppressed, and a separate omission in the same
+     * The {@code mutable val} case is deliberately <em>not</em> suppressed, and a separate omission in the same
      * body is still reported.
      *
      * <p>The specification assigns the mutable-capture code to both placements -- the item and each body
@@ -774,7 +774,7 @@ public final class SolvikCaptureTest {
     public void aCapturedVarUseStillReportsAndAnUnrelatedOmissionSurvives() {
         String source = """
             func demo(base: Integer): func(Integer): Integer {
-                var total: Integer = 0
+                mutable val total: Integer = 0
                 return func [total](value: Integer): Integer {
                     return total + base
                 }
@@ -786,10 +786,10 @@ public final class SolvikCaptureTest {
     }
 
     /**
-     * Referencing an enclosing {@code var} without listing it stays an unlisted capture rather than
+     * Referencing an enclosing {@code mutable val} without listing it stays an unlisted capture rather than
      * becoming a mutable-capture error.
      *
-     * <p>"Referencing the same outer {@code var} without listing it remains
+     * <p>"Referencing the same outer {@code mutable val} without listing it remains
      * {@code SEM_UNLISTED_CAPTURE} at the body reference; the compiler never silently converts it into
      * a capture" (section 6). The name never reaches a capture list, so no capture-item diagnostic can
      * apply, and reporting the mutable code instead would tell the reader to remove a capture that was
@@ -799,7 +799,7 @@ public final class SolvikCaptureTest {
     public void anUnlistedEnclosingVarIsAnUnlistedCaptureNotAMutableCapture() {
         String source = """
             func demo(): func(): Integer {
-                var total: Integer = 0
+                mutable val total: Integer = 0
                 return func(): Integer {
                     return total
                 }
@@ -811,18 +811,18 @@ public final class SolvikCaptureTest {
     }
 
     /**
-     * A {@code var} declared at top level is a local of the implicit entry point, so capturing it is
+     * A {@code mutable val} declared at top level is a local of the implicit entry point, so capturing it is
      * rejected like capturing any other local.
      *
      * <p>Section 5 gives top-level statements the scope of an implicit entry point, so a top-level
-     * {@code var} is a mutable local of that callable and the capture rule about {@code var}s applies
+     * {@code mutable val} is a mutable local of that callable and the capture rule about {@code mutable val}s applies
      * to it. This is the case where "capture top-level state" would be the natural wrong reading of
      * the exemption for top-level functions.
      */
     @Test
     public void aTopLevelVarIsNotCapturable() {
         String source = """
-            var count: Integer = 0
+            mutable val count: Integer = 0
             val read: func(): Integer = func [count](): Integer {
                 return count
             }
@@ -901,7 +901,7 @@ public final class SolvikCaptureTest {
     public void aCaptureItemMayNotNameATopLevelClass() {
         String source = """
             class Helper {
-                var n: Integer = 0
+                mutable val n: Integer = 0
             }
             func demo(): func(): Integer {
                 return func [Helper](): Integer {

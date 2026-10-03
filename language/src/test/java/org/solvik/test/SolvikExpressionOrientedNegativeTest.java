@@ -78,7 +78,7 @@ public final class SolvikExpressionOrientedNegativeTest {
         assertThat(hasCode(checkFails("""
                 func f(): Integer {
                     val x = {
-                        var local = 1
+                        mutable val local = 1
                         local = 2
                     }
                     return x

@@ -49,6 +49,13 @@ public enum DiagnosticCode {
      * of failing with a VM resource exhaustion.
      */
     PARSER_NESTING_TOO_DEEP("SOLV-PARS-005"),
+    /**
+     * A keyword removed by a previous specification revision was written. The spellings stay reserved
+     * and appear in no grammar production, so they can never be reused as identifiers; the diagnostic
+     * names the replacement rather than letting an old program mean something new. See
+     * {@code SolvikErrorListener#REMOVED_KEYWORDS}.
+     */
+    PARSER_UNSUPPORTED_REMOVED_SYNTAX("SOLV-PARS-006"),
 
     /** Name resolution: no declaration is visible for the referenced name. */
     RESOL_UNKNOWN_NAME("SOLV-RESOL-001"),
@@ -183,7 +190,7 @@ public enum DiagnosticCode {
     SEM_CLASS_REQUIRES_INITIALIZER("SOLV-SEM-006"),
     /** Semantic validation: a class declares more than one constructor. */
     SEM_DUPLICATE_CONSTRUCTOR("SOLV-SEM-007"),
-    /** Semantic validation: a class extends a class that was not declared {@code open}. */
+    /** Semantic validation: a class extends a class that was declared neither {@code mutable} nor {@code abstract}. */
     SEM_EXTEND_FINAL("SOLV-SEM-008"),
     /** Semantic validation: an {@code extends} clause names something other than a class or {@code Any}. */
     SEM_INVALID_SUPERCLASS("SOLV-SEM-009"),
@@ -193,7 +200,7 @@ public enum DiagnosticCode {
     SEM_ACCIDENTAL_OVERRIDE("SOLV-SEM-011"),
     /** Semantic validation: a method is marked {@code override} but no inherited method matches. */
     SEM_OVERRIDE_WITHOUT_SUPER("SOLV-SEM-012"),
-    /** Semantic validation: an override targets a method that is not {@code open}. */
+    /** Semantic validation: an override targets a method that is not {@code mutable}. */
     SEM_OVERRIDE_FINAL("SOLV-SEM-013"),
     /** Semantic validation: an override has incompatible parameter or return types. */
     SEM_OVERRIDE_SIGNATURE("SOLV-SEM-014"),
@@ -221,8 +228,8 @@ public enum DiagnosticCode {
     SEM_AMBIGUOUS_DELEGATION("SOLV-SEM-026"),
     /** Semantic validation: a member forwarded by a delegate does not conform to its requirement. */
     SEM_DELEGATE_SIGNATURE("SOLV-SEM-027"),
-    /** Semantic validation: a sealed (abstract) class is constructed directly. */
-    SEM_CANNOT_CONSTRUCT_SEALED("SOLV-SEM-028"),
+    /** Semantic validation: an {@code abstract} class is constructed directly. */
+    SEM_CANNOT_CONSTRUCT_ABSTRACT("SOLV-SEM-028"),
     /** Semantic validation: a {@code match} does not cover every known variant or permits null. */
     SEM_MATCH_NOT_EXHAUSTIVE("SOLV-SEM-029"),
     /** Semantic validation: a {@code match} branch can never be selected. */
@@ -243,8 +250,6 @@ public enum DiagnosticCode {
     SEM_RESERVED_MEMBER("SOLV-SEM-037"),
     /** Semantic validation: a range {@code for}-in bound is not an {@code Integer}. */
     SEM_INVALID_RANGE_BOUND("SOLV-SEM-038"),
-    /** Semantic validation: a sealed class is extended from a physical source file other than its own. */
-    SEM_SEALED_SUBTYPE_OUTSIDE_FILE("SOLV-SEM-039"),
     /** Semantic validation: a {@code key: value} entry appears outside a built-in {@code Map} construction. */
     SEM_MAP_ENTRY("SOLV-SEM-040"),
     /**
@@ -262,7 +267,7 @@ public enum DiagnosticCode {
     SEM_EQUALS_WITHOUT_HASHCODE("SOLV-SEM-045"),
     /** A class declares more than one {@code static} class initializer block. */
     SEM_DUPLICATE_STATIC_BLOCK("SOLV-SEM-046"),
-    /** A {@code static} member is declared {@code open} or {@code override}, which it cannot be. */
+    /** A {@code static} member is declared {@code mutable} or {@code override}, which it cannot be. */
     SEM_INVALID_STATIC_MODIFIER("SOLV-SEM-047"),
     /** A {@code static} member mentions a type parameter of its enclosing class. */
     SEM_TYPE_PARAMETER_IN_STATIC_MEMBER("SOLV-SEM-048"),
@@ -301,12 +306,12 @@ public enum DiagnosticCode {
     SEM_UNLISTED_CAPTURE("SOLV-SEM-058"),
 
     /**
-     * Function values: a capture item names a mutable ({@code var}) binding, or an anonymous function
+     * Function values: a capture item names a mutable ({@code mutable val}) binding, or an anonymous function
      * body reads or writes a name that its own capture list named as such a binding
      * (docs/LANGUAGE_SPEC.md section 6, "Explicit immutable closure capture"). The item reports this on
      * the capture item and the body use reports it on the body reference; both placements are specified
      * and both report this one code. Only a name the list itself named reaches the body placement — a
-     * body use of an {@code var} the list never named is the unlisted-capture diagnostic instead, since
+     * body use of a {@code mutable val} the list never named is the unlisted-capture diagnostic instead, since
      * no capture of it was ever written. Capture is immutable by rule, so mutable state is shared
      * through a captured immutable object reference instead.
      */

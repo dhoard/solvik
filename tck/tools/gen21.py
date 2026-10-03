@@ -10,7 +10,7 @@ import base64, json, os, re, subprocess, sys, tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SPEC = open(os.path.join(ROOT, "docs/LANGUAGE_SPEC.md")).read()
-CORPUS = os.path.join(ROOT, "tck/corpus/2026.10-draft")
+CORPUS = os.path.join(ROOT, "tck/corpus/2026.11-draft")
 LAUNCHER = os.path.join(ROOT, "standalone/target/solvik")
 
 
@@ -74,7 +74,7 @@ REQS = {
   summary="A `switch` in expression position produces a value from its matched case body, while a statement `switch` may omit `default` and do nothing when no label matches",
   kind="runtime",
   notes="Both halves are observable in one program: the expression form yields a string, and a statement switch whose label does not match contributes nothing to stdout. The missing-`default` rejection for the expression form is already SOL-TCK-0012 under REQ-0204.",
-  quotes=["Every expression `switch` must contain exactly one `default`, and it must remain last. `switch` does not gain enum or sealed exhaustiveness; that remains the responsibility of `match`. Requiring `default` makes value production explicit for `Integer`, `String`, and regex dispatch, while a statement `switch` may still omit `default` and do nothing when no label matches."]),
+  quotes=["Every expression `switch` must contain exactly one `default`, and it must remain last. `switch` does not gain enum exhaustiveness; that remains the responsibility of `match`. Requiring `default` makes value production explicit for `Integer`, `String`, and regex dispatch, while a statement `switch` may still omit `default` and do nothing when no label matches."]),
  "REQ-1208": dict(
   section="21.5 `switch` expressions / 21.9 required diagnostics",
   summary="Every normally completing case body, including `default`, must end in a tail expression, so a value-position case body ending in a declaration is SEM_BLOCK_RESULT_REQUIRED",
@@ -170,7 +170,7 @@ print(answer)
 // fresh `s` is 3, so total = 2+3 = 5. Printing after each block gives "2" then "5",
 // so the expected stdout is exactly "25". A shared or leaked scope could not produce 5
 // (it would produce 4 from `s + s`, or fail to compile).
-var total = 0
+mutable val total = 0
 val a = {
     val s = 2
     total = total + s
@@ -231,7 +231,7 @@ print("EXECUTED-INVALID")
 // expression". The block's last item assigns to an outer variable, so the block never
 // reaches a tail expression and must be rejected with SEM_BLOCK_RESULT_REQUIRED
 // (SOLV-SEM-041) rather than acquiring a `Unit` result.
-var target = 0
+mutable val target = 0
 val invalid = {
     target = 5
 }
@@ -266,7 +266,7 @@ print("EXECUTED-INVALID")
 // about ordering, so bracketing both marks this stream and keeps the two derivations
 // independently checkable. If the block were treated as an expression its value
 // would be required, and section 21.2 makes that a compile-time error instead.
-var x = 10
+mutable val x = 10
 {
     val d = 7
     x = x - d
@@ -521,7 +521,7 @@ print("]")
 // Four of those named contexts appear here, each producing a fixed value: assignment
 // right-hand side yields 10, call argument yields "n", explicit return yields "nonzero",
 // and a nested construct yields 2. Expected stdout is exactly "10nnonzero2".
-var score: Integer = 0
+mutable val score: Integer = 0
 score = if (true) {
     10
 } else {
@@ -726,7 +726,7 @@ def main():
             fh.write(src)
         e = EXPECT[tid]
         man = {
-            "manifestSchemaVersion": 1, "specVersion": "2026.10-draft", "testId": tid,
+            "manifestSchemaVersion": 1, "specVersion": "2026.11-draft", "testId": tid,
             "category": CATEGORY[tid], "profile": "full-language", "status": "required",
             "requirements": [REQ_FOR[tid]], "entryPoint": "main.sol",
             "outcome": e["outcome"], "expectation": (

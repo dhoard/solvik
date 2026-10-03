@@ -36,7 +36,7 @@ public final class SolvikGenericsNegativeTest {
 
     private static final String BOX = """
             class Box<T> {
-                var value: T
+                mutable val value: T
 
                 Box(value: T) {
                     this.value = value
@@ -160,7 +160,7 @@ public final class SolvikGenericsNegativeTest {
     public void duplicateTypeParameterNamesAreRejected() {
         assertThat(first(checkFails("""
                 class Pair<T, T> {
-                    var value: T
+                    mutable val value: T
 
                     Pair(value: T) {
                         this.value = value

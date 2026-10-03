@@ -245,8 +245,8 @@ public final class SolvikParserNegativeTest {
 
     @Test
     public void constructorModifiersAreRejected() {
-        // A constructor is not a method, so it carries no `open`/`override` modifier.
-        expectErrors("openctor.sol", "class C {\n    open C() {\n    }\n}\n");
+        // A constructor is not a method, so it carries no `mutable`/`override` modifier.
+        expectErrors("mutablector.sol", "class C {\n    mutable C() {\n    }\n}\n");
         expectErrors("overridector.sol", "class C {\n    override C() {\n    }\n}\n");
     }
 
@@ -256,5 +256,55 @@ public final class SolvikParserNegativeTest {
         SolvikParseResult r = org.solvik.parser.SolvikParser.parse(new SourceFile("ok.sol", ok));
         assertThat(r.isSuccess()).isTrue();
         assertThat(r.diagnostics().isEmpty()).isTrue();
+    }
+
+    /**
+     * The keywords removed in 2026.11-draft stay reserved and appear in no production, so a program
+     * written against 2026.10-draft fails at the keyword itself with the replacement named, rather
+     * than being silently reinterpreted -- which is what would happen if `var` were merely deleted
+     * from the lexer and `var x = 1` became an assignment to an identifier named `var`.
+     */
+    @Test
+    public void eachRemovedKeywordIsReportedAtItsOwnSpanWithItsReplacement() {
+        record Removed(String source, String keyword, String replacement) {
+        }
+        List<Removed> cases = List.of( //
+                        new Removed("var x: Integer = 1;\n", "var", "'mutable val'"), //
+                        new Removed("func f(): Unit {\n    var y = 2;\n}\n", "var", "'mutable val'"), //
+                        new Removed("open class C {\n}\n", "open", "'mutable'"), //
+                        new Removed("sealed class S {\n}\n", "sealed", "'abstract'"), //
+                        new Removed("class C {\n    open func f(): Unit {\n    }\n}\n", "open", "'mutable'"));
+        for (Removed testCase : cases) {
+            DiagnosticBag bag = expectErrors("removed.sol", testCase.source());
+            Diagnostic diagnostic = bag.all().stream().filter(d -> d.code() == DiagnosticCode.PARSER_UNSUPPORTED_REMOVED_SYNTAX).findFirst().orElseThrow();
+            assertThat(diagnostic.message()).as(testCase.source()).contains("'" + testCase.keyword() + "' keyword was removed")
+                            .contains(testCase.replacement());
+            int at = testCase.source().indexOf(testCase.keyword());
+            assertThat(diagnostic.span().startOffset()).as("points at the keyword in " + testCase.source()).isEqualTo(at);
+            assertThat(diagnostic.span().endOffset()).isEqualTo(at + testCase.keyword().length());
+        }
+    }
+
+    /**
+     * The removed keywords are reserved rather than identifiers, so a program cannot use them as names
+     * even where no diagnostic is otherwise expected. This is the property that keeps the removal
+     * unambiguous, and it is why the tokens must not be deleted from the grammar.
+     */
+    @Test
+    public void removedKeywordsRemainReservedAsNames() {
+        for (String keyword : List.of("var", "open", "sealed")) {
+            expectErrors("reserved.sol", "func " + keyword + "(): Unit {\n}\n");
+            expectErrors("reserved.sol", "val " + keyword + " = 1;\n");
+        }
+    }
+
+    @Test
+    public void removedKeywordsDoNotShadowTheNewVocabulary() {
+        // `mutable` and `abstract` are live, so a program using them must parse; a removed keyword in
+        // the same program must still be the only thing reported.
+        String src = "mutable class C {\n    mutable func f(): Unit {\n    }\n}\nabstract class D extends C {\n}\nfunc g(): Unit {\n    mutable val x = 1;\n    x = 2;\n}\n";
+        SolvikParseResult ok = org.solvik.parser.SolvikParser.parse(new SourceFile("new.sol", src));
+        assertThat(ok.diagnostics().all()).isEmpty();
+        assertThat(ok.isSuccess()).isTrue();
     }
 }

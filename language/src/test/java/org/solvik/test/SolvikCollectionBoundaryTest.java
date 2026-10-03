@@ -38,13 +38,13 @@ public final class SolvikCollectionBoundaryTest {
 
     @ParameterizedTest(name = "{0}")
     @CsvSource(delimiter = '|', value = {
-            "var l: List<Integer> = List(1); println(l.get(1)) | 1",
-            "var l: List<Integer> = List(1); println(l.get(-1)) | -1",
-            "var l: List<Integer> = List(1); l.set(1, 5) | 1",
-            "var l: List<Integer> = List(1); println(l.removeAt(2)) | 2",
-            "var l: List<Integer> = List(); println(l.get(0)) | 0",
-            "var l: List<Integer> = List(); l.set(0, 5) | 0",
-            "var l: List<Integer> = List(); println(l.removeAt(0)) | 0",
+            "mutable val l: List<Integer> = List(1); println(l.get(1)) | 1",
+            "mutable val l: List<Integer> = List(1); println(l.get(-1)) | -1",
+            "mutable val l: List<Integer> = List(1); l.set(1, 5) | 1",
+            "mutable val l: List<Integer> = List(1); println(l.removeAt(2)) | 2",
+            "mutable val l: List<Integer> = List(); println(l.get(0)) | 0",
+            "mutable val l: List<Integer> = List(); l.set(0, 5) | 0",
+            "mutable val l: List<Integer> = List(); println(l.removeAt(0)) | 0",
     })
     public void outOfRangeListIndexRaisesABoundsError(String program, int index) {
         PolyglotException failure = failureOf("func f() {\n    " + program + "\n}\nf()\n");
@@ -56,7 +56,7 @@ public final class SolvikCollectionBoundaryTest {
     @Test
     public void listIsEmptyAndSizeTrackItsContents() {
         assertThat(run("""
-                    var l: List<Integer> = List()
+                    mutable val l: List<Integer> = List()
                     println(l.isEmpty)
                     println(l.size)
                     l.add(1)
@@ -71,7 +71,7 @@ public final class SolvikCollectionBoundaryTest {
     @Test
     public void setReportsMembershipAndRemovalPresence() {
         assertThat(run("""
-                    var s: Set<Integer> = Set()
+                    mutable val s: Set<Integer> = Set()
                     println(s.add(1))
                     println(s.add(1))
                     println(s.contains(1))
@@ -85,7 +85,7 @@ public final class SolvikCollectionBoundaryTest {
     @Test
     public void mapReportsKeyPresenceAndRemovalPresence() {
         assertThat(run("""
-                    var m: Map<Integer, Integer> = Map(1: 10)
+                    mutable val m: Map<Integer, Integer> = Map(1: 10)
                     println(m.containsKey(1))
                     println(m.containsKey(2))
                     println(m.remove(2))
@@ -98,7 +98,7 @@ public final class SolvikCollectionBoundaryTest {
     @Test
     public void stackIsEmptyAndSizeTrackItsContents() {
         assertThat(run("""
-                    var st: Stack<Integer> = Stack()
+                    mutable val st: Stack<Integer> = Stack()
                     println(st.isEmpty)
                     println(st.size)
                     st.push(1)
@@ -113,7 +113,7 @@ public final class SolvikCollectionBoundaryTest {
     @Test
     public void listClearResetsToAnEmptyCollection() {
         assertThat(run("""
-                    var l: List<Integer> = List(1, 2, 3)
+                    mutable val l: List<Integer> = List(1, 2, 3)
                     println(l.size)
                     l.clear()
                     println(l.size)
@@ -124,7 +124,7 @@ public final class SolvikCollectionBoundaryTest {
     @Test
     public void setClearResetsToAnEmptyCollection() {
         assertThat(run("""
-                    var s: Set<Integer> = Set(1, 2, 3)
+                    mutable val s: Set<Integer> = Set(1, 2, 3)
                     println(s.size)
                     s.clear()
                     println(s.size)
@@ -135,7 +135,7 @@ public final class SolvikCollectionBoundaryTest {
     @Test
     public void mapClearResetsToAnEmptyCollection() {
         assertThat(run("""
-                    var m: Map<Integer, Integer> = Map(1: 1, 2: 2)
+                    mutable val m: Map<Integer, Integer> = Map(1: 1, 2: 2)
                     println(m.size)
                     m.clear()
                     println(m.size)
@@ -148,7 +148,7 @@ public final class SolvikCollectionBoundaryTest {
         // Confirms that `put` with a duplicate key preserves the original insertion position and
         // replaces only the value, exercising the SolvikMap.replace behavior at runtime.
         assertThat(run("""
-                    var m: Map<String, Integer> = Map()
+                    mutable val m: Map<String, Integer> = Map()
                     m.put("a", 1)
                     m.put("b", 2)
                     m.put("a", 3)
@@ -165,7 +165,7 @@ public final class SolvikCollectionBoundaryTest {
             PolyglotException failure = org.solvik.test.SolvikTestSupport.expectThrows(
                     PolyglotException.class,
                     () -> context.eval(build("""
-                                var m: Map<String, Integer> = Map()
+                                mutable val m: Map<String, Integer> = Map()
                                 m.put("a", 1)
                                 println(m.get("z"))
                             """)));
@@ -182,7 +182,7 @@ public final class SolvikCollectionBoundaryTest {
             PolyglotException failure = org.solvik.test.SolvikTestSupport.expectThrows(
                     PolyglotException.class,
                     () -> context.eval(build("""
-                                var st: Stack<Integer> = Stack()
+                                mutable val st: Stack<Integer> = Stack()
                                 println(st.peek())
                             """)));
             assertThat(out.size()).isEqualTo(0);
@@ -194,7 +194,7 @@ public final class SolvikCollectionBoundaryTest {
     @Test
     public void setAddWithADuplicateReturnsFalseAndKeepsSize() {
         assertThat(run("""
-                    var s: Set<Integer> = Set()
+                    mutable val s: Set<Integer> = Set()
                     println(s.add(1))
                     println(s.add(1))
                     println(s.size)

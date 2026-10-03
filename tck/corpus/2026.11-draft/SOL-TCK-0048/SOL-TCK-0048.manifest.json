@@ -1,0 +1,17 @@
+{
+ "manifestSchemaVersion": 1,
+ "specVersion": "2026.11-draft",
+ "testId": "SOL-TCK-0048",
+ "category": "types",
+ "profile": "full-language",
+ "status": "required",
+ "requirements": [
+  "REQ-0502"
+ ],
+ "entryPoint": "main.sol",
+ "outcome": "RUNTIME_ERROR",
+ "expectation": {
+  "runtimeCategory": "CAST_FAILURE",
+  "stdoutBase64": ""
+ }
+}

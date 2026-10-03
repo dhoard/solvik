@@ -165,7 +165,7 @@ public final class SolvikExpressionOrientedSemanticTest {
                     return if (value == 0) { "zero" } else { "nonzero" }
                 }
 
-                var score: Integer = 0
+                mutable val score: Integer = 0
                 score = if (true) { 10 } else { 0 }
                 print(if (true) { "a" } else { "b" })
                 print(classify(score))

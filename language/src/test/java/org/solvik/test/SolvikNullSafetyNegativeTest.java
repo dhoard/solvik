@@ -112,7 +112,7 @@ public final class SolvikNullSafetyNegativeTest {
     public void nullablePropertyWriteWithoutACheckIsRejected() {
         String text = """
                 class Box {
-                    var value: Integer
+                    mutable val value: Integer
 
                     Box(value: Integer) {
                         this.value = value
@@ -129,7 +129,7 @@ public final class SolvikNullSafetyNegativeTest {
     public void assignmentThroughASafeAccessIsRejected() {
         String text = """
                 class Box {
-                    var value: Integer
+                    mutable val value: Integer
 
                     Box(value: Integer) {
                         this.value = value
@@ -173,7 +173,7 @@ public final class SolvikNullSafetyNegativeTest {
                     }
                 }
                 func f(): Integer {
-                    var box: Box? = Box(1)
+                    mutable val box: Box? = Box(1)
                     if (box != null) {
                         box = null
                         return box.value
@@ -195,7 +195,7 @@ public final class SolvikNullSafetyNegativeTest {
                     }
                 }
                 func f(flag: Boolean): Integer {
-                    var box: Box? = Box(1)
+                    mutable val box: Box? = Box(1)
                     if (box != null) {
                         if (flag) {
                             box = null
@@ -219,7 +219,7 @@ public final class SolvikNullSafetyNegativeTest {
                     }
                 }
                 func f(flag: Boolean): Integer {
-                    var box: Box? = Box(1)
+                    mutable val box: Box? = Box(1)
                     if (box != null) {
                         while (flag) {
                             box = null

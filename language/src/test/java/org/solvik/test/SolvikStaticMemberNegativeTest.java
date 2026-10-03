@@ -82,10 +82,10 @@ public final class SolvikStaticMemberNegativeTest {
     }
 
     @Test
-    public void anOpenStaticMethodIsRejected() {
+    public void aMutableStaticMethodIsRejected() {
         Diagnostic diagnostic = only(checkFails("""
                 class Counter {
-                    static open func reset() {
+                    static mutable func reset() {
                         println("reset")
                     }
                 }
@@ -254,7 +254,7 @@ public final class SolvikStaticMemberNegativeTest {
     @Test
     public void superIsNotAvailableInsideAStaticMethodBody() {
         Diagnostic diagnostic = first(checkFails("""
-                open class Base {
+                mutable class Base {
                 }
                 class Counter extends Base {
                     static func reset() {

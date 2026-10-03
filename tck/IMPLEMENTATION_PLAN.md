@@ -20,14 +20,14 @@ Python 3.14**; Solvik/Java/GraalVM/Maven are never invoked by them.
 | `./tck/tck-check.sh` | exit 0 (validate + all self-tests) |
 | `python3 tck/tests/test_strict_json_and_schema.py` | 196/196 passed (incl. reference-validator parity vs `jsonschema` Draft 2020-12; 0 skipped) |
 | `python3 tck/tests/test_manifest_and_inventory.py` | 41/41 passed (incl. requirement/test linkage, whose error path is exercised by injected defects) |
-| `python3 tck/tests/test_oracle_quotes.py` | 2097/2097 passed (every quoted normative passage is grepped out of `LANGUAGE_SPEC.md`, in the inventory *and* in corpus oracle comments; section citations are resolved against real headings; corpus/structural invariants including exact-oracle independence between SUCCESS tests) |
+| `python3 tck/tests/test_oracle_quotes.py` | 2101/2101 passed (every quoted normative passage is grepped out of `LANGUAGE_SPEC.md`, in the inventory *and* in corpus oracle comments; section citations are resolved against real headings; corpus/structural invariants including exact-oracle independence between SUCCESS tests) |
 | `python3 tck/tests/test_protocol.py` | 22/22 passed |
 | `python3 tck/tests/test_preflight_and_determinism.py` | 19/19 passed |
 | `python3 tck/tests/test_integration_fake.py` | 62/62 passed |
 | `python3 tck/tests/test_solvik_adapter.py` | 69/69 passed (adapter translation + protocol state machine via a fake launcher; no GraalVM) |
 | `python3 tck/tests/test_differential.py` | 90/90 passed (comparator axes, refusal-as-absence, declaration-gated comparison, the legality-only marker, evidence digests, CRLF transform exercised under a simulated CRLF host, vacuity exit code, plus an end-to-end `tck_cli differential` run over behavior-scripted fake adapters; every guard exercised in both directions and proven falsifiable by injected defects). Comparability is decided at **two levels**, which one collapsed question once conflated: a *position on legality* (`COMPILE_ACCEPTED` or `COMPILE_REJECTED`, which a compile-only adapter holds because accepting a program is a claim about it) makes the acceptance axis comparable, while a *full language result* (a position plus an executed program) is what additionally makes stdout/stderr/exit/runtime-category comparable. Collapsing them let a partner that accepted a program the implementation rejected be classified as having observed nothing, reporting `disagreements=0` and exit 0 over the most fundamental divergence available; a refusal holds no position, and neither does a crash, whose recorded compile status may be well-formed but was produced by a process that then died) |
 | `python3 tck/tests/test_reference_adapter.py` | 48/48 passed (drives the **real** `Runner` over the **real** corpus with the independent reference front end: every executed program reproduces its oracle byte for byte, the answered set is an explicit allowlist, and every unimplemented program is an honest refusal that the runner can never record as a language result. Two further guards hold the front end to the specification rather than to convenience: its refused-name set must still equal the *mechanical* extraction of backticked bare lowercase words from LANGUAGE_SPEC.md -- section 1 reserves keywords but names no list, so curating that set would have the "independent" partner making language decisions it has no authority to make -- and a decimal literal outside the signed 32-bit range must be refused rather than accepted, because section 1 forbids it yet names no diagnostic to report. Both are falsifiable: dropping one word from the set as "obviously prose", a word that changes no program's behavior and no other guard observes, is caught by exactly one check) |
-| `python3 tck/runner/tck_cli.py validate` | OK: **304 requirements**, 1 profile, **493 manifests**; coverage **292/304 active**; states that `2026.10-draft` is a draft/non-certifiable baseline so aggregate certification is withheld |
+| `python3 tck/runner/tck_cli.py validate` | OK: **304 requirements**, 1 profile, **493 manifests**; coverage **292/304 active**; states that `2026.11-draft` is a draft/non-certifiable baseline so aggregate certification is withheld |
 | `python3 tck/runner/tck_cli.py differential --left-config <jvm> --right-config <native>` | **exit 0**, `disagreements=0 inconclusive=0 compared=493 unconstrained=261` -- the two shipped distributions agree on every normative observable across the entire portable corpus; the unconstrained entries are launcher `stderr` wording the oracle does not declare, reported with per-side digests but never counted |
 | `python3 tck/runner/tck_cli.py differential --left-config <jvm> --right-config <reference-subset>` | exit 0, `disagreements=0 inconclusive=477 compared=16 unconstrained=15` over 493 tests. The deliberately-incomplete adapter refuses 477 programs it does not implement, reported as an absence of observation rather than 477 fabricated disagreements; on the 14 programs both sides actually judge -- three raw-string/escape and `$` semantics, boolean/null rendering, three include-resolution rejections, three section 20 include-path rejections, and three section 1 lexical programs (the identifier character class, a `//` line comment, an in-range decimal literal) -- they agree on every oracle-declared observable, including byte-exact stdout with embedded NULs and escapes |
 
@@ -64,7 +64,7 @@ produce exactly one targeted message, the last of them saying outright that the 
 checking anything rather than passing quietly -- the failure mode a count guard is most likely to
 have and the one easiest to mistake for success.
 
-Total: **2644 self-test assertions** across 9 modules, all Python-only. The
+Total: **2648 self-test assertions** across 9 modules, all Python-only. The
 `test_integration_fake.py` suite additionally drives the aggregate conformance
 decision at the pure `build_report` layer (certifiable baseline -> `PASS`; draft
 baseline -> withheld; genuine failure -> `FAIL`; `NOT_RUN` -> withheld) so the `PASS`
@@ -110,7 +110,7 @@ offset conversion when the two diverge (non-ASCII source).
   21 example + 76 regression programs; 12 diagnostic fixtures; `test-corpus.sh`;
   no pre-existing `tck/`.
 * **Slice 2 — specification version identification.** Added an explicit, pre-1.0
-  language-specification revision `2026.10-draft` to `docs/LANGUAGE_SPEC.md`
+  language-specification revision `2026.11-draft` to `docs/LANGUAGE_SPEC.md`
   ("Versioning"). Semantics unchanged; the Maven `1.0.0-SNAPSHOT` is explicitly *not*
   treated as a spec version. A commit hash is not a semantic version.
 * **Slice 3 — normative requirement inventory.** `requirements/requirements.json`
@@ -168,7 +168,7 @@ of `JAVA_HOME` (the launcher contract: "Standard output carries only program out
 Full-language conformance certification is **withheld, and enforced in code**, for two
 independent reported reasons — neither of which an adapter can waive:
 
-1. **The normative baseline is a draft.** `2026.10-draft` is not a frozen, exhaustive
+1. **The normative baseline is a draft.** `2026.11-draft` is not a frozen, exhaustive
    normative inventory, and TCK.md §5 requires certification against an
    unversioned/draft baseline to be withheld. `versions.CERTIFIABLE_SPEC_VERSIONS` is
    therefore empty, so `report.build_report` returns `NOT_EVALUATED` for the aggregate
@@ -196,7 +196,7 @@ seed as well.
 Closing the `REQ-0100` gap took reported coverage to `4/4 active`, at which point the
 report flipped to `fullProfileConformance: PASS` after only six portable tests. That was
 **wrong output, not a milestone**: it would have asserted that the distribution conforms
-to the whole of `2026.10-draft` on the strength of a 4-requirement seed. The root cause was
+to the whole of `2026.11-draft` on the strength of a 4-requirement seed. The root cause was
 an under-enforcement in `report.build_report`, which withheld certification only for
 per-requirement gaps/ambiguities and never consulted the baseline's own maturity —
 contradicting this repository's own written policy (the README and this plan had both

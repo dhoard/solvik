@@ -8,11 +8,11 @@
 // position stays an unknown name; each creation is a fresh identity; and a `?.` reference through a
 // nullable receiver yields a nullable function value.
 
-open class Shape {
-    open func name(): String {
+mutable class Shape {
+    mutable func name(): String {
         return "shape"
     }
-    open func sides(): Integer {
+    mutable func sides(): Integer {
         return 0
     }
     func viaThis(): func(): String {
@@ -23,8 +23,8 @@ open class Shape {
     }
 }
 
-open class Polygon extends Shape {
-    override open func name(): String {
+mutable class Polygon extends Shape {
+    override mutable func name(): String {
         return "polygon"
     }
     func viaSuper(): func(): String {
@@ -56,7 +56,7 @@ class Badge implements Label {
 
 class ShapeCounter {
     val inner: Shape
-    var evaluations: Integer = 0
+    mutable val evaluations: Integer = 0
     ShapeCounter(inner: Shape) {
         this.inner = inner
     }
@@ -134,7 +134,7 @@ println(direct())
 // A property whose declared type is a function type reads its stored value; member resolution decides
 // statically which kind of read a name is, because no property and method share one member name.
 class Holder {
-    var stored: func(): Integer
+    mutable val stored: func(): Integer
     func storedMethod(): Integer {
         return 4
     }
@@ -164,7 +164,7 @@ class Cell<T> {
     Cell(stored: T) {
         this.stored = stored
     }
-    open func swap<E>(value: E): E {
+    mutable func swap<E>(value: E): E {
         return value
     }
 }

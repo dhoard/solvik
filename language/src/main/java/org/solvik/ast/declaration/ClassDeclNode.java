@@ -24,12 +24,14 @@ import org.solvik.ast.AstNode;
 import org.solvik.source.SourceSpan;
 
 /**
- * A {@code class} declaration with an optional {@code open} modifier, an optional single {@code
- * extends} superclass, and an optional {@code implements} interface list
- * (docs/LANGUAGE_SPEC.md sections 7, 8, and 9). Classes are final by default: only an {@code open
- * class} may be extended. The grammar permits at most one {@code extends} clause, so multiple
- * inheritance is a parse error rather than a semantic one, while {@code implements} accepts several
- * interfaces.
+ * A {@code class} declaration with at most one leading modifier — {@code mutable} or {@code abstract}
+ * — an optional single {@code extends} superclass, and an optional {@code implements} interface list
+ * (docs/LANGUAGE_SPEC.md sections 7 and 12). Classes are final by default: only a {@code mutable
+ * class} or an {@code abstract class} may be extended. The grammar's {@code (ABSTRACT | MUTABLE)?}
+ * alternation admits no combination of the two, because {@code abstract} already grants extension and
+ * leaves {@code mutable} no bit to flip. The grammar permits at most one {@code extends} clause, so
+ * multiple inheritance is a parse error rather than a semantic one, while {@code implements} accepts
+ * several interfaces.
  *
  * <p>The body is kept as one source-ordered member list, because a class may interleave properties,
  * delegates, its constructor, and methods freely. {@link #properties()}, {@link #delegates()},
@@ -41,26 +43,26 @@ import org.solvik.source.SourceSpan;
  */
 public final class ClassDeclNode extends DeclarationNode {
 
-    private final boolean sealed;
-    private final boolean open;
+    private final boolean abstractClass;
+    private final boolean mutable;
     private final String name;
     private final List<TypeParameterNode> typeParameters;
     private final TypeRef superClass;
     private final List<TypeRef> interfaces;
     private final List<AstNode> members;
 
-    public ClassDeclNode(boolean open, String name, TypeRef superClass, List<TypeRef> interfaces, List<AstNode> members, SourceSpan span) {
-        this(false, open, name, List.of(), superClass, interfaces, members, span);
+    public ClassDeclNode(boolean mutable, String name, TypeRef superClass, List<TypeRef> interfaces, List<AstNode> members, SourceSpan span) {
+        this(false, mutable, name, List.of(), superClass, interfaces, members, span);
     }
 
-    public ClassDeclNode(boolean open, String name, List<TypeParameterNode> typeParameters, TypeRef superClass, List<TypeRef> interfaces, List<AstNode> members, SourceSpan span) {
-        this(false, open, name, typeParameters, superClass, interfaces, members, span);
+    public ClassDeclNode(boolean mutable, String name, List<TypeParameterNode> typeParameters, TypeRef superClass, List<TypeRef> interfaces, List<AstNode> members, SourceSpan span) {
+        this(false, mutable, name, typeParameters, superClass, interfaces, members, span);
     }
 
-    public ClassDeclNode(boolean sealed, boolean open, String name, List<TypeParameterNode> typeParameters, TypeRef superClass, List<TypeRef> interfaces, List<AstNode> members, SourceSpan span) {
+    public ClassDeclNode(boolean abstractClass, boolean mutable, String name, List<TypeParameterNode> typeParameters, TypeRef superClass, List<TypeRef> interfaces, List<AstNode> members, SourceSpan span) {
         super(AstKind.CLASS_DECL, span);
-        this.sealed = sealed;
-        this.open = open;
+        this.abstractClass = abstractClass;
+        this.mutable = mutable;
         this.name = Objects.requireNonNull(name);
         this.typeParameters = List.copyOf(typeParameters);
         this.superClass = superClass;
@@ -69,12 +71,12 @@ public final class ClassDeclNode extends DeclarationNode {
     }
 
     /**
-     * Whether the class was declared {@code sealed} (docs/LANGUAGE_SPEC.md section 12). A sealed
-     * class is abstract and may be extended only by declarations in the same source file, so its
-     * complete subtype set is closed when the file is compiled.
+     * Whether the class was declared {@code abstract} (docs/LANGUAGE_SPEC.md section 12). An abstract
+     * class cannot be constructed and exists to be extended, from any file. {@code abstract} is a Java
+     * keyword, so the accessor carries the name rather than the field.
      */
-    public boolean isSealed() {
-        return sealed;
+    public boolean isAbstract() {
+        return abstractClass;
     }
 
     /** The declared type parameters of this generic class, in source order. */
@@ -82,9 +84,9 @@ public final class ClassDeclNode extends DeclarationNode {
         return typeParameters;
     }
 
-    /** Whether the class was declared {@code open} and may therefore be extended. */
-    public boolean isOpen() {
-        return open;
+    /** Whether the class was declared {@code mutable} and may therefore be extended. */
+    public boolean isMutable() {
+        return mutable;
     }
 
     public String name() {
@@ -107,10 +109,10 @@ public final class ClassDeclNode extends DeclarationNode {
     }
 
     /**
-     * The instance {@code val}/{@code var} property declarations, in source order. Static properties
-     * are excluded (docs/LANGUAGE_SPEC.md section 7): they are class-level storage, so they must not
-     * join the per-instance property list that drives object layout, constructor initialization,
-     * and member access.
+     * The instance {@code val} and {@code mutable val} property declarations, in source order. Static
+     * properties are excluded (docs/LANGUAGE_SPEC.md section 7): they are class-level storage, so they
+     * must not join the per-instance property list that drives object layout, constructor
+     * initialization, and member access.
      */
     public List<PropertyDeclNode> properties() {
         List<PropertyDeclNode> found = new ArrayList<>();
@@ -122,7 +124,7 @@ public final class ClassDeclNode extends DeclarationNode {
         return List.copyOf(found);
     }
 
-    /** The {@code static val}/{@code static var} declarations, in source order. */
+    /** The {@code static val} and {@code static mutable val} declarations, in source order. */
     public List<PropertyDeclNode> staticProperties() {
         List<PropertyDeclNode> found = new ArrayList<>();
         for (PropertyDeclNode property : membersOfKind(PropertyDeclNode.class)) {

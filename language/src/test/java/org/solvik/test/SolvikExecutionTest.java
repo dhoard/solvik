@@ -97,7 +97,7 @@ public final class SolvikExecutionTest {
     public void localsInferenceAndMutation() {
         assertThat(runMain("""
                 val a = 1
-                var b = 2
+                mutable val b = 2
                 b = b + a
                 println(b)
                 """)).isEqualTo("3\n");
@@ -128,7 +128,7 @@ public final class SolvikExecutionTest {
     @Test
     public void whileLoopWithBreakAndContinue() {
         assertThat(runMain("""
-                var i = 0
+                mutable val i = 0
                 while (i < 6) {
                     i = i + 1
                     if (i == 2) {
@@ -145,7 +145,7 @@ public final class SolvikExecutionTest {
     @Test
     public void forLoopRunsUpdateAfterContinue() {
         assertThat(runMain("""
-                for (var i = 0; i < 3; i = i + 1) {
+                for (mutable val i = 0; i < 3; i = i + 1) {
                     if (i == 1) {
                         continue
                     }
@@ -157,7 +157,7 @@ public final class SolvikExecutionTest {
     @Test
     public void forLoopBreakStopsIteration() {
         assertThat(runMain("""
-                for (var i = 0; i < 100; i = i + 1) {
+                for (mutable val i = 0; i < 100; i = i + 1) {
                     if (i == 2) {
                         break
                     }
@@ -274,8 +274,8 @@ public final class SolvikExecutionTest {
         // at runtime (both short-circuit branches), confirming the lowering pipeline
         // for complex while conditions rather than only scalar conditions.
         assertThat(runMain("""
-                var i = 0
-                var j = 0
+                mutable val i = 0
+                mutable val j = 0
                 while (i < 3 && j < 3) {
                     i = i + 1
                     j = j + 1
@@ -285,8 +285,8 @@ public final class SolvikExecutionTest {
                 """)).isEqualTo("3\n3\n");
 
         assertThat(runMain("""
-                var i = 0
-                var j = 0
+                mutable val i = 0
+                mutable val j = 0
                 while (i < 3 || j < 2) {
                     i = i + 1
                     if (i > 2) {
@@ -305,7 +305,7 @@ public final class SolvikExecutionTest {
         // confirming the omitted condition defaults to true (infinite iteration) rather
         // than being treated as false/empty. The break exits the loop so the program terminates.
         assertThat(runMain("""
-                var i = 0
+                mutable val i = 0
                 for (;;) {
                     i = i + 1
                     if (i >= 4) {
@@ -317,7 +317,7 @@ public final class SolvikExecutionTest {
 
         // Partial omission: update-only form (no init, no condition) lowers correctly.
         assertThat(runMain("""
-                var i = 0
+                mutable val i = 0
                 for (; ; i = i + 1) {
                     if (i >= 3) {
                         break

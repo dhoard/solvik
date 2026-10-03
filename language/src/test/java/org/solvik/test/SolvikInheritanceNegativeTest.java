@@ -61,8 +61,8 @@ public final class SolvikInheritanceNegativeTest {
     @Test
     public void accidentalOverrideWithoutTheKeywordIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
-                open class A {
-                    open func f(): Integer {
+                mutable class A {
+                    mutable func f(): Integer {
                         return 1
                     }
                 }
@@ -78,7 +78,7 @@ public final class SolvikInheritanceNegativeTest {
     @Test
     public void overridingAFinalMethodIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
-                open class A {
+                mutable class A {
                     func f(): Integer {
                         return 1
                     }
@@ -101,8 +101,8 @@ public final class SolvikInheritanceNegativeTest {
     @Test
     public void covariantReturnTypesAreAcceptedButUnrelatedOnesAreRejected() {
         Diagnostic diagnostic = first(checkFails("""
-                open class A {
-                    open func f(): Integer {
+                mutable class A {
+                    mutable func f(): Integer {
                         return 1
                     }
                 }
@@ -118,8 +118,8 @@ public final class SolvikInheritanceNegativeTest {
     @Test
     public void mismatchedOverrideParameterTypesAreRejected() {
         Diagnostic diagnostic = first(checkFails("""
-                open class A {
-                    open func f(x: Integer): Integer {
+                mutable class A {
+                    mutable func f(x: Integer): Integer {
                         return x
                     }
                 }
@@ -158,14 +158,14 @@ public final class SolvikInheritanceNegativeTest {
 
     @Test
     public void bareSuperAsAValueIsRejected() {
-        Diagnostic diagnostic = first(checkFails("open class A {\n}\nclass B extends A {\n    func f(): A {\n        val x = super;\n        return x;\n    }\n}\n"));
+        Diagnostic diagnostic = first(checkFails("mutable class A {\n}\nclass B extends A {\n    func f(): A {\n        val x = super;\n        return x;\n    }\n}\n"));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_SUPER_AS_VALUE);
     }
 
     @Test
     public void superCallMustBeTheFirstConstructorStatement() {
         Diagnostic diagnostic = first(checkFails("""
-                open class A {
+                mutable class A {
                     A(x: Integer) {
                     }
                 }
@@ -182,7 +182,7 @@ public final class SolvikInheritanceNegativeTest {
     @Test
     public void missingExplicitSuperCallIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
-                open class A {
+                mutable class A {
                     A(x: Integer) {
                     }
                 }
@@ -197,7 +197,7 @@ public final class SolvikInheritanceNegativeTest {
     @Test
     public void subclassWithoutConstructorCannotSatisfyASuperclassRequiringArguments() {
         Diagnostic diagnostic = first(checkFails("""
-                open class A {
+                mutable class A {
                     A(x: Integer) {
                     }
                 }
@@ -211,7 +211,7 @@ public final class SolvikInheritanceNegativeTest {
     @Test
     public void redeclaringAnInheritedPropertyIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
-                open class A {
+                mutable class A {
                     val x: Integer = 1
                 }
                 class B extends A {
@@ -224,7 +224,7 @@ public final class SolvikInheritanceNegativeTest {
     @Test
     public void writingAnInheritedValPropertyIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
-                open class A {
+                mutable class A {
                     val x: Integer = 1
                 }
                 class B extends A {

@@ -111,7 +111,7 @@ public final class SolvikInterfaceExecutionTest {
                         return "Hello " .. name()
                     }
                 }
-                open class Base implements Named {
+                mutable class Base implements Named {
                     func name(): String {
                         return "base"
                     }
@@ -260,7 +260,7 @@ public final class SolvikInterfaceExecutionTest {
                 interface Named {
                     func name(): String
                 }
-                open class Base implements Named {
+                mutable class Base implements Named {
                     func name(): String {
                         return "base"
                     }
@@ -305,8 +305,8 @@ public final class SolvikInterfaceExecutionTest {
                     }
                 }
                 func total(counter: Counter, limit: Integer): Integer {
-                    var sum = 0
-                    for (var i = 0; i < limit; i = i + 1) {
+                    mutable val sum = 0
+                    for (mutable val i = 0; i < limit; i = i + 1) {
                         sum = sum + counter.tick(i)
                     }
                     return sum

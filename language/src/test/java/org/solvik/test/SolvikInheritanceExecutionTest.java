@@ -16,12 +16,14 @@
 package org.solvik.test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import org.graalvm.polyglot.Context;
+import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Source;
 import org.junit.jupiter.api.Test;
 
@@ -51,7 +53,7 @@ public final class SolvikInheritanceExecutionTest {
     @Test
     public void inheritedPropertyAndMethodAreAvailable() {
         assertThat(run("""
-                open class Animal {
+                mutable class Animal {
                     val name: String
 
                     Animal(name: String) {
@@ -75,8 +77,8 @@ public final class SolvikInheritanceExecutionTest {
     @Test
     public void overrideDispatchesVirtuallyThroughASupertypeVariable() {
         assertThat(run("""
-                open class Animal {
-                    open func speak(): String {
+                mutable class Animal {
+                    mutable func speak(): String {
                         return "..."
                     }
                 }
@@ -93,8 +95,8 @@ public final class SolvikInheritanceExecutionTest {
     @Test
     public void virtualDispatchReachesAnOverrideFromAnInheritedMethod() {
         assertThat(run("""
-                open class Animal {
-                    open func speak(): String {
+                mutable class Animal {
+                    mutable func speak(): String {
                         return "..."
                     }
 
@@ -114,8 +116,8 @@ public final class SolvikInheritanceExecutionTest {
     @Test
     public void superMethodCallRunsTheSuperclassImplementation() {
         assertThat(run("""
-                open class Animal {
-                    open func speak(): String {
+                mutable class Animal {
+                    mutable func speak(): String {
                         return "..."
                     }
                 }
@@ -131,7 +133,7 @@ public final class SolvikInheritanceExecutionTest {
     @Test
     public void explicitSuperConstructorRunsBeforeSubclassInitialization() {
         assertThat(run("""
-                open class Animal {
+                mutable class Animal {
                     val legs: Integer
 
                     Animal(legs: Integer) {
@@ -155,7 +157,7 @@ public final class SolvikInheritanceExecutionTest {
     @Test
     public void implicitSuperConstructorRunsForAZeroArgumentSuperclass() {
         assertThat(run("""
-                open class Animal {
+                mutable class Animal {
                     val kind: String
 
                     Animal() {
@@ -173,7 +175,7 @@ public final class SolvikInheritanceExecutionTest {
     @Test
     public void superPropertyReadsTheInheritedField() {
         assertThat(run("""
-                open class Animal {
+                mutable class Animal {
                     val name: String
 
                     Animal(name: String) {
@@ -193,11 +195,11 @@ public final class SolvikInheritanceExecutionTest {
                 """)).isEqualTo("Rex\n");
     }
 
-    @Test
+   @Test
     public void declarationInitializersRunAfterTheSuperConstructor() {
         assertThat(run("""
-                open class Animal {
-                    var energy: Integer = 10
+                mutable class Animal {
+                    mutable val energy: Integer = 10
                 }
                 class Dog extends Animal {
                     val name: String = "Rex"
@@ -207,5 +209,70 @@ public final class SolvikInheritanceExecutionTest {
                     println(dog.energy)
                     println(dog.name)
                 """)).isEqualTo("15\nRex\n");
+    }
+
+    /**
+     * {@code abstract} locks construction of the class it marks and nothing below it.
+     *
+     * <p>Constructing the abstract supertype is the one act the marker forbids, so the accepted arm
+     * of this pair differs from the rejected one by a single name: {@code Shape()} versus
+     * {@code Circle()}. That contrast is what makes the rejection mean "abstract classes are not
+     * constructible" rather than "constructing anything in this program is broken".
+     */
+    @Test
+    public void anAbstractClassIsNotConstructibleButItsSubtypeIs() {
+        String shared = """
+                abstract class Shape {
+                    val sides: Integer
+
+                    Shape(sides: Integer) {
+                        this.sides = sides
+                    }
+                }
+                class Circle extends Shape {
+                    Circle() {
+                        super(1)
+                    }
+                }
+                """;
+        assertThatExceptionOfType(PolyglotException.class)
+                .isThrownBy(() -> run(shared + "    val s = Shape()\n    println(s.sides)\n"))
+                .withMessageContaining("SOLV-SEM-028");
+        assertThat(run(shared + "    val c = Circle()\n    println(c.sides)\n")).isEqualTo("1\n");
+    }
+
+    /**
+     * An {@code abstract} supertype's constructor is the shared state its subclasses reach with
+     * {@code super(...)}.
+     *
+     * <p>The constructor of an unconstructible class is not dead code, and this is the observable
+     * proof: the field it initializes and the method that reads it both run, through a subclass. Were
+     * the marker implemented as "strip the constructor", the {@code super(0)} call would fail to
+     * resolve rather than printing {@code 0 / shape}.
+     */
+    @Test
+    public void aSubclassReachesAnAbstractSuperclassConstructorThroughSuper() {
+        assertThat(run("""
+                abstract class Shape {
+                    val sides: Integer
+                    val label: String
+
+                    Shape(sides: Integer, label: String) {
+                        this.sides = sides
+                        this.label = label
+                    }
+
+                    func describe(): String {
+                        return this.label
+                    }
+                }
+                class Circle extends Shape {
+                    Circle() {
+                        super(0, "shape")
+                    }
+                }
+                    val c = Circle()
+                    println(c.sides .. " / " .. c.describe())
+                """)).isEqualTo("0 / shape\n");
     }
 }

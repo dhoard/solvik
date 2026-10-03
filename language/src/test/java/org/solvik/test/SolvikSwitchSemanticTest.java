@@ -191,7 +191,7 @@ public final class SolvikSwitchSemanticTest {
     public void aContinueInACaseTargetsAnEnclosingLoop() {
         check("""
                 func run(value: Integer): Unit {
-                    for (var i = 0; i < 3; i = i + 1) {
+                    for (mutable val i = 0; i < 3; i = i + 1) {
                         switch (value) {
                             case 1:
                                 continue

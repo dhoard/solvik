@@ -13,7 +13,7 @@ calls `exit(0)`.
 >  "limits":{"maxCapturedOutputBytes":1048576,"maxDiagnostics":512,
 >  "maxRequestBytes":1048576,"maxResponseBytes":1048576,"maxArtifacts":4096,
 >  "maxSourceTreeBytes":16777216},"name":"solvik-jvm","profiles":["full-language"],
->  "specVersions":["2026.10-draft"],"version":"1.0.0-SNAPSHOT"},"op":"describe",
+>  "specVersions":["2026.11-draft"],"version":"1.0.0-SNAPSHOT"},"op":"describe",
 >  "protocolVersion":"1","requestId":1,"schemaVersion":1}
 
 < {"compileTimeoutMs":30000,"entryPoint":"main.sol","inputTreeDigest":"a4f1…",

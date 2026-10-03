@@ -21,10 +21,10 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SPEC = open(os.path.join(ROOT, "docs/LANGUAGE_SPEC.md"), encoding="utf-8").read()
-CORPUS = os.path.join(ROOT, "tck/corpus/2026.10-draft")
+CORPUS = os.path.join(ROOT, "tck/corpus/2026.11-draft")
 REQUIREMENTS = os.path.join(ROOT, "tck/requirements/requirements.json")
 PROFILE = os.path.join(ROOT, "tck/profiles/full-language.profile.json")
-SPEC_VERSION = "2026.10-draft"
+SPEC_VERSION = "2026.11-draft"
 
 
 def norm(t):
@@ -277,11 +277,11 @@ BAD("SOL-TCK-0329", "objects", "REQ-2207",
     'print("EXECUTED-INVALID")\n', {},
     "The constructor invokes itself as `this.User()`.")
 BAD("SOL-TCK-0330", "objects", "REQ-2208",
-    'class User {\n    var name: String\n}\nval u = User()\nprint("EXECUTED-INVALID")\n', {},
+    'class User {\n    mutable val name: String\n}\nval u = User()\nprint("EXECUTED-INVALID")\n', {},
     "An uninitialized property without an explicit constructor removes the implicit zero-arg "
     "initializer.")
 BAD("SOL-TCK-0331", "objects", "REQ-2209",
-    'open class A {\n    A(x: Integer) {\n    }\n}\nclass B extends A {\n    B() {\n    }\n}\n'
+    'mutable class A {\n    A(x: Integer) {\n    }\n}\nclass B extends A {\n    B() {\n    }\n}\n'
     'val b = B()\nprint("EXECUTED-INVALID")\n', {},
     "The subclass constructor omits the required `super(...)` call.")
 BAD("SOL-TCK-0332", "objects", "REQ-2210",
@@ -302,8 +302,8 @@ OK("SOL-TCK-0334", "objects", "REQ-2211",
    "Assigning on both branches satisfies definite initialization and the read observes the taken "
    "branch; the arm differs from the rejection only by the else-assignment.")
 OK("SOL-TCK-0335", "objects", "REQ-2212",
-   'class C {\n    static var i: Integer\n    static var b: Boolean\n    static var d: Double\n'
-   '    static var s: String\n\n    C() {\n    }\n}\n'
+   'class C {\n    static mutable val i: Integer\n    static mutable val b: Boolean\n    static mutable val d: Double\n'
+   '    static mutable val s: String\n\n    C() {\n    }\n}\n'
    'print(C.i)\nprint(C.b)\nprint(C.d)\nprint(C.s)\n',
    "0false0.0null",
    "Each uninitialized static cell reads its declared type's zero value from the specification's "
@@ -319,18 +319,18 @@ BAD("SOL-TCK-0337", "objects", "REQ-2214",
     {"family": "SEM", "code": "SOLV-SEM-048"},
     "A static member mentioning the class type parameter pins the specification-named SOLV-SEM-048.")
 BAD("SOL-TCK-0338", "objects", "REQ-2215",
-    'open class A {\n    static var n: Integer = 5\n}\nclass B extends A {\n    B() {\n    }\n}\n'
+    'mutable class A {\n    static mutable val n: Integer = 5\n}\nclass B extends A {\n    B() {\n    }\n}\n'
     'print(B.n)\n' + NEG, {},
     "The subclass name must not expose the superclass's static member.")
 OK("SOL-TCK-0339", "objects", "REQ-2216",
-   'class A {\n    static {\n        print("initA")\n    }\n\n    static var n: Integer = 5\n\n'
+   'class A {\n    static {\n        print("initA")\n    }\n\n    static mutable val n: Integer = 5\n\n'
    '    A() {\n    }\n}\nclass B {\n    static {\n        print("initB")\n    }\n\n'
    '    B() {\n    }\n}\nprint("start")\nprint(A.n)\nprint("mid")\nprint("done")\n',
    "startinitA5middone",
    "The unused class B's initializer block does not run, and A's runs exactly once at the first "
    "read of its static property.")
 OK("SOL-TCK-0340", "objects", "REQ-2217",
-   'open class A {\n    static {\n        print("A")\n    }\n\n    A() {\n    }\n}\n'
+   'mutable class A {\n    static {\n        print("A")\n    }\n\n    A() {\n    }\n}\n'
    'class B extends A {\n    static {\n        print("B")\n    }\n\n    B() {\n    }\n}\n'
    'print("start")\nval b = B()\nprint("end")\n',
    "startABend",

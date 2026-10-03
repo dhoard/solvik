@@ -113,7 +113,7 @@ public final class SolvikInterfaceParserTest {
                 interface Named {
                     func name(): String
                 }
-                open class Base {
+                mutable class Base {
                     val id: Integer
 
                     Base(id: Integer) {

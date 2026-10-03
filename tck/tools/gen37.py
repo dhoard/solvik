@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Convert the function-value obligations that phase 2 made observable into tested requirements.
 
-`tck/tools/gen36.py` recorded five obligations of the `2026.10-draft` function-value revision as
+`tck/tools/gen36.py` recorded five obligations of the `2026.11-draft` function-value revision as
 `untested-portable`, because their subject is a function *value* and the repository could not produce
 one. It also recorded the conversion obligation those five carry: the phase that adds function values
 must, in the same change that makes each behaviour observable, give the ids a real `tests` list and
@@ -57,10 +57,10 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SPEC = open(os.path.join(ROOT, "docs/LANGUAGE_SPEC.md"), encoding="utf-8").read()
-CORPUS = os.path.join(ROOT, "tck/corpus/2026.10-draft")
+CORPUS = os.path.join(ROOT, "tck/corpus/2026.11-draft")
 REQUIREMENTS = os.path.join(ROOT, "tck/requirements/requirements.json")
 PROFILE = os.path.join(ROOT, "tck/profiles/full-language.profile.json")
-SPEC_VERSION = "2026.10-draft"
+SPEC_VERSION = "2026.11-draft"
 
 
 def norm(t):
@@ -89,7 +89,7 @@ TYPE039 = ("A failure of assignability uses the ordinary invalid-operand diagnos
 
 CONTRAVARIANT = ("Function-type assignability is contravariant in parameters and covariant in the "
                  "result.")
-ANIMAL_DOG = ("Given `open class Animal` and `class Dog extends Animal`, a value of type func(Animal): "
+ANIMAL_DOG = ("Given `mutable class Animal` and `class Dog extends Animal`, a value of type func(Animal): "
               "Dog is assignable to func(Dog): Animal, and a value of type func(Dog): Animal is not "
               "assignable to func(Animal): Dog.")
 NO_WIDEN = ("Numeric widening is not a subtype relation (section 4) and is never applied inside "
@@ -282,7 +282,7 @@ print("EXECUTED-INVALID")
         exp={"languageExit": 0, "stdoutBase64": base64.b64encode(b"animal-2").decode("ascii")},
         note="The section's accepted Animal/Dog direction is invoked, and a `func(Long): Long` value is "
              "called with an `Integer` literal, which is ordinary call-site widening.",
-        src="""open class Animal {
+        src="""mutable class Animal {
     val name: String = "animal"
 }
 
@@ -319,7 +319,7 @@ print(nameOf(accepted(Dog())) .. "-" .. takesLong(1))
         exp={"diagnostic": {"family": "TYPE", "code": "SOLV-TYPE-001"}},
         note="The rejected direction of the section's Animal/Dog pair, written as a static declaration "
              "initializer so the pinned code applies to the placement the section names.",
-        src="""open class Animal {
+        src="""mutable class Animal {
     val name: String = "animal"
 }
 
@@ -427,7 +427,7 @@ print("EXECUTED-INVALID")
         note="Both directions between `List<func(Animal): Dog>` and `List<func(Dog): Animal>` are "
              "refused, because generic type arguments stay invariant even where the element types are "
              "comparable. The sources carry explicit type arguments so inference cannot explain it.",
-        src="""open class Animal {
+        src="""mutable class Animal {
     val name: String = "animal"
 }
 
@@ -466,7 +466,7 @@ print("EXECUTED-INVALID")
              "by a binding whose declared type is the joined type written out. An implementation that "
              "fell back to `Any` here would fail to compile: `Any` is not callable and does not flow "
              "into a function-typed binding.",
-        src="""open class Animal {
+        src="""mutable class Animal {
     val name: String = "animal"
 }
 
@@ -506,7 +506,7 @@ print(nameOf(joined(Dog())) .. "-" .. nameOf(joinedWritten(Dog())))
              "and it is a static declaration initializer, the placement whose non-assignable "
              "diagnostic the section names verbatim, so `SOLV-TYPE-001` is pinned; the sentinel proves "
              "non-execution.",
-        src="""open class Animal {
+        src="""mutable class Animal {
     val name: String = "animal"
 }
 
@@ -537,7 +537,7 @@ print("EXECUTED-INVALID")
              "that took the more specific result would allow. Written as a static declaration "
              "initializer for the same reason as its sibling, so `SOLV-TYPE-001` is pinned; the "
              "sentinel proves non-execution.",
-        src="""open class Animal {
+        src="""mutable class Animal {
     val name: String = "animal"
 }
 

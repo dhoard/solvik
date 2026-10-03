@@ -21,8 +21,8 @@ func cmp6(a: Double, b: Double): Boolean {
 
 println(cmp6(44.0, 96.0))
 
-open class A7 {
-    open func v9(): Integer {
+mutable class A7 {
+    mutable func v9(): Integer {
         return 27
     }
 }

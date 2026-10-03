@@ -22,6 +22,7 @@ set -euo pipefail
 # Usage (from anywhere): ./tck/tck-check.sh
 
 here="$(cd "$(dirname "$0")" && pwd)"
+ROOT="$(cd "$here/.." && pwd)"
 
 if ! command -v python3 >/dev/null 2>&1; then
     printf 'tck-check.sh: python3 is required for the portable TCK runner.\n' >&2
@@ -46,5 +47,15 @@ python3 "$here/tests/run_selftests.py"
 # the committed artifacts. Pure Python, and it writes only into a temp directory.
 printf 'tck-check.sh: verifying generated-artifact provenance (no Solvik/Java/GraalVM)...\n'
 python3 "$here/tools/verify_regen.py"
+
+# Keyword-vocabulary guards. The 2026.11-draft revision removed `var`, `open`, and
+# `sealed`; these two scans keep the *prose* layers current, which the corpus gate
+# (SolvikRemovedKeywordCorpusTest, a JUnit test over .sol and .output files) cannot
+# see because prose carries no tokens. Both read committed files only.
+printf 'tck-check.sh: checking requirement prose against the current keyword vocabulary...\n'
+python3 "$ROOT/tools/repair-keyword-summaries.py" --check
+
+printf 'tck-check.sh: checking generator prose against the current keyword vocabulary...\n'
+python3 "$ROOT/tools/check-generator-keyword-prose.py"
 
 printf 'tck-check.sh: OK\n'

@@ -13,7 +13,7 @@ import base64, json, os, re, sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SPEC = open(os.path.join(ROOT, "docs/LANGUAGE_SPEC.md")).read()
-CORPUS = os.path.join(ROOT, "tck/corpus/2026.10-draft")
+CORPUS = os.path.join(ROOT, "tck/corpus/2026.11-draft")
 
 
 def norm(t):
@@ -25,7 +25,7 @@ SPEC_N = norm(SPEC)
 # Reusable declaration fragments. Classes are final by default (section 7), so a class that
 # this batch subclasses must be declared `open`; the spec's own exception example uses a
 # final class only because nothing extends it.
-PE = 'open class ParseError extends RuntimeException {\n}\n'
+PE = 'mutable class ParseError extends RuntimeException {\n}\n'
 
 # ---------------------------------------------------------------- requirements
 REQS = {
@@ -188,7 +188,7 @@ add("SOL-TCK-0142", PE + '''func guard() {
 guard()
 ''', "SUCCESS", stdout="handledbad int")
 
-add("SOL-TCK-0143", PE + '''open class DeepError extends ParseError {
+add("SOL-TCK-0143", PE + '''mutable class DeepError extends ParseError {
 }
 func guard() {
     try {
@@ -240,7 +240,7 @@ add("SOL-TCK-0148", PE + 'throw ParseError("a", "b")\n' + NEG,
     "COMPILE_ERROR", diag={"family": "TYPE", "code": "SOLV-TYPE-003"})
 
 # --- REQ-1304: the message is independent of the declared constructor.
-add("SOL-TCK-0149", '''open class CodeError extends RuntimeException {
+add("SOL-TCK-0149", '''mutable class CodeError extends RuntimeException {
     val code: Integer
 
     CodeError(code: Integer) {
@@ -296,7 +296,7 @@ add("SOL-TCK-0155", 'class ConfigError extends ApplicationException {\n}\nfunc g
     "SUCCESS", stdout="[no config]")
 
 # --- REQ-1308: first matching clause in source order runs.
-add("SOL-TCK-0156", PE + '''open class SubError extends ParseError {
+add("SOL-TCK-0156", PE + '''mutable class SubError extends ParseError {
 }
 func guard() {
     try {
@@ -336,7 +336,7 @@ guard()
 ''' + NEG, "COMPILE_ERROR", diag={"family": "RESOL", "code": "SOLV-RESOL-001"})
 
 # --- REQ-1311: two clauses may reuse the same binding name.
-add("SOL-TCK-0159", PE + '''open class OtherError extends RuntimeException {
+add("SOL-TCK-0159", PE + '''mutable class OtherError extends RuntimeException {
 }
 func guard() {
     try {
@@ -496,7 +496,7 @@ def main():
             fh.write(src)
         e = EXPECT[tid]
         man = {
-            "manifestSchemaVersion": 1, "specVersion": "2026.10-draft", "testId": tid,
+            "manifestSchemaVersion": 1, "specVersion": "2026.11-draft", "testId": tid,
             "category": CATEGORY[tid], "profile": "full-language", "status": "required",
             "requirements": [REQ_FOR[tid]], "entryPoint": "main.sol",
             "outcome": e["outcome"], "expectation": (

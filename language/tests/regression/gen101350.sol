@@ -15,8 +15,8 @@ println(sw1(6))
 
 println(sw1(42))
 
-open class A2 {
-    open func v4(): Integer {
+mutable class A2 {
+    mutable func v4(): Integer {
         return 41
     }
 }

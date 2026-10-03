@@ -41,7 +41,7 @@ import base64, json, os, re, sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SPEC = open(os.path.join(ROOT, "docs/LANGUAGE_SPEC.md")).read()
-CORPUS = os.path.join(ROOT, "tck/corpus/2026.10-draft")
+CORPUS = os.path.join(ROOT, "tck/corpus/2026.11-draft")
 
 
 def norm(t):
@@ -219,7 +219,7 @@ def main():
             fh.write(src)
         e = EXPECT[tid]
         man = {
-            "manifestSchemaVersion": 1, "specVersion": "2026.10-draft", "testId": tid,
+            "manifestSchemaVersion": 1, "specVersion": "2026.11-draft", "testId": tid,
             "category": CATEGORY[tid], "profile": "full-language", "status": "required",
             "requirements": [REQ_FOR[tid]], "entryPoint": "main.sol",
             "outcome": e["outcome"], "expectation": (

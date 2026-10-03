@@ -1,5 +1,5 @@
-open class A1 {
-    open func v3(): Integer {
+mutable class A1 {
+    mutable func v3(): Integer {
         return 9
     }
 }

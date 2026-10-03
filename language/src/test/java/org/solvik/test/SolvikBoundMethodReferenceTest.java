@@ -183,14 +183,14 @@ public final class SolvikBoundMethodReferenceTest {
     @Test
     public void aBoundReferenceDispatchesOnTheReceiverRuntimeClass() {
         assertThat(run("""
-                open class Base {
-                    open func greet(): String {
+                mutable class Base {
+                    mutable func greet(): String {
                         return "base"
                     }
                 }
 
-                open class Mid extends Base {
-                    override open func greet(): String {
+                mutable class Mid extends Base {
+                    override mutable func greet(): String {
                         return "mid"
                     }
                 }
@@ -224,8 +224,8 @@ public final class SolvikBoundMethodReferenceTest {
     @Test
     public void anInheritedMethodBindsThroughASubclassReceiver() {
         assertThat(run("""
-                open class Animal {
-                    open func sound(): String {
+                mutable class Animal {
+                    mutable func sound(): String {
                         return "generic"
                     }
                 }
@@ -336,8 +336,8 @@ public final class SolvikBoundMethodReferenceTest {
     @Test
     public void thisMethodIsABoundReferenceToTheCurrentReceiver() {
         assertThat(run("""
-                open class Base {
-                    open func greet(): String {
+                mutable class Base {
+                    mutable func greet(): String {
                         return "base"
                     }
                     func viaThis(): func(): String {
@@ -345,8 +345,8 @@ public final class SolvikBoundMethodReferenceTest {
                     }
                 }
 
-                open class Mid extends Base {
-                    override open func greet(): String {
+                mutable class Mid extends Base {
+                    override mutable func greet(): String {
                         return "mid"
                     }
                 }
@@ -421,14 +421,14 @@ public final class SolvikBoundMethodReferenceTest {
     @Test
     public void superMethodBindsTheImmediateSuperclassImplementation() {
         assertThat(run("""
-                open class Base {
-                    open func greet(): String {
+                mutable class Base {
+                    mutable func greet(): String {
                         return "base"
                     }
                 }
 
-                open class Mid extends Base {
-                    override open func greet(): String {
+                mutable class Mid extends Base {
+                    override mutable func greet(): String {
                         return "mid"
                     }
                     func viaSuper(): func(): String {
@@ -462,7 +462,7 @@ public final class SolvikBoundMethodReferenceTest {
     @Test
     public void superMethodWithoutAnOverrideBindsTheSuperclass() {
         assertThat(run("""
-                open class Base {
+                mutable class Base {
                     func describe(): String {
                         return "base"
                     }
@@ -492,11 +492,11 @@ public final class SolvikBoundMethodReferenceTest {
     @Test
     public void aUniversalMemberIsNotBindableThroughSuper() {
         assertThat(codeOf("""
-                open class Base {
-                    override open func equals(other: Any?): Boolean {
+                mutable class Base {
+                    override mutable func equals(other: Any?): Boolean {
                         return true
                     }
-                    override open func hashCode(): Integer {
+                    override mutable func hashCode(): Integer {
                         return 1
                     }
                 }
@@ -530,7 +530,7 @@ public final class SolvikBoundMethodReferenceTest {
                     }
                 }
 
-                open class Holder implements Greeter {
+                mutable class Holder implements Greeter {
                     delegate val greeter: Greeter
 
                     Holder(greeter: Greeter) {
@@ -562,7 +562,7 @@ public final class SolvikBoundMethodReferenceTest {
     @Test
     public void superMethodNamingNothingIsAnUnknownMember() {
         assertThat(codeOf("""
-                open class Base {
+                mutable class Base {
                 }
 
                 class Derived extends Base {
@@ -591,7 +591,7 @@ public final class SolvikBoundMethodReferenceTest {
         assertThat(run("""
                 class Wrapper {
                     val inner: Target
-                    var evaluations: Integer = 0
+                    mutable val evaluations: Integer = 0
                     Wrapper(inner: Target) {
                         this.inner = inner
                     }
@@ -637,8 +637,8 @@ public final class SolvikBoundMethodReferenceTest {
     @Test
     public void aSuperReferenceRetainsTheEnclosingReceiver() {
         assertThat(run("""
-                open class Base {
-                    open func label(): String {
+                mutable class Base {
+                    mutable func label(): String {
                         return "base"
                     }
                 }
@@ -870,7 +870,7 @@ public final class SolvikBoundMethodReferenceTest {
     public void aFunctionTypedPropertyReadsItsStoredValue() {
         assertThat(run("""
                 class Holder {
-                    var stored: func(): Integer
+                    mutable val stored: func(): Integer
                     func storedMethod(): Integer {
                         return 4
                     }
@@ -933,12 +933,12 @@ public final class SolvikBoundMethodReferenceTest {
     @Test
     public void aGenericMethodReferenceClosesTheReceiverTypeArgumentsFirst() {
         assertThat(run("""
-                open class Cell<T> {
+                mutable class Cell<T> {
                     val stored: T
                     Cell(stored: T) {
                         this.stored = stored
                     }
-                    open func replace<E>(value: E): E {
+                    mutable func replace<E>(value: E): E {
                         return value
                     }
                 }
@@ -1210,7 +1210,7 @@ public final class SolvikBoundMethodReferenceTest {
                 }
 
                 class Registry {
-                    static var transform: func(Integer): String = first
+                    static mutable val transform: func(Integer): String = first
                 }
 
                 print(Registry.transform(1))

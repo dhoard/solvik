@@ -44,7 +44,7 @@ public final class SolvikGenericTypeArgumentTest {
 
     private static final String PRELUDE = """
             class Box<T> {
-                var value: T
+                mutable val value: T
 
                 Box(value: T) {
                     this.value = value

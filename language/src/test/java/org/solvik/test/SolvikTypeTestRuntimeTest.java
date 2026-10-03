@@ -200,7 +200,7 @@ public final class SolvikTypeTestRuntimeTest {
                         func name(): String
                     }
 
-                    open class Animal {
+                    mutable class Animal {
                     }
 
                     class Dog extends Animal implements Named {
@@ -228,10 +228,10 @@ public final class SolvikTypeTestRuntimeTest {
     @Test
     public void typeTestsWalkAMultiLevelInheritanceChain() {
         assertThat(run("""
-                    open class A {
+                    mutable class A {
                     }
 
-                    open class B extends A {
+                    mutable class B extends A {
                     }
 
                     class C extends B {

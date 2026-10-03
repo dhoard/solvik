@@ -142,7 +142,7 @@ public final class SolvikDelegateExecutionTest {
                         return "hola"
                     }
                 }
-                open class Base {
+                mutable class Base {
                     func greet(): String {
                         return "inherited"
                     }
@@ -320,7 +320,7 @@ public final class SolvikDelegateExecutionTest {
                         return "hola"
                     }
                 }
-                open class Service implements Greeter {
+                mutable class Service implements Greeter {
                     delegate val greeter: Greeter
 
                     Service(greeter: Greeter) {
@@ -452,7 +452,7 @@ public final class SolvikDelegateExecutionTest {
                     }
                 }
 
-                open class Service implements Repo {
+                mutable class Service implements Repo {
                     delegate val repo: Repo
 
                     Service(repo: Repo) {

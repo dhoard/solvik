@@ -215,14 +215,14 @@ public final class SolvikParserTest {
     public void literalsNamesAndStrings() {
         String src = "func f(): Unit {\n" + //
                 "  val a: Integer = 42;\n" + //
-                "  var b: Boolean = true;\n" + //
+                "  mutable val b: Boolean = true;\n" + //
                 "  val c = \"esc\\t\";\n" + //
                 "}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("literals.sol", src));
 
         LocalDeclNode a = local(fn, 0);
         assertNode(a, AstKind.LOCAL_DECL, src, "val a: Integer = 42;");
-        assertThat(a.bindingKind()).isEqualTo(BindingKind.VAL);
+        assertThat(a.bindingKind()).isEqualTo(BindingKind.IMMUTABLE);
         assertThat(a.name()).isEqualTo("a");
         assertThat(a.declaredType().orElseThrow().name()).isEqualTo("Integer");
         IntegerLiteralNode lit = (IntegerLiteralNode) a.initializer();
@@ -230,8 +230,8 @@ public final class SolvikParserTest {
         assertThat(lit.lexeme()).isEqualTo("42");
 
         LocalDeclNode b = local(fn, 1);
-        assertNode(b, AstKind.LOCAL_DECL, src, "var b: Boolean = true;");
-        assertThat(b.bindingKind()).isEqualTo(BindingKind.VAR);
+        assertNode(b, AstKind.LOCAL_DECL, src, "mutable val b: Boolean = true;");
+        assertThat(b.bindingKind()).isEqualTo(BindingKind.MUTABLE);
         BoolLiteralNode bool = (BoolLiteralNode) b.initializer();
         assertNode(bool, AstKind.BOOL_LITERAL, src, "true");
         assertThat(bool.value()).isTrue();

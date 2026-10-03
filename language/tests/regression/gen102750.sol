@@ -1,10 +1,10 @@
-var total = 0
+mutable val total = 0
 
 for (i in 1...4) {
     total = total + i
 }
 
-var n = 0
+mutable val n = 0
 
 while (n < 5) {
     n = n + 1

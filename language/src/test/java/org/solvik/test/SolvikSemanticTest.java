@@ -104,8 +104,8 @@ public final class SolvikSemanticTest {
                 "    return a\n" + //
                 "}\n" + //
                 "func f(n: Integer): Integer {\n" + //
-                "    var total = 0\n" + //
-                "    var remaining = n\n" + //
+                "    mutable val total = 0\n" + //
+                "    mutable val remaining = n\n" + //
                 "    val flag = n > 0 && !(n == 0)\n" + //
                 "    while (flag && remaining > 0) {\n" + //
                 "        total = total + remaining\n" + //
@@ -115,7 +115,7 @@ public final class SolvikSemanticTest {
                 "        }\n" + //
                 "        continue\n" + //
                 "    }\n" + //
-                "    for (var i = 0; i < 3; i = i + 1) {\n" + //
+                "    for (mutable val i = 0; i < 3; i = i + 1) {\n" + //
                 "        total = total + g(i)\n" + //
                 "    }\n" + //
                 "    return total\n" + //
@@ -158,7 +158,7 @@ public final class SolvikSemanticTest {
 
     @Test
     public void localTypeInferenceAndMutabilityAreRecorded() {
-        String src = "func f(): Integer {\n    val inferred = 1\n    var annotated: Integer = inferred\n    val text = \"hi\"\n    annotated = 2\n    return annotated\n}\n";
+        String src = "func f(): Integer {\n    val inferred = 1\n    mutable val annotated: Integer = inferred\n    val text = \"hi\"\n    annotated = 2\n    return annotated\n}\n";
         CheckedProgram program = check(src);
         FunctionDeclNode fn = function(program, 0);
         VariableSymbol inferred = program.symbolOf(local(fn, 0)).orElseThrow();
@@ -181,7 +181,7 @@ public final class SolvikSemanticTest {
 
     @Test
     public void forInitializerVariableIsScopedToTheLoop() {
-        check("func f(): Integer {\n    for (var i = 0; i < 3; i = i + 1) {\n        return i\n    }\n    val i = 9\n    return i\n}\n");
+        check("func f(): Integer {\n    for (mutable val i = 0; i < 3; i = i + 1) {\n        return i\n    }\n    val i = 9\n    return i\n}\n");
     }
 
     @Test
@@ -265,13 +265,13 @@ public final class SolvikSemanticTest {
     @Test
     public void loopsAndLoopControlCheckInsideLoops() {
         String src = "func f(n: Integer): Integer {\n" + //
-                "    var total = 0\n" + //
-                "    var remaining = n\n" + //
+                "    mutable val total = 0\n" + //
+                "    mutable val remaining = n\n" + //
                 "    while (remaining > 0) {\n" + //
                 "        total = total + remaining\n" + //
                 "        remaining = remaining - 1\n" + //
                 "    }\n" + //
-                "    for (var i = 0; i < 3; i = i + 1) {\n" + //
+                "    for (mutable val i = 0; i < 3; i = i + 1) {\n" + //
                 "        if (i == 1) {\n" + //
                 "            continue\n" + //
                 "        }\n" + //
@@ -291,7 +291,7 @@ public final class SolvikSemanticTest {
     @Test
     public void siblingScopeBlocksMayReuseALocalName() {
         String src = "func f(): Integer {\n" + //
-                "    var total = 0\n" + //
+                "    mutable val total = 0\n" + //
                 "    {\n" + //
                 "        val result = 1\n" + //
                 "        total = total + result\n" + //

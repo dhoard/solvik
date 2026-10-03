@@ -58,8 +58,8 @@ public final class SolvikImplicitMainExecutionTest {
     @Test
     public void topLevelLocalsAndLoopsRun() {
         assertThat(run("""
-                var total = 0
-                for (var i = 1; i <= 3; i = i + 1) {
+                mutable val total = 0
+                for (mutable val i = 1; i <= 3; i = i + 1) {
                     total = total + i
                 }
                 println(total)

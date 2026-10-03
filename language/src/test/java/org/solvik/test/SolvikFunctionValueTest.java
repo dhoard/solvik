@@ -63,7 +63,7 @@ public final class SolvikFunctionValueTest {
      * branch declares.
      */
     private static final String ANIMAL_HIERARCHY = """
-            open class Animal {
+            mutable class Animal {
                 Animal() {
                 }
 
@@ -224,7 +224,7 @@ public final class SolvikFunctionValueTest {
                     return value + 2
                 }
 
-                var operation: func(Integer): Integer = first
+                mutable val operation: func(Integer): Integer = first
                 println(operation(1))
                 operation = second
                 println(operation(1))

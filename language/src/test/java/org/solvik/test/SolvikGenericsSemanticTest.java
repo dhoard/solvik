@@ -44,7 +44,7 @@ public final class SolvikGenericsSemanticTest {
 
     private static final String GENERIC_BOX = """
             class Box<T> {
-                var value: T
+                mutable val value: T
 
                 Box(value: T) {
                     this.value = value
@@ -165,7 +165,7 @@ public final class SolvikGenericsSemanticTest {
     public void nestedGenericApplicationsAreCanonicalAndTyped() {
         CheckedProgram program = check("""
                 class Box<T> {
-                    var value: T
+                    mutable val value: T
 
                     Box(value: T) {
                         this.value = value
@@ -239,7 +239,7 @@ public final class SolvikGenericsSemanticTest {
                     func get(): T
                 }
                 class Holder<T> implements Container<T> {
-                    var value: T
+                    mutable val value: T
 
                     Holder(value: T) {
                         this.value = value
@@ -271,14 +271,14 @@ public final class SolvikGenericsSemanticTest {
     @Test
     public void inheritedGenericMembersSubstituteThroughTheSupertype() {
         CheckedProgram program = check("""
-                open class Box<T> {
-                    var value: T
+                mutable class Box<T> {
+                    mutable val value: T
 
                     Box(value: T) {
                         this.value = value
                     }
 
-                    open func get(): T {
+                    mutable func get(): T {
                         return this.value
                     }
                 }
@@ -301,8 +301,8 @@ public final class SolvikGenericsSemanticTest {
     @Test
     public void genericSubclassSubstitutesThroughAGenericSupertype() {
         CheckedProgram program = check("""
-                open class Box<T> {
-                    var value: T
+                mutable class Box<T> {
+                    mutable val value: T
 
                     Box(value: T) {
                         this.value = value
@@ -324,7 +324,7 @@ public final class SolvikGenericsSemanticTest {
     public void genericApplicationsRemainAssignableToAny() {
         CheckedProgram program = check("""
                 class Box<T> {
-                    var value: T
+                    mutable val value: T
 
                     Box(value: T) {
                         this.value = value

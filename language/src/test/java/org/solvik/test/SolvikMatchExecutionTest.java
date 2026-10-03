@@ -114,9 +114,9 @@ public final class SolvikMatchExecutionTest {
     }
 
     @Test
-    public void sealedSubtypeBindingsAccessSubtypeMembers() {
+    public void subtypeBindingsAccessSubtypeMembers() {
         assertThat(run("""
-                sealed class Shape {
+                abstract class Shape {
                 }
 
                 class Circle extends Shape {
@@ -139,6 +139,7 @@ public final class SolvikMatchExecutionTest {
                     return match shape {
                         circle: Circle => circle.radius * circle.radius
                         square: Square => square.side * square.side
+                        _ => 0
                     }
                 }
 
@@ -209,10 +210,10 @@ public final class SolvikMatchExecutionTest {
     }
 
     @Test
-    public void matchResultFlowsThroughASealedSupertype() {
+    public void matchResultFlowsThroughAnAbstractSupertype() {
         assertThat(run("""
-                sealed class Shape {
-                    open func name(): String {
+                abstract class Shape {
+                    mutable func name(): String {
                         return "shape"
                     }
                 }
@@ -233,6 +234,7 @@ public final class SolvikMatchExecutionTest {
                     return match shape {
                         circle: Circle => circle
                         square: Square => square
+                        _ => shape
                     }
                 }
 

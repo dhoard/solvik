@@ -305,7 +305,7 @@ public final class SolvikClassSemanticNegativeTest {
     @Test
     public void aBareInheritedPropertyReadIsAnUnknownName() {
         Diagnostic diagnostic = first(checkFails("""
-                open class Base {
+                mutable class Base {
                     val id: Integer = 5
                 }
 

@@ -58,7 +58,7 @@ import base64, json, os, re, sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SPEC = open(os.path.join(ROOT, "docs/LANGUAGE_SPEC.md")).read()
-CORPUS = os.path.join(ROOT, "tck/corpus/2026.10-draft")
+CORPUS = os.path.join(ROOT, "tck/corpus/2026.11-draft")
 
 
 def norm(t):
@@ -88,7 +88,7 @@ REQS = {
   summary="Assignments are statements, not value-producing expressions, so an assignment is rejected wherever an expression is required while a statement assignment to a mutable local is accepted",
   kind="syntax",
   notes="Four positions are refused -- nested inside another assignment, as an initializer, as a controlling condition, and as a call argument -- because 'not value-producing' is a statement about every expression position and one position alone cannot distinguish it from a local syntactic restriction. The accepted control assigns as a statement and prints the assigned value. Rejections are bare: the specification names no code for this, and these are parse-level refusals.",
-  quotes=["Assignments are statements, not value-producing expressions. The target must be a mutable local or `var` property."]),
+  quotes=["Assignments are statements, not value-producing expressions. The target must be a `mutable val` local or a `mutable val` property."]),
  "REQ-1603": dict(
   section="3. Static and Strong Typing",
   summary="Operator precedence follows the stated tier order, with ?? the lowest tier and arithmetic tighter than the comparison and logical tiers above it",
@@ -186,15 +186,15 @@ add("SOL-TCK-0212", "REQ-1601", "types",
 
 # --- REQ-1602 assignment is a statement.
 add("SOL-TCK-0213", "REQ-1602", "syntax",
-    'var a = 1\nvar b = 2\nb = a\nprint("stmt" .. b)\n', "SUCCESS", stdout="stmt1")
+    'mutable val a = 1\nmutable val b = 2\nb = a\nprint("stmt" .. b)\n', "SUCCESS", stdout="stmt1")
 add("SOL-TCK-0214", "REQ-1602", "syntax",
-    'var a = 1\nvar b = 2\nb = (a = 3)\nprint(b)\n' + NEG, "COMPILE_ERROR", diag={})
+    'mutable val a = 1\nmutable val b = 2\nb = (a = 3)\nprint(b)\n' + NEG, "COMPILE_ERROR", diag={})
 add("SOL-TCK-0215", "REQ-1602", "syntax",
-    'var a = 1\nval z = (a = 5)\nprint(z)\n' + NEG, "COMPILE_ERROR", diag={})
+    'mutable val a = 1\nval z = (a = 5)\nprint(z)\n' + NEG, "COMPILE_ERROR", diag={})
 add("SOL-TCK-0216", "REQ-1602", "syntax",
-    'var a = 1\nif (a = 2) {\n    print(1)\n}\n' + NEG, "COMPILE_ERROR", diag={})
+    'mutable val a = 1\nif (a = 2) {\n    print(1)\n}\n' + NEG, "COMPILE_ERROR", diag={})
 add("SOL-TCK-0217", "REQ-1602", "syntax",
-    'var a = 1\nprint(a = 5)\n' + NEG, "COMPILE_ERROR", diag={})
+    'mutable val a = 1\nprint(a = 5)\n' + NEG, "COMPILE_ERROR", diag={})
 
 # --- REQ-1603 precedence tiers.
 add("SOL-TCK-0218", "REQ-1603", "syntax",
@@ -281,7 +281,7 @@ def main():
         os.makedirs(d, exist_ok=True)
         open(os.path.join(d, "main.sol"), "w").write(src)
         e = EXPECT[tid]
-        man = {"manifestSchemaVersion": 1, "specVersion": "2026.10-draft", "testId": tid,
+        man = {"manifestSchemaVersion": 1, "specVersion": "2026.11-draft", "testId": tid,
                "category": CATEGORY[tid], "profile": "full-language", "status": "required",
                "requirements": [REQ_FOR[tid]], "entryPoint": "main.sol",
                "outcome": e["outcome"],

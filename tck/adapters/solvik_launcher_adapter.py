@@ -59,7 +59,7 @@ import tempfile
 
 PROTOCOL_VERSION = "1"
 SCHEMA_VERSION = 1
-SPEC_VERSIONS = ["2026.10-draft"]
+SPEC_VERSIONS = ["2026.11-draft"]
 PROFILES = ["full-language"]
 CAPABILITIES = ["compile-only"]
 

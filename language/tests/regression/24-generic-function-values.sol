@@ -26,7 +26,7 @@ func alsoIdentity<U>(value: U): U {
     return value
 }
 
-open class Middle {
+mutable class Middle {
     func through(transform: func(Integer): Integer, value: Integer): Integer {
         return transform(value)
     }
@@ -40,7 +40,7 @@ class Bottom extends Middle {
 
 class Holder {
     val member: func(Integer): Integer = identity
-    static var shared: func(String): String = identity
+    static mutable val shared: func(String): String = identity
 }
 
 // A declared local type is the expected function type, so each binding gets its own instantiation.
@@ -68,7 +68,7 @@ Holder.shared = identity
 val taken: func(String): String = Holder.shared
 println(taken("ef"))
 
-var slot: func(Integer): Integer = identity
+mutable val slot: func(Integer): Integer = identity
 slot = identity
 println(slot(6))
 
@@ -102,7 +102,7 @@ println(identity<String>("ten"))
 println(integerIdentity.toString())
 
 // A nullable function type instantiates and remains refinable.
-var optional: (func(Integer): Integer)? = identity
+mutable val optional: (func(Integer): Integer)? = identity
 if (optional != null) {
     println(optional(7))
 }

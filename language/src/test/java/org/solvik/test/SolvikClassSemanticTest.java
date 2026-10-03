@@ -68,7 +68,7 @@ public final class SolvikClassSemanticTest {
         CheckedProgram program = check("""
                 class User {
                     val id: Integer
-                    var name: String
+                    mutable val name: String
 
                     User(id: Integer, name: String) {
                         this.id = id
@@ -129,7 +129,7 @@ public final class SolvikClassSemanticTest {
     public void memberReadsAndWritesResolveToProperties() {
         CheckedProgram program = check("""
                 class User {
-                    var name: String
+                    mutable val name: String
                     User(name: String) {
                         this.name = name
                     }
@@ -214,7 +214,7 @@ public final class SolvikClassSemanticTest {
     public void propertyDeclarationInitializersAreTyped() {
         CheckedProgram program = check("""
                 class Counter {
-                    var count: Integer = 0
+                    mutable val count: Integer = 0
                     val label: String = "c"
                 }
                 """);
@@ -229,9 +229,9 @@ public final class SolvikClassSemanticTest {
     public void methodBodiesMayUseLocalsLoopsAndConditions() {
         CheckedProgram program = check("""
                 class Accumulator {
-                    var total: Integer = 0
+                    mutable val total: Integer = 0
                     func addUpTo(limit: Integer): Integer {
-                        for (var i = 0; i < limit; i = i + 1) {
+                        for (mutable val i = 0; i < limit; i = i + 1) {
                             this.total = this.total + i
                         }
                         return this.total
@@ -272,7 +272,7 @@ public final class SolvikClassSemanticTest {
     public void mutablePropertyAssignmentInsideMethodsIsTyped() {
         CheckedProgram program = check("""
                 class Cell {
-                    var value: Integer
+                    mutable val value: Integer
                     Cell(value: Integer) {
                         this.value = value
                     }

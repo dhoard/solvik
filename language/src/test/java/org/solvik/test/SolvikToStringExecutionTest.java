@@ -104,8 +104,8 @@ public final class SolvikToStringExecutionTest {
     @Test
     public void overrideDispatchesThroughAnyAndInheritance() {
         assertThat(run("""
-                open class Base {
-                    open override func toString(): String {
+                mutable class Base {
+                    mutable override func toString(): String {
                         return "base"
                     }
                 }

@@ -361,7 +361,7 @@ def test_describe_identity_fields():
     rc, resp, err, *_ = _session("normal", run_exec=False)
     impl = {r["op"]: r for r in resp}["describe"]["implementation"]
     check("describe name", impl["name"] == "fake-iut")
-    check("describe spec version", "2026.10-draft" in impl["specVersions"])
+    check("describe spec version", "2026.11-draft" in impl["specVersions"])
     check("describe profile", "full-language" in impl["profiles"])
     check("describe capability", "compile-only" in impl["capabilities"])
     check("describe fingerprint hex", len(impl["fingerprint"]) == 64)

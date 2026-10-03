@@ -160,8 +160,8 @@ public final class SolvikToStringSemanticTest {
     @Test
     public void openToStringOverrideCanBeOverriddenAgain() {
         check("""
-                open class Base {
-                    open override func toString(): String {
+                mutable class Base {
+                    mutable override func toString(): String {
                         return "base"
                     }
                 }
@@ -176,7 +176,7 @@ public final class SolvikToStringSemanticTest {
     @Test
     public void overrideOfFinalToStringIsRejected() {
         assertThat(first(checkFails("""
-                open class Base {
+                mutable class Base {
                     override func toString(): String {
                         return "base"
                     }

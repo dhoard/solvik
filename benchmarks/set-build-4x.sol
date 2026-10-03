@@ -1,7 +1,7 @@
 // Set.add while growing: each insertion scans for an equal element. N = 80000.
-var set = Set<Integer>()
-var added = 0
-var i = 0
+mutable val set = Set<Integer>()
+mutable val added = 0
+mutable val i = 0
 while (i < 80000) {
     if (set.add(i)) {
         added = added + 1

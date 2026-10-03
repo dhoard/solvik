@@ -163,12 +163,12 @@ public final class SolvikEqualityTest {
     @Test
     public void setMembershipUsesScalarValueEquality() {
         assertThat(run("""
-                    var longs: Set<Long> = Set(1L, 2L)
+                    mutable val longs: Set<Long> = Set(1L, 2L)
                     println(longs.contains(1L))
                     println(longs.contains(3L))
-                    var doubles: Set<Double> = Set(1.5, 2.5)
+                    mutable val doubles: Set<Double> = Set(1.5, 2.5)
                     println(doubles.contains(2.5))
-                    var chars: Set<Character> = Set('a', 'b')
+                    mutable val chars: Set<Character> = Set('a', 'b')
                     println(chars.contains('b'))
                 """)).isEqualTo("true\nfalse\ntrue\ntrue\n");
     }
@@ -176,10 +176,10 @@ public final class SolvikEqualityTest {
     @Test
     public void mapLookupUsesScalarValueEquality() {
         assertThat(run("""
-                    var byLong: Map<Long, String> = Map(1L: "one")
+                    mutable val byLong: Map<Long, String> = Map(1L: "one")
                     println(byLong.containsKey(1L))
                     println(byLong.containsKey(2L))
-                    var byDouble: Map<Double, Integer> = Map(1.5: 1)
+                    mutable val byDouble: Map<Double, Integer> = Map(1.5: 1)
                     println(byDouble.containsKey(1.5))
                 """)).isEqualTo("true\nfalse\ntrue\n");
     }
@@ -192,7 +192,7 @@ public final class SolvikEqualityTest {
                         Green
                     }
 
-                    var colors: Set<Color> = Set(Color.Red)
+                    mutable val colors: Set<Color> = Set(Color.Red)
                     println(colors.contains(Color.Red))
                     println(colors.contains(Color.Green))
                 """)).isEqualTo("true\nfalse\n");
@@ -206,7 +206,7 @@ public final class SolvikEqualityTest {
                         Green
                     }
 
-                    var names: Map<Color, String> = Map(Color.Red: "red")
+                    mutable val names: Map<Color, String> = Map(Color.Red: "red")
                     println(names.containsKey(Color.Red))
                     println(names.containsKey(Color.Green))
                 """)).isEqualTo("true\nfalse\n");
@@ -215,7 +215,7 @@ public final class SolvikEqualityTest {
     @Test
     public void setKeepsOnlyTheFirstOfTwoEqualValues() {
         assertThat(run("""
-                    var values: Set<Long> = Set(1L, 1L, 2L)
+                    mutable val values: Set<Long> = Set(1L, 1L, 2L)
                     println(values.size)
                 """)).isEqualTo("2\n");
     }
@@ -255,7 +255,7 @@ public final class SolvikEqualityTest {
     @Test
     public void inheritedEqualsOverrideRemainsEffective() {
         assertThat(run("""
-                    open class Tagged {
+                    mutable class Tagged {
                         override func equals(other: Any?): Boolean {
                             return other is Tagged
                         }
@@ -336,10 +336,10 @@ public final class SolvikEqualityTest {
                         }
                     }
 
-                    var points: Set<Point> = Set(Point(1))
+                    mutable val points: Set<Point> = Set(Point(1))
                     println(points.contains(Point(1)))
                     println(points.contains(Point(2)))
-                    var byPoint: Map<Point, String> = Map(Point(1): "one")
+                    mutable val byPoint: Map<Point, String> = Map(Point(1): "one")
                     println(byPoint.get(Point(1)))
                 """)).isEqualTo("true\nfalse\none\n");
     }
@@ -347,20 +347,20 @@ public final class SolvikEqualityTest {
     @Test
     public void superEqualsReachesTheSuperclassOverride() {
         assertThat(run("""
-                    open class Base {
+                    mutable class Base {
                         val id: Integer
 
                         Base(id: Integer) {
                             this.id = id
                         }
 
-                        open override func equals(other: Any?): Boolean {
+                        mutable override func equals(other: Any?): Boolean {
                             if (other is Base) {
                                 return this.id == other.id
                             }
                             return false
                         }
-                        open override func hashCode(): Integer {
+                        mutable override func hashCode(): Integer {
                             return this.id
                         }
                     }
@@ -393,7 +393,7 @@ public final class SolvikEqualityTest {
     @Test
     public void superEqualsReachesTheRootIdentityDefault() {
         assertThat(run("""
-                    open class Base {
+                    mutable class Base {
                     }
 
                     class Derived extends Base {
@@ -627,14 +627,14 @@ public final class SolvikEqualityTest {
                         }
                     }
 
-                    var s: Set<Point> = Set()
+                    mutable val s: Set<Point> = Set()
                     println(s.add(Point(1)))
                     println(s.add(Point(1)))
                     println(s.size)
                     println(s.remove(Point(1)))
                     println(s.size)
 
-                    var m: Map<Point, String> = Map()
+                    mutable val m: Map<Point, String> = Map()
                     m.put(Point(1), "one")
                     m.put(Point(1), "uno")
                     println(m.size)
@@ -647,7 +647,7 @@ public final class SolvikEqualityTest {
     @Test
     public void nanCollectionKeysFollowSemanticEquality() {
         assertThat(run("""
-                    var m: Map<Double, Integer> = Map()
+                    mutable val m: Map<Double, Integer> = Map()
                     m.put(0.0 / 0.0, 1)
                     m.put(0.0 / 0.0, 2)
                     println(m.size)
@@ -695,7 +695,7 @@ public final class SolvikEqualityTest {
     public void notEqualsInvokesTheOverrideExactlyOnceAndNegates() {
         assertThat(run("""
                     class Counter {
-                        var calls: Integer
+                        mutable val calls: Integer
 
                         Counter() {
                             this.calls = 0
@@ -748,11 +748,11 @@ public final class SolvikEqualityTest {
     @Test
     public void anOpenEqualsOverrideCanBeOverriddenAgain() {
         assertThat(run("""
-                    open class Base {
-                        open override func equals(other: Any?): Boolean {
+                    mutable class Base {
+                        mutable override func equals(other: Any?): Boolean {
                             return true
                         }
-                        open override func hashCode(): Integer {
+                        mutable override func hashCode(): Integer {
                             return 1
                         }
                     }
@@ -902,7 +902,7 @@ public final class SolvikEqualityTest {
                         K(Point)
                     }
 
-                    var m: Map<Key, String> = Map()
+                    mutable val m: Map<Key, String> = Map()
                     m.put(Key.K(Point(1)), "one")
                     println(m.get(Key.K(Point(1))))
                     println(m.containsKey(Key.K(Point(2))))
@@ -912,7 +912,7 @@ public final class SolvikEqualityTest {
     @Test
     public void repeatedRegexEvaluationDoesNotChangeEquality() {
         assertThat(run("""
-                    var i = 0
+                    mutable val i = 0
                     while (i < 3) {
                         val constant = Regex("a+")
                         val dynamic = Regex("a" .. "+")

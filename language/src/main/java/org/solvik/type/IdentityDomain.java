@@ -24,7 +24,7 @@ import java.util.Set;
  * (docs/LANGUAGE_SPEC.md section 3).
  *
  * <p>Only values that carry Solvik allocation identity may name an identity operator. Those are the
- * user-defined class types (including sealed classes and parameterized applications), the interface
+ * user-defined class types (including abstract classes and parameterized applications), the interface
  * types whose runtime values are class instances (including parameterized applications), the four
  * mutable built-in collections and their applications, function types, and the nullable forms of any
  * of these. Every

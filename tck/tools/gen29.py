@@ -16,10 +16,10 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SPEC = open(os.path.join(ROOT, "docs/LANGUAGE_SPEC.md"), encoding="utf-8").read()
-CORPUS = os.path.join(ROOT, "tck/corpus/2026.10-draft")
+CORPUS = os.path.join(ROOT, "tck/corpus/2026.11-draft")
 REQUIREMENTS = os.path.join(ROOT, "tck/requirements/requirements.json")
 PROFILE = os.path.join(ROOT, "tck/profiles/full-language.profile.json")
-SPEC_VERSION = "2026.10-draft"
+SPEC_VERSION = "2026.11-draft"
 
 
 def norm(t):
@@ -93,33 +93,34 @@ REQS_SPEC = {
         note="A method assigns to the delegate after the constructor initialized it. The section "
              "names no code, so the rejection is bare."),
     "REQ-2706": dict(
-        section="12. Enums, Sealed Types, and Exhaustive Match",
-        summary="A sealed class is abstract and cannot be constructed, so constructing it directly "
-                "is a compile-time error",
+        section="12. Enums, Abstract Classes, and Exhaustive Match",
+        summary="An abstract class is not constructible, so calling its constructor directly is a "
+                "compile-time error",
         kind="compile-time",
-        quotes=["A `sealed class` is abstract and may be extended only by declarations in the same "
-                "physical source file."],
-        note="The program calls the sealed class's constructor. The section names no code, so the "
-             "rejection is bare; the sentinel proves non-execution."),
+        quotes=["An `abstract class` is not constructible: naming it as a constructor is "
+                "`SOLV-SEM-028`, and a program must construct one of its subtypes instead."],
+        note="The program calls the abstract class's constructor. The code is pinned because the "
+             "2026.11-draft section 12 names SOLV-SEM-028 for exactly this; 2026.10-draft left the "
+             "rejection unnamed. The sentinel proves non-execution."),
     "REQ-2707": dict(
-        section="12. Enums, Sealed Types, and Exhaustive Match",
+        section="12. Enums, Abstract Classes, and Exhaustive Match",
         summary="An enum variant's payload argument must be assignable to the variant's declared "
                 "payload type, so a wrong-typed payload is a compile-time error",
         kind="compile-time",
         quotes=["Assignments are statements, not value-producing expressions. The target must be a "
-                "mutable local or `var` property. Calls require exact arity, and each argument must "
-                "be assignable to its declared parameter type."],
+                "`mutable val` local or a `mutable val` property. Calls require exact arity, and "
+                "each argument must be assignable to its declared parameter type."],
         note="Variant `A` carries an `Integer` and is constructed with a `String`. A variant is a "
              "nominal constructor, so the general call-assignability rule applies; the section "
              "names no code for the payload mismatch, so the rejection is bare."),
     "REQ-2708": dict(
         section="7. Classes",
         summary="`super.member` accesses the immediate superclass implementation, and an override "
-                "must be re-marked `open` to be overridable further",
+                "must be re-marked `mutable` to be overridable further",
         kind="runtime",
         quotes=["`super.member` accesses the immediate superclass implementation.",
-                "An `open` member may be overridden; all other members are final."],
-        note="A three-level hierarchy each re-marking the override `open`; the most derived method "
+                "A `mutable` member may be overridden; all other members are final."],
+        note="A three-level hierarchy each re-marking the override `mutable`; the most derived method "
              "concatenates its own text with `super.label()`, so the printed `BC` proves `super` "
              "reached the immediate parent (`B`), not the root (`A`)."),
     "REQ-2709": dict(
@@ -129,7 +130,7 @@ REQS_SPEC = {
         kind="compile-time",
         quotes=["The compiler must narrow the type where the checked value is stable and no "
                 "intervening write can invalidate the refinement."],
-        note="After `x is String` narrows a `var`, a write to `x` occurs and a later read requires "
+        note="After `x is String` narrows a `mutable val`, a write to `x` occurs and a later read requires "
              "the narrowed type. The refinement must not survive the write, so the read is a "
              "compile-time error; no code is named, so the rejection is bare."),
     "REQ-2710": dict(
@@ -184,7 +185,7 @@ BAD("SOL-TCK-0380", "numerics", "REQ-2701",
     'val b: Byte = Byte(200)\nprint("EXECUTED-INVALID")\n',
     "200 is outside the signed 8-bit range, so the constant conversion is rejected.")
 RTE("SOL-TCK-0381", "numerics", "REQ-2702",
-    'var l: Long = 2147483648L\nval i: Integer = Integer(l)\nprint(i)\n',
+    'mutable val l: Long = 2147483648L\nval i: Integer = Integer(l)\nprint(i)\n',
     "ARITHMETIC_ERROR",
     "The value is outside the Integer range and is held in a mutable binding, so the conversion "
     "faults at run time with the arithmetic category.")
@@ -194,7 +195,7 @@ BAD("SOL-TCK-0382", "types", "REQ-2703",
     'val x: A = B()\nprint("EXECUTED-INVALID")\n',
     "The classes have identical members but no nominal relation, so the assignment is rejected.")
 BAD("SOL-TCK-0383", "objects", "REQ-2704",
-    'open class A {\n    A() {\n    }\n}\nopen class B {\n    B() {\n    }\n}\n'
+    'mutable class A {\n    A() {\n    }\n}\nmutable class B {\n    B() {\n    }\n}\n'
     'class C extends A, B {\n    C() {\n    }\n}\nprint("EXECUTED-INVALID")\n',
     "Two superclass names are forbidden.")
 BAD("SOL-TCK-0384", "objects", "REQ-2705",
@@ -203,23 +204,23 @@ BAD("SOL-TCK-0384", "objects", "REQ-2705",
     '    delegate val a: P\n\n    X(p: P) {\n        this.a = p\n    }\n\n'
     '    func mutate(p: P) {\n        this.a = p\n    }\n}\nprint("EXECUTED-INVALID")\n',
     "The delegate is assigned by `mutate` after initialization, which the immutable `val` forbids.")
-BAD("SOL-TCK-0385", "sealed", "REQ-2706",
-    'sealed class Shape {\n    Shape() {\n    }\n}\nval s = Shape()\nprint("EXECUTED-INVALID")\n',
-    "A sealed class is abstract and cannot be constructed directly.")
+BAD("SOL-TCK-0385", "abstract", "REQ-2706",
+    'abstract class Shape {\n    Shape() {\n    }\n}\nval s = Shape()\nprint("EXECUTED-INVALID")\n',
+    "An abstract class is not constructible, so its constructor call is rejected.")
 BAD("SOL-TCK-0386", "enums", "REQ-2707",
     'enum E {\n    A(Integer)\n    B(String)\n}\nval x: E = E.A("wrong")\n'
     'print("EXECUTED-INVALID")\n',
     "Variant A carries an Integer payload, so the String argument is not assignable.")
 OK("SOL-TCK-0387", "objects", "REQ-2708",
-   'open class A {\n    open func label(): String {\n        return "A"\n    }\n\n    A() {\n    }\n}\n'
-   'open class B extends A {\n    open override func label(): String {\n        return "B"\n    }\n\n'
+   'mutable class A {\n    mutable func label(): String {\n        return "A"\n    }\n\n    A() {\n    }\n}\n'
+   'mutable class B extends A {\n    mutable override func label(): String {\n        return "B"\n    }\n\n'
    '    B() {\n    }\n}\nclass C extends B {\n    override func label(): String {\n'
    '        return super.label() .. "C"\n    }\n\n    C() {\n    }\n}\nval c = C()\nprint(c.label())\n',
    "BC",
    "The most derived method concatenates its own text after `super.label()`, so the printed BC "
    "shows super reached the immediate parent B rather than the root A.")
 BAD("SOL-TCK-0388", "types", "REQ-2709",
-    'func f(v: Any): Integer {\n    var x: Any = v\n    if (x is String) {\n        x = 1\n'
+    'func f(v: Any): Integer {\n    mutable val x: Any = v\n    if (x is String) {\n        x = 1\n'
     '        val s: String = x\n        return 1\n    }\n    return 0\n}\n'
     'print("EXECUTED-INVALID")\n',
     "The write to x invalidates the is-refinement, so the later String read is rejected.")

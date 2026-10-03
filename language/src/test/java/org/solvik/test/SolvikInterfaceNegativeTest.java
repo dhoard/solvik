@@ -201,7 +201,7 @@ public final class SolvikInterfaceNegativeTest {
                         return "b"
                     }
                 }
-                open class Base {
+                mutable class Base {
                     func greet(): String {
                         return "base"
                     }

@@ -54,7 +54,7 @@ public final class SolvikGenericsExecutionTest {
     public void genericConstructionAndMembersExecute() {
         assertThat(run("""
                 class Box<T> {
-                    var value: T
+                    mutable val value: T
 
                     Box(value: T) {
                         this.value = value
@@ -89,7 +89,7 @@ public final class SolvikGenericsExecutionTest {
     public void genericMethodExecutes() {
         assertThat(run("""
                 class Box<T> {
-                    var value: T
+                    mutable val value: T
 
                     Box(value: T) {
                         this.value = value
@@ -135,7 +135,7 @@ public final class SolvikGenericsExecutionTest {
                 }
 
                 class Holder<T> implements Container<T> {
-                    var value: T
+                    mutable val value: T
 
                     Holder(value: T) {
                         this.value = value
@@ -155,14 +155,14 @@ public final class SolvikGenericsExecutionTest {
     @Test
     public void inheritedGenericMembersExecuteThroughASubclass() {
         assertThat(run("""
-                open class Box<T> {
-                    var value: T
+                mutable class Box<T> {
+                    mutable val value: T
 
                     Box(value: T) {
                         this.value = value
                     }
 
-                    open func get(): T {
+                    mutable func get(): T {
                         return this.value
                     }
                 }
@@ -183,7 +183,7 @@ public final class SolvikGenericsExecutionTest {
     public void genericClassDisplaysAsItsClassName() {
         assertThat(run("""
                 class Box<T> {
-                    var value: T
+                    mutable val value: T
 
                     Box(value: T) {
                         this.value = value
@@ -198,7 +198,7 @@ public final class SolvikGenericsExecutionTest {
     public void parameterizedArgumentInfersTheTypeArgument() {
         assertThat(run("""
                 class Box<T> {
-                    var value: T
+                    mutable val value: T
 
                     Box(value: T) {
                         this.value = value
@@ -236,7 +236,7 @@ public final class SolvikGenericsExecutionTest {
     public void enclosingTypeParameterInAParameterDoesNotConstrainInference() {
         assertThat(run("""
                 class Box<T> {
-                    var value: T
+                    mutable val value: T
 
                     Box(value: T) {
                         this.value = value
@@ -260,7 +260,7 @@ public final class SolvikGenericsExecutionTest {
         try (Context context = Context.newBuilder("solvik").out(out).err(out).allowAllAccess(true).build()) {
             PolyglotException failure = expectThrows(PolyglotException.class, () -> context.eval(build("""
                     class Box<T> {
-                        var value: T
+                        mutable val value: T
 
                         Box(value: T) {
                             this.value = value

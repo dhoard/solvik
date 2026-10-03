@@ -40,7 +40,7 @@ public final class SolvikNamespaceNegativeTest {
             class Thing {
             }
             class Holder {
-                static var count: Integer = 0
+                static mutable val count: Integer = 0
                 static val limit: Integer = 1
                 static func bump(): Integer {
                     Holder.count = Holder.count + 1

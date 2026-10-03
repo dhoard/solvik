@@ -28,7 +28,7 @@ import org.solvik.type.Type;
  *
  * <p>Every {@link #source()} of an identifier item is an immutable local or an immutable parameter of an
  * enclosing function, including the function-valued binding an intervening closure lists to forward a
- * value it does not own. A {@code var} never appears here: naming one is rejected, and the rejected name
+ * value it does not own. A {@code mutable val} never appears here: naming one is rejected, and the rejected name
  * is recorded so the body reports the mutable-capture code for it instead of reading a silent mirror.
  *
  * <p>A {@code [this]} item carries a synthetic source symbol that is <em>declared in no scope</em>. It

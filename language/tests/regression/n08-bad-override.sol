@@ -1,4 +1,4 @@
-open class A {
+mutable class A {
     func f(): Integer {
         return 1
     }

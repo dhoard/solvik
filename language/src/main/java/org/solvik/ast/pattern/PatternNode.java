@@ -21,7 +21,7 @@ import org.solvik.source.SourceSpan;
 
 /**
  * Base class of the initial {@code match} pattern forms (docs/LANGUAGE_SPEC.md section 12): an enum
- * variant pattern, a sealed-subtype binding pattern of the form {@code name: Type}, and the
+ * variant pattern, a subtype binding pattern of the form {@code name: Type}, and the
  * wildcard {@code _}. A pattern is a syntax node exactly like any other AST node, so it carries a
  * source span and ordered children but no resolved symbol or runtime representation.
  */

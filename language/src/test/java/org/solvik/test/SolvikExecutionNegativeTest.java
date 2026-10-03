@@ -130,7 +130,7 @@ public final class SolvikExecutionNegativeTest {
 
     @Test
     public void assignmentAsExpressionIsRejected() {
-        Result result = evaluate("  var x = 1\n  val y = (x = 2)\n  println(y)\n");
+        Result result = evaluate("  mutable val x = 1\n  val y = (x = 2)\n  println(y)\n");
         assertThat(result.failure).isNotNull();
         assertThat(result.failure.isSyntaxError()).isTrue();
         assertThat(result.output).isEqualTo("");

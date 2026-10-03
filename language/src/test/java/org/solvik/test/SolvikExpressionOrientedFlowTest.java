@@ -53,7 +53,7 @@ public final class SolvikExpressionOrientedFlowTest {
                         while (flag) {
                             break
                         }
-                        for (var i: Integer = 0; i < n; i = i + 1) {
+                        for (mutable val i: Integer = 0; i < n; i = i + 1) {
                             continue
                         }
                         for (i in 0...n) {

@@ -16,10 +16,10 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SPEC = open(os.path.join(ROOT, "docs/LANGUAGE_SPEC.md"), encoding="utf-8").read()
-CORPUS = os.path.join(ROOT, "tck/corpus/2026.10-draft")
+CORPUS = os.path.join(ROOT, "tck/corpus/2026.11-draft")
 REQUIREMENTS = os.path.join(ROOT, "tck/requirements/requirements.json")
 PROFILE = os.path.join(ROOT, "tck/profiles/full-language.profile.json")
-SPEC_VERSION = "2026.10-draft"
+SPEC_VERSION = "2026.11-draft"
 
 
 def norm(t):
@@ -59,12 +59,12 @@ REQS_SPEC = {
              "The section names no code for the redeclaration, so both rejections are bare."),
     "REQ-3102": dict(
         section="7. Classes",
-        summary="Classes are final by default, so extending a class that was not declared `open` is "
+        summary="Classes are final by default, so extending a class that was not declared `mutable` is "
                 "a compile-time error",
         kind="compile-time",
         quotes=["Classes are final by default.",
-                "A class must explicitly opt into inheritance:"],
-        note="A class without `open` is extended. The section names no code for the finality "
+                "A class must explicitly opt into inheritance."],
+        note="A class with neither `mutable` nor `abstract` is extended. The section names no code for the finality "
              "restriction, so the rejection is bare."),
     "REQ-3103": dict(
         section="7. Classes",
@@ -153,9 +153,9 @@ BAD("SOL-TCK-0407", "files", "REQ-3101",
 BAD("SOL-TCK-0408", "objects", "REQ-3102",
     'class A {\n    A() {\n    }\n}\nclass B extends A {\n    B() {\n    }\n}\n'
     'print("EXECUTED-INVALID")\n', {},
-    "Extending a class that was not declared open is rejected.")
+    "Extending a class that was not declared `mutable` or `abstract` is rejected.")
 BAD("SOL-TCK-0409", "objects", "REQ-3103",
-    'class C {\n    static var n: Integer = "wrong"\n\n    C() {\n    }\n}\n'
+    'class C {\n    static mutable val n: Integer = "wrong"\n\n    C() {\n    }\n}\n'
     'print("EXECUTED-INVALID")\n',
     {"family": "TYPE", "code": "SOLV-TYPE-001"},
     "A String static initializer for an Integer property pins SOLV-TYPE-001.")

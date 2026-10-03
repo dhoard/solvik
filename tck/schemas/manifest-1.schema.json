@@ -25,7 +25,7 @@
       "enum": [
         "lexical", "syntax", "types", "names", "numerics", "evaluation",
         "objects", "equality", "hashing", "generics", "collections",
-        "enums", "sealed", "match", "control", "regex", "files", "modules",
+        "enums", "abstract", "match", "control", "regex", "files", "modules",
         "exceptions", "result", "process"
       ]
     },
@@ -182,7 +182,7 @@
         "note": { "type": "string", "maxLength": 1024 }
       }
     },
-    "specVersion": { "type": "string", "enum": ["2026.10-draft"] },
+    "specVersion": { "type": "string", "enum": ["2026.11-draft"] },
     "profileName": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,62}[a-z0-9]$" },
     "testId": { "type": "string", "pattern": "^SOL-TCK-[0-9]{4,6}$" },
     "requirementId": { "type": "string", "pattern": "^REQ-[0-9]{4,6}$" },

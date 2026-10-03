@@ -32,7 +32,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 SPEC = open(os.path.join(ROOT, "docs/LANGUAGE_SPEC.md"), encoding="utf-8").read()
 REQUIREMENTS = os.path.join(ROOT, "tck/requirements/requirements.json")
 PROFILE = os.path.join(ROOT, "tck/profiles/full-language.profile.json")
-SPEC_VERSION = "2026.10-draft"
+SPEC_VERSION = "2026.11-draft"
 
 
 def norm(t):
@@ -74,7 +74,7 @@ UNEXERCISED = [
         rationale="A design-time tie-break ordering for the implementer, not a rule that constrains "
                   "guest program behavior. Where two designs both satisfy the specification there is "
                   "no observable to assert; the ordering guides choices the specification otherwise "
-                  "leaves open.",
+                  "leaves unspecified.",
         quotes=["When language features conflict, prefer:",
                 "1. compile-time correctness;"],
     ),

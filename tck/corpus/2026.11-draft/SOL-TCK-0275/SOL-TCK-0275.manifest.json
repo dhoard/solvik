@@ -1,0 +1,23 @@
+{
+  "manifestSchemaVersion": 1,
+  "specVersion": "2026.11-draft",
+  "testId": "SOL-TCK-0275",
+  "category": "types",
+  "profile": "full-language",
+  "status": "required",
+  "requirements": [
+    "REQ-1802"
+  ],
+  "entryPoint": "main.sol",
+  "outcome": "COMPILE_ERROR",
+  "expectation": {
+    "diagnostic": {
+      "family": "SEM",
+      "code": "SOLV-SEM-045",
+      "location": {
+        "startByteOffset": 255,
+        "endByteOffset": 326
+      }
+    }
+  }
+}

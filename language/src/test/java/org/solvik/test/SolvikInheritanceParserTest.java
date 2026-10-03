@@ -29,7 +29,7 @@ import org.solvik.ast.expression.SuperExprNode;
 import org.solvik.ast.statement.ExprStmtNode;
 
 /**
- * Phase 7 parser tests: {@code open class}, {@code extends}, {@code open}/{@code override} method
+ * Phase 7 parser tests: {@code open class}, {@code extends}, {@code mutable}/{@code override} method
  * modifiers, the {@code super(...)} constructor call, and {@code super.member} access. The grammar
  * permits at most one {@code extends} clause, so multiple inheritance is a parse error.
  */
@@ -37,15 +37,15 @@ public final class SolvikInheritanceParserTest {
 
     @Test
     public void openClassWithSingleSuperclassParses() {
-        CompilationUnitNode unit = parseOk("inherit.sol", "open class Animal {\n}\nclass Dog extends Animal {\n}\n");
+        CompilationUnitNode unit = parseOk("inherit.sol", "mutable class Animal {\n}\nclass Dog extends Animal {\n}\n");
         assertThat(unit.declarations().size()).isEqualTo(2);
         ClassDeclNode animal = (ClassDeclNode) unit.declarations().get(0);
-        assertThat(animal.isOpen()).isTrue();
+        assertThat(animal.isMutable()).isTrue();
         assertThat(animal.name()).isEqualTo("Animal");
         assertThat(animal.superClass().isEmpty()).isTrue();
 
         ClassDeclNode dog = (ClassDeclNode) unit.declarations().get(1);
-        assertThat(dog.isOpen()).isFalse();
+        assertThat(dog.isMutable()).isFalse();
         assertThat(dog.name()).isEqualTo("Dog");
         assertThat(dog.superClass().isPresent()).isTrue();
         assertThat(dog.superClass().orElseThrow().name()).isEqualTo("Animal");
@@ -54,8 +54,8 @@ public final class SolvikInheritanceParserTest {
     @Test
     public void methodModifiersAreRecorded() {
         CompilationUnitNode unit = parseOk("mods.sol", """
-                open class Animal {
-                    open func speak(): String {
+                mutable class Animal {
+                    mutable func speak(): String {
                         return "..."
                     }
                 }
@@ -67,19 +67,19 @@ public final class SolvikInheritanceParserTest {
                 """);
         ClassDeclNode animal = (ClassDeclNode) unit.declarations().get(0);
         FunctionDeclNode inherited = animal.methods().get(0);
-        assertThat(inherited.isOpen()).isTrue();
+        assertThat(inherited.isMutable()).isTrue();
         assertThat(inherited.isOverride()).isFalse();
 
         ClassDeclNode dog = (ClassDeclNode) unit.declarations().get(1);
         FunctionDeclNode overriding = dog.methods().get(0);
-        assertThat(overriding.isOpen()).isFalse();
+        assertThat(overriding.isMutable()).isFalse();
         assertThat(overriding.isOverride()).isTrue();
     }
 
     @Test
     public void explicitSuperConstructorCallParsesAsASuperExprCall() {
         CompilationUnitNode unit = parseOk("super.sol", """
-                open class Animal {
+                mutable class Animal {
                     val legs: Integer
                     Animal(legs: Integer) {
                         this.legs = legs
@@ -101,8 +101,8 @@ public final class SolvikInheritanceParserTest {
     @Test
     public void superMemberAccessParsesAsASuperExprReceiver() {
         CompilationUnitNode unit = parseOk("supermember.sol", """
-                open class Animal {
-                    open func speak(): String {
+                mutable class Animal {
+                    mutable func speak(): String {
                         return "..."
                     }
                 }
@@ -122,11 +122,11 @@ public final class SolvikInheritanceParserTest {
 
     @Test
     public void multipleInheritanceIsRejectedByTheGrammar() {
-        parseFails("multi.sol", "open class A {\n}\nopen class B {\n}\nclass C extends A, B {\n}\n");
+        parseFails("multi.sol", "mutable class A {\n}\nmutable class B {\n}\nclass C extends A, B {\n}\n");
     }
 
     @Test
     public void aTopLevelFunctionCannotCarryMethodModifiers() {
-        parseFails("topmod.sol", "open func f(): Integer {\n    return 1\n}\n");
+        parseFails("topmod.sol", "mutable func f(): Integer {\n    return 1\n}\n");
     }
 }

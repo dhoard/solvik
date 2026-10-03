@@ -8,6 +8,10 @@ target/
 # Local GraalVM checkout (build normally selects GraalVM via GRAALVM_HOME/JAVA_HOME).
 graalvm/
 
+# Python bytecode caches (tools/ scripts)
+__pycache__/
+*.py[cod]
+
 # Editors / IDEs
 *~
 .idea/

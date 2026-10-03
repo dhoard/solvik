@@ -11,9 +11,9 @@ import base64, json, os, re, sys, glob
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SPEC = os.path.join(ROOT, "docs/LANGUAGE_SPEC.md")
-CORPUS = os.path.join(ROOT, "tck/corpus/2026.10-draft")
+CORPUS = os.path.join(ROOT, "tck/corpus/2026.11-draft")
 REQS = os.path.join(ROOT, "tck/requirements/requirements.json")
-SPEC_VERSION = "2026.10-draft"
+SPEC_VERSION = "2026.11-draft"
 
 
 def normalize(text):
@@ -164,8 +164,8 @@ REQUIREMENTS = [
       kind="runtime",
       quotes=[Q["invariant"]],
       tests=["SOL-TCK-0089"],
-      notes=("Section 11's own `class Box<T> { var value: T }` example is the declaration under test; the program "
-             "adds the constructor that section 7 requires because section 2 rejects a `var` property with no "
+      notes=("Section 11's own `class Box<T> { mutable val value: T }` example is the declaration under test; the program "
+             "adds the constructor that section 7 requires because section 2 rejects a `mutable val` property with no "
              "initializer, which changes no generics semantics. Two different type arguments on the same declared "
              "class are the point: a runtime that shared one storage cell across instantiations could not print "
              "both the `String` and the incremented `Integer`. The type-test sentence is quoted because it is the "

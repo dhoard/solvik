@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Record the one `2026.10-draft` function-value obligation no *portable* test can ever exercise.
+"""Record the one `2026.11-draft` function-value obligation no *portable* test can ever exercise.
 
 Section 6 fixes what a function value reports at the interoperability boundary. Unlike the rest of
 that revision's function-value surface, this clause's observable lives in the *host*: the assertion is
@@ -50,7 +50,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 SPEC = open(os.path.join(ROOT, "docs/LANGUAGE_SPEC.md"), encoding="utf-8").read()
 REQUIREMENTS = os.path.join(ROOT, "tck/requirements/requirements.json")
 PROFILE = os.path.join(ROOT, "tck/profiles/full-language.profile.json")
-SPEC_VERSION = "2026.10-draft"
+SPEC_VERSION = "2026.11-draft"
 
 
 def norm(t):

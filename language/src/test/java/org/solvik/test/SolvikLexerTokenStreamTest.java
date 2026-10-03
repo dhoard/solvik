@@ -448,7 +448,10 @@ public final class SolvikLexerTokenStreamTest {
             }
         }
         Set<String> expected = new LinkedHashSet<>(List.of( //
-                "FUNC", "STATIC", "INCLUDE", "MODULE", "ALIAS", "CLASS", "INTERFACE", "ENUM", "SEALED", "DELEGATE", "IMPLEMENTS", "OPEN", "EXTENDS", "OVERRIDE", "THIS", "SUPER", "VAL", "VAR", "IF", "ELSE", //
+                // `SEALED`, `OPEN`, and `VAR` are reserved tokens with no parser production: they are
+                // the keywords removed in 2026.11-draft, kept reserved so old source fails with
+                // SOLV-PARS-006 instead of lexing as an identifier. `MUTABLE` and `ABSTRACT` replace them.
+                "FUNC", "STATIC", "INCLUDE", "MODULE", "ALIAS", "CLASS", "INTERFACE", "ENUM", "MUTABLE", "ABSTRACT", "SEALED", "DELEGATE", "IMPLEMENTS", "OPEN", "EXTENDS", "OVERRIDE", "THIS", "SUPER", "VAL", "VAR", "IF", "ELSE", //
                 "WHILE", "FOR", "IN", "BREAK", "CONTINUE", "RETURN", "MATCH", "ARROW", "SWITCH", "CASE", "DEFAULT", "REGEX_KW", "THROW", "TRY", "CATCH", "FINALLY", "NULL", "IS", "AS", "BOOL_LITERAL", "Identifier", "INTEGER_LITERAL", "LONG_LITERAL", "FLOATING_LITERAL", "CHARACTER_LITERAL", "STRING_LITERAL", "RAW_STRING_LITERAL", //
                 "LPAREN", "RPAREN", "LBRACE", "RBRACE", "SEMI", "ASSIGN", "COLON", "COLONCOLON", "COMMA", //
                 "DOT", "DOTDOT", "DOTDOTDOT", "DOTDOTLT", "DOTDOTGT", "NULLABLE_DOT", "NULL_COALESCE", "QUESTION", "LBRACKET", "RBRACKET", "ADD", "SUB", "MUL", "DIV", "BANG", "EQEQ", "NEQEQ", "EQ", "NEQ", //

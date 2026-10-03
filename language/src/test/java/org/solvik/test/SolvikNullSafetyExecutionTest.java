@@ -203,8 +203,8 @@ public final class SolvikNullSafetyExecutionTest {
     @Test
     public void inheritanceTypeTestsWalkTheRuntimeClassChain() {
         assertThat(run("""
-                open class Animal {
-                    open func speak(): String {
+                mutable class Animal {
+                    mutable func speak(): String {
                         return "..."
                     }
                 }

@@ -280,7 +280,7 @@ public final class SolvikGenericFunctionValueTest {
     }
 
     /**
-     * A {@code var} assignment is a context: the variable's declared type is known before the value is
+     * A {@code mutable val} assignment is a context: the variable's declared type is known before the value is
      * examined, so it constrains a generic reference written on the right.
      *
      * "assignment targets" is listed among the positions expected function types flow into.
@@ -292,7 +292,7 @@ public final class SolvikGenericFunctionValueTest {
                     return value
                 }
 
-                var slot: func(Integer): Integer = identity
+                mutable val slot: func(Integer): Integer = identity
                 slot = identity
                 println(slot(6))
                 """)).isEqualTo("6\n");
@@ -307,7 +307,7 @@ public final class SolvikGenericFunctionValueTest {
                 }
 
                 class Holder {
-                    var slot: func(Integer): Integer = identity
+                    mutable val slot: func(Integer): Integer = identity
                 }
 
                 val holder = Holder()
@@ -325,7 +325,7 @@ public final class SolvikGenericFunctionValueTest {
                 }
 
                 class Holder {
-                    static var slot: func(String): String = identity
+                    static mutable val slot: func(String): String = identity
                 }
 
                 Holder.slot = identity
@@ -429,7 +429,7 @@ public final class SolvikGenericFunctionValueTest {
                     return value
                 }
 
-                open class Base {
+                mutable class Base {
                     func apply(transform: func(Integer): Integer, value: Integer): Integer {
                         return transform(value)
                     }
@@ -530,7 +530,7 @@ public final class SolvikGenericFunctionValueTest {
                 }
 
                 class Holder {
-                    var slot: func(Integer): Integer = identity
+                    mutable val slot: func(Integer): Integer = identity
                 }
 
                 """;
@@ -578,7 +578,7 @@ public final class SolvikGenericFunctionValueTest {
                 }
 
                 class Store {
-                    static var slot: func(Integer): Integer = identity
+                    static mutable val slot: func(Integer): Integer = identity
                     static val frozen: func(Integer): Integer = identity
                     static func method(value: Integer): Integer {
                         return value
@@ -624,7 +624,7 @@ public final class SolvikGenericFunctionValueTest {
                 }
 
                 class Store {
-                    static var slot: func(String): String = identity
+                    static mutable val slot: func(String): String = identity
                 }
                 """, """
                 include "lib.sol" alias m
@@ -1166,7 +1166,7 @@ public final class SolvikGenericFunctionValueTest {
                     return value
                 }
 
-                var made: (func(Integer): Integer)? = identity
+                mutable val made: (func(Integer): Integer)? = identity
                 if (made != null) {
                     println(made(2))
                 }

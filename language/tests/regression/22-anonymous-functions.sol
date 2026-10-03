@@ -6,7 +6,7 @@
 // function's locals (that needs the capture list of a later revision), globals resolve with no entry,
 // `return` returns from the body, and `break`/`continue` cannot cross the boundary.
 
-open class Animal {
+mutable class Animal {
     val name: String = "animal"
 }
 
@@ -75,8 +75,8 @@ println(created())
 // A `break` in a loop written inside the body targets that loop, since the boundary stops the search
 // outward and not the search inside.
 val sumTo: func(Integer): Integer = func(limit: Integer): Integer {
-    var seen: Integer = 0
-    var i: Integer = 0
+    mutable val seen: Integer = 0
+    mutable val i: Integer = 0
     while (true) {
         i = i + 1
         if (i > limit) {

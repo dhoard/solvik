@@ -48,9 +48,9 @@ operations.add(anonymous)
 operations.add(closure)
 operations.add(stepper.step)
 
-var total = 0
-var slot = 0
-var i = 0
+mutable val total = 0
+mutable val slot = 0
+mutable val i = 0
 while (i < 20000000) {
     total = apply(operations.get(slot), total)
     slot = slot + 1

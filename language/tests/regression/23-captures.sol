@@ -9,11 +9,11 @@
 // list and forward a name explicitly.
 
 class Cell {
-    var n: Integer = 0
+    mutable val n: Integer = 0
 }
 
 class Adder {
-    var base: Integer = 0
+    mutable val base: Integer = 0
 
     func set(value: Integer) {
         this.base = value

@@ -126,7 +126,7 @@ public final class SolvikDelegateSemanticTest {
                     func save(value: String): Unit
                 }
                 """ + MEMORY_REPOSITORY + """
-                open class Base {
+                mutable class Base {
                     func save(value: String): Unit {
                     }
                 }
@@ -199,7 +199,7 @@ public final class SolvikDelegateSemanticTest {
                     func save(value: String): Unit
                 }
                 """ + MEMORY_REPOSITORY + """
-                open class UserService implements Repository {
+                mutable class UserService implements Repository {
                     delegate val repository: Repository = MemoryRepository()
                 }
                 class AuditedService extends UserService {

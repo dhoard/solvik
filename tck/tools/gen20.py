@@ -8,9 +8,9 @@ probes so far agreed with the hand derivations.
 import base64, json, os, re, sys, textwrap
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-CORPUS = os.path.join(ROOT, "tck/corpus/2026.10-draft")
+CORPUS = os.path.join(ROOT, "tck/corpus/2026.11-draft")
 REQS = os.path.join(ROOT, "tck/requirements/requirements.json")
-SPEC_VERSION = "2026.10-draft"
+SPEC_VERSION = "2026.11-draft"
 
 
 def normalize(text):
@@ -38,7 +38,7 @@ M_DEF = """func add(a: Integer, b: Integer): Integer {
 GEOM = """module geom
 
 class Point {
-    var x: Integer
+    mutable val x: Integer
 
     Point(v: Integer) {
         this.x = v

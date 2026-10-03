@@ -223,7 +223,7 @@ Initial implementation:
 - single class inheritance;
 - explicit `override`;
 - classes final by default;
-- methods final by default unless explicitly `open`;
+- methods final by default unless explicitly `mutable`;
 - multiple interfaces;
 - interface default methods;
 - delegation.
@@ -268,13 +268,13 @@ Compile-time facts, all recorded before lowering so lowering redoes no analysis:
 **Capture analysis** runs at the anonymous-function expression, before its parameter and body scope
 are entered, and preserves written order. It rejects a duplicate item, a capture/parameter name
 collision, an item that is not an eligible immutable local, parameter, function value, or `this`, a
-`var` item, and a self-reference to the binding being initialized. Body checking then resolves only
+`mutable val` item, and a self-reference to the binding being initialized. Body checking then resolves only
 parameters, body locals, written captures, and top-level/module declarations; an eligible enclosing
 binding reached without being listed is `SEM_UNLISTED_CAPTURE`, and after an invalid capture item is
 reported a poisoned placeholder must prevent the same root cause from re-reporting as an unknown
 name or an omitted capture.
 
-**Runtime representation.** A guest function value is a sealed family over a stable call target
+**Runtime representation.** A guest function value is a closed family over a stable call target
 plus an immutable environment: a canonical named value (one instance per declared function per
 context), an anonymous value (a fresh instance per evaluation, sharing one lowered root), and a
 bound value (a fresh instance per evaluation, retaining one already-evaluated receiver). Equality
@@ -462,8 +462,9 @@ Regex engine selection is an implementation decision. Keep it behind Solvik's `R
 `match`:
 - pattern-oriented;
 - expression-capable;
-- supports enum/sealed destructuring;
-- statically exhaustive for every known enum or sealed variant set.
+- supports enum variant destructuring and binding patterns of the form `name: Type`;
+- statically exhaustive for every known enum or `error` variant set; a class type has no knowable
+  subtype set, so a `match` over one is exhaustive only through a wildcard branch.
 
 Do not conflate `switch` and `match` internally merely because lowering may share code.
 

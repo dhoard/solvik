@@ -22,7 +22,7 @@ import org.solvik.type.Type;
 /**
  * A declared class property (docs/LANGUAGE_SPEC.md section 7): the compile-time descriptor of one
  * statically declared object field. {@code val} properties are immutable after construction;
- * {@code var} properties are mutable. {@code index} is the field's position in the class layout and
+ * A {@code mutable val} property is writable; a plain {@code val} property is not. {@code index} is the field's position in the class layout and
  * is stable for the lifetime of the program.
  *
  * <p>A {@code delegate val} declaration produces a property symbol with {@link #isDelegate()} set

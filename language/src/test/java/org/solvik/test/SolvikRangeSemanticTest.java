@@ -95,7 +95,7 @@ public final class SolvikRangeSemanticTest {
 
     @Test
     public void loopVariableShadowsAnOuterBinding() {
-        check("func f(): Integer {\n    var i = 99\n    for (i in 0...1) {\n    }\n    return i\n}\n");
+        check("func f(): Integer {\n    mutable val i = 99\n    for (i in 0...1) {\n    }\n    return i\n}\n");
     }
 
     @Test

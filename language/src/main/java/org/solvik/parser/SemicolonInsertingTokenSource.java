@@ -97,8 +97,12 @@ public final class SemicolonInsertingTokenSource implements TokenSource {
      * {@code null} literal joins for the same reason as the other literals, and {@code ?} joins
      * because it completes a written nullable type reference; the new keywords {@code is} and
      * {@code as} and the coalescing operator {@code ??} are not terminators. Phase 12's {@code enum}
-     * and {@code sealed} open a construct and are not terminators either: an enum variant already
-     * ends in {@code )} or an identifier, both of which terminate.
+     * and 2026.11-draft's {@code abstract} and {@code mutable} open a construct and are not terminators
+     * either: an enum variant already ends in {@code )} or an identifier, both of which terminate, and a
+     * line can never legitimately end in {@code abstract} or {@code mutable} because each is followed by
+     * the declaration it modifies. The three keywords that 2026.11-draft removed stay reserved tokens in
+     * no grammar production, so no valid program can end a line on them and the table has no view of
+     * them at all.
      */
     private static final int[] NEWLINE_TERMINATORS = { //
             SolvikLexer.Identifier, //

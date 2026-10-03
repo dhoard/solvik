@@ -22,10 +22,10 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SPEC = open(os.path.join(ROOT, "docs/LANGUAGE_SPEC.md"), encoding="utf-8").read()
-CORPUS = os.path.join(ROOT, "tck/corpus/2026.10-draft")
+CORPUS = os.path.join(ROOT, "tck/corpus/2026.11-draft")
 REQUIREMENTS = os.path.join(ROOT, "tck/requirements/requirements.json")
 PROFILE = os.path.join(ROOT, "tck/profiles/full-language.profile.json")
-SPEC_VERSION = "2026.10-draft"
+SPEC_VERSION = "2026.11-draft"
 
 
 def norm(t):
@@ -72,7 +72,7 @@ REQS_SPEC = {
         quotes=["An implementing method must use the same parameter types and a covariant return "
                 "type."],
         note="The positive arm returns a subtype `Dog` for an interface method declared to return "
-             "`Animal` (which must be `open` because classes are final by default) and is observed "
+             "`Animal` (which must be `mutable` because classes are final by default) and is observed "
              "as stdout; the negative arm returns an unrelated `Rock`, which the specification's "
              "'covariant' requirement rejects. The pair differs only in the return type's relation "
              "to `Animal`."),
@@ -209,7 +209,7 @@ BAD("SOL-TCK-0342", "objects", "REQ-2301",
     'print("EXECUTED-INVALID")\n', {},
     "The implementing method changes the interface parameter type to Integer.")
 OK("SOL-TCK-0343", "objects", "REQ-2302",
-   'open class Animal {\n    Animal() {\n    }\n}\nclass Dog extends Animal {\n    Dog() {\n    }\n}\n'
+   'mutable class Animal {\n    Animal() {\n    }\n}\nclass Dog extends Animal {\n    Dog() {\n    }\n}\n'
    'interface Maker {\n    func make(): Animal\n}\nclass DogMaker implements Maker {\n'
    '    DogMaker() {\n    }\n\n    func make(): Dog {\n        return Dog()\n    }\n}\n'
    'val m: Maker = DogMaker()\nprint("covok")\n',
@@ -217,7 +217,7 @@ OK("SOL-TCK-0343", "objects", "REQ-2302",
    "Returning the subtype Dog for an interface method declared to return Animal is a covariant "
    "return and is accepted.")
 BAD("SOL-TCK-0344", "objects", "REQ-2302",
-    'open class Animal {\n    Animal() {\n    }\n}\nclass Rock {\n    Rock() {\n    }\n}\n'
+    'mutable class Animal {\n    Animal() {\n    }\n}\nclass Rock {\n    Rock() {\n    }\n}\n'
     'interface Maker {\n    func make(): Animal\n}\nclass RockMaker implements Maker {\n'
     '    RockMaker() {\n    }\n\n    func make(): Rock {\n        return Rock()\n    }\n}\n'
     'val m: Maker = RockMaker()\nprint("EXECUTED-INVALID")\n', {},

@@ -143,7 +143,7 @@ public final class SolvikEqualsOverrideNegativeTest {
         // Both classes pair equals with hashCode so the equals/hashCode pairing rule does not fire and
         // the diagnostic under test is the final-override violation alone.
         String text = """
-                open class Base {
+                mutable class Base {
                     override func equals(other: Any?): Boolean {
                         return true
                     }

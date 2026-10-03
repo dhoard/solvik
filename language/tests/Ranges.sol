@@ -1,23 +1,23 @@
 // Solvik range for-in loops: inclusive `...`, ascending-exclusive `..<`, descending-exclusive `..>`.
-var inclusive = ""
+mutable val inclusive = ""
 for (i in 1...5) {
     inclusive = inclusive .. i
 }
 println(inclusive)
 
-var ascending = ""
+mutable val ascending = ""
 for (i in 0..<4) {
     ascending = ascending .. i
 }
 println(ascending)
 
-var descending = ""
+mutable val descending = ""
 for (i in 5..>0) {
     descending = descending .. i
 }
 println(descending)
 
-var total = 0
+mutable val total = 0
 for (i in 1...10) {
     if (i == 3) {
         continue

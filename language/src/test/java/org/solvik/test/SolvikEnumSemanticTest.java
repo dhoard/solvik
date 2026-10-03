@@ -209,12 +209,17 @@ public final class SolvikEnumSemanticTest {
         assertThat(program.testedTypeOf(statement.value().orElseThrow()).orElseThrow()).isEqualTo(program.enumSymbol("Color").orElseThrow().type());
     }
 
+    /**
+     * An {@code abstract} class is extendable and records its relation to each subclass, but the
+     * 2026.11-draft revision retired the closed subtype set: extension is open to any subclass, so
+     * there is no permitted-subtype list to record.
+     */
     @Test
-    public void sealedClassRecordsItsCompleteTransitiveSubtypeSet() {
+    public void abstractClassRecordsSubclassRelationsWithoutAClosedSubtypeSet() {
         CheckedProgram program = check("""
-                sealed class Shape {
+                abstract class Shape {
                 }
-                open class Circle extends Shape {
+                mutable class Circle extends Shape {
                 }
                 class UnitCircle extends Circle {
                 }
@@ -224,22 +229,29 @@ public final class SolvikEnumSemanticTest {
                 }
                 """);
         ClassSymbol shape = program.classSymbol("Shape").orElseThrow();
-        assertThat(shape.isSealed()).isTrue();
+        assertThat(shape.isAbstract()).isTrue();
         assertThat(shape.isExtendable()).isTrue();
-        List<String> permitted = shape.permittedSubtypes().stream().map(ClassSymbol::name).sorted().toList();
-        assertThat(permitted).isEqualTo(List.of("Circle", "Square"));
-        List<String> all = shape.allSubtypes().stream().map(ClassSymbol::name).sorted().toList();
-        assertThat(all).isEqualTo(List.of("Circle", "Square", "UnitCircle"));
-        assertThat(program.classSymbol("Unrelated").orElseThrow().isSealed()).isFalse();
-        assertThat(program.classSymbol("Unrelated").orElseThrow().permittedSubtypes().isEmpty()).isTrue();
-        assertThat(program.classSymbol("Unrelated").orElseThrow().allSubtypes().isEmpty()).isTrue();
+        assertThat(shape.isMutable()).isFalse();
+        ClassSymbol circle = program.classSymbol("Circle").orElseThrow();
+        ClassSymbol unitCircle = program.classSymbol("UnitCircle").orElseThrow();
+        ClassSymbol square = program.classSymbol("Square").orElseThrow();
+        ClassSymbol unrelated = program.classSymbol("Unrelated").orElseThrow();
+        assertThat(circle.isSubclassOf(shape)).isTrue();
+        assertThat(square.isSubclassOf(shape)).isTrue();
+        // Subclasshood is transitive through a mutable intermediate class.
+        assertThat(unitCircle.isSubclassOf(shape)).isTrue();
+        assertThat(unitCircle.isSubclassOf(circle)).isTrue();
+        assertThat(circle.isSubclassOf(unitCircle)).isFalse();
+        assertThat(unrelated.isAbstract()).isFalse();
+        assertThat(unrelated.isExtendable()).isFalse();
+        assertThat(unrelated.isSubclassOf(shape)).isFalse();
     }
 
     @Test
-    public void sealedClassIsNotConstructedButItsSubtypesAre() {
+    public void anAbstractClassIsNotConstructedButItsSubtypesAre() {
         CheckedProgram program = check("""
-                sealed class Shape {
-                    open func name(): String {
+                abstract class Shape {
+                    mutable func name(): String {
                         return "shape"
                     }
                 }

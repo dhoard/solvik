@@ -122,9 +122,9 @@ public final class SolvikMatchSemanticTest {
     }
 
     @Test
-    public void sealedSubtypeBindingNarrowsToTheSubtype() {
+    public void subtypeBindingNarrowsToTheSubtype() {
         CheckedProgram program = check("""
-                sealed class Shape {
+                abstract class Shape {
                 }
                 class Circle extends Shape {
                     val radius: Integer
@@ -136,6 +136,7 @@ public final class SolvikMatchSemanticTest {
                 func area(shape: Shape): Integer {
                     return match shape {
                         circle: Circle => circle.radius * circle.radius
+                        _ => 0
                     }
                 }
                 """);
@@ -145,9 +146,9 @@ public final class SolvikMatchSemanticTest {
     }
 
     @Test
-    public void subtypeBranchesUnifyToTheSealedSupertype() {
+    public void subtypeBranchesUnifyToTheAbstractSupertype() {
         CheckedProgram program = check("""
-                sealed class Shape {
+                abstract class Shape {
                 }
                 class Circle extends Shape {
                 }
@@ -157,6 +158,7 @@ public final class SolvikMatchSemanticTest {
                     return match shape {
                         circle: Circle => circle
                         square: Square => square
+                        _ => shape
                     }
                 }
                 """);
@@ -223,7 +225,7 @@ public final class SolvikMatchSemanticTest {
     @Test
     public void matchOnANullableSealedTypeIsExhaustiveWithAWildcard() {
         CheckedProgram program = check("""
-                sealed class Shape {
+                abstract class Shape {
                 }
                 class Circle extends Shape {
                 }
@@ -256,7 +258,7 @@ public final class SolvikMatchSemanticTest {
     @Test
     public void aWildcardAfterATypedBindingOnANullableTypeIsReachable() {
         CheckedProgram program = check("""
-                sealed class Shape {
+                abstract class Shape {
                 }
                 class Circle extends Shape {
                 }

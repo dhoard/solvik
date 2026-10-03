@@ -90,7 +90,7 @@ public final class SolvikExpressionOrientedExecutionTest {
                 println(describe(0))
                 println(describe(1))
 
-                var score: Integer = 0
+                mutable val score: Integer = 0
                 score = if (true) { 10 } else { 0 }
                 println(score)
                 """)).isEqualTo("negative\nzero\npositive\n10\n");
@@ -158,7 +158,7 @@ public final class SolvikExpressionOrientedExecutionTest {
     public void switchExpressionEvaluatesItsScrutineeOnce() {
         assertThat(run("""
                 class Counter {
-                    var value: Integer
+                    mutable val value: Integer
 
                     Counter() {
                         this.value = 0

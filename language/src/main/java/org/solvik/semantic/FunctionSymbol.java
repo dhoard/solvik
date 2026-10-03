@@ -36,8 +36,8 @@ import org.solvik.type.UnitType;
  * A declared callable: a top-level function, a class instance method, a class constructor, an
  * interface default method, an interface abstract signature, or a compiler-synthesized
  * delegation forwarding method. It carries its parameter bindings, its return type, its syntax
- * declaration, the owner it was declared on, and (for a class method) its {@code open}/{@code
- * override} modifiers.
+ * declaration, the owner it was declared on, and (for a class method) its {@code
+ * mutable} and {@code override} modifiers.
  *
  * <p>{@link #hasImplementation()} is the interface-conformance distinction
  * (docs/LANGUAGE_SPEC.md section 8): only an interface abstract signature lacks one, so a required
@@ -64,7 +64,7 @@ public final class FunctionSymbol extends Symbol {
     private final PropertySymbol delegateProperty;
     private final FunctionType functionType;
     private final boolean builtin;
-    private final boolean open;
+    private final boolean mutable;
     private final boolean override;
     /**
      * The body and captured bindings of an anonymous function, or {@code null} for every other callable.
@@ -94,17 +94,17 @@ public final class FunctionSymbol extends Symbol {
     }
 
     private FunctionSymbol(String name, SourceSpan declarationSpan, List<VariableSymbol> parameters, List<TypeParameterType> typeParameters, Type returnType, boolean returnTypeKnown, FunctionDeclNode declaration, ConstructorDeclNode constructorDeclaration,
-                    SignatureDeclNode signatureDeclaration, ClassDeclNode owner, InterfaceDeclNode interfaceOwner, FunctionSymbol forwardedDelegate, PropertySymbol delegateProperty, boolean builtin, boolean open, boolean override) {
-        this(name, declarationSpan, parameters, typeParameters, returnType, returnTypeKnown, declaration, constructorDeclaration, signatureDeclaration, owner, interfaceOwner, forwardedDelegate, delegateProperty, builtin, open, override, false);
+                    SignatureDeclNode signatureDeclaration, ClassDeclNode owner, InterfaceDeclNode interfaceOwner, FunctionSymbol forwardedDelegate, PropertySymbol delegateProperty, boolean builtin, boolean mutable, boolean override) {
+        this(name, declarationSpan, parameters, typeParameters, returnType, returnTypeKnown, declaration, constructorDeclaration, signatureDeclaration, owner, interfaceOwner, forwardedDelegate, delegateProperty, builtin, mutable, override, false);
     }
 
     private FunctionSymbol(String name, SourceSpan declarationSpan, List<VariableSymbol> parameters, List<TypeParameterType> typeParameters, Type returnType, boolean returnTypeKnown, FunctionDeclNode declaration, ConstructorDeclNode constructorDeclaration,
-                    SignatureDeclNode signatureDeclaration, ClassDeclNode owner, InterfaceDeclNode interfaceOwner, FunctionSymbol forwardedDelegate, PropertySymbol delegateProperty, boolean builtin, boolean open, boolean override, boolean isStatic) {
-        this(name, declarationSpan, parameters, typeParameters, returnType, returnTypeKnown, declaration, constructorDeclaration, signatureDeclaration, owner, interfaceOwner, forwardedDelegate, delegateProperty, builtin, open, override, isStatic, null);
+                    SignatureDeclNode signatureDeclaration, ClassDeclNode owner, InterfaceDeclNode interfaceOwner, FunctionSymbol forwardedDelegate, PropertySymbol delegateProperty, boolean builtin, boolean mutable, boolean override, boolean isStatic) {
+        this(name, declarationSpan, parameters, typeParameters, returnType, returnTypeKnown, declaration, constructorDeclaration, signatureDeclaration, owner, interfaceOwner, forwardedDelegate, delegateProperty, builtin, mutable, override, isStatic, null);
     }
 
     private FunctionSymbol(String name, SourceSpan declarationSpan, List<VariableSymbol> parameters, List<TypeParameterType> typeParameters, Type returnType, boolean returnTypeKnown, FunctionDeclNode declaration, ConstructorDeclNode constructorDeclaration,
-                    SignatureDeclNode signatureDeclaration, ClassDeclNode owner, InterfaceDeclNode interfaceOwner, FunctionSymbol forwardedDelegate, PropertySymbol delegateProperty, boolean builtin, boolean open, boolean override, boolean isStatic, AnonymousCallable anonymousCallable) {
+                    SignatureDeclNode signatureDeclaration, ClassDeclNode owner, InterfaceDeclNode interfaceOwner, FunctionSymbol forwardedDelegate, PropertySymbol delegateProperty, boolean builtin, boolean mutable, boolean override, boolean isStatic, AnonymousCallable anonymousCallable) {
         super(name, declarationSpan);
         this.anonymousCallable = anonymousCallable;
         this.anonymous = anonymousCallable != null;
@@ -120,7 +120,7 @@ public final class FunctionSymbol extends Symbol {
         this.forwardedDelegate = forwardedDelegate;
         this.delegateProperty = delegateProperty;
         this.builtin = builtin;
-        this.open = open;
+        this.mutable = mutable;
         this.override = override;
         this.isStatic = isStatic;
         List<Type> parameterTypes = new ArrayList<>(this.parameters.size());
@@ -157,7 +157,7 @@ public final class FunctionSymbol extends Symbol {
      * @param captures the bindings the expression's capture list resolved to, in source order; empty for
      *                a non-capturing anonymous function
      * @param suppressedCaptureNames capture item names the list reported and bound nothing for, other than
-     *                the {@code var} names in {@code rejectedCaptureNames}; a body reference to one of these
+     *                the {@code mutable val} names in {@code rejectedCaptureNames}; a body reference to one of these
      *                earns no diagnostic, because the item already reported the root cause
      */
     public static FunctionSymbol anonymous(String debugName, SourceSpan declarationSpan, List<VariableSymbol> parameters, Type returnType, boolean returnTypeKnown, BlockNode body, List<CapturedValue> captures, Set<String> rejectedCaptureNames, Set<String> suppressedCaptureNames) {
@@ -167,8 +167,8 @@ public final class FunctionSymbol extends Symbol {
 
     /** Creates an instance method of a class; the method's receiver is implicit. */
     static FunctionSymbol declaredMethod(String name, SourceSpan declarationSpan, List<VariableSymbol> parameters, List<TypeParameterType> typeParameters, Type returnType, boolean returnTypeKnown, FunctionDeclNode declaration, ClassDeclNode owner,
-                    boolean open, boolean override) {
-        return new FunctionSymbol(name, declarationSpan, parameters, typeParameters, returnType, returnTypeKnown, declaration, null, null, owner, null, null, null, false, open, override);
+                    boolean mutable, boolean override) {
+        return new FunctionSymbol(name, declarationSpan, parameters, typeParameters, returnType, returnTypeKnown, declaration, null, null, owner, null, null, null, false, mutable, override);
     }
 
     /**
@@ -332,9 +332,9 @@ public final class FunctionSymbol extends Symbol {
         return signatureDeclaration != null;
     }
 
-    /** Whether this method declaration used the {@code open} modifier. */
-    public boolean isOpen() {
-        return open;
+    /** Whether this method declaration used the {@code mutable} modifier, which permits overriding. */
+    public boolean isMutable() {
+        return mutable;
     }
 
     /** Whether this method declaration used the {@code override} modifier. */
@@ -372,13 +372,13 @@ public final class FunctionSymbol extends Symbol {
     }
 
     /**
-     * The names this anonymous function's capture list named as {@code var}s — the items it rejected.
+     * The names this anonymous function's capture list named as {@code mutable val}s — the items it rejected.
      * They are recorded because the body still has to name them: the specification reports a read or
      * write of such a name with the mutable-capture code, and the name is deliberately bound to nothing
      * so the body cannot read a silently mirrored copy of the mutable binding.
      *
      * <p>Empty for every callable that is not an anonymous function and for one whose capture list named
-     * no {@code var}.
+     * no {@code mutable val}.
      */
     public Set<String> rejectedCaptureNames() {
         return anonymousCallable == null ? Set.of() : anonymousCallable.rejectedCaptureNames();
@@ -386,12 +386,12 @@ public final class FunctionSymbol extends Symbol {
 
     /**
      * The capture item names this anonymous function's capture list reported and bound nothing for, other
-     * than the {@code var} names {@link #rejectedCaptureNames()} carries. A body reference to one of these
+     * than the {@code mutable val} names {@link #rejectedCaptureNames()} carries. A body reference to one of these
      * names is reported nowhere: the item already reported the single root cause, and the specification
      * forbids restating it as an unlisted-capture or unknown-name diagnostic.
      *
      * <p>Empty for every callable that is not an anonymous function and for one whose capture list reported
-     * no item other than {@code var}s.
+     * no item other than {@code mutable val}s.
      */
     public Set<String> suppressedCaptureNames() {
         return anonymousCallable == null ? Set.of() : anonymousCallable.suppressedCaptureNames();

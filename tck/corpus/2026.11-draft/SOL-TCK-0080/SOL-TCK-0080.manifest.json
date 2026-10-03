@@ -1,0 +1,17 @@
+{
+  "manifestSchemaVersion": 1,
+  "specVersion": "2026.11-draft",
+  "testId": "SOL-TCK-0080",
+  "category": "collections",
+  "profile": "full-language",
+  "status": "required",
+  "requirements": [
+    "REQ-0905"
+  ],
+  "entryPoint": "main.sol",
+  "outcome": "RUNTIME_ERROR",
+  "expectation": {
+    "runtimeCategory": "INDEX_OUT_OF_BOUNDS",
+    "stdoutBase64": ""
+  }
+}

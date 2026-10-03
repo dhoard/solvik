@@ -47,7 +47,7 @@ public final class SolvikInheritanceSemanticTest {
 
     @Test
     public void subclassJoinsTheNominalHierarchy() {
-        CheckedProgram program = check("open class Animal {\n}\nclass Dog extends Animal {\n}\n");
+        CheckedProgram program = check("mutable class Animal {\n}\nclass Dog extends Animal {\n}\n");
         ClassSymbol animal = program.classSymbol("Animal").orElseThrow();
         ClassSymbol dog = program.classSymbol("Dog").orElseThrow();
         assertThat(dog.superClass().orElseThrow()).isEqualTo(animal);
@@ -60,7 +60,7 @@ public final class SolvikInheritanceSemanticTest {
     @Test
     public void inheritedPropertiesAndMethodsAreVisible() {
         check("""
-                open class Animal {
+                mutable class Animal {
                     val name: String
 
                     Animal(name: String) {
@@ -86,8 +86,8 @@ public final class SolvikInheritanceSemanticTest {
     @Test
     public void overrideReplacesTheInheritedMethodInTheDispatchTable() {
         CheckedProgram program = check("""
-                open class Animal {
-                    open func speak(): String {
+                mutable class Animal {
+                    mutable func speak(): String {
                         return "..."
                     }
                 }
@@ -101,7 +101,7 @@ public final class SolvikInheritanceSemanticTest {
         ClassSymbol dog = program.classSymbol("Dog").orElseThrow();
         FunctionSymbol inherited = animal.method("speak").orElseThrow();
         FunctionSymbol overriding = dog.method("speak").orElseThrow();
-        assertThat(inherited.isOpen()).isTrue();
+        assertThat(inherited.isMutable()).isTrue();
         assertThat(overriding.isOverride()).isTrue();
         assertThat(inherited == overriding).isFalse();
         assertThat(dog.declaredMethods().get(0)).isEqualTo(overriding);
@@ -110,7 +110,7 @@ public final class SolvikInheritanceSemanticTest {
     @Test
     public void explicitSuperConstructorCallIsRecognized() {
         CheckedProgram program = check("""
-                open class Animal {
+                mutable class Animal {
                     val legs: Integer
                     Animal(legs: Integer) {
                         this.legs = legs
@@ -131,7 +131,7 @@ public final class SolvikInheritanceSemanticTest {
     @Test
     public void implicitSuperConstructorCallIsAcceptedForAZeroArgumentSuperclass() {
         check("""
-                open class Animal {
+                mutable class Animal {
                     val legs: Integer = 4
                 }
                 class Dog extends Animal {
@@ -146,8 +146,8 @@ public final class SolvikInheritanceSemanticTest {
     @Test
     public void superMemberAccessTargetsTheSuperclassImplementation() {
         CheckedProgram program = check("""
-                open class Animal {
-                    open func speak(): String {
+                mutable class Animal {
+                    mutable func speak(): String {
                         return "..."
                     }
                 }
@@ -171,7 +171,7 @@ public final class SolvikInheritanceSemanticTest {
         // built-in root calls so lowering emits the identity comparison and identity hash rather than
         // re-dispatching (section 3). `equals` and `hashCode` must be overridden together.
         CheckedProgram program = check("""
-                open class Base {
+                mutable class Base {
                 }
                 class Derived extends Base {
                     override func equals(other: Any?): Boolean {
@@ -215,7 +215,7 @@ public final class SolvikInheritanceSemanticTest {
 
     @Test
     public void userDeclaredObjectIsAnOrdinaryNominalTypeUnderAny() {
-        CheckedProgram program = check("open class Object {\n}\nclass User extends Object {\n}\n");
+        CheckedProgram program = check("mutable class Object {\n}\nclass User extends Object {\n}\n");
         ClassSymbol object = program.classSymbol("Object").orElseThrow();
         ClassSymbol user = program.classSymbol("User").orElseThrow();
         assertThat(object.superClass().isEmpty()).isTrue();

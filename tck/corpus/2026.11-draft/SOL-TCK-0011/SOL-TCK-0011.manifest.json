@@ -1,0 +1,19 @@
+{
+  "manifestSchemaVersion": 1,
+  "specVersion": "2026.11-draft",
+  "testId": "SOL-TCK-0011",
+  "category": "evaluation",
+  "profile": "full-language",
+  "status": "required",
+  "requirements": [
+    "REQ-0203"
+  ],
+  "entryPoint": "main.sol",
+  "outcome": "COMPILE_ERROR",
+  "expectation": {
+    "diagnostic": {
+      "family": "SEM",
+      "code": "SOLV-SEM-042"
+    }
+  }
+}

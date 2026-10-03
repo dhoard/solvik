@@ -604,16 +604,18 @@ public final class SolvikLexerTest {
         assertThat(renderDefault("class")).isEqualTo("CLASS(class)");
         assertThat(renderDefault("interface")).isEqualTo("INTERFACE(interface)");
         assertThat(renderDefault("enum")).isEqualTo("ENUM(enum)");
-        assertThat(renderDefault("sealed")).isEqualTo("SEALED(sealed)");
+        assertThat(renderDefault("sealed")).isEqualTo("SEALED(sealed)"); // solvik-keyword: reserved
+        assertThat(renderDefault("mutable")).isEqualTo("MUTABLE(mutable)");
+        assertThat(renderDefault("abstract")).isEqualTo("ABSTRACT(abstract)");
         assertThat(renderDefault("delegate")).isEqualTo("DELEGATE(delegate)");
         assertThat(renderDefault("implements")).isEqualTo("IMPLEMENTS(implements)");
-        assertThat(renderDefault("open")).isEqualTo("OPEN(open)");
+        assertThat(renderDefault("open")).isEqualTo("OPEN(open)"); // solvik-keyword: reserved
         assertThat(renderDefault("extends")).isEqualTo("EXTENDS(extends)");
         assertThat(renderDefault("override")).isEqualTo("OVERRIDE(override)");
         assertThat(renderDefault("this")).isEqualTo("THIS(this)");
         assertThat(renderDefault("super")).isEqualTo("SUPER(super)");
         assertThat(renderDefault("val")).isEqualTo("VAL(val)");
-        assertThat(renderDefault("var")).isEqualTo("VAR(var)");
+        assertThat(renderDefault("var")).isEqualTo("VAR(var)"); // solvik-keyword: reserved
         assertThat(renderDefault("if")).isEqualTo("IF(if)");
         assertThat(renderDefault("else")).isEqualTo("ELSE(else)");
         assertThat(renderDefault("while")).isEqualTo("WHILE(while)");

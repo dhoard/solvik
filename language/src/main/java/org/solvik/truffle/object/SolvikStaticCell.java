@@ -21,7 +21,7 @@ package org.solvik.truffle.object;
  * member observes the latest write to it from anywhere in the program.
  *
  * <p>The value is boxed, exactly as an instance property value is boxed in the object's property
- * array, so a {@code static var} of any declared type stores and reloads without a representation
+ * array, so a {@code static mutable val} of any declared type stores and reloads without a representation
  * change. The declared type is enforced at compile time and is not rechecked at run time, matching how
  * instance properties are stored.
  */

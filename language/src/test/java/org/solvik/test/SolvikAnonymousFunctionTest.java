@@ -425,7 +425,7 @@ public final class SolvikAnonymousFunctionTest {
     }
 
     /**
-     * The unlisted-capture rule covers a write as well as a read, so the enclosing {@code var} is
+     * The unlisted-capture rule covers a write as well as a read, so the enclosing {@code mutable val} is
      * reported at the assignment target inside the body and not merely at a read.
      *
      * <p>The same sentence of section 6 governs both: the dependency "must appear in an explicit capture
@@ -435,7 +435,7 @@ public final class SolvikAnonymousFunctionTest {
     public void writingAnEnclosingLocalIsAnUnlistedCapture() {
         assertThat(first("""
             func demo(): Integer {
-                var total: Integer = 0
+                mutable val total: Integer = 0
                 val bump: func() = func() {
                     total = total + 1
                 }
@@ -517,7 +517,7 @@ public final class SolvikAnonymousFunctionTest {
     public void anEnclosingTypeParameterIsNotVisibleInTheBody() {
         // The name appears in a type position, so it is reported as an unknown type.
         assertThat(firstCode("""
-            open class Box<Value> {
+            mutable class Box<Value> {
                 func make(): func(): Integer {
                     return func(): Value {
                         return null
@@ -562,12 +562,12 @@ public final class SolvikAnonymousFunctionTest {
     public void breakCannotCrossTheFunctionBoundary() {
         assertThat(first("""
             func demo(): Integer {
-                var count: Integer = 0
+                mutable val count: Integer = 0
                 val body: func(): Integer = func(): Integer {
                     break
                     return 0
                 }
-                var i: Integer = 0
+                mutable val i: Integer = 0
                 while (i < 3) {
                     i = i + 1
                     count = count + body()
@@ -589,8 +589,8 @@ public final class SolvikAnonymousFunctionTest {
         assertThat(run("""
             func demo(): Integer {
                 val countTo: func(Integer): Integer = func(limit: Integer): Integer {
-                    var seen: Integer = 0
-                    var i: Integer = 0
+                    mutable val seen: Integer = 0
+                    mutable val i: Integer = 0
                     while (true) {
                         i = i + 1
                         if (i > limit) {
@@ -617,7 +617,7 @@ public final class SolvikAnonymousFunctionTest {
                     continue
                     return 0
                 }
-                var i: Integer = 0
+                mutable val i: Integer = 0
                 while (i < 2) {
                     i = i + 1
                     body()
@@ -751,11 +751,11 @@ public final class SolvikAnonymousFunctionTest {
     @Test
     public void anAnonymousValueIsAssignableUnderFunctionTypeVariance() {
         assertThat(run("""
-            open class Animal {
+            mutable class Animal {
                 val name: String = "animal"
             }
 
-            open class Dog extends Animal {
+            mutable class Dog extends Animal {
             }
 
             func describe(animal: Animal): String {

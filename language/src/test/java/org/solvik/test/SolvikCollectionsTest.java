@@ -50,7 +50,7 @@ public final class SolvikCollectionsTest {
     @Test
     public void listAddsAndGetByIndex() {
         assertThat(runMain("""
-                var nums: List<Integer> = List<Integer>()
+                mutable val nums: List<Integer> = List<Integer>()
                 nums.add(1)
                 nums.add(2)
                 nums.add(3)
@@ -65,11 +65,11 @@ public final class SolvikCollectionsTest {
     @Test
     public void listRemoveAtReturnsRemovedElement() {
         assertThat(runMain("""
-                var nums: List<Integer> = List<Integer>()
+                mutable val nums: List<Integer> = List<Integer>()
                 nums.add(1)
                 nums.add(2)
                 nums.add(3)
-                var removed = nums.removeAt(1)
+                mutable val removed = nums.removeAt(1)
                 println(nums.size)
                 println(removed)
                 """)).isEqualTo("2\n2\n");
@@ -78,7 +78,7 @@ public final class SolvikCollectionsTest {
     @Test
     public void listIsMutable() {
         assertThat(runMain("""
-                var nums: List<Integer> = List<Integer>()
+                mutable val nums: List<Integer> = List<Integer>()
                 nums.add(4)
                 println(!nums.isEmpty)
                 """)).isEqualTo("true\n");
@@ -87,7 +87,7 @@ public final class SolvikCollectionsTest {
     @Test
     public void setAddsUniqueElements() {
         assertThat(runMain("""
-                var s: Set<String> = Set<String>()
+                mutable val s: Set<String> = Set<String>()
                 s.add("a")
                 s.add("a")
                 s.add("b")
@@ -100,10 +100,10 @@ public final class SolvikCollectionsTest {
     @Test
     public void setRemoveDropsAMember() {
         assertThat(runMain("""
-                var s: Set<String> = Set<String>()
+                mutable val s: Set<String> = Set<String>()
                 s.add("x")
                 s.add("y")
-                var present = s.remove("y")
+                mutable val present = s.remove("y")
                 println(present)
                 println(s.size)
                 """)).isEqualTo("true\n1\n");
@@ -112,7 +112,7 @@ public final class SolvikCollectionsTest {
     @Test
     public void mapPutsAndGetByKey() {
         assertThat(runMain("""
-                var m: Map<Integer, String> = Map<Integer, String>()
+                mutable val m: Map<Integer, String> = Map<Integer, String>()
                 m.put(1, "one")
                 m.put(2, "two")
                 println(m.get(1))
@@ -124,7 +124,7 @@ public final class SolvikCollectionsTest {
     @Test
     public void mapPutReplacesWithoutGrowing() {
         assertThat(runMain("""
-                var m: Map<Integer, String> = Map<Integer, String>()
+                mutable val m: Map<Integer, String> = Map<Integer, String>()
                 m.put(1, "one")
                 m.put(1, "one2")
                 println(m.size)
@@ -135,10 +135,10 @@ public final class SolvikCollectionsTest {
     @Test
     public void mapRemoveDeletesKey() {
         assertThat(runMain("""
-                var m: Map<Integer, String> = Map<Integer, String>()
+                mutable val m: Map<Integer, String> = Map<Integer, String>()
                 m.put(1, "one")
                 m.put(2, "two")
-                var present = m.remove(1)
+                mutable val present = m.remove(1)
                 println(present)
                 println(m.size)
                 """)).isEqualTo("true\n1\n");
@@ -148,7 +148,7 @@ public final class SolvikCollectionsTest {
     public void mapGetMissingKeyRaisesCollectionError() {
         runtimeFails("""
                 func f(): Integer {
-                    var m: Map<Integer, String> = Map<Integer, String>()
+                    mutable val m: Map<Integer, String> = Map<Integer, String>()
                     return m.get(9)
                 }
                 f()
@@ -158,7 +158,7 @@ public final class SolvikCollectionsTest {
     @Test
     public void stackPeekAndPopLifo() {
         String out = runMain("""
-                var st: Stack<Integer> = Stack<Integer>()
+                mutable val st: Stack<Integer> = Stack<Integer>()
                 st.push(10)
                 st.push(20)
                 println(st.peek())
@@ -172,7 +172,7 @@ public final class SolvikCollectionsTest {
     public void stackPopEmptyRaisesCollectionError() {
         runtimeFails("""
                 func f(): Integer {
-                    var st: Stack<Integer> = Stack<Integer>()
+                    mutable val st: Stack<Integer> = Stack<Integer>()
                     return st.pop()
                 }
                 f()
@@ -182,7 +182,7 @@ public final class SolvikCollectionsTest {
     @Test
     public void collectionClearEmptiesIt() {
         assertThat(runMain("""
-                var nums: List<Integer> = List<Integer>()
+                mutable val nums: List<Integer> = List<Integer>()
                 nums.add(1)
                 nums.add(2)
                 nums.add(3)
@@ -194,7 +194,7 @@ public final class SolvikCollectionsTest {
     @Test
     public void listConstructorTakesInitialElements() {
         assertThat(runMain("""
-                var nums: List<Integer> = List(1, 2, 3)
+                mutable val nums: List<Integer> = List(1, 2, 3)
                 println(nums.size)
                 println(nums.get(0))
                 println(nums.get(2))
@@ -204,7 +204,7 @@ public final class SolvikCollectionsTest {
     @Test
     public void listConstructorWithExplicitTypeArgumentsTakesInitialElements() {
         assertThat(runMain("""
-                var nums = List<Integer>(1, 2, 3)
+                mutable val nums = List<Integer>(1, 2, 3)
                 nums.add(4)
                 println(nums.size)
                 """)).isEqualTo("4\n");
@@ -213,7 +213,7 @@ public final class SolvikCollectionsTest {
     @Test
     public void setConstructorKeepsTheFirstOccurrence() {
         assertThat(runMain("""
-                var s: Set<Integer> = Set(1, 1, 2, 2)
+                mutable val s: Set<Integer> = Set(1, 1, 2, 2)
                 println(s.size)
                 println(s.contains(1))
                 """)).isEqualTo("2\ntrue\n");
@@ -222,7 +222,7 @@ public final class SolvikCollectionsTest {
     @Test
     public void stackConstructorPushesInOrder() {
         assertThat(runMain("""
-                var st: Stack<Integer> = Stack(10, 20, 30)
+                mutable val st: Stack<Integer> = Stack(10, 20, 30)
                 println(st.size)
                 println(st.pop())
                 """)).isEqualTo("3\n30\n");
@@ -231,7 +231,7 @@ public final class SolvikCollectionsTest {
     @Test
     public void mapConstructorTakesKeyValueEntries() {
         assertThat(runMain("""
-                var m: Map<Integer, String> = Map(1: "one", 2: "two")
+                mutable val m: Map<Integer, String> = Map(1: "one", 2: "two")
                 println(m.size)
                 println(m.get(1))
                 println(m.containsKey(2))
@@ -241,7 +241,7 @@ public final class SolvikCollectionsTest {
     @Test
     public void mapConstructorWithExplicitTypeArgumentsTakesEntries() {
         assertThat(runMain("""
-                var m = Map<String, Integer>("one": 1)
+                mutable val m = Map<String, Integer>("one": 1)
                 println(m.size)
                 """)).isEqualTo("1\n");
     }
@@ -249,7 +249,7 @@ public final class SolvikCollectionsTest {
     @Test
     public void mapConstructorAcceptsATrailingComma() {
         assertThat(runMain("""
-                var m: Map<Integer, String> = Map(1: "one", 2: "two",)
+                mutable val m: Map<Integer, String> = Map(1: "one", 2: "two",)
                 println(m.size)
                 println(m.get(1))
                 """)).isEqualTo("2\none\n");
@@ -258,7 +258,7 @@ public final class SolvikCollectionsTest {
     @Test
     public void mapConstructorKeepsTheLastValueForARepeatedKey() {
         assertThat(runMain("""
-                var m: Map<Integer, String> = Map(1: "one", 1: "two")
+                mutable val m: Map<Integer, String> = Map(1: "one", 1: "two")
                 println(m.size)
                 println(m.get(1))
                 """)).isEqualTo("1\ntwo\n");
@@ -267,7 +267,7 @@ public final class SolvikCollectionsTest {
     @Test
     public void nestedCollectionConstructionInfersFromItsElementPosition() {
         assertThat(runMain("""
-                var rows: List<List<Integer>> = List(List(7))
+                mutable val rows: List<List<Integer>> = List(List(7))
                 println(rows.size)
                 println(rows.get(0).get(0))
                 """)).isEqualTo("1\n7\n");
@@ -279,7 +279,7 @@ public final class SolvikCollectionsTest {
     public void listElementWithTheWrongTypeIsRejected() {
         assertThat(firstFails("""
                 func f(): Unit {
-                    var nums: List<Integer> = List(1, "two")
+                    mutable val nums: List<Integer> = List(1, "two")
                 }
                 """)).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
@@ -288,7 +288,7 @@ public final class SolvikCollectionsTest {
     public void mapKeyWithTheWrongTypeIsRejected() {
         assertThat(firstFails("""
                 func f(): Unit {
-                    var m: Map<Integer, String> = Map("one": "one")
+                    mutable val m: Map<Integer, String> = Map("one": "one")
                 }
                 """)).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
@@ -297,7 +297,7 @@ public final class SolvikCollectionsTest {
     public void mapValueWithTheWrongTypeIsRejected() {
         assertThat(firstFails("""
                 func f(): Unit {
-                    var m: Map<Integer, String> = Map(1: 2)
+                    mutable val m: Map<Integer, String> = Map(1: 2)
                 }
                 """)).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
@@ -306,7 +306,7 @@ public final class SolvikCollectionsTest {
     public void mapPositionalValueIsRejected() {
         assertThat(firstFails("""
                 func f(): Unit {
-                    var m: Map<Integer, String> = Map(1, "one")
+                    mutable val m: Map<Integer, String> = Map(1, "one")
                 }
                 """)).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
@@ -315,7 +315,7 @@ public final class SolvikCollectionsTest {
     public void keyValueEntryOutsideAMapConstructionIsRejected() {
         assertThat(firstFails("""
                 func f(): Unit {
-                    var nums: List<Integer> = List(1: 2)
+                    mutable val nums: List<Integer> = List(1: 2)
                 }
                 """)).isEqualTo(DiagnosticCode.SEM_MAP_ENTRY);
     }
@@ -324,7 +324,7 @@ public final class SolvikCollectionsTest {
     public void constructionWithoutLhsOrExplicitTypeArgumentsIsRejected() {
         assertThat(firstFails("""
                 func f(): Unit {
-                    var nums = List(1, 2)
+                    mutable val nums = List(1, 2)
                 }
                 """)).isEqualTo(DiagnosticCode.TYPE_CANNOT_INFER);
     }
@@ -333,7 +333,7 @@ public final class SolvikCollectionsTest {
     public void mapConstructionWithoutLhsOrExplicitTypeArgumentsIsRejected() {
         assertThat(firstFails("""
                 func f(): Unit {
-                    var m = Map(1: "one")
+                    mutable val m = Map(1: "one")
                 }
                 """)).isEqualTo(DiagnosticCode.TYPE_CANNOT_INFER);
     }
@@ -387,7 +387,7 @@ public final class SolvikCollectionsTest {
     public void unknownCollectionNameIsRejected() {
         assertThat(firstFails("""
                 func f(): Integer {
-                    var v: Queue<Integer> = Queue<Integer>()
+                    mutable val v: Queue<Integer> = Queue<Integer>()
                     return v.size
                 }
                 """)).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_TYPE);
@@ -397,7 +397,7 @@ public final class SolvikCollectionsTest {
     public void valueLessCollectionConstructionIsRejected() {
         CompilationUnitNode unit = parseOk("ccol.sol", """
                 func f() {
-                    var l = List()
+                    mutable val l = List()
                 }
                 """);
         SemanticResult result = SolvikSemanticAnalyzer.analyze(unit);
@@ -410,7 +410,7 @@ public final class SolvikCollectionsTest {
     public void valueLessConstructionInfersFromDeclaredType() {
         assertThat(runMain("""
                 func f() {
-                    var l: List<Integer> = List()
+                    mutable val l: List<Integer> = List()
                     l.add(1)
                     println(l.size)
                 }
@@ -461,28 +461,28 @@ public final class SolvikCollectionsTest {
     @Test
     public void collectionEmptinessTracksMembership() {
         assertThat(runMain("""
-                var l: List<Integer> = List<Integer>()
+                mutable val l: List<Integer> = List<Integer>()
                 println(l.isEmpty)
                 l.add(1)
                 println(l.isEmpty)
                 l.clear()
                 println(l.isEmpty)
 
-                var s: Set<Integer> = Set<Integer>()
+                mutable val s: Set<Integer> = Set<Integer>()
                 println(s.isEmpty)
                 s.add(1)
                 println(s.isEmpty)
                 s.clear()
                 println(s.isEmpty)
 
-                var m: Map<Integer, Integer> = Map()
+                mutable val m: Map<Integer, Integer> = Map()
                 println(m.isEmpty)
                 m.put(1, 1)
                 println(m.isEmpty)
                 m.clear()
                 println(m.isEmpty)
 
-                var st: Stack<Integer> = Stack<Integer>()
+                mutable val st: Stack<Integer> = Stack<Integer>()
                 println(st.isEmpty)
                 st.push(1)
                 println(st.isEmpty)
@@ -494,11 +494,11 @@ public final class SolvikCollectionsTest {
     @Test
     public void listSetReplacesAnElementAndStackPushPeeks() {
         assertThat(runMain("""
-                var l: List<Integer> = List(1, 2, 3)
+                mutable val l: List<Integer> = List(1, 2, 3)
                 l.set(1, 9)
                 println(l.get(1))
 
-                var st: Stack<Integer> = Stack<Integer>()
+                mutable val st: Stack<Integer> = Stack<Integer>()
                 st.push(1)
                 st.push(2)
                 println(st.peek())

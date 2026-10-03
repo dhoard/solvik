@@ -15,7 +15,7 @@ A bare `{}` would accept an implementation that reported the violation somewhere
 or that reported several. Each pairing program below is therefore constructed so the
 rule under test is the ONLY thing that can produce a diagnostic -- the class overrides
 nothing else wrongly, and where an inherited member is re-overridden the parent members
-are declared `open` so the finality rule is not also violated -- and the manifest then
+are declared `mutable` so the finality rule is not also violated -- and the manifest then
 pins the exact byte span, which is the member declaration itself. The span is computed
 from the program text at generation time as the offset of the member declaration through
 its closing brace, so it is derived from the requirement's wording rather than copied
@@ -74,7 +74,7 @@ import base64, json, os, re, sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SPEC = open(os.path.join(ROOT, "docs/LANGUAGE_SPEC.md")).read()
-CORPUS = os.path.join(ROOT, "tck/corpus/2026.10-draft")
+CORPUS = os.path.join(ROOT, "tck/corpus/2026.11-draft")
 
 
 def norm(t):
@@ -101,7 +101,7 @@ REQS = {
   section="3. Equality and reference identity",
   summary="The equals/hashCode pairing is checked per class declaration and is never satisfied by inheritance, while a subclass of a class overriding both members needs no override of its own",
   kind="compile-time",
-  notes="The rule is pinned against its own opposite. A subclass whose parent overrides both members and which declares nothing of its own must be accepted, which is the arm an implementation that enforced pairing by looking at inherited members would reject, and it is also the arm that stops the rejection from being satisfied by any implementation hostile to subclass overrides. The violation arm is a subclass adding only equals over a parent declaring both as open, and because these two requirements are simultaneously true the program carries exactly one diagnostic, so the manifest pins the code and the exact span of the unpaired member rather than a bare expectation -- the alternative of accepting any single diagnostic would not distinguish 'reported on the single unpaired member' from 'reported somewhere'.",
+  notes="The rule is pinned against its own opposite. A subclass whose parent overrides both members and which declares nothing of its own must be accepted, which is the arm an implementation that enforced pairing by looking at inherited members would reject, and it is also the arm that stops the rejection from being satisfied by any implementation hostile to subclass overrides. The violation arm is a subclass adding only equals over a parent declaring both as mutable, and because these two requirements are simultaneously true the program carries exactly one diagnostic, so the manifest pins the code and the exact span of the unpaired member rather than a bare expectation -- the alternative of accepting any single diagnostic would not distinguish 'reported on the single unpaired member' from 'reported somewhere'.",
   quotes=["The rule is checked per declaration and is never satisfied by inheritance.",
           "A class that overrides neither member inherits both root defaults, which is valid because both root defaults are reference identity.",
           "Each violation is a compile-time error reported on the single unpaired member, so a class missing one of the two produces one diagnostic."]),
@@ -200,14 +200,14 @@ add("SOL-TCK-0273", "REQ-1801", "types",
 
 # --- REQ-1802 pairing per declaration, never by inheritance.
 add("SOL-TCK-0274", "REQ-1802", "types",
-    'open class Both {\n    Both() {\n    }\n\n    override func equals(other: Any?): Boolean {\n        return true\n    }\n\n'
+    'mutable class Both {\n    Both() {\n    }\n\n    override func equals(other: Any?): Boolean {\n        return true\n    }\n\n'
     '    override func hashCode(): Integer {\n        return 5\n    }\n}\n'
     'class Plain extends Both {\n    Plain() {\n    }\n}\n'
     'val s = Plain()\nprint("inh" .. (s == s) .. s.hashCode())\n',
     "SUCCESS", stdout="inhtrue5")
 add("SOL-TCK-0275", "REQ-1802", "types",
-    'open class Both2 {\n    Both2() {\n    }\n\n    open override func equals(other: Any?): Boolean {\n        return true\n    }\n\n'
-    '    open override func hashCode(): Integer {\n        return 5\n    }\n}\n'
+    'mutable class Both2 {\n    Both2() {\n    }\n\n    mutable override func equals(other: Any?): Boolean {\n        return true\n    }\n\n'
+    '    mutable override func hashCode(): Integer {\n        return 5\n    }\n}\n'
     'class OnlyEq extends Both2 {\n    OnlyEq() {\n    }\n\n    override func equals(other: Any?): Boolean {\n        return false\n    }\n}\n'
     'val s = OnlyEq()\nprint(s)\n' + NEG,
     "COMPILE_ERROR",
@@ -309,7 +309,7 @@ def main():
         os.makedirs(d, exist_ok=True)
         open(os.path.join(d, "main.sol"), "w").write(src)
         e = EXPECT[tid]
-        man = {"manifestSchemaVersion": 1, "specVersion": "2026.10-draft", "testId": tid,
+        man = {"manifestSchemaVersion": 1, "specVersion": "2026.11-draft", "testId": tid,
                "category": CATEGORY[tid], "profile": "full-language", "status": "required",
                "requirements": [REQ_FOR[tid]], "entryPoint": "main.sol",
                "outcome": e["outcome"],

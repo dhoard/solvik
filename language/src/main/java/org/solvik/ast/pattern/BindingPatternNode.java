@@ -25,7 +25,7 @@ import org.solvik.ast.declaration.TypeRef;
 import org.solvik.source.SourceSpan;
 
 /**
- * A binding pattern (docs/LANGUAGE_SPEC.md section 12). The specification's sealed-subtype form is
+ * A binding pattern (docs/LANGUAGE_SPEC.md section 12). The specification's subtype form is
  * {@code name: Type}, which matches a value of that subtype and binds {@code name} to it. A variant
  * argument may also be a bare name, which binds the value with the variant's known value type, so
  * the written type is optional.

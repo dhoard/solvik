@@ -365,7 +365,7 @@ public final class SolvikParserConstructTest {
 
     @Test
     public void whileAndThreeClauseForParseToStatementNodes() {
-        String src = "func f(): Unit {\n    while (true) {\n        break;\n    }\n    for (var i = 0; i < 3; i) {\n        continue;\n    }\n}\n";
+        String src = "func f(): Unit {\n    while (true) {\n        break;\n    }\n    for (mutable val i = 0; i < 3; i) {\n        continue;\n    }\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("loops.sol", src));
         assertThat(((org.solvik.ast.statement.WhileStmtNode) fn.body().statements().get(0)).kind()).isEqualTo(AstKind.WHILE_STMT);
     }
@@ -392,7 +392,7 @@ public final class SolvikParserConstructTest {
         assertThat(cls.properties()).hasSize(1);
         assertThat(cls.constructor()).isPresent();
         assertThat(cls.methods()).hasSize(1);
-        assertThat(cls.isSealed()).isFalse();
+        assertThat(cls.isAbstract()).isFalse();
     }
 
     @Test

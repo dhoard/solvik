@@ -287,7 +287,9 @@ public final class SolvikParserRobustnessTest {
      */
     @Test
     public void randomTokenSoupNeverThrowsAndNeverProducesAnOutOfBoundSpan() {
-        String[] atoms = {"func", "class", "val", "var", "if", "else", "while", "for", "in", "return", "match", "switch", "case", "regex", "null", "is", "as", "true", "include", "module", "alias", "(", ")", "{", "}", "[", "]", ";", ",", ":", "::", "=", ".", "..", "...", "..<", "..>", "?.", "??", "?", "+", "-", "*", "/", "!", "===", "!==", "==", "!=", "<", "<=", ">", ">=", "&&", "||", "=>", "@", "#", "$", "\\", "1", "2", "123L", "1.5", "1e3", "\"s\"", "'c'", "r\"r\"", "x", "y", "_", "function", "\n", "\t", " ", "//c\n", "/*c*/", "/*\nc*/"};
+        // The soup intentionally includes the keywords removed in 2026.11-draft: feeding them to the
+        // parser must produce a diagnostic rather than throw.
+        String[] atoms = {"func", "class", "val", "var", "sealed", "open", "mutable", "abstract", "if", "else", "while", "for", "in", "return", "match", "switch", "case", "regex", "null", "is", "as", "true", "include", "module", "alias", "(", ")", "{", "}", "[", "]", ";", ",", ":", "::", "=", ".", "..", "...", "..<", "..>", "?.", "??", "?", "+", "-", "*", "/", "!", "===", "!==", "==", "!=", "<", "<=", ">", ">=", "&&", "||", "=>", "@", "#", "$", "\\", "1", "2", "123L", "1.5", "1e3", "\"s\"", "'c'", "r\"r\"", "x", "y", "_", "function", "\n", "\t", " ", "//c\n", "/*c*/", "/*\nc*/"}; // solvik-keyword: soup feeds removed keywords
         Random random = new Random(20_260_923L);
         for (int iteration = 0; iteration < 3_000; iteration++) {
             StringBuilder src = new StringBuilder();

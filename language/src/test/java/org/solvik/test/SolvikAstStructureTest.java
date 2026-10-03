@@ -157,7 +157,7 @@ public final class SolvikAstStructureTest {
         stack.push(parse("""
                 func f(a: Integer): Integer {
                     val v: Integer = (a + obj.g(1)) * 2;
-                    var w: Integer = h(v, obj.field);
+                    mutable val w: Integer = h(v, obj.field);
                     if (true) {
                         obj.store(1);
                         return v;
@@ -187,7 +187,7 @@ public final class SolvikAstStructureTest {
         stack.push(parse("""
                 func f(a: Integer): Integer {
                     val v: Integer = (a + obj.g(1)) * 2;
-                    var w: Integer = true;
+                    mutable val w: Integer = true;
                     if (true) {
                         obj.store(1);
                         return v;
@@ -231,8 +231,8 @@ public final class SolvikAstStructureTest {
         Deque<AstNode> stack = new ArrayDeque<>();
         stack.push(parse("""
                 func f(n: Integer): Integer {
-                    var total = 0
-                    for (var i = 0; i < n; i = i + 1) {
+                    mutable val total = 0
+                    for (mutable val i = 0; i < n; i = i + 1) {
                         total = total + i
                         if (total > 100) {
                             break
@@ -268,7 +268,7 @@ public final class SolvikAstStructureTest {
         stack.push(parse("""
                 class User {
                     val id: Integer
-                    var name: String
+                    mutable val name: String
 
                     User(id: Integer, name: String) {
                         this.id = id
@@ -297,8 +297,8 @@ public final class SolvikAstStructureTest {
         Set<AstKind> kinds = new HashSet<>();
         Deque<AstNode> stack = new ArrayDeque<>();
         stack.push(parse("""
-                open class Animal {
-                    open func speak(): String {
+                mutable class Animal {
+                    mutable func speak(): String {
                         return "..."
                     }
                 }
@@ -436,7 +436,7 @@ public final class SolvikAstStructureTest {
         Deque<AstNode> stack = new ArrayDeque<>();
         stack.push(parse("""
                 class Box<T> {
-                    var value: T
+                    mutable val value: T
                 }
                 interface Container<U> {
                     func get(): U
@@ -461,13 +461,13 @@ public final class SolvikAstStructureTest {
                 AstKind.FUNCTION_DECL))).isTrue();
     }
 
-    /** Enum declarations and their variants, plus the sealed modifier, produce their own nodes. */
+    /** Enum declarations and their variants, plus the abstract modifier, produce their own nodes. */
     @Test
     public void phaseTwelveNodeFamiliesAreProduced() {
         Set<AstKind> kinds = new HashSet<>();
         Deque<AstNode> stack = new ArrayDeque<>();
         stack.push(parse("""
-                sealed class Shape {
+                abstract class Shape {
                 }
                 class Circle extends Shape {
                 }
@@ -497,7 +497,7 @@ public final class SolvikAstStructureTest {
                     Ok(Integer)
                     Error(String)
                 }
-                sealed class Shape {
+                abstract class Shape {
                 }
                 class Circle extends Shape {
                 }

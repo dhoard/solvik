@@ -158,7 +158,7 @@ public final class SolvikInterfaceSemanticTest {
                         return "Doug"
                     }
                 }
-                open class Manager implements Named {
+                mutable class Manager implements Named {
                     func name(): String {
                         return "Manager"
                     }
@@ -234,7 +234,7 @@ public final class SolvikInterfaceSemanticTest {
                 interface Named {
                     func name(): String
                 }
-                open class Base implements Named {
+                mutable class Base implements Named {
                     func name(): String {
                         return "base"
                     }
@@ -284,7 +284,7 @@ public final class SolvikInterfaceSemanticTest {
                         return "Hello " .. name()
                     }
                 }
-                open class Base {
+                mutable class Base {
                     func greeting(): String {
                         return "Hello base"
                     }
@@ -302,7 +302,7 @@ public final class SolvikInterfaceSemanticTest {
     @Test
     public void aCovariantImplementationOfARequirementIsAccepted() {
         CheckedProgram program = check("""
-                open class Name {
+                mutable class Name {
                     func text(): String {
                         return "n"
                     }

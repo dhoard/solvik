@@ -16,10 +16,10 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SPEC = open(os.path.join(ROOT, "docs/LANGUAGE_SPEC.md"), encoding="utf-8").read()
-CORPUS = os.path.join(ROOT, "tck/corpus/2026.10-draft")
+CORPUS = os.path.join(ROOT, "tck/corpus/2026.11-draft")
 REQUIREMENTS = os.path.join(ROOT, "tck/requirements/requirements.json")
 PROFILE = os.path.join(ROOT, "tck/profiles/full-language.profile.json")
-SPEC_VERSION = "2026.10-draft"
+SPEC_VERSION = "2026.11-draft"
 
 
 def norm(t):
@@ -166,25 +166,25 @@ BAD("SOL-TCK-0363", "objects", "REQ-2501",
     'class MyInt extends Integer {\n    MyInt() {\n    }\n}\nprint("EXECUTED-INVALID")\n', {},
     "A class extending the built-in Integer is the forbidden extension.")
 BAD("SOL-TCK-0364", "objects", "REQ-2502",
-    'class Counter {\n    static var n: Integer = 0\n\n    Counter() {\n    }\n}\n'
+    'class Counter {\n    static mutable val n: Integer = 0\n\n    Counter() {\n    }\n}\n'
     'val c = Counter\nprint("EXECUTED-INVALID")\n',
     {"family": "TYPE", "code": "SOLV-TYPE-016"},
     "Binding the class name to a local uses it as a value, which pins SOLV-TYPE-016.")
 BAD("SOL-TCK-0365", "objects", "REQ-2503",
-    'class Counter {\n    static var n: Integer = 0\n\n    Counter() {\n    }\n}\n'
+    'class Counter {\n    static mutable val n: Integer = 0\n\n    Counter() {\n    }\n}\n'
     'val c = Counter()\nprint(c.n)\n' + NEG, {},
     "Reading a static member through an instance is the second rejected form.")
 BAD("SOL-TCK-0366", "objects", "REQ-2504",
-    'class C {\n    static var x: Integer = 1\n    val x: Integer\n\n    C() {\n'
+    'class C {\n    static mutable val x: Integer = 1\n    val x: Integer\n\n    C() {\n'
     '        this.x = 2\n    }\n}\nval c = C()\nprint("EXECUTED-INVALID")\n', {},
     "A static and an instance member share the name x, which the shared namespace forbids.")
 BAD("SOL-TCK-0367", "objects", "REQ-2505",
-    'class C {\n    static var n: Integer = 1\n\n    static func f(): Integer {\n'
+    'class C {\n    static mutable val n: Integer = 1\n\n    static func f(): Integer {\n'
     '        return this.n\n    }\n\n    C() {\n    }\n}\nprint(C.f())\n' + NEG,
     {"family": "RESOL", "code": "SOLV-RESOL-005"},
     "`this` inside a static method pins the specification-named SOLV-RESOL-005.")
 BAD("SOL-TCK-0368", "objects", "REQ-2506",
-    'open class A {\n    A() {\n    }\n}\nclass C extends A {\n    static func f(): Integer {\n'
+    'mutable class A {\n    A() {\n    }\n}\nclass C extends A {\n    static func f(): Integer {\n'
     '        return super.hashCode()\n    }\n\n    C() {\n        super()\n    }\n}\n'
     'print(C.f())\n' + NEG,
     {"family": "RESOL", "code": "SOLV-RESOL-006"},

@@ -229,11 +229,11 @@ public final class SolvikStaticMemberParserTest {
 
     @Test
     public void methodModifiersRemainGrammaticalAfterStaticSoTheSemanticLayerCanReportThem() {
-        // `static` always leads, so `open static` is a parse error, but `static open` parses so the
+        // `static` always leads, so `mutable static` is a parse error, but `static mutable` parses so the
         // override rules can report the precise SOLV-SEM-047 diagnostic instead of a bare parse error.
         String src = """
                 class Counter {
-                    static open func reset() {
+                    static mutable func reset() {
                         println("reset")
                     }
                 }
@@ -242,7 +242,7 @@ public final class SolvikStaticMemberParserTest {
         List<FunctionDeclNode> statics = counter.staticMethods();
         assertThat(statics).hasSize(1);
         assertThat(statics.get(0).isStatic()).isTrue();
-        assertThat(statics.get(0).isOpen()).isTrue();
+        assertThat(statics.get(0).isMutable()).isTrue();
     }
 
     @Test

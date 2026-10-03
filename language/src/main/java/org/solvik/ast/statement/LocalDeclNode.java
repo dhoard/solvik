@@ -25,7 +25,7 @@ import org.solvik.ast.expression.ExpressionNode;
 import org.solvik.source.SourceSpan;
 
 /**
- * A {@code val} or {@code var} local declaration with an initializer. The type annotation is
+ * A {@code val} or {@code mutable val} local declaration with an initializer. The type annotation is
  * syntactically optional; inference rules are a Phase 4 concern.
  */
 public final class LocalDeclNode extends StatementNode {

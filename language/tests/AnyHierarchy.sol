@@ -2,8 +2,8 @@
 // is direct root derivation, numeric leaves reach Any through Number, and unrelated values join to
 // Any. This example is the published behavior for the corrected root hierarchy.
 
-open class Animal {
-    open func speak(): String {
+mutable class Animal {
+    mutable func speak(): String {
         return "..."
     }
 }

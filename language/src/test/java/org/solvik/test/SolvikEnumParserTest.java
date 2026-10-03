@@ -28,7 +28,7 @@ import org.solvik.ast.declaration.TypeRefNode;
 
 /**
  * Phase 12 parser tests (docs/LANGUAGE_SPEC.md section 12): enum declarations with value-carrying
- * variants and the {@code sealed} class modifier.
+ * variants and the {@code mutable} class modifier.
  */
 public final class SolvikEnumParserTest {
 
@@ -111,19 +111,19 @@ public final class SolvikEnumParserTest {
     @Test
     public void sealedAndOpenClassModifiersAreRecorded() {
         CompilationUnitNode unit = parseOk("e.sol", """
-                sealed class Shape {
+                abstract class Shape {
                 }
-                open class Base {
+                mutable class Base {
                 }
                 class Plain {
                 }
                 """);
-        assertThat(((ClassDeclNode) unit.declarations().get(0)).isSealed()).isTrue();
-        assertThat(((ClassDeclNode) unit.declarations().get(0)).isOpen()).isFalse();
-        assertThat(((ClassDeclNode) unit.declarations().get(1)).isOpen()).isTrue();
-        assertThat(((ClassDeclNode) unit.declarations().get(1)).isSealed()).isFalse();
-        assertThat(((ClassDeclNode) unit.declarations().get(2)).isSealed()).isFalse();
-        assertThat(((ClassDeclNode) unit.declarations().get(2)).isOpen()).isFalse();
+        assertThat(((ClassDeclNode) unit.declarations().get(0)).isAbstract()).isTrue();
+        assertThat(((ClassDeclNode) unit.declarations().get(0)).isMutable()).isFalse();
+        assertThat(((ClassDeclNode) unit.declarations().get(1)).isMutable()).isTrue();
+        assertThat(((ClassDeclNode) unit.declarations().get(1)).isAbstract()).isFalse();
+        assertThat(((ClassDeclNode) unit.declarations().get(2)).isAbstract()).isFalse();
+        assertThat(((ClassDeclNode) unit.declarations().get(2)).isMutable()).isFalse();
     }
 
     @Test
@@ -182,9 +182,10 @@ public final class SolvikEnumParserTest {
     }
 
     @Test
-    public void sealedIsRejectedOnAFunction() {
+    public void abstractIsRejectedOnAFunction() {
         assertThat(parseFails("e.sol", """
-                sealed func f(): Unit {
+                // `abstract` marks a class only, never a method. // solvik-keyword: abstract
+                abstract func f(): Unit {
                 }
                 """).hasErrors()).isTrue();
     }

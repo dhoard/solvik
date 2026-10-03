@@ -65,7 +65,7 @@ import base64, json, os, re, sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SPEC = open(os.path.join(ROOT, "docs/LANGUAGE_SPEC.md")).read()
-CORPUS = os.path.join(ROOT, "tck/corpus/2026.10-draft")
+CORPUS = os.path.join(ROOT, "tck/corpus/2026.11-draft")
 
 
 def norm(t):
@@ -85,7 +85,7 @@ REQS = {
   section="3. Equality and reference identity",
   summary="The identity-bearing static types are exactly user class types, interface types, the four collection types, function types, and nullable forms of those, so `===` on a scalar, enum, or Regex pair is a compile-time error reported with SOLV-TYPE-039",
   kind="compile-time",
-  notes="Five different non-identity operand pairs are rejected with the one code section 3 names for a compatible pair with no identity-bearing operand, covering the two named scalar cases a real implementation is most likely to allow through (a numeric scalar and a String) plus a Boolean, an enum value and a Regex, so the rejection cannot be a per-type special case. The accepted arms cover the two positive cases most likely to be omitted by an implementation that only recognises plain user classes, namely a collection and an interface-typed value. Section 3 is unusually explicit here, listing the bearing and non-bearing types and naming the code, so the codes are pinned rather than left bare. `2026.10-draft` added function types to the bearing list; this requirement's own tests are unchanged because none of them mentions a function type, and the new positive arm is recorded separately as REQ-3307, which is untested until the language can produce a function value.",
+  notes="Five different non-identity operand pairs are rejected with the one code section 3 names for a compatible pair with no identity-bearing operand, covering the two named scalar cases a real implementation is most likely to allow through (a numeric scalar and a String) plus a Boolean, an enum value and a Regex, so the rejection cannot be a per-type special case. The accepted arms cover the two positive cases most likely to be omitted by an implementation that only recognises plain user classes, namely a collection and an interface-typed value. Section 3 is unusually explicit here, listing the bearing and non-bearing types and naming the code, so the codes are pinned rather than left bare. `2026.11-draft` added function types to the bearing list; this requirement's own tests are unchanged because none of them mentions a function type, and the new positive arm is recorded separately as REQ-3307, which is untested until the language can produce a function value.",
   quotes=["The identity-bearing static types are exactly:",
           "The following types are not identity-bearing: `Byte`, `Short`, `Integer`, `Long`, `Float`, `Double`, `Boolean`, `Character`, `String`, and `Unit`; enum types; `Regex` and `RegexMatch`; `Any`; unbounded type parameters; `Nothing` and a bare null literal.",
           "a compatible pair with no identity-bearing operand uses `SOLV-TYPE-039`."]),
@@ -336,7 +336,7 @@ def main():
         os.makedirs(d, exist_ok=True)
         open(os.path.join(d, "main.sol"), "w").write(src)
         e = EXPECT[tid]
-        man = {"manifestSchemaVersion": 1, "specVersion": "2026.10-draft", "testId": tid,
+        man = {"manifestSchemaVersion": 1, "specVersion": "2026.11-draft", "testId": tid,
                "category": CATEGORY[tid], "profile": "full-language", "status": "required",
                "requirements": [REQ_FOR[tid]], "entryPoint": "main.sol",
                "outcome": e["outcome"],

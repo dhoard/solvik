@@ -267,8 +267,8 @@ final class SolvikAstBuilder {
     }
 
     private ClassDeclNode buildClass(ClassDeclContext ctx) {
-        boolean sealed = ctx.SEALED() != null;
-        boolean open = ctx.OPEN() != null;
+        boolean abstractClass = ctx.ABSTRACT() != null;
+        boolean mutable = ctx.MUTABLE() != null;
         TypeRef superClass = ctx.typeRef() == null ? null : buildTypeRef(ctx.typeRef());
         List<TypeRef> interfaces = new ArrayList<>();
         if (ctx.typeRefList() != null) {
@@ -292,7 +292,7 @@ final class SolvikAstBuilder {
                 members.add(buildMethod(member.methodDecl()));
             }
         }
-        return new ClassDeclNode(sealed, open, ctx.Identifier().getText(), buildTypeParameters(ctx.typeParameterList()), superClass, interfaces, members, span(ctx.getStart(), ctx.getStop()));
+        return new ClassDeclNode(abstractClass, mutable, ctx.Identifier().getText(), buildTypeParameters(ctx.typeParameterList()), superClass, interfaces, members, span(ctx.getStart(), ctx.getStop()));
     }
 
     private EnumDeclNode buildEnum(EnumDeclContext ctx) {
@@ -370,7 +370,7 @@ final class SolvikAstBuilder {
     }
 
     private PropertyDeclNode buildProperty(PropertyDeclContext ctx, boolean isStatic, SourceSpan span) {
-        BindingKind kind = "val".equals(ctx.bindingKind().getText()) ? BindingKind.VAL : BindingKind.VAR;
+        BindingKind kind = BindingKind.fromMutable(ctx.bindingKind().MUTABLE() != null);
         TypeRef declaredType = ctx.typeRef() == null ? null : buildTypeRef(ctx.typeRef());
         ExpressionNode initializer = ctx.expression() == null ? null : buildExpression(ctx.expression());
         return new PropertyDeclNode(kind, ctx.Identifier().getText(), declaredType, initializer, isStatic, span);
@@ -433,30 +433,30 @@ final class SolvikAstBuilder {
     }
 
     private FunctionDeclNode buildMethod(MethodDeclContext ctx, boolean isStatic, SourceSpan span) {
-        boolean open = false;
+        boolean mutable = false;
         boolean override = false;
         for (MethodModifierContext modifier : ctx.methodModifier()) {
-            if (modifier.OPEN() != null) {
-                open = true;
+            if (modifier.MUTABLE() != null) {
+                mutable = true;
             } else if (modifier.OVERRIDE() != null) {
                 override = true;
             }
         }
-        return buildFunction(open, override, isStatic, ctx.Identifier().getText(), ctx.typeParameterList(), ctx.parameterList(), ctx.typeRef(), ctx.block(), span);
+        return buildFunction(mutable, override, isStatic, ctx.Identifier().getText(), ctx.typeParameterList(), ctx.parameterList(), ctx.typeRef(), ctx.block(), span);
     }
 
-    private FunctionDeclNode buildFunction(boolean open, boolean override, String name, TypeParameterListContext typeParameterList, org.solvik.parser.generated.SolvikParser.ParameterListContext parameterList, TypeRefContext returnTypeCtx,
+    private FunctionDeclNode buildFunction(boolean mutable, boolean override, String name, TypeParameterListContext typeParameterList, org.solvik.parser.generated.SolvikParser.ParameterListContext parameterList, TypeRefContext returnTypeCtx,
                     BlockContext bodyCtx, SourceSpan span) {
-        return buildFunction(open, override, false, name, typeParameterList, parameterList, returnTypeCtx, bodyCtx, span);
+        return buildFunction(mutable, override, false, name, typeParameterList, parameterList, returnTypeCtx, bodyCtx, span);
     }
 
-    private FunctionDeclNode buildFunction(boolean open, boolean override, boolean isStatic, String name, TypeParameterListContext typeParameterList, org.solvik.parser.generated.SolvikParser.ParameterListContext parameterList, TypeRefContext returnTypeCtx,
+    private FunctionDeclNode buildFunction(boolean mutable, boolean override, boolean isStatic, String name, TypeParameterListContext typeParameterList, org.solvik.parser.generated.SolvikParser.ParameterListContext parameterList, TypeRefContext returnTypeCtx,
                     BlockContext bodyCtx, SourceSpan span) {
         List<TypeParameterNode> typeParameters = buildTypeParameters(typeParameterList);
         List<ParameterNode> parameters = buildParameters(parameterList);
         TypeRef returnType = returnTypeCtx == null ? implicitUnitReturnType(span) : buildTypeRef(returnTypeCtx);
         BlockNode body = buildBlock(bodyCtx);
-        return new FunctionDeclNode(open, override, isStatic, name, typeParameters, parameters, returnType, body, span);
+        return new FunctionDeclNode(mutable, override, isStatic, name, typeParameters, parameters, returnType, body, span);
     }
 
     /**
@@ -570,7 +570,7 @@ final class SolvikAstBuilder {
     }
 
     private LocalDeclNode buildLocalDecl(org.solvik.parser.generated.SolvikParser.BindingKindContext kindCtx, TerminalNode identifier, TypeRefContext typeRefCtx, ExpressionContext initCtx, SourceSpan span) {
-        BindingKind kind = "val".equals(kindCtx.getText()) ? BindingKind.VAL : BindingKind.VAR;
+        BindingKind kind = BindingKind.fromMutable(kindCtx.MUTABLE() != null);
         TypeRef declaredType = typeRefCtx == null ? null : buildTypeRef(typeRefCtx);
         return new LocalDeclNode(kind, identifier.getText(), declaredType, buildExpression(initCtx), span);
     }

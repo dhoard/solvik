@@ -1,5 +1,5 @@
 class Box<T> {
-    var value: T
+    mutable val value: T
     Box(value: T) {
         this.value = value
     }

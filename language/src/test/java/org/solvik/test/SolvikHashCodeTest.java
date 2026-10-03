@@ -89,11 +89,11 @@ public final class SolvikHashCodeTest {
     @Test
     public void integralScalarsHashByValue() {
         assertThat(run("""
-                    var a: Integer = 7;
-                    var b: Integer = 7;
+                    mutable val a: Integer = 7;
+                    mutable val b: Integer = 7;
                     println(a.hashCode() == b.hashCode());
                     println(a.hashCode());
-                    var big: Long = 5000000000L;
+                    mutable val big: Long = 5000000000L;
                     println(big.hashCode() == 5000000000L.hashCode());
                     println((1 + 2).hashCode() == 3.hashCode());
                 """)).isEqualTo("true\n7\ntrue\ntrue\n");
@@ -123,11 +123,11 @@ public final class SolvikHashCodeTest {
         // Solvik uses IEEE `==`, where 0.0 equals -0.0, while Java's Double.hashCode separates them.
         // The hash canonicalizes negative zero so the invariant holds, and a Set keeps one element.
         assertThat(run("""
-                    var z: Double = 0.0;
-                    var mz: Double = -0.0;
+                    mutable val z: Double = 0.0;
+                    mutable val mz: Double = -0.0;
                     println(z == mz);
                     println(z.hashCode() == mz.hashCode());
-                    var s: Set<Double> = Set<Double>();
+                    mutable val s: Set<Double> = Set<Double>();
                     println(s.add(0.0));
                     println(s.add(-0.0));
                     println(s.size);
@@ -139,10 +139,10 @@ public final class SolvikHashCodeTest {
         // NaN is unequal even to itself. Hashing equal values alike is required; hashing unequal
         // values alike is permitted, so NaN keeps a stable hash without violating the invariant.
         assertThat(run("""
-                    var n: Double = 0.0 / 0.0;
+                    mutable val n: Double = 0.0 / 0.0;
                     println(n == n);
                     println(n.hashCode() == n.hashCode());
-                    var f: Float = 0.0f / 0.0f;
+                    mutable val f: Float = 0.0f / 0.0f;
                     println(f == f);
                     println(f.hashCode() == f.hashCode());
                 """)).isEqualTo("false\ntrue\nfalse\ntrue\n");
@@ -151,7 +151,7 @@ public final class SolvikHashCodeTest {
     @Test
     public void floatsMatchTheirIntegralValue() {
         assertThat(run("""
-                    var a: Float = 1.5f;
+                    mutable val a: Float = 1.5f;
                     println(a.hashCode() == 1.5f.hashCode());
                     println(a.hashCode() == 2.5f.hashCode());
                 """)).isEqualTo("true\nfalse\n");
@@ -162,9 +162,9 @@ public final class SolvikHashCodeTest {
         // A nullable receiver must use `?.`, matching every other universal member: a null receiver
         // yields null, and a present one dispatches the ordinary fixed rule.
         assertThat(run("""
-                    var a: Integer? = null;
+                    mutable val a: Integer? = null;
                     println(a?.hashCode() == null);
-                    var b: Integer? = 7;
+                    mutable val b: Integer? = 7;
                     println(b?.hashCode() == 7.hashCode());
                     println(a?.hashCode());
                 """)).isEqualTo("true\ntrue\nnull\n");
@@ -173,8 +173,8 @@ public final class SolvikHashCodeTest {
     @Test
     public void unitHashesConsistently() {
         assertThat(run("""
-                    var u: Unit = println("a");
-                    var v: Unit = println("b");
+                    mutable val u: Unit = println("a");
+                    mutable val v: Unit = println("b");
                     println(u.hashCode() == v.hashCode());
                 """)).isEqualTo("a\nb\ntrue\n");
     }
@@ -184,31 +184,31 @@ public final class SolvikHashCodeTest {
     @Test
     public void userOverrideIsUsedForEqualObjectsAndThroughAnyReceivers() {
         assertThat(run("""
-                    open class Point {
+                    mutable class Point {
                         val x: Integer
                         val y: Integer
                         Point(x: Integer, y: Integer) {
                             this.x = x
                             this.y = y
                         }
-                        open override func equals(other: Any?): Boolean {
+                        mutable override func equals(other: Any?): Boolean {
                             if (other is Point) {
                                 return this.x == other.x && this.y == other.y;
                             }
                             return false;
                         }
-                        open override func hashCode(): Integer {
+                        mutable override func hashCode(): Integer {
                             return 31 * this.x + this.y;
                         }
                     }
-                    var a: Point = Point(1, 2);
-                    var b: Point = Point(1, 2);
-                    var c: Point = Point(9, 9);
+                    mutable val a: Point = Point(1, 2);
+                    mutable val b: Point = Point(1, 2);
+                    mutable val c: Point = Point(9, 9);
                     println(a == b);
                     println(a.hashCode() == b.hashCode());
                     println(a == c);
-                    var o: Any = a;
-                    var p: Any = b;
+                    mutable val o: Any = a;
+                    mutable val p: Any = b;
                     println(o.hashCode() == p.hashCode());
                 """)).isEqualTo("true\ntrue\nfalse\ntrue\n");
     }
@@ -232,7 +232,7 @@ public final class SolvikHashCodeTest {
                             return this.x;
                         }
                     }
-                    var s: Set<Point> = Set(Point(1), Point(1), Point(2));
+                    mutable val s: Set<Point> = Set(Point(1), Point(1), Point(2));
                     println(s.size);
                     println(s.contains(Point(1)));
                     println(s.contains(Point(3)));
@@ -246,8 +246,8 @@ public final class SolvikHashCodeTest {
         assertThat(run("""
                     class Plain {
                     }
-                    var a: Plain = Plain();
-                    var b: Plain = Plain();
+                    mutable val a: Plain = Plain();
+                    mutable val b: Plain = Plain();
                     println(a == b);
                     println(a.hashCode() == b.hashCode());
                     println(a == a);
@@ -273,8 +273,8 @@ public final class SolvikHashCodeTest {
                             return this.v * 7;
                         }
                     }
-                    var typed: Wrapped = Wrapped(6);
-                    var erased: Any = Wrapped(6);
+                    mutable val typed: Wrapped = Wrapped(6);
+                    mutable val erased: Any = Wrapped(6);
                     println(typed.hashCode());
                     println(erased.hashCode());
                 """)).isEqualTo("42\n42\n");
@@ -284,18 +284,18 @@ public final class SolvikHashCodeTest {
     public void inheritedOverrideAppliesToASubclassWithoutItsOwn() {
         // Inheritance satisfies the pairing: the subclass inherits both members from its superclass.
         assertThat(run("""
-                    open class Base {
-                        open override func equals(other: Any?): Boolean {
+                    mutable class Base {
+                        mutable override func equals(other: Any?): Boolean {
                             return true;
                         }
-                        open override func hashCode(): Integer {
+                        mutable override func hashCode(): Integer {
                             return 5;
                         }
                     }
                     class Derived extends Base {
                     }
-                    var a: Derived = Derived();
-                    var b: Derived = Derived();
+                    mutable val a: Derived = Derived();
+                    mutable val b: Derived = Derived();
                     println(a == b);
                     println(a.hashCode() == b.hashCode());
                     println(a.hashCode());
@@ -340,11 +340,11 @@ public final class SolvikHashCodeTest {
                         return item.hashCode();
                     }
 
-                    var iface: Shape = Square(3);
+                    mutable val iface: Shape = Square(3);
                     println(iface.hashCode() == Square(3).hashCode());
-                    var concrete: Square = Square(4);
+                    mutable val concrete: Square = Square(4);
                     println(concrete.hashCode() == Square(4).hashCode());
-                    var num: Number = 5;
+                    mutable val num: Number = 5;
                     println(num.hashCode() == 5.hashCode());
                     println(hashOf(Square(5)) == Square(5).hashCode());
                     println(hashOf(7) == 7.hashCode());
@@ -362,7 +362,7 @@ public final class SolvikHashCodeTest {
         // invariant still holds because the same inherited rule answers both questions. A programmer who
         // wants the new field to matter overrides both members in the subclass.
         assertThat(run("""
-                    open class Base {
+                    mutable class Base {
                         val x: Integer
 
                         Base(x: Integer) {
@@ -390,8 +390,8 @@ public final class SolvikHashCodeTest {
                         }
                     }
 
-                    var a: Derived = Derived(1, 100);
-                    var b: Derived = Derived(1, 200);
+                    mutable val a: Derived = Derived(1, 100);
+                    mutable val b: Derived = Derived(1, 200);
                     println(a == b);
                     println(a.hashCode() == b.hashCode());
                     println(a == Derived(2, 100));
@@ -403,11 +403,11 @@ public final class SolvikHashCodeTest {
     @Test
     public void superHashCodeDispatchesToTheInheritedOverride() {
         assertThat(run("""
-                    open class Base {
-                        open override func equals(other: Any?): Boolean {
+                    mutable class Base {
+                        mutable override func equals(other: Any?): Boolean {
                             return true;
                         }
-                        open override func hashCode(): Integer {
+                        mutable override func hashCode(): Integer {
                             return 1;
                         }
                     }
@@ -422,7 +422,7 @@ public final class SolvikHashCodeTest {
                             return super.hashCode();
                         }
                     }
-                    var d: Derived = Derived();
+                    mutable val d: Derived = Derived();
                     println(d.hashCode());
                     println(d.hashViaSuper());
                 """)).isEqualTo("2\n1\n");
@@ -433,7 +433,7 @@ public final class SolvikHashCodeTest {
         // No class in the hierarchy overrides the member, so super.hashCode() is the identity default
         // and must not re-dispatch to the current class's own override (which would recurse).
         assertThat(run("""
-                    open class Base {
+                    mutable class Base {
                     }
                     class Derived extends Base {
                         override func equals(other: Any?): Boolean {
@@ -443,8 +443,8 @@ public final class SolvikHashCodeTest {
                             return super.hashCode();
                         }
                     }
-                    var a: Derived = Derived();
-                    var b: Derived = Derived();
+                    mutable val a: Derived = Derived();
+                    mutable val b: Derived = Derived();
                     println(a == a);
                     println(a == b);
                     println(a.hashCode() == a.hashCode());
@@ -457,18 +457,18 @@ public final class SolvikHashCodeTest {
         // A subclass that adds an equality-relevant field mixes the superclass hash with it, so the
         // two decisions remain aligned across the hierarchy.
         assertThat(run("""
-                    open class Base {
+                    mutable class Base {
                         val id: Integer
                         Base(id: Integer) {
                             this.id = id
                         }
-                        open override func equals(other: Any?): Boolean {
+                        mutable override func equals(other: Any?): Boolean {
                             if (other is Base) {
                                 return this.id == other.id;
                             }
                             return false;
                         }
-                        open override func hashCode(): Integer {
+                        mutable override func hashCode(): Integer {
                             return this.id;
                         }
                     }
@@ -511,8 +511,8 @@ public final class SolvikHashCodeTest {
     @Test
     public void regexValuesHashBySourceText() {
         assertThat(run("""
-                    var a: Regex = Regex("a+");
-                    var b: Regex = Regex("a+");
+                    mutable val a: Regex = Regex("a+");
+                    mutable val b: Regex = Regex("a+");
                     println(a == b);
                     println(a.hashCode() == b.hashCode());
                     println(a.hashCode() == Regex("b+").hashCode());
@@ -523,8 +523,8 @@ public final class SolvikHashCodeTest {
     public void collectionsHashByReferenceIdentity() {
         // Collection equality is reference identity, so the hash must be the identity hash.
         assertThat(run("""
-                    var a: List<Integer> = List(1, 2);
-                    var b: List<Integer> = List(1, 2);
+                    mutable val a: List<Integer> = List(1, 2);
+                    mutable val b: List<Integer> = List(1, 2);
                     println(a == b);
                     println(a.hashCode() == b.hashCode());
                     println(a.hashCode() == a.hashCode());
@@ -541,7 +541,7 @@ public final class SolvikHashCodeTest {
         // if the rejection were ever relaxed, the untested branch would become reachable and this test
         // would fail before the behavior could silently diverge.
         assertThat(errorCodes("""
-                    var maybe: Integer? = null;
+                    mutable val maybe: Integer? = null;
                     println(maybe.hashCode());
                 """)).containsExactly(DiagnosticCode.TYPE_NULLABLE_DEREFERENCE);
         assertThat(errorCodes("""
@@ -555,7 +555,7 @@ public final class SolvikHashCodeTest {
                         }
                     }
 
-                    var maybe: Key? = null;
+                    mutable val maybe: Key? = null;
                     println(maybe.hashCode());
                 """)).containsExactly(DiagnosticCode.TYPE_NULLABLE_DEREFERENCE);
     }
@@ -779,11 +779,11 @@ public final class SolvikHashCodeTest {
                         }
                     }
 
-                    var s: Set<Violator> = Set(Violator(1), Violator(1), Violator(2));
+                    mutable val s: Set<Violator> = Set(Violator(1), Violator(1), Violator(2));
                     println(s.size);
                     println(s.contains(Violator(2)));
                     println(s.contains(Violator(3)));
-                    var m: Map<Violator, String> = Map();
+                    mutable val m: Map<Violator, String> = Map();
                     m.put(Violator(1), "one");
                     m.put(Violator(1), "uno");
                     println(m.size);
@@ -805,7 +805,7 @@ public final class SolvikHashCodeTest {
         assertThat(run("""
                     class Inconsistent {
                         val id: Integer
-                        var noise: Integer
+                        mutable val noise: Integer
 
                         Inconsistent(id: Integer, noise: Integer) {
                             this.id = id
@@ -826,12 +826,12 @@ public final class SolvikHashCodeTest {
                         }
                     }
 
-                    var s: Set<Inconsistent> = Set();
+                    mutable val s: Set<Inconsistent> = Set();
                     s.add(Inconsistent(1, 3));
                     println(s.contains(Inconsistent(1, 4)));
                     println(s.contains(Inconsistent(1, 3)));
                     println(s.size);
-                    var m: Map<Inconsistent, String> = Map();
+                    mutable val m: Map<Inconsistent, String> = Map();
                     m.put(Inconsistent(1, 3), "stored");
                     println(m.get(Inconsistent(1, 4)));
                     println(m.size);
@@ -842,11 +842,11 @@ public final class SolvikHashCodeTest {
     public void scalarKeysStayCorrectThroughTheEqualityScan() {
         // Unequal keys must not collapse and an equal key must update in place rather than append.
         assertThat(run("""
-                    var keys: Set<Integer> = Set(1, 2, 3, 1, 2);
+                    mutable val keys: Set<Integer> = Set(1, 2, 3, 1, 2);
                     println(keys.size);
                     println(keys.contains(3));
                     println(keys.contains(4));
-                    var counts: Map<Integer, Integer> = Map();
+                    mutable val counts: Map<Integer, Integer> = Map();
                     counts.put(7, 1);
                     counts.put(3 + 4, 2);
                     println(counts.size);

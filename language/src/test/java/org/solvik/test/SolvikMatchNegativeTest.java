@@ -73,7 +73,7 @@ public final class SolvikMatchNegativeTest {
     @Test
     public void aMissingSealedSubtypeIsNotExhaustive() {
         assertThat(first(checkFails("""
-                sealed class Shape {
+                abstract class Shape {
                 }
                 class Circle extends Shape {
                 }
@@ -226,7 +226,7 @@ public final class SolvikMatchNegativeTest {
     @Test
     public void aNullableBindingPatternTypeIsRejected() {
         assertThat(first(checkFails("""
-                sealed class Shape {
+                abstract class Shape {
                 }
                 func name(shape: Shape): String {
                     return match shape {
@@ -239,7 +239,7 @@ public final class SolvikMatchNegativeTest {
     @Test
     public void anErasedGenericBindingPatternTypeIsRejected() {
         assertThat(first(checkFails("""
-                sealed class Shape {
+                abstract class Shape {
                 }
                 func name(shape: Shape): String {
                     return match shape {
@@ -256,7 +256,7 @@ public final class SolvikMatchNegativeTest {
                 }
                 interface B {
                 }
-                sealed class Root {
+                abstract class Root {
                 }
                 class Left extends Root implements A, B {
                 }
@@ -266,6 +266,7 @@ public final class SolvikMatchNegativeTest {
                     return match root {
                         left: Left => left
                         right: Right => right
+                        _ => root
                     }
                 }
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_MATCH_RESULT);

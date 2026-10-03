@@ -67,8 +67,8 @@ public final class ClassSymbol extends Symbol {
 
     private final ClassDeclNode declaration;
     private final ClassType type;
-    private final boolean open;
-    private final boolean sealed;
+    private final boolean abstractClass;
+    private final boolean mutable;
     private final ClassSymbol superClass;
     private final List<InterfaceSymbol> interfaces;
     private final List<InterfaceSymbol> allInterfaces;
@@ -109,23 +109,15 @@ public final class ClassSymbol extends Symbol {
     private final Map<PropertySymbol, Map<TypeParameterType, Type>> propertySubstitutions = new IdentityHashMap<>();
     /** For each dispatch name, the substitution from the implementation's declaring parameters. */
     private final Map<String, Map<TypeParameterType, Type>> methodSubstitutions = new LinkedHashMap<>();
-    /**
-     * The complete permitted subtype set of a sealed class, installed after every class is
-     * collected (docs/LANGUAGE_SPEC.md section 12). A non-sealed class keeps empty sets. The direct
-     * set is the sealed hierarchy's variant set; the transitive set is every descendant, which the
-     * specification guarantees is closed when the file is compiled.
-     */
-    private List<ClassSymbol> permittedSubtypes = List.of();
-    private List<ClassSymbol> allSubtypes = List.of();
 
-    ClassSymbol(ClassDeclNode declaration, ClassType type, boolean open, boolean sealed, ClassSymbol superClass, List<InterfaceSymbol> interfaces, List<DelegateBinding> delegates, //
+    ClassSymbol(ClassDeclNode declaration, ClassType type, boolean abstractClass, boolean mutable, ClassSymbol superClass, List<InterfaceSymbol> interfaces, List<DelegateBinding> delegates, //
                     List<PropertySymbol> declaredProperties, List<FunctionSymbol> declaredMethods, FunctionSymbol constructor, Map<InterfaceDeclNode, Map<TypeParameterType, Type>> interfaceBindings, //
                     List<PropertySymbol> declaredStaticProperties, List<FunctionSymbol> declaredStaticMethods, StaticBlockNode staticBlock) {
         super(declaration.name(), declaration.span());
         this.declaration = Objects.requireNonNull(declaration);
         this.type = Objects.requireNonNull(type);
-        this.open = open;
-        this.sealed = sealed;
+        this.abstractClass = abstractClass;
+        this.mutable = mutable;
         this.superClass = superClass;
         this.interfaces = List.copyOf(interfaces);
         this.delegates = List.copyOf(delegates);
@@ -462,42 +454,24 @@ public final class ClassSymbol extends Symbol {
         return type;
     }
 
-    /** Whether the class was declared {@code open} and may be extended. */
-    public boolean isOpen() {
-        return open;
+    /** Whether the class was declared {@code mutable} and may be extended. */
+    public boolean isMutable() {
+        return mutable;
     }
 
-    /** Whether the class was declared {@code sealed} (docs/LANGUAGE_SPEC.md section 12). */
-    public boolean isSealed() {
-        return sealed;
+    /** Whether the class was declared {@code abstract} (docs/LANGUAGE_SPEC.md section 12). */
+    public boolean isAbstract() {
+        return abstractClass;
     }
 
     /**
-     * Whether this class may be extended at all. An {@code open} class opts in explicitly and a
-     * {@code sealed} class is extendable only because its same-file subtype set is closed; every
-     * other class is final by default.
+     * Whether this class may be extended at all. A {@code mutable} class opts in explicitly and an
+     * {@code abstract} class is extendable because it exists only to be extended; every other class is
+     * final by default. Neither form restricts extension to the declaring file, so neither yields a
+     * knowable subtype set.
      */
     public boolean isExtendable() {
-        return open || sealed;
-    }
-
-    /**
-     * Installs the permitted subtype metadata of this sealed class. Called once by semantic analysis
-     * after every class declaration has been collected; a non-sealed class is never given subtypes.
-     */
-    void resolvePermittedSubtypes(List<ClassSymbol> direct, List<ClassSymbol> transitive) {
-        this.permittedSubtypes = List.copyOf(Objects.requireNonNull(direct));
-        this.allSubtypes = List.copyOf(Objects.requireNonNull(transitive));
-    }
-
-    /** The direct permitted subtypes of a sealed class; empty for every other class. */
-    public List<ClassSymbol> permittedSubtypes() {
-        return permittedSubtypes;
-    }
-
-    /** Every descendant of a sealed class, direct or transitive; empty for every other class. */
-    public List<ClassSymbol> allSubtypes() {
-        return allSubtypes;
+        return mutable || abstractClass;
     }
 
     /** The single resolved superclass, or empty when the class derives directly from {@code Any}. */

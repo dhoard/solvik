@@ -97,8 +97,8 @@ including:
 - classes, constructors, final-by-default inheritance, interfaces, default methods, delegation,
   universal `toString`, static members, static storage, and lazy class initialization;
 - invariant generics and built-in `List`, `Set`, `Map`, and `Stack` operations;
-- value-carrying enums, sealed classes, exhaustive `match`, and non-fallthrough statement and
-  expression `switch`;
+- value-carrying enums, abstract classes, exhaustive `match` over a closed variant set, and
+  non-fallthrough statement and expression `switch`;
 - block expressions, `if` expressions, shared result-type joining, and abrupt-completion rules;
 - range loops, three-clause loops, `break`, `continue`, and `return`;
 - the portable regular-expression dialect and `RegexMatch` values;
@@ -585,7 +585,7 @@ evaluation-order, and feature-interaction tests where meaningful. At minimum, or
    zero, IEEE NaN/infinity/signed-zero behavior, and constant versus runtime conversion failure.
 4. Evaluation: left-to-right and exactly-once rules, short circuiting, `..`, calls, assignments as
    statements, block/`if`/`switch` expression results, joins, and abrupt completion.
-5. Object model: construction and initialization, final/open/override rules, single inheritance,
+5. Object model: construction and initialization, the `mutable`/`abstract`/`override` rules, single inheritance,
    `super`, property initialization, virtual dispatch, interfaces, default conflicts, delegation,
    static members, initialization order, cycles, and one-time lazy initialization.
 6. Equality and hashing: comparability, null cases, scalar and IEEE rules, enum recursion, class
@@ -593,8 +593,8 @@ evaluation-order, and feature-interaction tests where meaningful. At minimum, or
    behavior, identity domains, collection key/element semantics, and switch matching.
 7. Generics and collections: arity, inference, invariance, erasure restrictions, every collection
    constructor/member, ordering and duplicate behavior, and defined bounds/collection failures.
-8. Enums, sealed types, and match: construction, payload typing, physical-file sealing, ordering,
-   reachability, binding, wildcard coverage, exhaustiveness, and result joining.
+8. Enums, abstract classes, and match: construction, payload typing, extension across file
+   boundaries, ordering, reachability, binding, wildcard coverage, exhaustiveness, and result joining.
 9. Control flow: statement/expression `switch`, non-fallthrough, constant and regex cases, loops,
    ranges, `break`, `continue`, `return`, and implicit-main behavior.
 10. Regex: the complete portable dialect, rejected extensions, matching/search/replacement,

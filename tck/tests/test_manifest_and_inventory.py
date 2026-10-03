@@ -49,7 +49,7 @@ def raises(fn, exc):
 
 def base_manifest(outcome="SUCCESS", exp=None, **over):
     m = {
-        "manifestSchemaVersion": 1, "specVersion": "2026.10-draft", "testId": "SOL-TCK-0001",
+        "manifestSchemaVersion": 1, "specVersion": "2026.11-draft", "testId": "SOL-TCK-0001",
         "category": "numerics", "profile": "full-language", "status": "required",
         "requirements": ["REQ-0001"], "entryPoint": "main.sol",
         "outcome": outcome, "expectation": exp if exp is not None else {"languageExit": 0},
@@ -62,7 +62,7 @@ def valid_model(req_ids=("REQ-0001",)):
     by_id = {r: {"id": r, "lifecycle": "active", "profile": "full-language",
                  "tests": ["SOL-TCK-0001"]} for r in req_ids}
     return {"by_id": by_id, "closures": {"full-language": set(req_ids)},
-            "full_profile": "full-language", "spec_version": "2026.10-draft",
+            "full_profile": "full-language", "spec_version": "2026.11-draft",
             "inventoryDigest": "a" * 64, "requiredCapabilities": ["compile-only"],
             "requirementGaps": [], "coverage": {}, "ambiguities": []}
 
@@ -105,12 +105,12 @@ def corpus_level_tests():
     model = valid_model()
     # duplicate test ids
     dup = corpus_with([base_manifest(), dict(base_manifest())])
-    check("dup test ids rejected", raises(lambda: MF.load_and_validate(dup, MANIFEST_SCHEMA, model, "2026.10-draft"), MF.ManifestError))
+    check("dup test ids rejected", raises(lambda: MF.load_and_validate(dup, MANIFEST_SCHEMA, model, "2026.11-draft"), MF.ManifestError))
     # missing entry point
     root = tempfile.mkdtemp()
     d = os.path.join(root, "SOL-TCK-0001"); os.makedirs(d)
     open(os.path.join(d, "SOL-TCK-0001.manifest.json"), "w").write(SJ.dumps_canonical(base_manifest()))
-    check("missing source rejected", raises(lambda: MF.load_and_validate(root, MANIFEST_SCHEMA, model, "2026.10-draft"), MF.ManifestError))
+    check("missing source rejected", raises(lambda: MF.load_and_validate(root, MANIFEST_SCHEMA, model, "2026.11-draft"), MF.ManifestError))
     # bad spec version
     check("incompatible spec version rejected",
           raises(lambda: MF.load_and_validate(corpus_with([base_manifest()]), MANIFEST_SCHEMA, model, "9999"),
@@ -118,21 +118,21 @@ def corpus_level_tests():
     # unknown requirement in manifest (schema allows REQ pattern; inventory rejects)
     check("unknown requirement rejected",
           raises(lambda: MF.load_and_validate(
-              corpus_with([base_manifest(requirements=["REQ-9999"])]), MANIFEST_SCHEMA, model, "2026.10-draft"),
+              corpus_with([base_manifest(requirements=["REQ-9999"])]), MANIFEST_SCHEMA, model, "2026.11-draft"),
               MF.ManifestError))
     # relabel required as optional
     check("relabel optional rejected",
           raises(lambda: MF.load_and_validate(
-              corpus_with([base_manifest(status="optional")]), MANIFEST_SCHEMA, model, "2026.10-draft"),
+              corpus_with([base_manifest(status="optional")]), MANIFEST_SCHEMA, model, "2026.11-draft"),
               MF.ManifestError))
     # good corpus validates and digests deterministically
     good = corpus_with([base_manifest(),
                         dict(base_manifest(), testId="SOL-TCK-0002")])
-    ms = MF.load_and_validate(good, MANIFEST_SCHEMA, valid_model(("REQ-0001",)), "2026.10-draft")
+    ms = MF.load_and_validate(good, MANIFEST_SCHEMA, valid_model(("REQ-0001",)), "2026.11-draft")
     check("good corpus loads 2", len(ms) == 2)
     # duplicate detection needs two distinct ids to load first; then a same-id set:
     dup2 = corpus_with([base_manifest(), dict(base_manifest(), testId="SOL-TCK-0001")])
-    check("same-id two manifests rejected", raises(lambda: MF.load_and_validate(dup2, MANIFEST_SCHEMA, model, "2026.10-draft"), MF.ManifestError))
+    check("same-id two manifests rejected", raises(lambda: MF.load_and_validate(dup2, MANIFEST_SCHEMA, model, "2026.11-draft"), MF.ManifestError))
 
 
 def linkage_tests():
@@ -175,7 +175,7 @@ def linkage_tests():
 def inventory_tests():
     def req(rid="REQ-0001", profile="full-language", tests=None, status="tested",
             life="active", portable=True, **over):
-        r = {"id": rid, "specVersion": "2026.10-draft", "section": "4",
+        r = {"id": rid, "specVersion": "2026.11-draft", "section": "4",
              "summary": "a requirement that does something meaningful",
              "kind": "compile-time", "profile": profile, "portable": portable,
              "tests": tests if tests is not None else ["SOL-TCK-0001"],
@@ -188,17 +188,17 @@ def inventory_tests():
         return r
 
     def write(reqs):
-        doc = {"schemaVersion": 1, "specVersion": "2026.10-draft", "requirements": reqs}
+        doc = {"schemaVersion": 1, "specVersion": "2026.11-draft", "requirements": reqs}
         p = tempfile.mktemp(suffix=".json")
         open(p, "w").write(SJ.dumps_canonical(doc))
         return p
 
-    prof_full = {"full-language": {"schemaVersion": 1, "specVersion": "2026.10-draft",
+    prof_full = {"full-language": {"schemaVersion": 1, "specVersion": "2026.11-draft",
                                    "name": "full-language", "kind": "full",
                                    "requirements": ["REQ-0001"], "capabilities": []}}
     inv = INV.load_inventory(write([req()]), REQ_SCHEMA)
     check("inventory loads", inv["by_id"]["REQ-0001"]["id"] == "REQ-0001")
-    check("inventory validates", INV.validate(inv, prof_full, "2026.10-draft")["full_profile"] == "full-language")
+    check("inventory validates", INV.validate(inv, prof_full, "2026.11-draft")["full_profile"] == "full-language")
     check("duplicate req rejected", raises(lambda: INV.load_inventory(write([req(), req()]), REQ_SCHEMA), INV.InventoryError))
     # Oracle-source discipline (TCK.md section 6.1): every requirement must carry the
     # normative passages its oracle was derived from, so a fabricated or missing source
@@ -212,26 +212,26 @@ def inventory_tests():
     check("requirement with non-substantive quote rejected",
           raises(lambda: INV.load_inventory(write([req(normativeQuotes=["short"])]), REQ_SCHEMA), INV.InventoryError))
     check("empty full profile rejected",
-          raises(lambda: INV.validate(inv, {"full-language": {**prof_full["full-language"], "requirements": []}}, "2026.10-draft"), INV.InventoryError))
-    check("missing full profile rejected", raises(lambda: INV.validate(inv, {}, "2026.10-draft"), INV.InventoryError))
+          raises(lambda: INV.validate(inv, {"full-language": {**prof_full["full-language"], "requirements": []}}, "2026.11-draft"), INV.InventoryError))
+    check("missing full profile rejected", raises(lambda: INV.validate(inv, {}, "2026.11-draft"), INV.InventoryError))
     cyclic = {"full-language": {**prof_full["full-language"], "extends": ["a"]},
-              "a": {"schemaVersion": 1, "specVersion": "2026.10-draft", "name": "a", "kind": "sub",
+              "a": {"schemaVersion": 1, "specVersion": "2026.11-draft", "name": "a", "kind": "sub",
                     "requirements": [], "capabilities": [], "extends": ["full-language"]}}
-    check("cyclic profile rejected", raises(lambda: INV.validate(inv, cyclic, "2026.10-draft"), INV.InventoryError))
+    check("cyclic profile rejected", raises(lambda: INV.validate(inv, cyclic, "2026.11-draft"), INV.InventoryError))
     check("unknown profile ref rejected",
-          raises(lambda: INV.validate(inv, {"full-language": {**prof_full["full-language"], "extends": ["nope"]}}, "2026.10-draft"), INV.InventoryError))
+          raises(lambda: INV.validate(inv, {"full-language": {**prof_full["full-language"], "extends": ["nope"]}}, "2026.11-draft"), INV.InventoryError))
     # requirement in no profile (valid inventory, empty profile closure)
     prof_no = {"full-language": {**prof_full["full-language"], "requirements": []}}
     check("req in no profile rejected",
-          raises(lambda: INV.validate(inv, prof_no, "2026.10-draft"), INV.InventoryError))
+          raises(lambda: INV.validate(inv, prof_no, "2026.11-draft"), INV.InventoryError))
     # untested gap listing
     inv3 = INV.load_inventory(write([req(tests=[], status="untested-portable",
                                          rationale="portable but deferred pending oracle")]), REQ_SCHEMA)
-    m3 = INV.validate(inv3, prof_full, "2026.10-draft")
+    m3 = INV.validate(inv3, prof_full, "2026.11-draft")
     check("gap reported", INV.untested_requirements(m3) == ["REQ-0001"])
     # schema: tested status requires tests
     check("schema tested needs tests",
-          raises(lambda: S.validate(REQ_SCHEMA, {"schemaVersion": 1, "specVersion": "2026.10-draft",
+          raises(lambda: S.validate(REQ_SCHEMA, {"schemaVersion": 1, "specVersion": "2026.11-draft",
                                                  "requirements": [req(tests=[])]}), S.ValidationError))
 
 

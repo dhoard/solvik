@@ -113,21 +113,52 @@ public final class SolvikIncludeSemanticTest {
                         "lib.sol", "func main(): Unit {\n}\n")), DiagnosticCode.SEM_INVALID_ENTRY_POINT);
     }
 
+    /**
+     * A subclass of an {@code abstract} class may be declared in the same physical file.
+     */
     @Test
-    public void sealedSubclassInSamePhysicalFileIsValid() {
+    public void abstractSubclassInSamePhysicalFileIsValid() {
         assertOk(analyze("root.sol", Map.of( //
-                        "root.sol", "sealed class Shape {\n}\nclass Circle extends Shape {\n}\n")));
+                        "root.sol", "abstract class Shape {\n}\nclass Circle extends Shape {\n}\n")));
     }
 
+    /**
+     * Extension is open, so a subclass may also live in an included file. 2026.10-draft rejected this
+     * with {@code SOLV-SEM-039}, whose premise was that a supertype's subtype set is closed within the
+     * file that declares it; 2026.11-draft retires that premise along with the code.
+     */
     @Test
-    public void sealedSubclassInAnIncludedFileIsRejected() {
-        SemanticResult result = analyze("root.sol", Map.of( //
+    public void abstractSubclassInAnIncludedFileIsValid() {
+        assertOk(analyze("root.sol", Map.of( //
                         "root.sol", "include \"lib.sol\"\nclass Circle extends Shape {\n}\n", //
-                        "lib.sol", "sealed class Shape {\n}\n"));
-        assertCode(result, DiagnosticCode.SEM_SEALED_SUBTYPE_OUTSIDE_FILE);
-        org.solvik.diagnostic.Diagnostic diagnostic = result.diagnostics().all().stream().filter(d -> d.code() == DiagnosticCode.SEM_SEALED_SUBTYPE_OUTSIDE_FILE).findFirst().orElseThrow();
-        // The diagnostic points at the subclass in the root physical file (source id 0).
-        assertThat(diagnostic.span().sourceId()).isEqualTo(0);
+                        "lib.sol", "abstract class Shape {\n}\n")));
+    }
+
+    /**
+     * A {@code mutable} class may be extended from an included file.
+     *
+     * <p>This is the accepted half of the file-boundary rule, and it is what the locked-class
+     * rejection below depends on. Without it, an implementation that forbade cross-file extension of
+     * <em>anything</em> -- a module-boundary bug or a name-resolution ordering bug would do just as
+     * well -- would satisfy the rejection as neatly as a correct one, and both tests would pass while
+     * the language had silently lost the feature.
+     */
+    @Test
+    public void mutableClassExtendedFromAnIncludedFileIsValid() {
+        assertOk(analyze("root.sol", Map.of( //
+                        "root.sol", "include \"lib.sol\"\nclass Circle extends Shape {\n}\n", //
+                        "lib.sol", "mutable class Shape {\n}\n")));
+    }
+
+    /**
+     * Extending a class that is neither {@code abstract} nor {@code mutable} is still rejected, and the
+     * rejection crosses file boundaries the same way an in-file one does.
+     */
+    @Test
+    public void extendingALockedClassFromAnIncludedFileIsRejected() {
+        assertCode(analyze("root.sol", Map.of( //
+                        "root.sol", "include \"lib.sol\"\nclass Circle extends Shape {\n}\n", //
+                        "lib.sol", "class Shape {\n}\n")), DiagnosticCode.SEM_EXTEND_FINAL);
     }
 
     @Test

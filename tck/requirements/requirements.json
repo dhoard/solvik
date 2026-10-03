@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "specVersion": "2026.10-draft",
+  "specVersion": "2026.11-draft",
   "requirements": [
     {
       "id": "REQ-0001",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "3. Static and Strong Typing (operator precedence and concatenation)",
       "summary": "The `..` operator concatenates: both operands render via toString, the result is always String (`1 .. \"x\"` is `\"1x\"`, `\"x\" .. null` is `\"xnull\"`), it binds looser than arithmetic, and it is left-associative.",
       "kind": "compile-time",
@@ -24,7 +24,7 @@
     },
     {
       "id": "REQ-0002",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "3. Equality and reference identity (the equals/hashCode pairing rule)",
       "summary": "A class that declares `override func equals` without a matching `override func hashCode` in the same declaration is a compile-time error (SEM_EQUALS_WITHOUT_HASHCODE).",
       "kind": "compile-time",
@@ -45,7 +45,7 @@
     },
     {
       "id": "REQ-0003",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "6. Functions (exit)",
       "summary": "The predeclared `exit(code: Integer)` terminates the program with `code` as the process exit status and runs no further code; an explicit exit(n) is a normal language completion, not a runtime error.",
       "kind": "process",
@@ -63,7 +63,7 @@
     },
     {
       "id": "REQ-0100",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "4. Root Type Hierarchy (checked integral arithmetic) / 3 (division by zero)",
       "summary": "Integral arithmetic overflow raises a Solvik runtime arithmetic error; division by zero raises a Solvik runtime arithmetic error.",
       "kind": "runtime",
@@ -83,7 +83,7 @@
     },
     {
       "id": "REQ-0200",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "22.2 `throw` / 22.1 exception types / 22.6 required diagnostics",
       "summary": "The `throw` operand type must be assignable to a guest exception type; throwing any other value is the compile-time error SEM_THROW_NON_EXCEPTION (SOLV-SEM-053), reported on the operand.",
       "kind": "compile-time",
@@ -103,7 +103,7 @@
     },
     {
       "id": "REQ-0201",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "22.3 `try`, `catch`, and `finally` / 22.6 required diagnostics",
       "summary": "A `try` with neither a `catch` clause nor a `finally` clause is the compile-time error SEM_TRY_NEEDS_HANDLER (SOLV-SEM-056), reported on the whole statement.",
       "kind": "compile-time",
@@ -123,9 +123,9 @@
     },
     {
       "id": "REQ-0202",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "7. Static members and class initialization",
-      "summary": "A static member is not inherited and not overridable; declaring `open` or `override` on a static member is the compile-time error SEM_INVALID_STATIC_MODIFIER (SOLV-SEM-047).",
+      "summary": "A static member is not inherited and not overridable; declaring `mutable` or `override` on a static member is the compile-time error SEM_INVALID_STATIC_MODIFIER (SOLV-SEM-047).",
       "kind": "compile-time",
       "profile": "full-language",
       "portable": true,
@@ -138,13 +138,13 @@
       "diagnosticNormative": true,
       "oracleNotes": "LANGUAGE_SPEC section 7 (Static members) states verbatim: 'A static member is **not inherited** and is **not overridable**. ... Declaring `open` or `override` on a static member is `SOLV-SEM-047`.' The static diagnostic table names SEM_INVALID_STATIC_MODIFIER = SOLV-SEM-047 for 'a static member declared `open` or `override`'. Specification-required code (TCK.md section 6). `static open func` is the grammatically valid spelling (grammar: staticMember: STATIC methodDecl; methodModifier: OPEN | OVERRIDE), so the program is well-formed apart from the single named violation.",
       "normativeQuotes": [
-        "Declaring open or override on a static member is SOLV-SEM-047.",
-        "SEM_INVALID_STATIC_MODIFIER | SOLV-SEM-047 | a static member declared open or override"
+        "Declaring `mutable` or `override` on a static member is `SOLV-SEM-047`.",
+        "`SEM_INVALID_STATIC_MODIFIER` | `SOLV-SEM-047` | a static member declared `mutable` or `override`"
       ]
     },
     {
       "id": "REQ-0203",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "21.4 `if` expressions / 21.9 required diagnostics",
       "summary": "An expression-position `if` must have an `else`; a missing `else` is the dedicated compile-time error SEM_IF_EXPRESSION_MISSING_ELSE (SOLV-SEM-042) and does not also fabricate a branch-type mismatch.",
       "kind": "compile-time",
@@ -165,7 +165,7 @@
     },
     {
       "id": "REQ-0204",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "21.5 `switch` expressions / 21.9 required diagnostics",
       "summary": "A `switch` expression must have a default arm; a missing default is the compile-time error SEM_SWITCH_EXPRESSION_MISSING_DEFAULT (SOLV-SEM-043), reported on the whole `switch` expression.",
       "kind": "compile-time",
@@ -185,7 +185,7 @@
     },
     {
       "id": "REQ-0205",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "23.2 Consuming a Result",
       "summary": "A `Result`-typed value used as a standalone statement is the compile-time error SEM_UNUSED_RESULT (SOLV-SEM-052); `compute()` alone is rejected while `compute().ignore()` is accepted.",
       "kind": "compile-time",
@@ -206,7 +206,7 @@
     },
     {
       "id": "REQ-0206",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "23.1 Wrong-variant faults",
       "summary": "`unwrap` on an `Err` and `unwrapErr` on an `Ok` raise a Solvik runtime fault of the same class as an arithmetic, cast, or bounds fault: an ordinary guest failure with a non-zero exit status, not an internal error, detected at run time at the operation.",
       "kind": "runtime",
@@ -226,7 +226,7 @@
     },
     {
       "id": "REQ-0207",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "22.5 Program boundary",
       "summary": "A thrown value that reaches the program boundary with no remaining handler is uncaught: a guest-visible failure terminating the program with a non-zero exit status, reported as an ordinary guest error and never as a host internal error.",
       "kind": "process",
@@ -245,9 +245,9 @@
     },
     {
       "id": "REQ-0300",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "2. Variables and Mutability",
-      "summary": "A `val` binding cannot be reassigned; reassigning an immutable binding is a compile-time error, while mutating a `var` property of an object held in a `val` remains legal.",
+      "summary": "A `val` binding cannot be reassigned; reassigning an immutable binding is a compile-time error, while mutating a `mutable val` property of an object held in a `val` remains legal.",
       "kind": "compile-time",
       "profile": "full-language",
       "portable": true,
@@ -260,14 +260,14 @@
       "oracleNotes": "LANGUAGE_SPEC section 2 states 'Reassignment is illegal' with the example `count = 2 // compile error`, and its `val freezes the binding, not the complete reachable object graph` example marks `user.name = \"Douglas\"` valid and `user = User(\"Other\")` a compile error. IMPORTANT: the specification names NO stable diagnostic code for this rule, so no code is asserted and `diagnosticNormative` is false -- TCK.md section 6 forbids promoting an implementation enum entry to normative status. The manifest therefore asserts only the diagnostic family, which is the protocol's own closed taxonomy (protocol.md section 4.1), and the compile-time category is a section 3 fact ('Assignments are statements, not value-producing expressions' plus the static-typing model).",
       "normativeQuotes": [
         "Reassignment is illegal",
-        "val freezes the binding, not the complete reachable object graph."
+        "`val` freezes the binding, not the complete reachable object graph"
       ]
     },
     {
       "id": "REQ-0301",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "2. Variables and Mutability",
-      "summary": "`val` freezes the binding, not the complete reachable object graph: reassigning a `var` property of an object held in a `val` is legal and the new value is observed by later reads.",
+      "summary": "`val` freezes the binding, not the complete reachable object graph: reassigning a `mutable val` property of an object held in a `val` is legal and the new value is observed by later reads.",
       "kind": "compile-time",
       "profile": "full-language",
       "portable": true,
@@ -278,14 +278,14 @@
       "lifecycle": "active",
       "oracleNotes": "LANGUAGE_SPEC section 2 states verbatim: '`val` freezes the binding, not the complete reachable object graph', demonstrated by the example where `user.name = \"Douglas\"` is annotated 'valid' and `user = User(\"Other\")` 'compile error'. This requirement covers the VALID half (property mutation through a `val`); REQ-0300 covers the rejected half (rebinding). Expected stdout is the reassigned name; section 5 states `print` appends no line separator, so the bytes are exactly `Douglas`. No code is involved: this is an acceptance, so the oracle is a plain observable.",
       "normativeQuotes": [
-        "val freezes the binding, not the complete reachable object graph.",
+        "`val` freezes the binding, not the complete reachable object graph",
         "user.name = \"Douglas\" // valid",
         "user = User(\"Other\")  // compile error"
       ]
     },
     {
       "id": "REQ-0400",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "15. Strings (Rust-style raw strings)",
       "summary": "A raw string is `r` + N '#' + '\"' + content + '\"' + exactly N '#'; its semantic value is the content between the delimiters, backslash escapes are not processed, and embedded newlines are preserved.",
       "kind": "lexical",
@@ -307,7 +307,7 @@
     },
     {
       "id": "REQ-0401",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "15. Strings (Normal strings)",
       "summary": "Normal strings support exactly the escapes `\\\\`, `\\\"`, `\\n`, `\\r`, `\\t`, `\\0`, and `N` (`\\N`); any other escape is a lexical error.",
       "kind": "lexical",
@@ -327,7 +327,7 @@
     },
     {
       "id": "REQ-0402",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "15. Strings (Normal strings)",
       "summary": "String interpolation is deferred and a `$` has no interpolation meaning, so `$` and `${...}` inside a normal string are ordinary literal text.",
       "kind": "lexical",
@@ -345,7 +345,7 @@
     },
     {
       "id": "REQ-0403",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "16. Statement Termination",
       "summary": "Programmers may explicitly write `;`: an explicit semicolon and a newline-inserted semicolon terminate a declaration equivalently under lexical semicolon insertion.",
       "kind": "lexical",
@@ -363,7 +363,7 @@
     },
     {
       "id": "REQ-0404",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "15. Strings (Rust-style raw strings)",
       "summary": "An unterminated raw string is a lexical error at its opening delimiter.",
       "kind": "lexical",
@@ -382,7 +382,7 @@
     },
     {
       "id": "REQ-0405",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "15. Strings (Normal strings)",
       "summary": "Normal strings cannot contain an unescaped physical newline.",
       "kind": "lexical",
@@ -401,7 +401,7 @@
     },
     {
       "id": "REQ-0450",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "3. Static and Strong Typing (truncating division)",
       "summary": "Integral division truncates toward zero (sign-symmetrically), as distinct from floor division.",
       "kind": "runtime",
@@ -419,7 +419,7 @@
     },
     {
       "id": "REQ-0451",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "4. Root Type Hierarchy (IEEE 754) / 3. Equality and reference identity",
       "summary": "`Float` and `Double` follow IEEE 754 arithmetic, and floating equality preserves IEEE behavior: NaN is unequal to every value including itself, positive and negative zero are equal, and infinities compare by value.",
       "kind": "runtime",
@@ -439,7 +439,7 @@
     },
     {
       "id": "REQ-0452",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "3. Equality and reference identity (widened equality comparison)",
       "summary": "`==`/`!=` between numeric operands of different types first widen both to their least common widened numeric type, so `1 == 1L` compares as `Long` and `1.5f == 1.5` compares as `Double`.",
       "kind": "compile-time",
@@ -457,7 +457,7 @@
     },
     {
       "id": "REQ-0453",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "5. Nullability (safe access and coalescing)",
       "summary": "For `receiver?.member` the member is evaluated only when the receiver is non-null and the result is the member type made nullable; for `left ?? right` the left operand must be nullable and the result is the common type of non-null `left` and `right`.",
       "kind": "runtime",
@@ -475,7 +475,7 @@
     },
     {
       "id": "REQ-0454",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "5. Nullability (flow-sensitive narrowing)",
       "summary": "Flow-sensitive narrowing is required: a non-null test narrows the subject to its non-null type within the branch, so a use requiring the non-null type type-checks inside it.",
       "kind": "compile-time",
@@ -495,9 +495,9 @@
     },
     {
       "id": "REQ-0455",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "5. Nullability (narrowing invalidation)",
-      "summary": "Narrowing is permitted only while the value cannot be written or invalidated along the path; a write to a `var` invalidates its prior narrowing.",
+      "summary": "Narrowing is permitted only while the value cannot be written or invalidated along the path; a write to a `mutable val` invalidates its prior narrowing.",
       "kind": "compile-time",
       "profile": "full-language",
       "portable": true,
@@ -507,15 +507,15 @@
       "status": "tested",
       "lifecycle": "active",
       "diagnosticNormative": false,
-      "oracleNotes": "LANGUAGE_SPEC section 5 states verbatim: 'Narrowing is permitted only when the analyzed value cannot be written or invalidated along that control-flow path. A write to a `var` invalidates its prior narrowing.' The test writes `mv = null` between the `mv != null` test and a use that requires non-null, so the program must be rejected; SOL-TCK-0037 is the otherwise-identical control with the write removed, which must be accepted, isolating the rejection to the invalidating write alone. The specification names NO code for this rejection, and TCK.md section 6 forbids promoting an implementation enum entry to normative status, so only the protocol family is asserted.",
+      "oracleNotes": "LANGUAGE_SPEC section 5 states verbatim: 'Narrowing is permitted only when the analyzed value cannot be written or invalidated along that control-flow path. A write to a `mutable val` invalidates its prior narrowing.' The test writes `mv = null` between the `mv != null` test and a use that requires non-null, so the program must be rejected; SOL-TCK-0037 is the otherwise-identical control with the write removed, which must be accepted, isolating the rejection to the invalidating write alone. The specification names NO code for this rejection, and TCK.md section 6 forbids promoting an implementation enum entry to normative status, so only the protocol family is asserted.",
       "normativeQuotes": [
         "Narrowing is permitted only when the analyzed value cannot be written or invalidated along that control-flow path.",
-        "A write to a var invalidates its prior narrowing."
+        "A write to a `mutable val` invalidates its prior narrowing."
       ]
     },
     {
       "id": "REQ-0456",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "5. Nullability / 4. Root Type Hierarchy",
       "summary": "Types are non-null by default and `null` is assignable only to nullable types; initializing a non-null declaration with `null` is a compile-time error.",
       "kind": "compile-time",
@@ -536,7 +536,7 @@
     },
     {
       "id": "REQ-0457",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "5. Nullability (assignability)",
       "summary": "If `S` is a subtype of `T` then `S` is assignable to `T?` and `S?` to `T?`, but `S?` is not assignable to non-null `T`.",
       "kind": "compile-time",
@@ -555,7 +555,7 @@
     },
     {
       "id": "REQ-0458",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "4. Root Type Hierarchy (implicit widening)",
       "summary": "Implicit numeric widening holds for exactly the enumerated relation (Byte->Short->Integer->Long; Byte/Short to Float; Byte/Short/Integer to Double; Float to Double); no other conversion is implicit and no narrowing is implicit.",
       "kind": "compile-time",
@@ -577,7 +577,7 @@
     },
     {
       "id": "REQ-0459",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "4. Root Type Hierarchy (least common widened type)",
       "summary": "Arithmetic, ordering, and equality operands widen to the unique minimal type both can widen or stay to; when two numeric operands have no such common type (for example `Long` and `Float`) the operator is ill-typed.",
       "kind": "compile-time",
@@ -597,7 +597,7 @@
     },
     {
       "id": "REQ-0500",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "17. Control Flow",
       "summary": "Range for-in loops: `...` includes the end, `..<` excludes it ascending, `..>` excludes it descending, reversed or empty ranges iterate zero times, and both bounds are evaluated once before the first iteration",
       "kind": "runtime",
@@ -622,7 +622,7 @@
     },
     {
       "id": "REQ-0501",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "17. Control Flow",
       "summary": "Three-clause `for` with explicit semicolon separators, an omitted condition treated as true, and `break`/`continue` controlling the enclosing loop",
       "kind": "runtime",
@@ -642,7 +642,7 @@
     },
     {
       "id": "REQ-0502",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "18. Type Tests and Casts",
       "summary": "`is` type tests narrow the checked value where it is stable, `as` performs a checked cast, and an unsuccessful `as` raises a Solvik runtime type error",
       "kind": "runtime",
@@ -662,7 +662,7 @@
     },
     {
       "id": "REQ-0503",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "6. Functions",
       "summary": "Declaration lookup is order-independent within a module, and the top-level statements form the body of an implicit main",
       "kind": "compile-time",
@@ -676,12 +676,12 @@
       "oracleNotes": "SOL-TCK-0052 calls a function declared textually after the calling statement, and the expected bytes are computed from the declaration body rather than observed.",
       "normativeQuotes": [
         "Declaration lookup remains order-independent within a module, so a declaration may be referenced from a physically earlier file or statement.",
-        "The top-level statements, in include-expansion order, form the body of an implicit `func main()`; a top-level `val`/`var` is therefore a local of the implicit main, not a global."
+        "The top-level statements, in include-expansion order, form the body of an implicit `func main()`; a top-level `val`, whether or not it is `mutable`, is therefore a local of the implicit main, not a global."
       ]
     },
     {
       "id": "REQ-0504",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "6. Functions",
       "summary": "Display goes through toString: a class override is honored by the concatenation operator, null renders as null, and Boolean renders as the words true and false",
       "kind": "runtime",
@@ -702,7 +702,7 @@
     },
     {
       "id": "REQ-0505",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "20. File Inclusion",
       "summary": "Declaring func main explicitly is a compile-time error reported as SOLV-SEM-001",
       "kind": "compile-time",
@@ -721,7 +721,7 @@
     },
     {
       "id": "REQ-0506",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "17. Control Flow",
       "summary": "break and continue outside any loop are compile-time errors",
       "kind": "compile-time",
@@ -739,7 +739,7 @@
     },
     {
       "id": "REQ-0507",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "17. Control Flow",
       "summary": "if and loop conditions must have type Boolean",
       "kind": "compile-time",
@@ -757,7 +757,7 @@
     },
     {
       "id": "REQ-0508",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "6. Functions",
       "summary": "Argument count for a statically resolved callable must equal its declared parameter count, checked before argument-type checking and inference",
       "kind": "compile-time",
@@ -778,9 +778,9 @@
     },
     {
       "id": "REQ-0600",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "7. Classes",
-      "summary": "A subclass overriding an `open` member is dispatched dynamically through a base-typed reference while the base implementation is preserved",
+      "summary": "A subclass overriding a `mutable` member is dispatched dynamically through a base-typed reference while the base implementation is preserved",
       "kind": "runtime",
       "profile": "full-language",
       "portable": true,
@@ -793,12 +793,12 @@
       "normativeQuotes": [
         "Single inheritance only:",
         "Overrides must always use `override`.",
-        "An `open` member may be overridden; all other members are final."
+        "A `mutable` member may be overridden; all other members are final."
       ]
     },
     {
       "id": "REQ-0601",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "7. Classes",
       "summary": "A member that redeclares an inherited overridable member must use the `override` keyword",
       "kind": "compile-time",
@@ -817,7 +817,7 @@
     },
     {
       "id": "REQ-0602",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "7. Classes",
       "summary": "An overriding method must keep exactly the inherited parameter types, with only the return type permitted to vary covariantly",
       "kind": "compile-time",
@@ -835,7 +835,7 @@
     },
     {
       "id": "REQ-0603",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "7. Classes",
       "summary": "`extends Any` is the explicit spelling of direct root derivation and does not create a source class symbol for Any",
       "kind": "compile-time",
@@ -853,7 +853,7 @@
     },
     {
       "id": "REQ-0604",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "7. Classes",
       "summary": "Inside a method or constructor a bare name never resolves to a property, a local may shadow a property name, and an unresolvable bare reference is SOLV-RESOL-001",
       "kind": "compile-time",
@@ -873,7 +873,7 @@
     },
     {
       "id": "REQ-0605",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "7. Classes",
       "summary": "`this` outside an instance method or constructor is SOLV-RESOL-005",
       "kind": "compile-time",
@@ -891,7 +891,7 @@
     },
     {
       "id": "REQ-0700",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "8. Interfaces",
       "summary": "Interfaces define nominal contracts, a class may implement several of them, and an interface default implementation is usable on an implementor that declares only the abstract members",
       "kind": "runtime",
@@ -911,7 +911,7 @@
     },
     {
       "id": "REQ-0701",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "9. Composition and Delegation",
       "summary": "A `delegate val` of interface type causes the compiler to synthesize forwarding for interface members, an explicit method on the class takes precedence over a delegated member, and ambiguous delegation is a compile-time error",
       "kind": "runtime",
@@ -933,7 +933,7 @@
     },
     {
       "id": "REQ-0800",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "13. switch",
       "summary": "Switch cases never fall through implicitly, need no `break` to terminate, are tested in source order with exactly the first matching case executing, and shared cases are written as a comma-separated list because there is no `fallthrough` keyword",
       "kind": "runtime",
@@ -957,7 +957,7 @@
     },
     {
       "id": "REQ-0801",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "13. switch",
       "summary": "A `break` inside a case is illegal unless it exits a loop nested inside that case, and each case body is an implicit block so `continue` applies to the enclosing loop",
       "kind": "compile-time",
@@ -978,7 +978,7 @@
     },
     {
       "id": "REQ-0900",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "11. Generics",
       "summary": "`List<T>` exposes the operations and return types its operation table gives, and construction with explicit type arguments populates it",
       "kind": "library",
@@ -997,7 +997,7 @@
     },
     {
       "id": "REQ-0901",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "11. Generics",
       "summary": "`Set<T>` de-duplicates its initial elements and its Boolean-valued operations report insertion, membership, and removal",
       "kind": "library",
@@ -1016,7 +1016,7 @@
     },
     {
       "id": "REQ-0902",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "11. Generics",
       "summary": "`Map<K, V>` accepts `key: value` construction entries, keeps a repeated key's latest value, and reports size, membership, and removal",
       "kind": "library",
@@ -1037,7 +1037,7 @@
     },
     {
       "id": "REQ-0903",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "11. Generics",
       "summary": "`Stack<T>` reports last-in first-out order through `peek` and `pop`, both typed to return the element",
       "kind": "library",
@@ -1056,7 +1056,7 @@
     },
     {
       "id": "REQ-0904",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "11. Generics",
       "summary": "A type argument may be written explicitly or inferred from the declared type of the left-hand side, but a construction writing neither is a compile-time error",
       "kind": "compile-time",
@@ -1075,7 +1075,7 @@
     },
     {
       "id": "REQ-0905",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "11. Generics",
       "summary": "Collection failure modes raise: an invalid `List` index, `Map.get` for a missing key, and `peek` or `pop` on an empty stack",
       "kind": "runtime",
@@ -1098,7 +1098,7 @@
     },
     {
       "id": "REQ-0906",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "11. Generics",
       "summary": "Construction initial elements must be assignable to the element type, and a positional value is not valid where a `Map` requires `key: value` entries",
       "kind": "compile-time",
@@ -1117,7 +1117,7 @@
     },
     {
       "id": "REQ-0907",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "11. Generics",
       "summary": "Type arguments are invariant, and a runtime type test against a non-reified type argument is a compile-time error",
       "kind": "compile-time",
@@ -1138,7 +1138,7 @@
     },
     {
       "id": "REQ-0908",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "11. Generics",
       "summary": "A user-declared nominal generic class binds its type parameter per use, so independent instantiations hold independent typed storage",
       "kind": "runtime",
@@ -1149,14 +1149,14 @@
       ],
       "status": "tested",
       "lifecycle": "active",
-      "oracleNotes": "Section 11's own `class Box<T> { var value: T }` example is the declaration under test; the program adds the constructor that section 7 requires because section 2 rejects a `var` property with no initializer, which changes no generics semantics. Two different type arguments on the same declared class are the point: a runtime that shared one storage cell across instantiations could not print both the `String` and the incremented `Integer`. The type-test sentence is quoted because it is the only normative sentence in section 11 that speaks to user-declared generic types.",
+      "oracleNotes": "Section 11's own `class Box<T> { mutable val value: T }` example is the declaration under test; the program adds the constructor that section 7 requires because section 2 rejects a `mutable val` property with no initializer, which changes no generics semantics. Two different type arguments on the same declared class are the point: a runtime that shared one storage cell across instantiations could not print both the `String` and the incremented `Integer`. The type-test sentence is quoted because it is the only normative sentence in section 11 that speaks to user-declared generic types.",
       "normativeQuotes": [
         "Generic type arguments are invariant. The initial runtime uses erasure while preserving complete compile-time checking. A runtime type test against a non-reified type argument is a compile-time error."
       ]
     },
     {
       "id": "REQ-1000",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "20. File Inclusion",
       "summary": "Including a file that declares a module makes that module's name a visible prefix in the including file, and included declarations are reached through `::`",
       "kind": "module",
@@ -1175,7 +1175,7 @@
     },
     {
       "id": "REQ-1001",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "20. File Inclusion",
       "summary": "`include P alias p` binds the prefix `p` to the included file's module, and the prefix addresses the module's declarations (functions and classes) through `::`",
       "kind": "module",
@@ -1193,7 +1193,7 @@
     },
     {
       "id": "REQ-1002",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "20. File Inclusion",
       "summary": "An `alias` naming a file in the implicit default module is rejected as SOLV-RESOL-014",
       "kind": "compile-time",
@@ -1211,7 +1211,7 @@
     },
     {
       "id": "REQ-1003",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "20. File Inclusion",
       "summary": "Binding one prefix twice in a file, including collision with a prefix an unaliased include made visible, is SOLV-RESOL-013",
       "kind": "compile-time",
@@ -1229,7 +1229,7 @@
     },
     {
       "id": "REQ-1004",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "20. File Inclusion",
       "summary": "A duplicate declaration name is SOLV-RESOL-002, within the shared scope of the implicit default module and within a merged named module",
       "kind": "compile-time",
@@ -1249,7 +1249,7 @@
     },
     {
       "id": "REQ-1005",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "20. File Inclusion",
       "summary": "An include path naming a nonexistent file is rejected with SOLV-RESOL-008 at the include directive",
       "kind": "compile-time",
@@ -1268,7 +1268,7 @@
     },
     {
       "id": "REQ-1006",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "20. File Inclusion",
       "summary": "A canonical file encountered while still being expanded is reported as SOLV-RESOL-011 at the include that closes the cycle",
       "kind": "compile-time",
@@ -1286,7 +1286,7 @@
     },
     {
       "id": "REQ-1007",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "20. File Inclusion",
       "summary": "A module name is a single identifier matching `[a-z][a-z0-9]*(_[a-z0-9]+)*` and not a reserved word; violations that reach the name check are SOLV-RESOL-012",
       "kind": "compile-time",
@@ -1305,7 +1305,7 @@
     },
     {
       "id": "REQ-1008",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "20. File Inclusion",
       "summary": "With an alias present the included file's own module name is not bound in the including file (`instead`), so referencing it is rejected",
       "kind": "compile-time",
@@ -1323,7 +1323,7 @@
     },
     {
       "id": "REQ-1009",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "20. File Inclusion",
       "summary": "A canonical physical file is expanded at most once per evaluated root; a later include is a no-op, so a diamond is deterministic and an included top-level statement never runs twice",
       "kind": "module",
@@ -1341,7 +1341,7 @@
     },
     {
       "id": "REQ-1010",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "20. File Inclusion",
       "summary": "Expansion is depth-first and left-to-right: for root including a then b with both including common, item order is common, then a, then b, then root",
       "kind": "module",
@@ -1359,7 +1359,7 @@
     },
     {
       "id": "REQ-1011",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "20. File Inclusion",
       "summary": "Prefixes are file-local and non-transitive: a file does not inherit prefixes or aliases of the files it includes",
       "kind": "compile-time",
@@ -1377,7 +1377,7 @@
     },
     {
       "id": "REQ-1100",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "14. Regex",
       "summary": "`matches` requires the complete input to match",
       "kind": "runtime",
@@ -1395,7 +1395,7 @@
     },
     {
       "id": "REQ-1101",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "14. Regex",
       "summary": "Regex construction accepts raw strings",
       "kind": "runtime",
@@ -1413,7 +1413,7 @@
     },
     {
       "id": "REQ-1102",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "14. Regex",
       "summary": "The initial portable pattern syntax supports literals, `.`, character classes, capturing groups, alternation, `*`, `+`, `?`, `{m}`, `{m,}`, `{m,n}`, and the ASCII classes `\\d`, `\\s`, `\\w` with their uppercase negations",
       "kind": "runtime",
@@ -1431,7 +1431,7 @@
     },
     {
       "id": "REQ-1103",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "14. Regex",
       "summary": "`findAll` returns all non-overlapping matches from left to right, with zero-based character offsets and an exclusive `end`",
       "kind": "runtime",
@@ -1450,7 +1450,7 @@
     },
     {
       "id": "REQ-1104",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "14. Regex",
       "summary": "`replace` replaces all non-overlapping matches and treats the replacement as literal text",
       "kind": "runtime",
@@ -1468,7 +1468,7 @@
     },
     {
       "id": "REQ-1105",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "14. Regex",
       "summary": "Backreferences, lookaround, embedded flags, and engine-specific extensions are rejected",
       "kind": "compile-time",
@@ -1488,7 +1488,7 @@
     },
     {
       "id": "REQ-1106",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "14. Regex",
       "summary": "Regex patterns may be used in `switch` cases",
       "kind": "runtime",
@@ -1508,7 +1508,7 @@
     },
     {
       "id": "REQ-1107",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "5. Nullability",
       "summary": "`S?` is not assignable to non-null `T`, so a member of `T` is unreachable through a `T?` value without narrowing",
       "kind": "compile-time",
@@ -1526,7 +1526,7 @@
     },
     {
       "id": "REQ-1108",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "13. switch",
       "summary": "Every expression `switch` must contain exactly one `default`, and it must remain last, while a statement `switch` may omit it",
       "kind": "compile-time",
@@ -1539,12 +1539,12 @@
       "lifecycle": "active",
       "oracleNotes": "Exact code from the registry. Covers the missing-`default` clause together with the statement-form permission; the count and ordering clauses stay uncovered for the reason recorded in ORACLE_REVIEW.md.",
       "normativeQuotes": [
-        "Every expression `switch` must contain exactly one `default`, and it must remain last. `switch` does not gain enum or sealed exhaustiveness; that remains the responsibility of `match`. Requiring `default` makes value production explicit for `Integer`, `String`, and regex dispatch, while a statement `switch` may still omit `default` and do nothing when no label matches."
+        "Every expression `switch` must contain exactly one `default`, and it must remain last. `switch` does not gain enum exhaustiveness; that remains the responsibility of `match`. Requiring `default` makes value production explicit for `Integer`, `String`, and regex dispatch, while a statement `switch` may still omit `default` and do nothing when no label matches."
       ]
     },
     {
       "id": "REQ-1109",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "3. Static and Strong Typing",
       "summary": "`Regex` equality is by exact pattern source text and `RegexMatch` equality is by its immutable snapshot",
       "kind": "runtime",
@@ -1563,7 +1563,7 @@
     },
     {
       "id": "REQ-1200",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "21.1 Terms / 21.2 Block expressions",
       "summary": "A block expression has its own lexical scope, its earlier statements execute in source order, and a local declared inside it is visible to later items in that block and nowhere outside it",
       "kind": "runtime",
@@ -1584,7 +1584,7 @@
     },
     {
       "id": "REQ-1201",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "21.2 Block expressions / 21.9 required diagnostics",
       "summary": "A value-required block whose normally completing path reaches `}` without a tail expression is the compile-time error SEM_BLOCK_RESULT_REQUIRED, and an empty block, a block ending in a local declaration, and a block ending in an assignment are all invalid in expression position",
       "kind": "compile-time",
@@ -1605,7 +1605,7 @@
     },
     {
       "id": "REQ-1202",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "21.1 Terms / 21.2 Block expressions",
       "summary": "A path that completes abruptly carries no value and does not participate in result joining; a value-required block whose every path completes abruptly has type Nothing and never evaluates a tail expression",
       "kind": "compile-time",
@@ -1624,7 +1624,7 @@
     },
     {
       "id": "REQ-1203",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "21.2 Block expressions",
       "summary": "A standalone scope block in statement position remains a statement block, so it contributes no value and its locals stay inside it",
       "kind": "runtime",
@@ -1642,7 +1642,7 @@
     },
     {
       "id": "REQ-1204",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "21.3 Semicolons and tail expressions",
       "summary": "Explicit and synthesized semicolons are the same token with the same meaning, token origin is never inspected to decide whether a value exists, and comments and blank lines before `}` do not affect tail selection",
       "kind": "syntax",
@@ -1661,7 +1661,7 @@
     },
     {
       "id": "REQ-1205",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "21.4 `if` expressions",
       "summary": "An expression-position `if` may chain through `else if`, every normally completing branch must produce a tail result, and the condition must be Boolean exactly as for statement `if`",
       "kind": "compile-time",
@@ -1680,7 +1680,7 @@
     },
     {
       "id": "REQ-1206",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "21.4 `if` expressions",
       "summary": "Abrupt branches are excluded from result joining, so an `if` expression whose `else` completes abruptly still produces the value of its normally completing branch",
       "kind": "runtime",
@@ -1698,7 +1698,7 @@
     },
     {
       "id": "REQ-1207",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "21.5 `switch` expressions",
       "summary": "A `switch` in expression position produces a value from its matched case body, while a statement `switch` may omit `default` and do nothing when no label matches",
       "kind": "runtime",
@@ -1711,12 +1711,12 @@
       "lifecycle": "active",
       "oracleNotes": "Both halves are observable in one program: the expression form yields a string, and a statement switch whose label does not match contributes nothing to stdout. The missing-`default` rejection for the expression form is already SOL-TCK-0012 under REQ-0204.",
       "normativeQuotes": [
-        "Every expression `switch` must contain exactly one `default`, and it must remain last. `switch` does not gain enum or sealed exhaustiveness; that remains the responsibility of `match`. Requiring `default` makes value production explicit for `Integer`, `String`, and regex dispatch, while a statement `switch` may still omit `default` and do nothing when no label matches."
+        "Every expression `switch` must contain exactly one `default`, and it must remain last. `switch` does not gain enum exhaustiveness; that remains the responsibility of `match`. Requiring `default` makes value production explicit for `Integer`, `String`, and regex dispatch, while a statement `switch` may still omit `default` and do nothing when no label matches."
       ]
     },
     {
       "id": "REQ-1208",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "21.5 `switch` expressions / 21.9 required diagnostics",
       "summary": "Every normally completing case body, including `default`, must end in a tail expression, so a value-position case body ending in a declaration is SEM_BLOCK_RESULT_REQUIRED",
       "kind": "compile-time",
@@ -1735,7 +1735,7 @@
     },
     {
       "id": "REQ-1209",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "21.5 `switch` expressions",
       "summary": "The scrutinee of a `switch` is evaluated exactly once",
       "kind": "runtime",
@@ -1753,7 +1753,7 @@
     },
     {
       "id": "REQ-1210",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "21.7 Result types",
       "summary": "A construct's result type is the nearest common declared supertype to which every normally completing branch result is assignable, with no numeric promotion or widening, so `if (c) { 1 } else { 1L }` has type `Number` and is not assignable to `Integer` or `Long`",
       "kind": "compile-time",
@@ -1772,7 +1772,7 @@
     },
     {
       "id": "REQ-1211",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "21.7 Result types",
       "summary": "If exactly one branch can complete normally, its result type is the construct's result type, and `Unit` participates in the join as any other non-null value type",
       "kind": "compile-time",
@@ -1791,7 +1791,7 @@
     },
     {
       "id": "REQ-1212",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "21.8 Expression contexts",
       "summary": "Block, `if`, and `switch` expressions are accepted wherever the grammar accepts an expression, including assignment right-hand sides, call arguments, explicit `return` values, and nested expression constructs",
       "kind": "runtime",
@@ -1809,7 +1809,7 @@
     },
     {
       "id": "REQ-1213",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "21.8 Expression contexts / 21.9 required diagnostics",
       "summary": "A function body does not implicitly return its final expression, so a value-returning function whose body evaluates but does not return is rejected",
       "kind": "compile-time",
@@ -1828,7 +1828,7 @@
     },
     {
       "id": "REQ-1214",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "21.6 Existing `match` expressions",
       "summary": "A `match` branch may use a block expression for multiple statements, following the same tail-result, scope, and typing rules as any other block expression",
       "kind": "runtime",
@@ -1847,7 +1847,7 @@
     },
     {
       "id": "REQ-1215",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "21.2 Block expressions / 21.1 Terms",
       "summary": "A local declared inside a block expression is visible nowhere outside it, so referencing it after the block is an unknown-name error",
       "kind": "compile-time",
@@ -1866,7 +1866,7 @@
     },
     {
       "id": "REQ-1216",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "21.9 required diagnostics",
       "summary": "A class that declares `override func hashCode` must also declare `override func equals` in the same class declaration, which is SEM_HASHCODE_WITHOUT_EQUALS",
       "kind": "compile-time",
@@ -1885,7 +1885,7 @@
     },
     {
       "id": "REQ-1300",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "22.1 Exception types / 22.3 `try`, `catch`, and `finally`",
       "summary": "A guest exception type is a class whose declared superclass chain reaches one of the three built-in bases directly or transitively, and a handler whose type is a built-in base catches a thrown value whose chain reaches it",
       "kind": "runtime",
@@ -1905,7 +1905,7 @@
     },
     {
       "id": "REQ-1301",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "22.1 Exception types",
       "summary": "Construction of a guest exception type accepts a single optional trailing String? message, and the synthesized getMessage() returns that message or null when no message argument was supplied",
       "kind": "runtime",
@@ -1926,7 +1926,7 @@
     },
     {
       "id": "REQ-1302",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "22.1 Exception types",
       "summary": "The message is a compiler-synthesized private slot and never a readable member, so reading e.message on an exception is the compile-time error SOLV-RESOL-004",
       "kind": "compile-time",
@@ -1944,7 +1944,7 @@
     },
     {
       "id": "REQ-1303",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "22.1 Exception types / 22.6 Required diagnostics",
       "summary": "A message argument must be assignable to String? or the construction is SOLV-TYPE-001, and supplying more than one extra trailing argument is the arity error SOLV-TYPE-003",
       "kind": "compile-time",
@@ -1964,7 +1964,7 @@
     },
     {
       "id": "REQ-1304",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "22.1 Exception types",
       "summary": "The message is independent of the class's declared constructor, so a subclass keeps its own declared parameters and the message is still the single trailing argument",
       "kind": "runtime",
@@ -1983,7 +1983,7 @@
     },
     {
       "id": "REQ-1305",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "22.1 Exception types / 22.3 `try`, `catch`, and `finally`",
       "summary": "getMessage() is available on every guest exception type, including on a handler written on a base type, so a handler typed on a base can read the message of a value caught as that base",
       "kind": "runtime",
@@ -2002,7 +2002,7 @@
     },
     {
       "id": "REQ-1306",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "22.1 Exception types / 22.6 Required diagnostics",
       "summary": "The names message and getMessage are reserved on every guest exception class and declaring either is SOLV-SEM-037, while on a class that is not a guest exception both remain ordinary user-declarable members",
       "kind": "compile-time",
@@ -2024,7 +2024,7 @@
     },
     {
       "id": "REQ-1307",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "22.1 Exception types",
       "summary": "The built-in bases Exception, RuntimeException and ApplicationException have no declaration and are not constructible, and serve instead as handler and superclass types",
       "kind": "compile-time",
@@ -2043,7 +2043,7 @@
     },
     {
       "id": "REQ-1308",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "22.3 `try`, `catch`, and `finally`",
       "summary": "When the try block throws, the catch clauses are tried in source order and the first clause whose declared type matches the thrown runtime class runs",
       "kind": "runtime",
@@ -2061,7 +2061,7 @@
     },
     {
       "id": "REQ-1309",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "22.3 `try`, `catch`, and `finally` / 22.6 Required diagnostics",
       "summary": "A catch clause whose handler type is a subtype of an earlier clause's handler type can never run and is the compile-time error SOLV-SEM-055",
       "kind": "compile-time",
@@ -2081,7 +2081,7 @@
     },
     {
       "id": "REQ-1310",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "22.3 `try`, `catch`, and `finally`",
       "summary": "A catch binding has the clause's declared type, is scoped to that handler body only, is not visible after the clause, and may shadow an outer name",
       "kind": "compile-time",
@@ -2100,7 +2100,7 @@
     },
     {
       "id": "REQ-1311",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "22.3 `try`, `catch`, and `finally`",
       "summary": "Because each handler body has its own scope, two clauses in the same try may reuse the same binding name without conflict",
       "kind": "runtime",
@@ -2118,7 +2118,7 @@
     },
     {
       "id": "REQ-1312",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "22.3 `try`, `catch`, and `finally`",
       "summary": "The catch binding is initialized before the handler body runs, so the handler may read it immediately and rethrow it with throw e",
       "kind": "runtime",
@@ -2136,7 +2136,7 @@
     },
     {
       "id": "REQ-1313",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "22.3 `try`, `catch`, and `finally` / 22.6 Required diagnostics",
       "summary": "Declaring a handler type that is not a guest exception type is the compile-time error SOLV-SEM-054, reported on the type reference",
       "kind": "compile-time",
@@ -2156,7 +2156,7 @@
     },
     {
       "id": "REQ-1314",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "22.3 `try`, `catch`, and `finally`",
       "summary": "If no clause matches, the thrown value keeps propagating outward after the finally clause runs, and an enclosing handler above the throw site still receives it",
       "kind": "runtime",
@@ -2174,7 +2174,7 @@
     },
     {
       "id": "REQ-1315",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "22.3 `try`, `catch`, and `finally`",
       "summary": "A try consists of a try block, zero or more catch clauses and an optional finally clause, so a try with no catch clause and a finally clause is accepted and the finally body runs on normal completion",
       "kind": "runtime",
@@ -2193,7 +2193,7 @@
     },
     {
       "id": "REQ-1316",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "22.2 `throw`",
       "summary": "A throw completes abruptly and produces no value, so a throw as the final statement of a value-returning function satisfies the value-on-all-paths rule the same way return does",
       "kind": "runtime",
@@ -2212,7 +2212,7 @@
     },
     {
       "id": "REQ-1317",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "22.4 Propagation across call boundaries",
       "summary": "A thrown value crosses function-call boundaries during unwinding and is caught by a handler in any dynamically enclosing frame, and an ordinary call target must not itself terminate the program",
       "kind": "runtime",
@@ -2231,7 +2231,7 @@
     },
     {
       "id": "REQ-1400",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "1. Design Goals (Lexical basics)",
       "summary": "Identifiers match [A-Za-z_][A-Za-z0-9_]*, so a leading underscore or letter followed by letters, digits and underscores is a single identifier that can be bound and read back",
       "kind": "lexical",
@@ -2250,7 +2250,7 @@
     },
     {
       "id": "REQ-1401",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "1. Design Goals (Lexical basics)",
       "summary": "Keywords are reserved and cannot be used as an identifier, and an identifier may not begin with a digit",
       "kind": "lexical",
@@ -2269,7 +2269,7 @@
     },
     {
       "id": "REQ-1402",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "1. Design Goals (Lexical basics)",
       "summary": "$ is not an identifier character, so a name containing a dollar sign is not a valid identifier",
       "kind": "lexical",
@@ -2287,7 +2287,7 @@
     },
     {
       "id": "REQ-1403",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "1. Design Goals (Lexical basics)",
       "summary": "// starts a line comment and /* ... */ is a NON-nesting block comment; a nesting block-comment lexer would fail to reject a trailing delimiter left after the outer comment closes",
       "kind": "lexical",
@@ -2306,7 +2306,7 @@
     },
     {
       "id": "REQ-1404",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "1. Design Goals (Lexical basics)",
       "summary": "Comments are otherwise whitespace, but their physical newlines remain visible to semicolon insertion",
       "kind": "lexical",
@@ -2325,7 +2325,7 @@
     },
     {
       "id": "REQ-1405",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "1. Design Goals (Lexical basics)",
       "summary": "A decimal integer literal has type Integer in the initial typed core, and a literal outside the signed 32-bit range is a compile-time error",
       "kind": "lexical",
@@ -2344,7 +2344,7 @@
     },
     {
       "id": "REQ-1406",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "1. Design Goals (Lexical basics)",
       "summary": "An L-suffixed literal has type Long, and a Long-suffixed literal is not usable where Integer is declared",
       "kind": "lexical",
@@ -2363,7 +2363,7 @@
     },
     {
       "id": "REQ-1407",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "1. Design Goals (Lexical basics)",
       "summary": "A decimal floating-point literal with an optional exponent has type Double, an F suffix selects Float, and the exponent is applied to the significand",
       "kind": "lexical",
@@ -2384,7 +2384,7 @@
     },
     {
       "id": "REQ-1408",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "1. Design Goals (Lexical basics)",
       "summary": "A character literal uses single quotes and contains exactly one Unicode scalar value or one escape supported by normal strings",
       "kind": "lexical",
@@ -2403,8 +2403,8 @@
     },
     {
       "id": "REQ-1500",
-      "specVersion": "2026.10-draft",
-      "section": "12. Enums, Sealed Types, and Exhaustive Match",
+      "specVersion": "2026.11-draft",
+      "section": "12. Enums, Abstract Classes, and Exhaustive Match",
       "summary": "An enum variant is a nested nominal constructor: outside a context that already establishes the enum type it must be qualified as EnumName.Variant, and an unqualified variant name is not visible",
       "kind": "compile-time",
       "profile": "full-language",
@@ -2422,8 +2422,8 @@
     },
     {
       "id": "REQ-1501",
-      "specVersion": "2026.10-draft",
-      "section": "12. Enums, Sealed Types, and Exhaustive Match",
+      "specVersion": "2026.11-draft",
+      "section": "12. Enums, Abstract Classes, and Exhaustive Match",
       "summary": "Inside a match over a known enum the unqualified variant pattern is permitted, so a match may bind variant payloads without re-qualifying the enum name",
       "kind": "compile-time",
       "profile": "full-language",
@@ -2441,8 +2441,8 @@
     },
     {
       "id": "REQ-1502",
-      "specVersion": "2026.10-draft",
-      "section": "12. Enums, Sealed Types, and Exhaustive Match",
+      "specVersion": "2026.11-draft",
+      "section": "12. Enums, Abstract Classes, and Exhaustive Match",
       "summary": "A match over a closed variant set must cover every variant unless a wildcard pattern is present, and missing a known variant is a compile-time error",
       "kind": "compile-time",
       "profile": "full-language",
@@ -2454,17 +2454,17 @@
       ],
       "status": "tested",
       "lifecycle": "active",
-      "oracleNotes": "Three arms pin one rule so that 'covered' cannot be read as 'some branch happened to match at runtime': an omitted variant must be rejected, the same program with the variant restored must be accepted, and a wildcard standing in for the missing variant must be accepted because the specification explicitly permits it. Both named diagnostics for this area are unnamed in the specification, so the rejection is bare.",
+      "oracleNotes": "Three arms pin one rule so that 'covered' cannot be read as 'some branch happened to match at runtime': an omitted variant must be rejected, the same program with the variant restored must be accepted, and a wildcard standing in for the missing variant must be accepted because the specification explicitly permits it. A closed variant set is known only for `enum` and `error` types, which is why every arm here is over an enum and the class-typed counterpart is REQ-1504. Both named diagnostics for this area are unnamed in the specification, so the rejection is bare.",
       "normativeQuotes": [
         "`match` is expression-oriented and exhaustive where the compiler knows a closed variant set.",
-        "Missing a known enum/sealed variant is a compile-time error unless a wildcard pattern handles it.",
+        "Missing a known enum variant is a compile-time error unless a wildcard pattern handles it.",
         "every known variant must be covered unless `_` is present"
       ]
     },
     {
       "id": "REQ-1503",
-      "specVersion": "2026.10-draft",
-      "section": "12. Enums, Sealed Types, and Exhaustive Match",
+      "specVersion": "2026.11-draft",
+      "section": "12. Enums, Abstract Classes, and Exhaustive Match",
       "summary": "Branches are checked in source order and duplicate or unreachable branches are errors, so a branch shadowed by an earlier one is rejected while the same branches ordered specific-first are accepted",
       "kind": "compile-time",
       "profile": "full-language",
@@ -2476,16 +2476,17 @@
       ],
       "status": "tested",
       "lifecycle": "active",
-      "oracleNotes": "The pair is the whole point: a transitive sealed hierarchy is matched with the most specific branch first (accepted, and the specific marker is printed, so first-match-wins is observed rather than assumed) and then with the base branch first (rejected, because the specific branch is unreachable once the base branch covers it). An implementation selecting the last or the most specific matching branch rather than the first would accept the second program and print the other marker in the first. The unreachable-branch diagnostic is not named in the specification, so the rejection is bare.",
+      "oracleNotes": "The pair is the whole point: a transitive hierarchy is matched with the most specific branch first (accepted, and the specific marker is printed, so first-match-wins is observed rather than assumed) and then with the base branch first (rejected, because the specific branch is unreachable once the base branch covers it). An implementation selecting the last or the most specific matching branch rather than the first would accept the second program and print the other marker in the first. Reachability is decided by type subsumption independently of exhaustiveness, which is what keeps this requirement meaningful now that a class-typed match no longer has a closed set to cover; both arms carry the wildcard that a class-typed match requires, so unreachability is the only difference between them. The unreachable-branch diagnostic is not named in the specification, so the rejection is bare.",
       "normativeQuotes": [
-        "Branches are checked in source order, duplicate or unreachable branches are errors"
+        "Branches are checked in source order, duplicate or unreachable branches are errors",
+        "Branch reachability is decided by type subsumption and is independent of exhaustiveness"
       ]
     },
     {
       "id": "REQ-1504",
-      "specVersion": "2026.10-draft",
-      "section": "12. Enums, Sealed Types, and Exhaustive Match",
-      "summary": "A sealed class is abstract and its complete transitive subtype set is closed at compile time, so a match over it must cover every subtype and the sealed class itself is not constructible",
+      "specVersion": "2026.11-draft",
+      "section": "12. Enums, Abstract Classes, and Exhaustive Match",
+      "summary": "An abstract class is not constructible, and a match whose matched type is a class type is exhaustive only when it has a wildcard branch",
       "kind": "compile-time",
       "profile": "full-language",
       "portable": true,
@@ -2496,17 +2497,18 @@
       ],
       "status": "tested",
       "lifecycle": "active",
-      "oracleNotes": "Both halves are needed and neither is derivable from the other: a match over a sealed value must cover all direct subtypes (an omitted one is rejected, a wildcard satisfies the requirement), and the sealed class may not be constructed because it is abstract. A sealed hierarchy whose only child is itself open and has further subclasses is covered by REQ-1503, where the base branch legitimately covers the deeper subtype; this requirement is about the direct closed set and about construction.",
+      "oracleNotes": "Two rules the 2026.11-draft revision separated, pinned together because both are about what an `abstract` class does and does not license. Constructing it is rejected with the code section 12 names, and constructing a subtype instead is the accepted control. The exhaustiveness half is the revision's substantive change: before it, a match over an `abstract` class was exhaustive over the class's closed transitive subtype set and a wildcard was one way to satisfy that; now no class type has a subtype set at all, so the wildcard is mandatory and a class-typed match without one is rejected however many subtypes it names. The accepted arm adds only `_`, which is what makes the rejection mean 'no wildcard' rather than 'matching a class is broken'.",
       "normativeQuotes": [
-        "A `sealed class` is abstract and may be extended only by declarations in the same physical source file.",
-        "Its complete transitive subtype set is closed when the program is compiled."
+        "An `abstract class` is not constructible: naming it as a constructor is `SOLV-SEM-028`, and a program must construct one of its subtypes instead.",
+        "A class type \u2014 `abstract`, `mutable`, or otherwise \u2014 has no knowable subtype set, so a `match` whose matched type is a class type is exhaustive only when it has a wildcard branch.",
+        "`match` over an `abstract` class type is therefore legal and useful, and it always requires `_`."
       ]
     },
     {
       "id": "REQ-1505",
-      "specVersion": "2026.10-draft",
-      "section": "12. Enums, Sealed Types, and Exhaustive Match",
-      "summary": "A subclass of a sealed class written in a different physical source file is a compile-time error, because include splices declarations into one program but does not erase the physical file boundary",
+      "specVersion": "2026.11-draft",
+      "section": "12. Enums, Abstract Classes, and Exhaustive Match",
+      "summary": "An abstract class may be extended from any file including one brought in by include, so the physical file boundary does not decide whether a subclass is legal",
       "kind": "compile-time",
       "profile": "full-language",
       "portable": true,
@@ -2515,16 +2517,16 @@
       ],
       "status": "tested",
       "lifecycle": "active",
-      "oracleNotes": "This is asserted as a genuine two-file fixture, because the rule is ABOUT the physical file boundary and a single-file program cannot test it. The specification's own diagnostic table names SOLV-SEM-039 for exactly this illegal subclass declaration, and section 12 is the section that states the rule, so the code is pinned rather than left bare. A same-file control in the following requirement is what makes the rejection mean 'wrong file' rather than 'subclassing is broken'.",
+      "oracleNotes": "Asserted from a genuine two-file fixture, because the rule is ABOUT the physical file boundary and a single-file program cannot test it. The revision changed the direction: 2026.10-draft confined a subclass to the supertype's own physical file and named SOLV-SEM-039 for a subclass elsewhere, and that code no longer exists. What the requirement still pins is that the boundary is inert, so an implementation that kept the old file rule rejects the included arm and fails. A same-file control in the following requirement is what makes this mean 'the boundary does not matter' rather than 'subclassing happens to work here'.",
       "normativeQuotes": [
-        "An `include` splices declarations into one program but does not erase the physical file boundary, so a subclass written in a different included file is a compile-time error."
+        "An `abstract` class may be extended from any file, including a file brought in by `include`."
       ]
     },
     {
       "id": "REQ-1506",
-      "specVersion": "2026.10-draft",
-      "section": "12. Enums, Sealed Types, and Exhaustive Match",
-      "summary": "A sealed subclass declared in the same physical file is legal, so the closed-hierarchy rule restricts the file a subclass may appear in rather than forbidding subclassing",
+      "specVersion": "2026.11-draft",
+      "section": "12. Enums, Abstract Classes, and Exhaustive Match",
+      "summary": "An abstract subclass declared in the same physical file is legal, so the same-file case is accepted as plainly as the cross-file one",
       "kind": "compile-time",
       "profile": "full-language",
       "portable": true,
@@ -2533,16 +2535,16 @@
       ],
       "status": "tested",
       "lifecycle": "active",
-      "oracleNotes": "The control arm for REQ-1505 and the reason it is a separate requirement: without it, an implementation that rejected all sealed subclassing would satisfy the rejection test and silently make sealed types unusable. The accepted program constructs the subclass and matches on it, so the subclass is shown to be a usable member of the closed hierarchy rather than merely a declaration that parses.",
+      "oracleNotes": "The control arm for REQ-1505 and the reason it is a separate requirement: without it, an implementation that rejected all subclassing of an abstract class would fail only one test rather than being shown inconsistent. The accepted program constructs the subclass and matches on it, so the subclass is shown to be a usable type rather than merely a declaration that parses.",
       "normativeQuotes": [
-        "A `sealed class` is abstract and may be extended only by declarations in the same physical source file."
+        "An `abstract` class may be extended from any file, including a file brought in by `include`."
       ]
     },
     {
       "id": "REQ-1507",
-      "specVersion": "2026.10-draft",
-      "section": "12. Enums, Sealed Types, and Exhaustive Match",
-      "summary": "Initial match patterns are enum variant patterns, sealed-subtype binding patterns of the form name: Type, and wildcard underscore",
+      "specVersion": "2026.11-draft",
+      "section": "12. Enums, Abstract Classes, and Exhaustive Match",
+      "summary": "Initial match patterns are enum variant patterns, binding patterns of the form name: Type, and wildcard underscore",
       "kind": "compile-time",
       "profile": "full-language",
       "portable": true,
@@ -2553,15 +2555,15 @@
       ],
       "status": "tested",
       "lifecycle": "active",
-      "oracleNotes": "The three admitted forms are each exercised, with the sealed-subtype binding form observed printing a value reached through the binding rather than a constant, so the binding is shown to carry the matched value. Together the forms are the closed set the specification admits, and no fourth form is asserted absent, because the specification's word 'initial' records a scope boundary rather than a prohibition on future forms.",
+      "oracleNotes": "The three admitted forms are each exercised, with the binding form observed printing a value reached through the binding rather than a constant, so the binding is shown to carry the matched value. Together the forms are the closed set the specification admits, and no fourth form is asserted absent, because the specification's word 'initial' records a scope boundary rather than a prohibition on future forms.",
       "normativeQuotes": [
-        "Initial `match` patterns are enum variant patterns, sealed-subtype binding patterns of the form `name: Type`, and wildcard `_`."
+        "Initial `match` patterns are enum variant patterns, binding patterns of the form `name: Type`, and wildcard `_`."
       ]
     },
     {
       "id": "REQ-1508",
-      "specVersion": "2026.10-draft",
-      "section": "12. Enums, Sealed Types, and Exhaustive Match",
+      "specVersion": "2026.11-draft",
+      "section": "12. Enums, Abstract Classes, and Exhaustive Match",
       "summary": "The result type of a match is the nearest common declared supertype to which every branch result is assignable; if none exists the match is ill-typed",
       "kind": "compile-time",
       "profile": "full-language",
@@ -2579,8 +2581,8 @@
     },
     {
       "id": "REQ-1509",
-      "specVersion": "2026.10-draft",
-      "section": "12. Enums, Sealed Types, and Exhaustive Match",
+      "specVersion": "2026.11-draft",
+      "section": "12. Enums, Abstract Classes, and Exhaustive Match",
       "summary": "A match branch result is an expression, so a branch may use a brace-delimited block for multiple statements followed by a tail result",
       "kind": "runtime",
       "profile": "full-language",
@@ -2597,7 +2599,7 @@
     },
     {
       "id": "REQ-1600",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "3. Static and Strong Typing",
       "summary": "Typing is nominal: two unrelated classes declaring identical members are not assignment-compatible, and each is used only through its own type",
       "kind": "compile-time",
@@ -2617,7 +2619,7 @@
     },
     {
       "id": "REQ-1601",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "3. Static and Strong Typing",
       "summary": "Assigning a value to Any does not disable type checking: members and operators are unavailable on an Any receiver and an Any value is not assignable to a narrower type without a checked cast",
       "kind": "compile-time",
@@ -2640,7 +2642,7 @@
     },
     {
       "id": "REQ-1602",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "3. Static and Strong Typing",
       "summary": "Assignments are statements, not value-producing expressions, so an assignment is rejected wherever an expression is required while a statement assignment to a mutable local is accepted",
       "kind": "syntax",
@@ -2657,12 +2659,12 @@
       "lifecycle": "active",
       "oracleNotes": "Four positions are refused -- nested inside another assignment, as an initializer, as a controlling condition, and as a call argument -- because 'not value-producing' is a statement about every expression position and one position alone cannot distinguish it from a local syntactic restriction. The accepted control assigns as a statement and prints the assigned value. Rejections are bare: the specification names no code for this, and these are parse-level refusals.",
       "normativeQuotes": [
-        "Assignments are statements, not value-producing expressions. The target must be a mutable local or `var` property."
+        "Assignments are statements, not value-producing expressions. The target must be a `mutable val` local or a `mutable val` property."
       ]
     },
     {
       "id": "REQ-1603",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "3. Static and Strong Typing",
       "summary": "Operator precedence follows the stated tier order, with ?? the lowest tier and arithmetic tighter than the comparison and logical tiers above it",
       "kind": "compile-time",
@@ -2686,7 +2688,7 @@
     },
     {
       "id": "REQ-1604",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "3. Static and Strong Typing",
       "summary": "The logical operators short-circuit, so the right operand is not evaluated when the left operand already decides the result",
       "kind": "runtime",
@@ -2705,7 +2707,7 @@
     },
     {
       "id": "REQ-1605",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "3. Equality and reference identity",
       "summary": "Every equality or identity expression evaluates its left operand first and its right operand second exactly once each, and the negating forms negate the result without evaluating either operand again",
       "kind": "runtime",
@@ -2725,7 +2727,7 @@
     },
     {
       "id": "REQ-1606",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "3. Equality and reference identity",
       "summary": "Equality is well typed only when one operand type is assignable to the other, so unrelated nominal classes are not directly comparable while an Any-typed operand or an explicit equals call is permitted",
       "kind": "compile-time",
@@ -2748,7 +2750,7 @@
     },
     {
       "id": "REQ-1607",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "3. Static and Strong Typing",
       "summary": "The logical operators require Boolean operands on both sides and unary ! requires a Boolean operand, so a non-Boolean operand on either side of && or || is a compile-time error",
       "kind": "compile-time",
@@ -2768,7 +2770,7 @@
     },
     {
       "id": "REQ-1700",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "3. Equality and reference identity",
       "summary": "`===` answers whether two values are the same allocation and never invokes `equals`, another guest method, or Java `Object.equals`, and `!==` is its exact logical negation",
       "kind": "runtime",
@@ -2788,7 +2790,7 @@
     },
     {
       "id": "REQ-1701",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "3. Equality and reference identity",
       "summary": "The identity-bearing static types are exactly user class types, interface types, the four collection types, function types, and nullable forms of those, so `===` on a scalar, enum, or Regex pair is a compile-time error reported with SOLV-TYPE-039",
       "kind": "compile-time",
@@ -2815,7 +2817,7 @@
     },
     {
       "id": "REQ-1702",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "3. Equality and reference identity",
       "summary": "Identity operands must also satisfy ordinary comparability and a null literal is permitted only against a nullable identity-bearing operand, so `null === null` and an identity test against a non-nullable operand are compile-time errors",
       "kind": "compile-time",
@@ -2837,7 +2839,7 @@
     },
     {
       "id": "REQ-1703",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "3. Equality and reference identity",
       "summary": "Stable nullable identity tests participate in flow analysis, so `x !== null` narrows on the true path and `x === null` narrows on the false path under the same write-invalidation rules as the equality null tests",
       "kind": "compile-time",
@@ -2856,7 +2858,7 @@
     },
     {
       "id": "REQ-1704",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "3. Equality and reference identity",
       "summary": "A value held in Any must first be narrowed or checked-cast to an identity-bearing type before an identity test, so identity is rejected on Any operands and accepted after a checked cast",
       "kind": "compile-time",
@@ -2875,7 +2877,7 @@
     },
     {
       "id": "REQ-1705",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "3. Equality and reference identity",
       "summary": "The semantic equality algorithm returns true when both values are null and false when exactly one is null with no user code running",
       "kind": "runtime",
@@ -2896,7 +2898,7 @@
     },
     {
       "id": "REQ-1706",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "3. Equality and reference identity",
       "summary": "An equals override is invoked even when both operands are the same reference because there is no general identity shortcut before user dispatch, which keeps `==` and an explicit equals call behaviorally aligned",
       "kind": "runtime",
@@ -2914,7 +2916,7 @@
     },
     {
       "id": "REQ-1707",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "3. Equality and reference identity",
       "summary": "The left operand is the dynamic receiver of semantic equality and the right operand never receives a fallback equality call",
       "kind": "runtime",
@@ -2932,7 +2934,7 @@
     },
     {
       "id": "REQ-1708",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "3. Equality and reference identity",
       "summary": "When no class in a user class hierarchy overrides equals, the root default is reference identity",
       "kind": "runtime",
@@ -2950,7 +2952,7 @@
     },
     {
       "id": "REQ-1709",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "3. Equality and reference identity",
       "summary": "The equals/hashCode invariant holds for the fixed built-in rules, including that floating equality is IEEE so negative zero must fold onto zero in the hash",
       "kind": "runtime",
@@ -2970,7 +2972,7 @@
     },
     {
       "id": "REQ-1710",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "3. Equality and reference identity",
       "summary": "List, Set, Map and Stack compare by reference identity under both equality and hashing, not by content",
       "kind": "runtime",
@@ -2989,7 +2991,7 @@
     },
     {
       "id": "REQ-1711",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "3. Equality and reference identity",
       "summary": "Two enum values are equal exactly when they share the enum type, the variant, and semantically equal payloads, and enum equality never delegates to Java array or object equality",
       "kind": "runtime",
@@ -3007,7 +3009,7 @@
     },
     {
       "id": "REQ-1800",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "3. Equality and reference identity",
       "summary": "A user class may declare equals only as exactly `override func equals(other: Any?): Boolean`, so the override keyword, one parameter typed exactly Any?, and a return type of exactly Boolean are each required",
       "kind": "compile-time",
@@ -3030,7 +3032,7 @@
     },
     {
       "id": "REQ-1801",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "3. Equality and reference identity",
       "summary": "A user class may declare hashCode only as exactly `override func hashCode(): Integer`, requiring the override keyword, no parameters, and a return type of exactly Integer",
       "kind": "compile-time",
@@ -3051,7 +3053,7 @@
     },
     {
       "id": "REQ-1802",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "3. Equality and reference identity",
       "summary": "The equals/hashCode pairing is checked per class declaration and is never satisfied by inheritance, while a subclass of a class overriding both members needs no override of its own",
       "kind": "compile-time",
@@ -3072,7 +3074,7 @@
     },
     {
       "id": "REQ-1803",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "3. Equality and reference identity",
       "summary": "The names equals and hashCode are reserved as members, so a property or delegate may not use either name and an interface may not redeclare either",
       "kind": "compile-time",
@@ -3093,7 +3095,7 @@
     },
     {
       "id": "REQ-1804",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "3. Equality and reference identity",
       "summary": "A call on a possibly-null receiver must use the safe-call form, which yields a nullable result, so `value?.equals(other)` is safe with result Boolean?, `value?.hashCode()` yields Integer?, and a direct member call on a possibly-null receiver is an error",
       "kind": "compile-time",
@@ -3115,7 +3117,7 @@
     },
     {
       "id": "REQ-1805",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "3. Equality and reference identity",
       "summary": "A bare member read of equals or hashCode without a call is invalid, exactly like a bare toString read",
       "kind": "compile-time",
@@ -3136,7 +3138,7 @@
     },
     {
       "id": "REQ-1900",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "16. Statement Termination",
       "summary": "A top-level statement must end with an explicit or inserted SEMI: newline-separated and explicitly-semicolon-terminated declarations are both accepted, and a statement with no terminator at all is a compile-time error",
       "kind": "compile-time",
@@ -3157,7 +3159,7 @@
     },
     {
       "id": "REQ-1901",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "16. Statement Termination",
       "summary": "Semicolon insertion is suppressed while the unmatched `(` and `[` nesting depth is nonzero, so a newline inside an unclosed parenthesis does not terminate the expression",
       "kind": "compile-time",
@@ -3177,7 +3179,7 @@
     },
     {
       "id": "REQ-1902",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "16. Statement Termination",
       "summary": "Insertion happens only when the token before the newline is a terminator-triggering token, so an expression continues after a trailing operator or comma, while a newline before an operator (identifier before it, operator after) inserts a SEMI and is a compile-time error",
       "kind": "compile-time",
@@ -3199,7 +3201,7 @@
     },
     {
       "id": "REQ-1903",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "16. Statement Termination",
       "summary": "Insertion is suppressed when the token after the newline is `.`, `?.`, or `else` -- the only member-chain lookahead exceptions -- so a leading-dot chain, a leading-safe-call chain, and an `else` on its own line all parse",
       "kind": "compile-time",
@@ -3222,7 +3224,7 @@
     },
     {
       "id": "REQ-1904",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "16. Statement Termination",
       "summary": "A newline contained in a line comment or a block comment is treated as a physical newline, so a statement can be terminated by a newline that appears only inside a comment",
       "kind": "compile-time",
@@ -3241,7 +3243,7 @@
     },
     {
       "id": "REQ-1905",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "16. Statement Termination",
       "summary": "`return` followed by a newline terminates the return statement, so a value placed on the next line is not the returned value and a bare return leaves the function before any following statement",
       "kind": "compile-time",
@@ -3262,7 +3264,7 @@
     },
     {
       "id": "REQ-1906",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "16. Statement Termination",
       "summary": "Consecutive blank lines between statements must not emit duplicate semicolons, and at end of file the same insertion rule applies without the next-token exception",
       "kind": "compile-time",
@@ -3282,7 +3284,7 @@
     },
     {
       "id": "REQ-1907",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "16. Statement Termination",
       "summary": "A top-level include directive ends with an explicit or inserted SEMI exactly like a statement -- its path is a string or raw-string literal so a following physical newline terminates it -- and an include with no separator is a compile-time error",
       "kind": "compile-time",
@@ -3303,7 +3305,7 @@
     },
     {
       "id": "REQ-2000",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "23.3 Propagation",
       "summary": "The postfix `?` operator unwraps the success payload of a `Result<T, E>` value as a value of type `T` and evaluates its operand exactly once",
       "kind": "runtime",
@@ -3324,7 +3326,7 @@
     },
     {
       "id": "REQ-2001",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "23.3 Propagation",
       "summary": "On `Err`, `?` returns `Err(error)` from the enclosing function immediately, without evaluating the rest of its body, and the returned `Err` composes across call frames",
       "kind": "runtime",
@@ -3344,7 +3346,7 @@
     },
     {
       "id": "REQ-2002",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "23.3 Propagation",
       "summary": "The `?` operand must have a `Result<T, E>` type; otherwise the compile-time error is `SEM_RESULT_PROPAGATION_INVALID_OPERAND` (`SOLV-SEM-049`)",
       "kind": "compile-time",
@@ -3365,7 +3367,7 @@
     },
     {
       "id": "REQ-2003",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "23.3 Propagation",
       "summary": "`?` is permitted only inside a function declared to return a `Result<T2, E2>`; a `?` with no such boundary is `SEM_RESULT_PROPAGATION_NO_BOUNDARY` (`SOLV-SEM-050`)",
       "kind": "compile-time",
@@ -3386,7 +3388,7 @@
     },
     {
       "id": "REQ-2004",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "23.3 Propagation",
       "summary": "Propagation checks the success type `T` and the propagated error type `E` for assignability to the boundary `T2`/`E2`; a mismatch is `SEM_RESULT_PROPAGATION_TYPE_MISMATCH` (`SOLV-SEM-051`)",
       "kind": "compile-time",
@@ -3408,7 +3410,7 @@
     },
     {
       "id": "REQ-2005",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "23.3 Propagation / 22.3 try, catch, and finally",
       "summary": "Propagation is a control-flow transition, not a wrong-variant fault: an enclosing guest `catch` does not intercept it, and a `finally` it unwinds through still runs",
       "kind": "runtime",
@@ -3428,7 +3430,7 @@
     },
     {
       "id": "REQ-2006",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "23.3 Propagation",
       "summary": "`?` and the section 23 `Result` operations are independent: a program may use either or both, reading a propagated `Result` back through `isOk`/`unwrap` and `isErr`/`unwrapErr`",
       "kind": "runtime",
@@ -3446,7 +3448,7 @@
     },
     {
       "id": "REQ-2200",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "6. Functions",
       "summary": "Parameter types must be explicit in the initial implementation, so a parameter written without a type is a compile-time error",
       "kind": "syntax",
@@ -3464,7 +3466,7 @@
     },
     {
       "id": "REQ-2201",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "6. Functions",
       "summary": "Declaring a function named `main` explicitly is a compile-time error, because the entry point is always the implicit main formed by top-level statements",
       "kind": "compile-time",
@@ -3482,7 +3484,7 @@
     },
     {
       "id": "REQ-2202",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "6. Functions",
       "summary": "Functions are not overloaded: two functions with the same name in one scope are a compile-time error",
       "kind": "compile-time",
@@ -3500,7 +3502,7 @@
     },
     {
       "id": "REQ-2203",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "6. Functions",
       "summary": "Redeclaration in the same scope is an error, so a second binding of the same name at top level is rejected while a nested block may shadow it",
       "kind": "compile-time",
@@ -3518,7 +3520,7 @@
     },
     {
       "id": "REQ-2204",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "6. Functions",
       "summary": "A call may be used as a statement, but another value-producing expression cannot stand alone as a statement",
       "kind": "compile-time",
@@ -3536,7 +3538,7 @@
     },
     {
       "id": "REQ-2205",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "7. Classes",
       "summary": "A class member other than the constructor cannot have the same name as its class, so a property named after the class is a compile-time error",
       "kind": "compile-time",
@@ -3554,7 +3556,7 @@
     },
     {
       "id": "REQ-2206",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "7. Classes",
       "summary": "A class has at most one constructor declaration, so a second constructor is a compile-time error",
       "kind": "compile-time",
@@ -3572,7 +3574,7 @@
     },
     {
       "id": "REQ-2207",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "7. Classes",
       "summary": "A constructor cannot be invoked as a method call such as `this.User(...)`",
       "kind": "compile-time",
@@ -3590,7 +3592,7 @@
     },
     {
       "id": "REQ-2208",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "7. Classes",
       "summary": "A class with no explicit constructor has an implicit zero-argument initializer only when all properties have declaration initializers",
       "kind": "compile-time",
@@ -3608,7 +3610,7 @@
     },
     {
       "id": "REQ-2209",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "7. Classes",
       "summary": "A subclass constructor must invoke `super(arguments)` as its first statement when the superclass has no zero-argument initializer",
       "kind": "compile-time",
@@ -3626,7 +3628,7 @@
     },
     {
       "id": "REQ-2210",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "7. Classes",
       "summary": "`toString` on a class must be declared with `override` and keep the exact signature; declaring it without `override` is a compile-time error",
       "kind": "compile-time",
@@ -3644,7 +3646,7 @@
     },
     {
       "id": "REQ-2211",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "7. Classes",
       "summary": "Every property without a declaration initializer must be assigned exactly once on every successful constructor path before it is read",
       "kind": "compile-time",
@@ -3663,7 +3665,7 @@
     },
     {
       "id": "REQ-2212",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "7. Static members and class initialization",
       "summary": "Every static cell begins at its declared type's zero value whether or not the declaration supplies an initializer",
       "kind": "runtime",
@@ -3681,7 +3683,7 @@
     },
     {
       "id": "REQ-2213",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "7. Static members and class initialization",
       "summary": "A class declares at most one class initializer block; a second block is the compile-time error `SEM_DUPLICATE_STATIC_BLOCK` (`SOLV-SEM-046`)",
       "kind": "compile-time",
@@ -3702,7 +3704,7 @@
     },
     {
       "id": "REQ-2214",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "7. Static members and class initialization",
       "summary": "A static member may not mention a type parameter of its enclosing class, which is `SEM_TYPE_PARAMETER_IN_STATIC_MEMBER` (`SOLV-SEM-048`)",
       "kind": "compile-time",
@@ -3723,7 +3725,7 @@
     },
     {
       "id": "REQ-2215",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "7. Static members and class initialization",
       "summary": "A static member is not inherited, so a subclass does not expose its superclass's static members",
       "kind": "compile-time",
@@ -3741,7 +3743,7 @@
     },
     {
       "id": "REQ-2216",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "7. Static members and class initialization",
       "summary": "A class that is never actively used is never initialized, and its first active use runs its initializer once, in superclass-first order",
       "kind": "runtime",
@@ -3760,7 +3762,7 @@
     },
     {
       "id": "REQ-2217",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "7. Static members and class initialization",
       "summary": "A class's direct superclass is initialized before the class itself on first active use",
       "kind": "runtime",
@@ -3778,7 +3780,7 @@
     },
     {
       "id": "REQ-2300",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "8. Interfaces",
       "summary": "Interfaces contain methods, not stored properties, so a property declaration in an interface is a compile-time error",
       "kind": "compile-time",
@@ -3796,7 +3798,7 @@
     },
     {
       "id": "REQ-2301",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "8. Interfaces",
       "summary": "An implementing method must use the same parameter types as the interface method; a different parameter type is a compile-time error rather than an overload",
       "kind": "compile-time",
@@ -3814,7 +3816,7 @@
     },
     {
       "id": "REQ-2302",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "8. Interfaces",
       "summary": "An implementing method may narrow the interface method's return type covariantly, and a return type unrelated to the interface's is a compile-time error",
       "kind": "compile-time",
@@ -3826,14 +3828,14 @@
       ],
       "status": "tested",
       "lifecycle": "active",
-      "oracleNotes": "The positive arm returns a subtype `Dog` for an interface method declared to return `Animal` (which must be `open` because classes are final by default) and is observed as stdout; the negative arm returns an unrelated `Rock`, which the specification's 'covariant' requirement rejects. The pair differs only in the return type's relation to `Animal`.",
+      "oracleNotes": "The positive arm returns a subtype `Dog` for an interface method declared to return `Animal` (which must be `mutable` because classes are final by default) and is observed as stdout; the negative arm returns an unrelated `Rock`, which the specification's 'covariant' requirement rejects. The pair differs only in the return type's relation to `Animal`.",
       "normativeQuotes": [
         "An implementing method must use the same parameter types and a covariant return type."
       ]
     },
     {
       "id": "REQ-2303",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "8. Interfaces",
       "summary": "When multiple interfaces provide an otherwise unresolved default for the same method, the class must explicitly override it; without an override the class is rejected, and with one the override runs",
       "kind": "compile-time",
@@ -3852,7 +3854,7 @@
     },
     {
       "id": "REQ-2304",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "22.1 Exception types",
       "summary": "A generic class cannot be thrown, because constructing it yields a parameterized type that a `throw` operand does not accept",
       "kind": "compile-time",
@@ -3873,7 +3875,7 @@
     },
     {
       "id": "REQ-2305",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "22.1 Exception types",
       "summary": "A generic class cannot be caught, because a parameterized type is not an accepted `catch` handler type",
       "kind": "compile-time",
@@ -3894,7 +3896,7 @@
     },
     {
       "id": "REQ-2306",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "22.1 Exception types",
       "summary": "For a generic exception class, supplying more arguments than its declared constructor has remains an ordinary arity error rather than the synthesized message argument",
       "kind": "compile-time",
@@ -3915,7 +3917,7 @@
     },
     {
       "id": "REQ-2307",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "23.4 Required diagnostics",
       "summary": "A `Result` receiver member that is not a `Result` operation is `RESOL_UNKNOWN_MEMBER` (`SOLV-RESOL-004`)",
       "kind": "compile-time",
@@ -3936,7 +3938,7 @@
     },
     {
       "id": "REQ-2308",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "23.4 Required diagnostics",
       "summary": "A `Result` operation call with the wrong argument count is `TYPE_ARITY_MISMATCH` (`SOLV-TYPE-003`)",
       "kind": "compile-time",
@@ -3957,7 +3959,7 @@
     },
     {
       "id": "REQ-2309",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "23.4 Required diagnostics",
       "summary": "A bare member read of a `Result` operation, without the call, is `TYPE_FUNCTION_AS_VALUE` (`SOLV-TYPE-014`)",
       "kind": "compile-time",
@@ -3978,7 +3980,7 @@
     },
     {
       "id": "REQ-2400",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "17. Control Flow",
       "summary": "`while` is a pre-test loop: the condition is evaluated before each iteration and the body runs only while it is true",
       "kind": "runtime",
@@ -3996,7 +3998,7 @@
     },
     {
       "id": "REQ-2401",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "6. Functions",
       "summary": "`return;` is valid only in a function declared without a return type, so a bare return in a value-returning function is a compile-time error",
       "kind": "compile-time",
@@ -4014,7 +4016,7 @@
     },
     {
       "id": "REQ-2402",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "6. Functions",
       "summary": "`return value` requires the value assignable to the declared return type, so a value returned from a function declared without a return type is a compile-time error",
       "kind": "compile-time",
@@ -4032,7 +4034,7 @@
     },
     {
       "id": "REQ-2403",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "6. Functions",
       "summary": "A call's argument list may end with a trailing comma, which contributes no argument; the list still requires at least one argument, so `add(,)` is a parse error while `add()` is the ordinary empty argument list",
       "kind": "syntax",
@@ -4051,7 +4053,7 @@
     },
     {
       "id": "REQ-2404",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "6. Functions",
       "summary": "A program with no executable top-level statements has no entry point and does nothing, completing with status 0",
       "kind": "process",
@@ -4069,7 +4071,7 @@
     },
     {
       "id": "REQ-2405",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "4. Root Type Hierarchy",
       "summary": "`Unit` is a real type with one value and renders as `Unit` through its fixed, non-overridable `toString`",
       "kind": "runtime",
@@ -4088,7 +4090,7 @@
     },
     {
       "id": "REQ-2406",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "13. switch",
       "summary": "Constant case expressions must be compile-time constants assignable to the switched value's type, so a case label naming a runtime binding is a compile-time error",
       "kind": "compile-time",
@@ -4106,7 +4108,7 @@
     },
     {
       "id": "REQ-2407",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "13. switch",
       "summary": "Regex cases require a `String` switch value, so a regex case on a non-String switch is a compile-time error",
       "kind": "compile-time",
@@ -4124,7 +4126,7 @@
     },
     {
       "id": "REQ-2500",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "4. Root Type Hierarchy",
       "summary": "Built-in scalars have fixed, non-overridable `toString` implementations: integers render in decimal, floating types in Java-style text, Boolean as the words, Character as its character, and String as its contents",
       "kind": "runtime",
@@ -4142,7 +4144,7 @@
     },
     {
       "id": "REQ-2501",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "4. Root Type Hierarchy",
       "summary": "A built-in scalar cannot be extended, so a class whose superclass is a built-in scalar type is a compile-time error",
       "kind": "compile-time",
@@ -4160,7 +4162,7 @@
     },
     {
       "id": "REQ-2502",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "7. Static members and class initialization",
       "summary": "A class name is a receiver, not a value, so using it anywhere but as the root of a static member reference is `SOLV-TYPE-016`",
       "kind": "compile-time",
@@ -4181,7 +4183,7 @@
     },
     {
       "id": "REQ-2503",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "7. Static members and class initialization",
       "summary": "A static member is reached only through the class name, so reading it through an instance is a compile-time error",
       "kind": "compile-time",
@@ -4200,7 +4202,7 @@
     },
     {
       "id": "REQ-2504",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "7. Static members and class initialization",
       "summary": "A static member shares the class's member namespace, so a static and an instance member may not reuse the same name",
       "kind": "compile-time",
@@ -4219,7 +4221,7 @@
     },
     {
       "id": "REQ-2505",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "7. Static members and class initialization",
       "summary": "A static member has no receiver, so `this` inside a static method is `SOLV-RESOL-005`",
       "kind": "compile-time",
@@ -4239,7 +4241,7 @@
     },
     {
       "id": "REQ-2506",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "7. Static members and class initialization",
       "summary": "A static member has no receiver, so `super` inside a static method is `SOLV-RESOL-006`",
       "kind": "compile-time",
@@ -4259,7 +4261,7 @@
     },
     {
       "id": "REQ-2507",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "7. Static members and class initialization",
       "summary": "The `toString`/`equals`/`hashCode` reserved-name rules are instance-only, so a static member may use those names and reading it still works",
       "kind": "runtime",
@@ -4277,7 +4279,7 @@
     },
     {
       "id": "REQ-2600",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "20. File Inclusion",
       "summary": "An include path must be non-empty and its final file name must end in `.sol`; otherwise the include is `RESOL_INCLUDE_INVALID_PATH` (`SOLV-RESOL-007`) at the path literal",
       "kind": "compile-time",
@@ -4299,7 +4301,7 @@
     },
     {
       "id": "REQ-2601",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "20. File Inclusion",
       "summary": "An include whose canonical target is not a regular file is `RESOL_INCLUDE_NOT_FILE` (`SOLV-RESOL-009`) at the include directive",
       "kind": "compile-time",
@@ -4320,7 +4322,7 @@
     },
     {
       "id": "REQ-2602",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "20. File Inclusion",
       "summary": "A qualified reference to a module that is not visible is `RESOL_UNKNOWN_MODULE` (`SOLV-RESOL-015`) at the reference",
       "kind": "compile-time",
@@ -4340,7 +4342,7 @@
     },
     {
       "id": "REQ-2603",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "7. Static members and class initialization",
       "summary": "A class initializer block holds statements and returns nothing, so a `return` with a value in the block is `SOLV-TYPE-011`",
       "kind": "compile-time",
@@ -4360,7 +4362,7 @@
     },
     {
       "id": "REQ-2604",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "9. Composition and Delegation",
       "summary": "A delegate is an explicitly typed property, so a `delegate val` declaration without a type is a compile-time error",
       "kind": "syntax",
@@ -4378,7 +4380,7 @@
     },
     {
       "id": "REQ-2605",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "9. Composition and Delegation",
       "summary": "A delegate must be initialized under the normal constructor rules, so a constructor path that leaves it unassigned is a compile-time error",
       "kind": "compile-time",
@@ -4396,7 +4398,7 @@
     },
     {
       "id": "REQ-2606",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "4. Root Type Hierarchy",
       "summary": "`Any` is the sole top type for every non-null value, so scalar, String, and class values are all assignable to `Any` without disabling their dynamic typing",
       "kind": "runtime",
@@ -4414,7 +4416,7 @@
     },
     {
       "id": "REQ-2700",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "4. Root Type Hierarchy",
       "summary": "Narrowing and precision-losing numeric conversions use an explicit built-in type call such as `Byte(x)`/`Short(x)`/`Integer(x)`/`Long(x)`, and in-range values convert to their target type",
       "kind": "runtime",
@@ -4433,7 +4435,7 @@
     },
     {
       "id": "REQ-2701",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "4. Root Type Hierarchy",
       "summary": "An out-of-range constant conversion is a compile-time error, so a literal that does not fit the target type is rejected before execution",
       "kind": "compile-time",
@@ -4452,7 +4454,7 @@
     },
     {
       "id": "REQ-2702",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "4. Root Type Hierarchy",
       "summary": "An out-of-range runtime integral conversion raises a Solvik runtime arithmetic error rather than wrapping or truncating silently",
       "kind": "runtime",
@@ -4470,7 +4472,7 @@
     },
     {
       "id": "REQ-2703",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "3. Static and Strong Typing",
       "summary": "Two unrelated classes with identical members are not assignment-compatible, so nominal typing is not structural",
       "kind": "compile-time",
@@ -4488,7 +4490,7 @@
     },
     {
       "id": "REQ-2704",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "7. Classes",
       "summary": "Multiple class inheritance is forbidden, so a class with two superclass names is a compile-time error",
       "kind": "syntax",
@@ -4506,7 +4508,7 @@
     },
     {
       "id": "REQ-2705",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "9. Composition and Delegation",
       "summary": "A delegate is immutable, so assigning to it after construction is a compile-time error",
       "kind": "compile-time",
@@ -4524,9 +4526,9 @@
     },
     {
       "id": "REQ-2706",
-      "specVersion": "2026.10-draft",
-      "section": "12. Enums, Sealed Types, and Exhaustive Match",
-      "summary": "A sealed class is abstract and cannot be constructed, so constructing it directly is a compile-time error",
+      "specVersion": "2026.11-draft",
+      "section": "12. Enums, Abstract Classes, and Exhaustive Match",
+      "summary": "An abstract class is not constructible, so calling its constructor directly is a compile-time error",
       "kind": "compile-time",
       "profile": "full-language",
       "portable": true,
@@ -4535,15 +4537,15 @@
       ],
       "status": "tested",
       "lifecycle": "active",
-      "oracleNotes": "The program calls the sealed class's constructor. The section names no code, so the rejection is bare; the sentinel proves non-execution.",
+      "oracleNotes": "The program calls the abstract class's constructor. The code is pinned because the 2026.11-draft section 12 names SOLV-SEM-028 for exactly this; 2026.10-draft left the rejection unnamed. The sentinel proves non-execution.",
       "normativeQuotes": [
-        "A `sealed class` is abstract and may be extended only by declarations in the same physical source file."
+        "An `abstract class` is not constructible: naming it as a constructor is `SOLV-SEM-028`, and a program must construct one of its subtypes instead."
       ]
     },
     {
       "id": "REQ-2707",
-      "specVersion": "2026.10-draft",
-      "section": "12. Enums, Sealed Types, and Exhaustive Match",
+      "specVersion": "2026.11-draft",
+      "section": "12. Enums, Abstract Classes, and Exhaustive Match",
       "summary": "An enum variant's payload argument must be assignable to the variant's declared payload type, so a wrong-typed payload is a compile-time error",
       "kind": "compile-time",
       "profile": "full-language",
@@ -4555,14 +4557,14 @@
       "lifecycle": "active",
       "oracleNotes": "Variant `A` carries an `Integer` and is constructed with a `String`. A variant is a nominal constructor, so the general call-assignability rule applies; the section names no code for the payload mismatch, so the rejection is bare.",
       "normativeQuotes": [
-        "Assignments are statements, not value-producing expressions. The target must be a mutable local or `var` property. Calls require exact arity, and each argument must be assignable to its declared parameter type."
+        "Assignments are statements, not value-producing expressions. The target must be a `mutable val` local or a `mutable val` property. Calls require exact arity, and each argument must be assignable to its declared parameter type."
       ]
     },
     {
       "id": "REQ-2708",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "7. Classes",
-      "summary": "`super.member` accesses the immediate superclass implementation, and an override must be re-marked `open` to be overridable further",
+      "summary": "`super.member` accesses the immediate superclass implementation, and an override must be re-marked `mutable` to be overridable further",
       "kind": "runtime",
       "profile": "full-language",
       "portable": true,
@@ -4571,15 +4573,15 @@
       ],
       "status": "tested",
       "lifecycle": "active",
-      "oracleNotes": "A three-level hierarchy each re-marking the override `open`; the most derived method concatenates its own text with `super.label()`, so the printed `BC` proves `super` reached the immediate parent (`B`), not the root (`A`).",
+      "oracleNotes": "A three-level hierarchy each re-marking the override `mutable`; the most derived method concatenates its own text with `super.label()`, so the printed `BC` proves `super` reached the immediate parent (`B`), not the root (`A`).",
       "normativeQuotes": [
         "`super.member` accesses the immediate superclass implementation.",
-        "An `open` member may be overridden; all other members are final."
+        "A `mutable` member may be overridden; all other members are final."
       ]
     },
     {
       "id": "REQ-2709",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "18. Type Tests and Casts",
       "summary": "An `is` refinement is valid only while the checked value is stable, so a write to the narrowed variable invalidates it",
       "kind": "compile-time",
@@ -4590,14 +4592,14 @@
       ],
       "status": "tested",
       "lifecycle": "active",
-      "oracleNotes": "After `x is String` narrows a `var`, a write to `x` occurs and a later read requires the narrowed type. The refinement must not survive the write, so the read is a compile-time error; no code is named, so the rejection is bare.",
+      "oracleNotes": "After `x is String` narrows a `mutable val`, a write to `x` occurs and a later read requires the narrowed type. The refinement must not survive the write, so the read is a compile-time error; no code is named, so the rejection is bare.",
       "normativeQuotes": [
         "The compiler must narrow the type where the checked value is stable and no intervening write can invalidate the refinement."
       ]
     },
     {
       "id": "REQ-2710",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "6. Functions",
       "summary": "Writing the `: Unit` return type explicitly is permitted and equivalent to omitting it",
       "kind": "runtime",
@@ -4615,7 +4617,7 @@
     },
     {
       "id": "REQ-2800",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "10. Built-in Types and Runtime Representation",
       "summary": "The runtime may specialize language-level primitive types to efficient primitive representations, and the object model must not force unnecessary boxing",
       "kind": "runtime",
@@ -4633,7 +4635,7 @@
     },
     {
       "id": "REQ-2801",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "19. Semantic Priorities",
       "summary": "When language features conflict, the implementation prefers compile-time correctness, deterministic syntax, explicit semantics, safe defaults, understandable diagnostics, runtime performance, then syntactic convenience",
       "kind": "compile-time",
@@ -4642,8 +4644,8 @@
       "tests": [],
       "status": "untested-ambiguous",
       "lifecycle": "active",
-      "rationale": "A design-time tie-break ordering for the implementer, not a rule that constrains guest program behavior. Where two designs both satisfy the specification there is no observable to assert; the ordering guides choices the specification otherwise leaves open.",
-      "oracleNotes": "A design-time tie-break ordering for the implementer, not a rule that constrains guest program behavior. Where two designs both satisfy the specification there is no observable to assert; the ordering guides choices the specification otherwise leaves open.",
+      "rationale": "A design-time tie-break ordering for the implementer, not a rule that constrains guest program behavior. Where two designs both satisfy the specification there is no observable to assert; the ordering guides choices the specification otherwise leaves unspecified.",
+      "oracleNotes": "A design-time tie-break ordering for the implementer, not a rule that constrains guest program behavior. Where two designs both satisfy the specification there is no observable to assert; the ordering guides choices the specification otherwise leaves unspecified.",
       "normativeQuotes": [
         "When language features conflict, prefer:",
         "1. compile-time correctness;"
@@ -4651,7 +4653,7 @@
     },
     {
       "id": "REQ-2802",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "20. File Inclusion",
       "summary": "Denied access and other include I/O failures are `SOLV-RESOL-010` and never escape as host errors",
       "kind": "compile-time",
@@ -4669,7 +4671,7 @@
     },
     {
       "id": "REQ-2803",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "20. File Inclusion",
       "summary": "An include path beginning with the exact prefix `~/` is expanded against the host user's home directory, and a later `~` or leading `~name` is ordinary path text",
       "kind": "module",
@@ -4686,7 +4688,7 @@
     },
     {
       "id": "REQ-2804",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "20. File Inclusion",
       "summary": "An absolute expanded include path is used directly rather than resolved against the including file",
       "kind": "module",
@@ -4703,7 +4705,7 @@
     },
     {
       "id": "REQ-2805",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "6. Functions",
       "summary": "A local variable must be definitely initialized before it is read",
       "kind": "compile-time",
@@ -4720,7 +4722,7 @@
     },
     {
       "id": "REQ-2806",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "1. Design Goals (Versioning)",
       "summary": "A new specification revision is declared only when the normative semantics change, released revisions are immutable, and pre-1.0 conformance reports must state that certification is withheld",
       "kind": "process",
@@ -4738,7 +4740,7 @@
     },
     {
       "id": "REQ-2807",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "1. Design Goals",
       "summary": "Features explicitly marked deferred are not part of the language, and an implementation must not invent semantics for a deferred or unspecified feature",
       "kind": "process",
@@ -4756,7 +4758,7 @@
     },
     {
       "id": "REQ-2808",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "3. Equality and reference identity",
       "summary": "A user equals implementation must be reflexive, symmetric, transitive, consistent, and false for null, but the compiler and runtime do not prove or repair those properties",
       "kind": "runtime",
@@ -4774,7 +4776,7 @@
     },
     {
       "id": "REQ-2809",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "21.7 Result types",
       "summary": "A set of value-producing branches whose only shared supertypes are incomparable has no single nearest result and is a compile-time error",
       "kind": "compile-time",
@@ -4791,7 +4793,7 @@
     },
     {
       "id": "REQ-2810",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "15. Strings (Rust-style raw strings)",
       "summary": "An unterminated raw string is a lexical error at its opening delimiter, and its diagnostic must show the exact closing delimiter that was expected",
       "kind": "lexical",
@@ -4809,9 +4811,9 @@
     },
     {
       "id": "REQ-2900",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "2. Variables and Mutability",
-      "summary": "`var` declares a mutable binding or property, so a local declared with `var` may be reassigned and the new value is observed",
+      "summary": "`mutable val` declares a mutable binding or property, so a local declared `mutable val` may be reassigned and the new value is observed",
       "kind": "runtime",
       "profile": "full-language",
       "portable": true,
@@ -4820,16 +4822,16 @@
       ],
       "status": "tested",
       "lifecycle": "active",
-      "oracleNotes": "A `var` local is reassigned and printed, so the observed bytes are the assigned value; this is the positive counterpart to the `val` immutability covered by REQ-0300/REQ-0301.",
+      "oracleNotes": "A `mutable val` local is reassigned and printed, so the observed bytes are the assigned value; this is the positive counterpart to the `val` immutability covered by REQ-0300/REQ-0301.",
       "normativeQuotes": [
-        "`var` declares a mutable binding/property."
+        "`mutable val` declares a mutable binding/property."
       ]
     },
     {
       "id": "REQ-2901",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "6. Functions",
-      "summary": "A top-level `val`/`var` is a local of the implicit main, not a global, so it is not visible to a user-declared function",
+      "summary": "A top-level `val`, mutable or not, is a local of the implicit main, not a global, so it is not visible to a user-declared function",
       "kind": "compile-time",
       "profile": "full-language",
       "portable": true,
@@ -4840,12 +4842,12 @@
       "lifecycle": "active",
       "oracleNotes": "A top-level binding is referenced from a declared function, which is not the implicit main. The reference is resolved against function locals and parameters only, so it is an unresolvable-name error. The section names no code, so the rejection is bare.",
       "normativeQuotes": [
-        "a top-level `val`/`var` is therefore a local of the implicit main, not a global."
+        "a top-level `val`, whether or not it is `mutable`, is therefore a local of the implicit main, not a global."
       ]
     },
     {
       "id": "REQ-2902",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "6. Functions",
       "summary": "A scope block introduces a new lexical scope, and sibling blocks are independent, so the same local name may be declared in each without shadowing",
       "kind": "runtime",
@@ -4863,7 +4865,7 @@
     },
     {
       "id": "REQ-2903",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "6. Functions",
       "summary": "A scope block is neither a loop nor a function boundary, so `break` inside one applies to the enclosing loop",
       "kind": "runtime",
@@ -4881,7 +4883,7 @@
     },
     {
       "id": "REQ-2904",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "13. switch",
       "summary": "A statement `switch` may omit `default` and do nothing when no case label matches",
       "kind": "runtime",
@@ -4899,7 +4901,7 @@
     },
     {
       "id": "REQ-2905",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "17. Control Flow",
       "summary": "The range `for`-in loop variable is an implicitly declared immutable `Integer`, so assigning to it is a compile-time error",
       "kind": "compile-time",
@@ -4917,7 +4919,7 @@
     },
     {
       "id": "REQ-2906",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "17. Control Flow",
       "summary": "The range `for`-in loop variable is scoped to the loop body, so it is not visible after the loop",
       "kind": "compile-time",
@@ -4935,7 +4937,7 @@
     },
     {
       "id": "REQ-2907",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "20. File Inclusion",
       "summary": "Include paths are literal text: environment-variable expansion is not part of the language, so a `$` in a path is an ordinary character",
       "kind": "compile-time",
@@ -4956,7 +4958,7 @@
     },
     {
       "id": "REQ-2908",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "20. File Inclusion",
       "summary": "Two paths that resolve to the same canonical file are the same include, so a second include through a `..` spelling is a no-op and the file's top-level statement runs once",
       "kind": "module",
@@ -4975,7 +4977,7 @@
     },
     {
       "id": "REQ-3000",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "23. Result Operations",
       "summary": "`expect(message)` returns the success payload of an `Ok`, ignoring the message",
       "kind": "runtime",
@@ -4993,7 +4995,7 @@
     },
     {
       "id": "REQ-3001",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "23. Result Operations",
       "summary": "`expect(message)` on an `Err` raises a runtime fault reporting the message together with the carried error",
       "kind": "runtime",
@@ -5011,7 +5013,7 @@
     },
     {
       "id": "REQ-3002",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "23. Result Operations",
       "summary": "The `expect` message is evaluated exactly once whenever the call runs, on either variant",
       "kind": "runtime",
@@ -5029,7 +5031,7 @@
     },
     {
       "id": "REQ-3003",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "23. Result Operations",
       "summary": "`ignore` evaluates its receiver exactly once, discards the value, and yields `Unit`, so it is a well-formed standalone statement",
       "kind": "runtime",
@@ -5047,7 +5049,7 @@
     },
     {
       "id": "REQ-3004",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "23. Result Operations",
       "summary": "`isOk` and `isErr` are complementary variant tests that never fault",
       "kind": "runtime",
@@ -5065,7 +5067,7 @@
     },
     {
       "id": "REQ-3005",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "23. Result Operations",
       "summary": "`unwrapErr` returns the error payload of an `Err`",
       "kind": "runtime",
@@ -5083,7 +5085,7 @@
     },
     {
       "id": "REQ-3100",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "20. File Inclusion",
       "summary": "An include may appear only as an item of a compilation unit, so an include inside a function, block, loop, or other statement position is rejected",
       "kind": "syntax",
@@ -5101,7 +5103,7 @@
     },
     {
       "id": "REQ-3101",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "20. File Inclusion",
       "summary": "Redeclaring a built-in function or type is rejected, and built-in names cannot be shadowed by a declaration",
       "kind": "compile-time",
@@ -5121,9 +5123,9 @@
     },
     {
       "id": "REQ-3102",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "7. Classes",
-      "summary": "Classes are final by default, so extending a class that was not declared `open` is a compile-time error",
+      "summary": "Classes are final by default, so extending a class that was not declared `mutable` is a compile-time error",
       "kind": "compile-time",
       "profile": "full-language",
       "portable": true,
@@ -5132,15 +5134,15 @@
       ],
       "status": "tested",
       "lifecycle": "active",
-      "oracleNotes": "A class without `open` is extended. The section names no code for the finality restriction, so the rejection is bare.",
+      "oracleNotes": "A class with neither `mutable` nor `abstract` is extended. The section names no code for the finality restriction, so the rejection is bare.",
       "normativeQuotes": [
         "Classes are final by default.",
-        "A class must explicitly opt into inheritance:"
+        "A class must explicitly opt into inheritance."
       ]
     },
     {
       "id": "REQ-3103",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "7. Classes",
       "summary": "A static declaration initializer that is not assignable to the declared type is `SOLV-TYPE-001`",
       "kind": "compile-time",
@@ -5160,7 +5162,7 @@
     },
     {
       "id": "REQ-3104",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "13. switch",
       "summary": "A switch contains at most one `default`, and it must be last, whether the switch is a statement or an expression",
       "kind": "compile-time",
@@ -5179,7 +5181,7 @@
     },
     {
       "id": "REQ-3105",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "23. Result Operations",
       "summary": "`unwrap` returns the success payload of an `Ok`",
       "kind": "runtime",
@@ -5197,7 +5199,7 @@
     },
     {
       "id": "REQ-3106",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "6. Functions",
       "summary": "The predeclared `print`, `println`, and `exit` functions each declare exactly one parameter, so a call with a different argument count is a compile-time error",
       "kind": "compile-time",
@@ -5215,7 +5217,7 @@
     },
     {
       "id": "REQ-3107",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "20. File Inclusion",
       "summary": "Every nested relative include is resolved against its including file, never the root directory",
       "kind": "module",
@@ -5233,7 +5235,7 @@
     },
     {
       "id": "REQ-3200",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "7. Static members and class initialization",
       "summary": "A static `toString` cannot replace the universal `Any.toString()` instance member, so an instance still formats through the universal member",
       "kind": "runtime",
@@ -5252,7 +5254,7 @@
     },
     {
       "id": "REQ-3201",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "18. Type Tests and Casts",
       "summary": "Safe-cast syntax is deferred, so the `as?` spelling is not part of the language and is a parse error",
       "kind": "syntax",
@@ -5270,7 +5272,7 @@
     },
     {
       "id": "REQ-3300",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "6. Functions (function types)",
       "summary": "A function type is legal in parameter and nested result position of a declaration signature, and the spellings of a function type -- omitted versus written `Unit` return, and parameter names -- do not change which type it is",
       "kind": "compile-time",
@@ -5292,7 +5294,7 @@
     },
     {
       "id": "REQ-3301",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "6. Functions (function types)",
       "summary": "A function type is a legal generic type argument, ungrouped and grouped, non-nullable and nullable",
       "kind": "compile-time",
@@ -5312,7 +5314,7 @@
     },
     {
       "id": "REQ-3302",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "6. Functions (function types)",
       "summary": "A function type is a legal declared type for a static property, in the parenthesized nullable spelling and the nullable-result spelling, and a static function-typed property needs no initializer because it starts at `null`",
       "kind": "compile-time",
@@ -5334,7 +5336,7 @@
     },
     {
       "id": "REQ-3303",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "6. Functions (function types)",
       "summary": "`null` is not assignable to a non-null function type, so a static function-typed property initialized to `null` is the ordinary assignment failure",
       "kind": "compile-time",
@@ -5353,7 +5355,7 @@
     },
     {
       "id": "REQ-3304",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "6. Functions (function types)",
       "summary": "The parameter and result types inside a function type participate in interface implementation matching, so an implementation differing only inside a nested function type is refused",
       "kind": "compile-time",
@@ -5373,7 +5375,7 @@
     },
     {
       "id": "REQ-3305",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "6. Functions (function types)",
       "summary": "Nullability of the function value requires parentheses and names a different type from nullability of its result, so `(func(Integer): String)?` and `func(Integer): String?` do not match",
       "kind": "compile-time",
@@ -5396,7 +5398,7 @@
     },
     {
       "id": "REQ-3306",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "6. Functions (type tests, casts, and other constructs)",
       "summary": "A function type is not reifiable, so writing one as the target of `is` or of `as` is `TYPE_INVALID_TYPE_OPERAND` (`SOLV-TYPE-025`)",
       "kind": "compile-time",
@@ -5418,7 +5420,7 @@
     },
     {
       "id": "REQ-3307",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "3. Equality and reference identity (function values)",
       "summary": "A function type is identity-bearing, so `===` accepts a concrete function type against its nullable form and keeps rejecting an unrefined `Any` pair, and semantic equality, `hashCode()`, and every rendering are the fixed reference-identity and `func` operations",
       "kind": "compile-time",
@@ -5444,7 +5446,7 @@
     },
     {
       "id": "REQ-3308",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "6. Functions (function values)",
       "summary": "At the interoperability boundary a non-null function value reports itself executable and a nullable one does not, and a host execution enforces the function's arity and reaches the same call target a guest call would",
       "kind": "compile-time",
@@ -5462,7 +5464,7 @@
     },
     {
       "id": "REQ-3309",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "6. Functions (structural identity and assignability)",
       "summary": "Function-type assignability is contravariant in parameters and covariant in the result, numeric widening is never applied inside it, and ordinary call-site widening still applies to arguments supplied at an indirect call",
       "kind": "compile-time",
@@ -5478,7 +5480,7 @@
       "oracleNotes": "Three tests, one clause each. SOL-TCK-0428 binds the section's accepted Animal/Dog direction -- a `func(Animal): Dog` value into a `func(Dog): Animal` binding -- and invokes it, so the accepted direction is not merely typed but callable; it then calls a `func(Long): Long` value with an `Integer` literal, which is the call-site widening the same section permits, and prints both results. SOL-TCK-0429 writes the rejected direction, a `func(Dog): Animal` value against a `func(Animal): Dog` binding, as a static declaration initializer -- the placement whose diagnostic the section names, so `SOLV-TYPE-001` is pinned rather than merely observed; the sentinel proves non-execution. SOL-TCK-0430 isolates the widening clause: a `func(Long): Long` value against a `func(Integer): Integer` binding is refused with the same pinned code even though an `Integer` argument widens at an ordinary conversion site, and the pair is written with a `Long` result so no other clause could explain the rejection.",
       "normativeQuotes": [
         "Function-type assignability is contravariant in parameters and covariant in the result.",
-        "Given `open class Animal` and `class Dog extends Animal`, a value of type func(Animal): Dog is assignable to func(Dog): Animal, and a value of type func(Dog): Animal is not assignable to func(Animal): Dog.",
+        "Given `mutable class Animal` and `class Dog extends Animal`, a value of type func(Animal): Dog is assignable to func(Dog): Animal, and a value of type func(Dog): Animal is not assignable to func(Animal): Dog.",
         "Numeric widening is not a subtype relation (section 4) and is never applied inside function-type assignability: a function accepting `Long` is not assignable to a function type accepting `Integer` merely because an `Integer` argument may widen at an ordinary conversion site.",
         "Arguments supplied when a function value is invoked still receive the ordinary call-site widening rules.",
         "A static declaration initializer that is not assignable to the declared type is `SOLV-TYPE-001`."
@@ -5486,7 +5488,7 @@
     },
     {
       "id": "REQ-3310",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "6. Functions (structural identity and assignability)",
       "summary": "Every non-null function type has `Any` as its top supertype, the shared type join produces a callable function type for two same-shape function types and manufactures no function supertype for an unrelated pair, and generic type arguments containing function types remain invariant in both directions",
       "kind": "compile-time",
@@ -5514,7 +5516,7 @@
     },
     {
       "id": "REQ-3311",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "3. Static and Strong Typing / 6. Functions (structural identity)",
       "summary": "Structural identity is confined to function types: a value of one written function type fills a binding typed from an unrelated declaration and keeps reference identity, while two classes with identical members remain assignment-incompatible",
       "kind": "compile-time",
@@ -5536,7 +5538,7 @@
     },
     {
       "id": "REQ-3312",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "6. Functions (Generic function values)",
       "summary": "A generic function used as a value is instantiated to one monomorphic function type from the expected function type at the reference site, by one complete substitution computed before lowering and then checked by ordinary function-type assignability",
       "kind": "compile-time",
@@ -5561,7 +5563,7 @@
     },
     {
       "id": "REQ-3313",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "6. Functions (Generic function values) / 3. Equality and reference identity (function values; hashing)",
       "summary": "Contextual instantiations of one generic declaration at different function types share that declaration's canonical runtime identity, while distinct declarations never share an identity whatever their types",
       "kind": "runtime",
@@ -5582,7 +5584,7 @@
     },
     {
       "id": "REQ-3314",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "6. Functions (Generic function values; required diagnostics)",
       "summary": "A generic function used as a value with no expected function type, or with an expected type that exposes no complete function signature such as Any or an unbounded type parameter, is TYPE_CANNOT_INFER reported on the reference with no second inference diagnostic",
       "kind": "compile-time",
@@ -5605,7 +5607,7 @@
     },
     {
       "id": "REQ-3315",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "6. Functions (Generic function values; function values and invocation)",
       "summary": "Call positions supply expected function types to a generic function reference, including a callee parameter settled by a later argument and a callee parameter that mentions the type parameter only inside a nested function type",
       "kind": "compile-time",
@@ -5628,7 +5630,7 @@
     },
     {
       "id": "REQ-3316",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "6. Functions (Generic function values; required diagnostics)",
       "summary": "A generic reference whose arity disagrees with the expected function type resolves every shared position and fails ordinary assignability, rather than reporting an inference failure",
       "kind": "compile-time",
@@ -5649,7 +5651,7 @@
     },
     {
       "id": "REQ-3317",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "6. Functions (Anonymous functions)",
       "summary": "An anonymous function is written with explicit parameter types and an optional return type, omitting the return type declares `Unit`, the ordinary return diagnostics apply inside the body, and a bare anonymous function is not a statement",
       "kind": "compile-time",
@@ -5674,7 +5676,7 @@
     },
     {
       "id": "REQ-3318",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "6. Functions (Anonymous functions)",
       "summary": "Each evaluation of an anonymous-function expression creates a distinct function value, and re-reading a local that holds one preserves its identity",
       "kind": "runtime",
@@ -5693,7 +5695,7 @@
     },
     {
       "id": "REQ-3319",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "6. Functions (Explicit immutable closure capture)",
       "summary": "Capture is written between `func` and the parameter list and is not part of the function type, so a capturing closure occupies any function-typed position; an empty list and a non-identifier item are both refused",
       "kind": "compile-time",
@@ -5716,7 +5718,7 @@
     },
     {
       "id": "REQ-3320",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "6. Functions (Explicit immutable closure capture)",
       "summary": "A capture binds the value the name held at the creation site, an object is captured by reference so later mutation stays observable, storing a closure does not flatten the closure it captured, every intervening closure must forward a value itself, and a top-level function needs no capture entry and is usable recursively from a body",
       "kind": "runtime",
@@ -5733,7 +5735,7 @@
       "normativeQuotes": [
         "A capture item is an identifier or `this`. It must resolve at the closure-creation site to one of: a `val` local declared in an enclosing function scope; an immutable parameter of an enclosing function; another function value held by an immutable binding; or `this` in an enclosing instance method or constructor.",
         "Each listed binding's value is captured when evaluation reaches the anonymous-function expression.",
-        "Capturing an object copies the reference, not the reachable object graph, so later mutation of that object's `var` properties remains observable through the captured reference.",
+        "Capturing an object copies the reference, not the reachable object graph, so later mutation of that object's `mutable val` properties remains observable through the captured reference.",
         "Capture is transitive only through explicit values.",
         "A closure that captures another closure lists that function-valued binding and stores the function value; it does not duplicate or flatten the captured closure's environment.",
         "In nested closures, a name used in an inner capture list counts as a use by the enclosing closure, so every intervening closure must list and forward that value explicitly.",
@@ -5743,9 +5745,9 @@
     },
     {
       "id": "REQ-3321",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "6. Functions (Explicit immutable closure capture; required diagnostics)",
-      "summary": "A `var` named in a capture list is `SOLV-SEM-057`, an unlisted outer local or uncaptured `this` is `SOLV-SEM-058` at the body reference, an unknown item is `SOLV-RESOL-001`, `this` with no receiver is `SOLV-RESOL-005`, and a duplicate item or item colliding with a parameter is `SOLV-RESOL-002`",
+      "summary": "A `mutable val` named in a capture list is `SOLV-SEM-057`, an unlisted outer local or uncaptured `this` is `SOLV-SEM-058` at the body reference, an unknown item is `SOLV-RESOL-001`, `this` with no receiver is `SOLV-RESOL-005`, and a duplicate item or item colliding with a parameter is `SOLV-RESOL-002`",
       "kind": "compile-time",
       "profile": "full-language",
       "portable": true,
@@ -5761,10 +5763,10 @@
       ],
       "status": "tested",
       "lifecycle": "active",
-      "oracleNotes": "Each report is a program of its own with the body written not to introduce a second root cause. SOL-TCK-0457 and SOL-TCK-0458 are the two mutable-state halves the revision distinguishes by span -- `SOLV-SEM-057` at the item that names a `var`, plain `SOLV-SEM-058` at a body reference to the *same kind* of outer `var` that was never listed. That pair is the whole content of the sentence: a host that silently captured the unlisted variable fails 0458, and one that reported the item-side case with the unlisted code, or with none, fails 0457. SOL-TCK-0459 and SOL-TCK-0460 assert the body-reference code for an omitted `val` and for `this` used without `[this]`. SOL-TCK-0461 and SOL-TCK-0462 are the two halves of the duplicate-name rule -- `[base, base]`, whose body never mentions the duplicated name, and an item colliding with a parameter. SOL-TCK-0463 and SOL-TCK-0464 pin the remaining item codes, an unknown name and `this` in a top-level function where no instance receiver exists; each body is written to reference nothing from outside the closure at all, so the capture item is the only report the program can produce and a passing match cannot be about an unrelated diagnostic. Every program carries the sentinel.",
+      "oracleNotes": "Each report is a program of its own with the body written not to introduce a second root cause. SOL-TCK-0457 and SOL-TCK-0458 are the two mutable-state halves the revision distinguishes by span -- `SOLV-SEM-057` at the item that names a `mutable val`, plain `SOLV-SEM-058` at a body reference to the *same kind* of outer `mutable val` that was never listed. That pair is the whole content of the sentence: a host that silently captured the unlisted variable fails 0458, and one that reported the item-side case with the unlisted code, or with none, fails 0457. SOL-TCK-0459 and SOL-TCK-0460 assert the body-reference code for an omitted `val` and for `this` used without `[this]`. SOL-TCK-0461 and SOL-TCK-0462 are the two halves of the duplicate-name rule -- `[base, base]`, whose body never mentions the duplicated name, and an item colliding with a parameter. SOL-TCK-0463 and SOL-TCK-0464 pin the remaining item codes, an unknown name and `this` in a top-level function where no instance receiver exists; each body is written to reference nothing from outside the closure at all, so the capture item is the only report the program can produce and a passing match cannot be about an unrelated diagnostic. Every program carries the sentinel.",
       "normativeQuotes": [
-        "A closure must not list or otherwise capture a `var` local. Naming a `var` in a capture list is `SEM_MUTABLE_CAPTURE` (`SOLV-SEM-057`), reported on that capture item, and a read or write of that captured name in the body is reported with the same code.",
-        "Referencing the same outer `var` without listing it remains `SEM_UNLISTED_CAPTURE` at the body reference; the compiler never silently converts it into a capture.",
+        "A closure must not list or otherwise capture a `mutable val` local. Naming a `mutable val` in a capture list is `SEM_MUTABLE_CAPTURE` (`SOLV-SEM-057`), reported on that capture item, and a read or write of that captured name in the body is reported with the same code.",
+        "Referencing the same outer `mutable val` without listing it remains `SEM_UNLISTED_CAPTURE` at the body reference; the compiler never silently converts it into a capture.",
         "An outer local or parameter referenced by the body but omitted from the capture list is `SEM_UNLISTED_CAPTURE` (`SOLV-SEM-058`), reported on the body reference. This applies to `this` as well: a closure body may use `this` only when `[this]` is written.",
         "The capture list uses source order as environment order.",
         "A duplicate capture item, and a capture item with the same name as one of the anonymous function's parameters, is `SOLV-RESOL-002`.",
@@ -5773,7 +5775,7 @@
     },
     {
       "id": "REQ-3322",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "6. Functions (Anonymous functions) / 6. Functions (Explicit immutable closure capture)",
       "summary": "An anonymous function introduces a function boundary and a lexical scope whose parameters are immutable and may shadow outer bindings, and naming the binding whose own initializer is evaluating the expression is a read-before-initialization error",
       "kind": "compile-time",
@@ -5795,7 +5797,7 @@
     },
     {
       "id": "REQ-3323",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "6. Functions (Bound method references)",
       "summary": "Reading a declared instance method without calling it produces a bound method value whose function type excludes the method's implicit receiver, and the deferral diagnostic never reports such a bound reference",
       "kind": "compile-time",
@@ -5816,7 +5818,7 @@
     },
     {
       "id": "REQ-3324",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "6. Functions (Bound method references)",
       "summary": "A bound method reference invokes the implementation the captured receiver's runtime class selects -- overrides, inherited methods, interface defaults, and delegated implementations -- and the two bound values of one method are unequal under the reference-identity equality",
       "kind": "compile-time",
@@ -5839,7 +5841,7 @@
     },
     {
       "id": "REQ-3325",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "6. Functions (Bound method references)",
       "summary": "The receiver expression of a bound method reference is evaluated exactly once at creation and retained strongly by the resulting value, and two values so created are distinct under the reference-identity semantic equality",
       "kind": "compile-time",
@@ -5858,7 +5860,7 @@
     },
     {
       "id": "REQ-3326",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "6. Functions (Bound method references)",
       "summary": "`this.method` binds the current receiver, a bare unqualified method name in a value position is `SOLV-RESOL-001` while the same name as an immediate call stays legal, and `super.method` binds the immediate superclass implementation without redispatch",
       "kind": "compile-time",
@@ -5881,7 +5883,7 @@
     },
     {
       "id": "REQ-3327",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "6. Functions (Bound method references)",
       "summary": "Each evaluation of a bound method-reference expression creates a distinct function-value identity even for the same receiver and method, while copying the value through bindings preserves it",
       "kind": "compile-time",
@@ -5900,7 +5902,7 @@
     },
     {
       "id": "REQ-3328",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "6. Functions (Bound method references)",
       "summary": "A normal member reference on a nullable receiver is illegal, `?.` produces a nullable function value that is null only when the receiver is null, and `?.` on a non-null receiver keeps the non-null type",
       "kind": "compile-time",
@@ -5923,7 +5925,7 @@
     },
     {
       "id": "REQ-3329",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "6. Functions (Bound method references)",
       "summary": "A generic method reference is instantiated contextually to one monomorphic function type per reference site, and an unconstrained reference is `SOLV-TYPE-030`",
       "kind": "compile-time",
@@ -5944,7 +5946,7 @@
     },
     {
       "id": "REQ-3330",
-      "specVersion": "2026.10-draft",
+      "specVersion": "2026.11-draft",
       "section": "6. Functions (Bound method references)",
       "summary": "Only a declared callable binds -- a bare read of a universal member, a `super` read of an overridden universal member, and a static method read stay errors -- and a member whose name denotes a function-typed property reads the stored value",
       "kind": "compile-time",

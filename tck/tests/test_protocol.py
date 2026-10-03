@@ -66,7 +66,7 @@ def main():
     check("describe request has id/op/version",
           req["op"] == "describe" and req["requestId"] == 1 and req["protocolVersion"] == "1")
     r = s.expect_response(raw(resp(1, "describe", implementation={
-        "name": "f", "version": "1", "specVersions": ["2026.10-draft"],
+        "name": "f", "version": "1", "specVersions": ["2026.11-draft"],
         "profiles": ["full-language"], "capabilities": ["compile-only"], "fingerprint": "a" * 64})),
         1, "describe")
     check("describe response ok", r["op"] == "describe")
