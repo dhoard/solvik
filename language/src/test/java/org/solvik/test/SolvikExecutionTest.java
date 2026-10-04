@@ -109,17 +109,21 @@ public final class SolvikExecutionTest {
                 val x = 5
                 if (x < 3) {
                     println("tiny")
-                } else if (x < 10) {
+                }
+                else if (x < 10) {
                     println("small")
-                } else {
+                }
+                else {
                     println("big")
                 }
                 val y = 50
                 if (y < 3) {
                     println("tiny")
-                } else if (y < 10) {
+                }
+                else if (y < 10) {
                     println("small")
-                } else {
+                }
+                else {
                     println("medium")
                 }
                 """)).isEqualTo("small\nmedium\n");
@@ -143,25 +147,35 @@ public final class SolvikExecutionTest {
     }
 
     @Test
-    public void forLoopRunsUpdateAfterContinue() {
+    public void whileSkipsAnElementWithoutAForUpdateClause() {
+        // The removed three-clause `for` guaranteed an update after `continue`; the
+        // `while` replacement has no update clause, so a skip is written as a guard
+        // and the induction step always runs as the body's final item.
         assertThat(runMain("""
-                for (mutable val i = 0; i < 3; i = i + 1) {
-                    if (i == 1) {
-                        continue
+                {
+                    mutable val i = 0
+                    while (i < 3) {
+                        if (i != 1) {
+                            println(i)
+                        }
+                        i = i + 1
                     }
-                    println(i)
                 }
                 """)).isEqualTo("0\n2\n");
     }
 
     @Test
-    public void forLoopBreakStopsIteration() {
+    public void whileLoopBreakStopsIteration() {
         assertThat(runMain("""
-                for (mutable val i = 0; i < 100; i = i + 1) {
-                    if (i == 2) {
-                        break
+                {
+                    mutable val i = 0
+                    while (i < 100) {
+                        if (i == 2) {
+                            break
+                        }
+                        println(i)
+                        i = i + 1
                     }
-                    println(i)
                 }
                 """)).isEqualTo("0\n1\n");
     }
@@ -300,13 +314,12 @@ public final class SolvikExecutionTest {
     }
 
     @Test
-    public void threeClauseForWithOmittedConditionRunsInfiniteIterationAtRuntime() {
-        // Exercises the lowering of a three-clause for with an omitted condition at runtime,
-        // confirming the omitted condition defaults to true (infinite iteration) rather
-        // than being treated as false/empty. The break exits the loop so the program terminates.
+    public void whileTrueLoopsTerminateThroughBreakAtRuntime() {
+        // The scope-plus-while idiom covers both shapes the removed three-clause
+        // `for` used to reach: an infinite loop and a bare update-only loop.
         assertThat(runMain("""
                 mutable val i = 0
-                for (;;) {
+                while (true) {
                     i = i + 1
                     if (i >= 4) {
                         break
@@ -315,12 +328,14 @@ public final class SolvikExecutionTest {
                 println(i)
                 """)).isEqualTo("4\n");
 
-        // Partial omission: update-only form (no init, no condition) lowers correctly.
         assertThat(runMain("""
                 mutable val i = 0
-                for (; ; i = i + 1) {
-                    if (i >= 3) {
-                        break
+                {
+                    while (true) {
+                        if (i >= 3) {
+                            break
+                        }
+                        i = i + 1
                     }
                 }
                 println(i)

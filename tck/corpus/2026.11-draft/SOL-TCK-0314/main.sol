@@ -12,11 +12,11 @@ func a(): Result<Integer, String> {
     return Result.Err("deep")
 }
 func b(): Result<Integer, String> {
-    val v = a()?;
+    val v = a()?
     return Result.Ok(v + 1)
 }
 func c(): Result<Integer, String> {
-    val v = b()?;
+    val v = b()?
     return Result.Ok(v + 1)
 }
 val r = c()

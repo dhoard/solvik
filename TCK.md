@@ -62,7 +62,7 @@ implementation begins. Counts are inventory aids, not acceptance targets.
 | Project status | Experimental and under active development |
 | Build | Maven reactor: `language`, `launcher`, `standalone`, `coverage` |
 | Toolchain | GraalVM for JDK 25; Maven wrapper; ANTLR 4.13.2; JUnit 6.1.3 |
-| Language pipeline | Lexer -> semicolon insertion -> parser -> syntax AST -> include/module resolution -> semantic analysis -> typed lowering -> Truffle AST |
+| Language pipeline | Lexer -> physical-line separation -> parser -> syntax AST -> include/module resolution -> semantic analysis -> typed lowering -> Truffle AST |
 | Backend | One Truffle AST backend; no second Solvik backend |
 | Distributions | `standalone/target/solvik` and `standalone/target/solvik-native` |
 | CLI input | First non-option argument is a source file; otherwise source is read from stdin |
@@ -85,7 +85,7 @@ The normative baseline is the complete non-deferred surface in `docs/LANGUAGE_SP
 including:
 
 - lexical rules, comments, normal strings, Rust-style raw strings, character and numeric literals;
-- Go-style lexical semicolon insertion and leading-dot member chains;
+- physical-line statement termination, same-line `;` separation, strict brace placement, and leading-dot member chains;
 - immutable and mutable bindings, lexical scopes, definite initialization, functions, implicit
   top-level `main`, exact arity, `print`, `println`, and `exit`;
 - nominal static typing, `Any`, `Nothing`, `Unit`, nullability, safe access, coalescing, checked casts,
@@ -577,7 +577,7 @@ Cover every current non-deferred normative requirement with focused positive, ne
 evaluation-order, and feature-interaction tests where meaningful. At minimum, organize coverage for:
 
 1. Lexing and syntax: identifiers, keywords, comments, literals, escapes, raw-string delimiters,
-   lexical errors, semicolon insertion, precedence, associativity, and permitted trailing commas.
+   lexical errors, physical-line separation, precedence, associativity, and permitted trailing commas.
 2. Types and names: lexical scope, shadowing, declaration order, definite initialization, nominal
    assignability, `Any`, `Nothing`, `Unit`, nullability, flow invalidation, casts, and type tests.
 3. Numerics: every type, literal boundary, lossless widening edge, forbidden conversion, mixed

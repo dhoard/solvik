@@ -37,7 +37,7 @@ import org.junit.jupiter.api.Test;
  */
 public final class SolvikResultOperationsExecutionTest {
 
-    /** A two-variant {@code Result} declaration reused across cases (variants on separate lines for semicolon insertion). */
+    /** A two-variant {@code Result} declaration reused across cases (variants on separate lines, each terminated by its line's boundary). */
     private static final String RESULT_DECL = "enum Result<T, E> {\n    Ok(T)\n    Err(E)\n}\n";
 
     private static final class Result {

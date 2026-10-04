@@ -8,9 +8,11 @@
 mutable val v: Integer = 2
 
 switch (v) {
-    case 1:
+    case 1 {
         break
+    }
 
-    default:
+    default {
         print("other")
+    }
 }

@@ -27,6 +27,11 @@ func fromUnrelated(value: Unrelated): String {
 // value is not of a function type and invoking it is an invocation whose callee is not a
 // function type -- the code the section names verbatim for that shape.
 val flag: Boolean = true
-val joined = if (flag) { format } else { fromUnrelated }
+val joined = if (flag) {
+    format
+}
+else {
+    fromUnrelated
+}
 print(joined(1))
 print("EXECUTED-INVALID")

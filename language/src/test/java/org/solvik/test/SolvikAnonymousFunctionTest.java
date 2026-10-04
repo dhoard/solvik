@@ -729,17 +729,17 @@ public final class SolvikAnonymousFunctionTest {
      * An anonymous function may be invoked immediately where the call's syntax allows the expression,
      * confirming the value the expression produces is the value that gets called.
      *
-     * <p>The explicit {@code ;} inside the body is required by semicolon insertion: at a physical newline
-     * a synthetic {@code SEMI} is emitted only when the unmatched {@code (} depth is zero
-     * (docs/LANGUAGE_SPEC.md section 2), and here the enclosing call's {@code (} is still open. Section
-     * 6's own examples avoid the case by writing the binding form.
+     * <p>The braces are written inside the call, so the body's closing brace and the call's closing
+     * paren take their own lines: the strict closing-brace rule of section 16 admits nothing but a
+     * comment after a standalone {@code}}, which is why the closer closes on a line of its own.
      */
     @Test
     public void anAnonymousFunctionMayBeInvokedImmediately() {
         assertThat(run("""
             print((func(): Integer {
-                return 1 + 2;
-            })())
+                return 1 + 2
+            }
+            )())
             """)).isEqualTo("3");
     }
 
@@ -789,7 +789,8 @@ public final class SolvikAnonymousFunctionTest {
                 try {
                     raiser()
                     return "no exception"
-                } catch (error: Boom) {
+                }
+                catch (error: Boom) {
                     return "caught " .. error.getMessage()
                 }
             }

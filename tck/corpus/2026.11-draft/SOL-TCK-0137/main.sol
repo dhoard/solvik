@@ -8,31 +8,38 @@
 mutable val score: Integer = 0
 score = if (true) {
     10
-} else {
+}
+else {
     0
 }
 print(score)
 print(if (false) {
     "d"
-} else {
+}
+else {
     "n"
-})
+}
+)
 func classify(value: Integer): String {
     return switch (value) {
-        case 0:
+        case 0 {
             "zero"
-        default:
+        }
+        default {
             "nonzero"
+        }
     }
 }
 print(classify(5))
 val nested = if (true) {
     if (false) {
         1
-    } else {
+    }
+    else {
         2
     }
-} else {
+}
+else {
     3
 }
 print(nested)

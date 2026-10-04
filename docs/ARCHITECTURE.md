@@ -19,10 +19,10 @@ Source
 Lexer
   |
   v
-Semicolon-Inserting Token Stream
+Physical-Line Separation (LineBoundaryTokenSource)
   |
   v
-ANTLR Parser
+ANTLR Parser + PhysicalLineRules
   |
   v
 Solvik Syntax AST
@@ -60,7 +60,7 @@ org.solvik
 ├── parser
 │   ├── grammar
 │   ├── lexer support
-│   └── semicolon insertion
+│   └── physical-line separation
 ├── ast
 │   ├── declaration
 │   ├── expression
@@ -124,7 +124,7 @@ The parser returns syntax AST plus diagnostics. Semantic passes may annotate or 
 
 ## Source Identity and Inclusion
 
-A root compilation may use top-level `include` directives (docs/LANGUAGE_SPEC.md section 20). Each physical file is parsed independently, then include resolution recursively splices the resolved top-level items of every file into one syntax AST in depth-first, left-to-right order. Source text is never concatenated and reparsed, because that would break lexer boundaries, semicolon insertion, source spans, file names, and instrumentation.
+A root compilation may use top-level `include` directives (docs/LANGUAGE_SPEC.md section 20). Each physical file is parsed independently, then include resolution recursively splices the resolved top-level items of every file into one syntax AST in depth-first, left-to-right order. Source text is never concatenated and reparsed, because that would break lexer boundaries, physical-line separation, source spans, file names, and instrumentation.
 
 A physical file may declare a `module` namespace and may bind file-local module prefixes with `include P alias p`. `org.solvik.parser.FileScope` records the declaring file's module name and its visible prefix-to-module bindings, and every resolved top-level item carries the `FileScope` of the file that physically declared it (`IncludeResolutionResult.itemScopes()`). Prefixes are file-local and non-transitive; unaliased inclusion of a module-declaring file also makes that module's name a visible prefix. The implicit default module has no name and keeps the flat program scope. A qualified reference uses the `::` namespace separator (`prefix::Name`), represented by `org.solvik.ast.expression.NamespaceAccessExprNode`, which keeps namespace qualification distinct from `.` member access; a qualified type uses the optional prefix on `TypeRefNode`.
 
@@ -416,15 +416,36 @@ Then add `is` narrowing.
 
 Do not let runtime null checks substitute for compile-time enforcement.
 
-## Semicolon Insertion
+## Physical-Line Separation
 
-Newlines cannot simply be discarded by the lexer before semicolon insertion.
+Newlines cannot be discarded by the lexer: statement termination, brace placement, and every
+line-rule diagnostic are decided from real physical lines (LANGUAGE_SPEC.md section 16).
 
-Implement a token stage that observes line boundaries and significant tokens, emitting a synthetic `SEMI` token when the lexical rule requires it.
+The lexer emits one `NEWLINE` token per physical newline, placed on the `NEWLINES` channel so the
+default token stream is unchanged for tools that do not care. The parser reads through
+`PhysicalLineTokenSource`, which computes, for each newline, whether the line that just ended ends
+of its own accord - its last significant token is one the language says ends a line - and if so
+places `NEWLINE` on the default channel as that line's boundary. The stage is purely lexical: no
+parser feedback, no insertion of tokens that are not in the file, no lookahead beyond the single
+next significant token, and no synthetic tokens of any kind -- the removed semicolon-inserting
+stage fabricated `SEMI` tokens the programmer never wrote, and no successor does. Explicit `;` is
+never rewritten into a boundary; it separates two constructs written on one line, and a `;` that
+ends a line, ends the file, or precedes a stand-alone closing brace is rejected by the layout pass
+as `SOLV-PARS-012` at the semicolon. The
+grammar admits `NEWLINE*` exactly where a construct may span lines (after operators, at commas,
+around argument and pattern lists, before member suffixes), so continuation is a property of the
+grammar rather than a heuristic. Raw strings, block comments, and line comments carry their own
+newlines inside their text; the stage treats those as the physical newlines they are, and a
+multi-line raw string is one token whose internal newlines end no line.
 
-Explicit `;` and synthetic semicolons use the same parser token type.
-
-Raw-string internal newlines are part of a single token and must never participate in semicolon insertion.
+`PhysicalLineRules` scans the significant token sequence once after parsing and enforces the
+line-layout rules with a single pairing of the significant `{` and `}` tokens plus a table of the
+keywords that begin a clause (`else`, `catch`, `finally`). A closing brace that shares its line, a
+clause keyword that does not begin its line, a body `{` that is not the last token of its
+introducing line, a `{` that begins a line where a body brace was required, and a `;` that
+terminates rather than separates are one diagnostic each (`SOLV-PARS-007`, `SOLV-PARS-008`,
+`SOLV-PARS-009`, `SOLV-PARS-010`, and `SOLV-PARS-012`). The removed three-clause `for` header is
+rejected at the `for` keyword during parsing with its own code (`SOLV-PARS-011`).
 
 ## Raw Strings
 
@@ -457,7 +478,9 @@ Regex engine selection is an implementation decision. Keep it behind Solvik's `R
 - no implicit fallthrough;
 - supports ordinary constant cases;
 - supports Regex pattern cases;
-- supports `default`.
+- supports `default`;
+- gives every `case` and `default` body a real brace-delimited lexical scope; a body's bindings are
+  visible only in that body and the case label is terminated by the body's opening brace.
 
 `match`:
 - pattern-oriented;
@@ -477,7 +500,7 @@ Their analysis and lowering responsibilities are located as follows.
 - **Tail-result identification.** The parser/AST builder identifies the terminal expression of a
   value-required block or case body structurally, from the trailing expression-form item, in
   `org.solvik.parser.SolvikAstBuilder` (`valueBlock`, `valueTail`, `valueCaseBody`). It never inspects
-  whether a terminal semicolon was explicit or synthesized, so both share one AST shape. The optional
+  how the terminal item's line was separated, so every spelling shares one AST shape. The optional
   tail lives on `org.solvik.ast.statement.BlockNode#tail`; expression forms are
   `BlockExprNode`, `IfExprNode`, and `SwitchExprNode`.
 - **Control-flow completion analysis.** `SolvikSemanticAnalyzer` computes an explicit compile-time

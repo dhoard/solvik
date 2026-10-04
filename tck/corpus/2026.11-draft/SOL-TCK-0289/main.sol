@@ -1,6 +1,8 @@
-func f(x: Integer): Integer {
-    return x
+func add(x: Integer, y: Integer): Integer {
+    return x + y
 }
-val v = f(1
-    + 2)
+val v = add(
+    1,
+    2,
+)
 print("v" .. v)

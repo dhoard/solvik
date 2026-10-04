@@ -10,6 +10,7 @@ class Point {
 val a: Point? = Point(3, 4)
 if (a === null) {
     print("isnull")
-} else {
+}
+else {
     print("el" .. a.y)
 }

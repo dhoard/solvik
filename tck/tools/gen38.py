@@ -82,7 +82,10 @@ used as a value without a complete expected function type, and `SOLV-TYPE-001` f
 initializer that is not assignable; both are pinned wherever they are the spec-named consequence. What is
 deliberately *not* pinned is the diagnostic on a *binding* expression: the table places `SOLV-TYPE-030`
 on the reference, and no section names a code for an initializer position tainted by a rejected
-reference, so SOL-TCK-0439 and SOL-TCK-0441 assert that one as `{"family": "TYPE"}` alone -- the same
+reference, so SOL-TCK-0439 and SOL-TCK-0441 assert that one as `{
+    "family": "TYPE"
+}
+` alone -- the same
 division SOL-TCK-0433 and SOL-TCK-0412 use for immutability violations.
 
 Idempotent like every other generator, and refuses to run if any id it claims is already claimed by

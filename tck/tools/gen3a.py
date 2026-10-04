@@ -15,7 +15,9 @@ specification rather than by adopting what the launcher prints:
     rejections here are asserted BARE. This is the same reading already applied to
     SOL-TCK-0135 and SOL-TCK-0204, applied consistently rather than re-decided.
   * `SOLV-TYPE-004` and `SOLV-PARS-001` occur ZERO times in the specification, so every
-    invalid-operand and every parse rejection in this batch is a bare `{}`.
+    invalid-operand and every parse rejection in this batch is a bare `{
+    }
+    `.
   * `SOLV-RESOL-004` is named, but only as "a member of a `Result` receiver that is not a
     `Result` operation", so an unknown member on an `Any` receiver is asserted bare.
   * `SOLV-TYPE-014` is named only as "a bare member read of a `Result` operation", so a

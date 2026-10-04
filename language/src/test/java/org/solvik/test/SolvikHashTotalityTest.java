@@ -40,7 +40,7 @@ public class SolvikHashTotalityTest {
         try (Context context = hostAccessContext(out)) {
             Value result = eval(context, """
                     func use(x: Any): Integer {
-                        return x.hashCode();
+                        return x.hashCode()
                     }
                     """);
             assertThat(result.canExecute()).as("a top-level eval result must not be callable").isFalse();
@@ -69,8 +69,8 @@ public class SolvikHashTotalityTest {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         try (Context context = hostAccessContext(out)) {
             assertThatThrownBy(() -> eval(context, """
-                    mutable val viaBinding: Any = hostList;
-                    println(viaBinding.hashCode());
+                    mutable val viaBinding: Any = hostList
+                    println(viaBinding.hashCode())
                     """)).isInstanceOf(PolyglotException.class)
                             .hasMessageContaining("SOLV-RESOL-001")
                             .hasMessageContaining("unknown name 'hostList'");
@@ -104,10 +104,10 @@ public class SolvikHashTotalityTest {
                         }
                     }
 
-                    mutable val keys: Set<Key> = Set();
-                    keys.add(Key(1));
-                    println(keys.contains(Key(1)));
-                    println(keys.contains(Key(2)));
+                    mutable val keys: Set<Key> = Set()
+                    keys.add(Key(1))
+                    println(keys.contains(Key(1)))
+                    println(keys.contains(Key(2)))
                     """).isNull()).isTrue();
             assertThat(out.toString(StandardCharsets.UTF_8)).isEqualTo("true\nfalse\n");
         }

@@ -311,7 +311,8 @@ public final class SolvikInteropTest {
             func guarded(): String {
                 try {
                     return "returned " .. failing().toString()
-                } catch (error: Boom) {
+                }
+                catch (error: Boom) {
                     return "caught " .. error.getMessage()
                 }
             }

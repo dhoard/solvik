@@ -146,8 +146,8 @@ public final class SolvikStaticMemberParserTest {
     }
 
     @Test
-    public void aStaticBlockTerminatesWithoutASemicolonThroughInsertion() {
-        // A block ends in `}`, which is a semicolon-insertion terminator, so the class body needs no
+    public void aStaticBlockTerminatesThroughItsClosingBracesLine() {
+        // A block ends in a standalone `}`, which ends its own line, so the class body needs no
         // explicit `;` after the initializer and may still be closed by the next line's `}`.
         String src = """
                 class Counter {

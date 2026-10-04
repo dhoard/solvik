@@ -346,8 +346,8 @@
     {
       "id": "REQ-0403",
       "specVersion": "2026.11-draft",
-      "section": "16. Statement Termination",
-      "summary": "Programmers may explicitly write `;`: an explicit semicolon and a newline-inserted semicolon terminate a declaration equivalently under lexical semicolon insertion.",
+      "section": "16. Statement Termination and Brace Placement",
+      "summary": "A top-level `;` separates two constructs written on the same physical line and never terminates one: the same-line spelling of two declarations introduces both bindings exactly as the newline-separated spelling does, and a `;` that ends a line, ends the file, or precedes a stand-alone closing brace is the specification-named rejection",
       "kind": "lexical",
       "profile": "full-language",
       "portable": true,
@@ -356,9 +356,9 @@
       ],
       "status": "tested",
       "lifecycle": "active",
-      "oracleNotes": "LANGUAGE_SPEC section 16 states verbatim: 'Programmers may explicitly write `;`, but normal style uses newlines.' Both declarations therefore introduce their bindings in the same scope and the program is accepted, so the observable is the two values joined by `-`, i.e. the bytes `1-2`. The `..` used to observe them is owned by REQ-0001 and is only the vehicle here (TCK.md section 10's one-obligation preference).",
+      "oracleNotes": "SOL-TCK-0022 binds two declarations written on one physical line separated by `;` and reads both back, byte-identical to the newline-separated control SOL-TCK-0286, so the separator carries no value and introduces no empty statement. The rejection arms are SOL-TCK-0496 through SOL-TCK-0498, which pin the code section 16 names for a `;` that terminates rather than separates. An implementation that treated a line-final `;` as a second, empty statement -- or that required it -- fails one arm.",
       "normativeQuotes": [
-        "Programmers may explicitly write ;, but normal style uses newlines."
+        "The semicolon is a separator, not a terminator. It may separate two constructs written on the same physical line:"
       ]
     },
     {
@@ -624,19 +624,20 @@
       "id": "REQ-0501",
       "specVersion": "2026.11-draft",
       "section": "17. Control Flow",
-      "summary": "Three-clause `for` with explicit semicolon separators, an omitted condition treated as true, and `break`/`continue` controlling the enclosing loop",
+      "summary": "A counted loop is written as a scope block around a `while` loop, the form the specification prescribes in place of a three-clause `for`, and `break`/`continue` inside its body control the enclosing loop",
       "kind": "runtime",
       "profile": "full-language",
       "portable": true,
       "tests": [
         "SOL-TCK-0043",
-        "SOL-TCK-0044"
+        "SOL-TCK-0044",
+        "SOL-TCK-0499"
       ],
       "status": "tested",
       "lifecycle": "active",
-      "oracleNotes": "SOL-TCK-0043 sums a windowed sequence so the derived total (12) differs from both the no-continue (15) and no-break (10) results. SOL-TCK-0044 omits the condition clause and counts passes, so an implementation reading an omitted condition as false prints 0 instead of the derived 3.",
+      "oracleNotes": "SOL-TCK-0043 sums a windowed sequence in the prescribed scope-plus-`while` idiom so the derived total (12) differs from both the no-continue (15) and no-break (10) results. SOL-TCK-0044 runs the always-true `while` form with an inner `break` guard, so an implementation whose `break` did not exit the loop prints 0 or hangs instead of the derived 3. SOL-TCK-0499 rejects the canonical three-clause `for` outright: the specification states the form does not exist, so the expectation is the bare compile-time error it forces, and an implementation that still accepts the removed spelling executes the sentinel and fails. The obligations (counter mutation, condition tested before each iteration, break/continue bind the enclosing loop) survive the revision.",
       "normativeQuotes": [
-        "`for` uses exactly three clauses: an optional local declaration or assignment, an optional Boolean condition, and an optional assignment. The two separators inside `for (...)` are explicit semicolons. An omitted condition is `true`.",
+        "There is no three-clause `for` statement: it would require semicolons inside its header, which section 16 reserves for separating constructs on one line. Initializer-scoped counting loops are written as a scope block around a `while` loop.",
         "`break` and `continue` are valid only inside a loop."
       ]
     },
@@ -959,7 +960,7 @@
       "id": "REQ-0801",
       "specVersion": "2026.11-draft",
       "section": "13. switch",
-      "summary": "A `break` inside a case is illegal unless it exits a loop nested inside that case, and each case body is an implicit block so `continue` applies to the enclosing loop",
+      "summary": "A `break` inside a case is illegal unless it exits a loop nested inside that case, and every case body is a real braced lexical scope, so `continue` applies to the enclosing loop rather than terminating the case",
       "kind": "compile-time",
       "profile": "full-language",
       "portable": true,
@@ -973,7 +974,7 @@
       "oracleNotes": "The conditional in the first sentence demands both branches, so SOL-TCK-0073 (break inside a loop nested in a case: legal, prints once, terminates) and SOL-TCK-0074 (bare break in a case: rejected) are a pair. Neither has a specification-named code, so SOL-TCK-0074 asserts only the semantic diagnostic family. SOL-TCK-0075 observes 'implicit block' through `continue` reaching the enclosing loop, yielding the derived exact stream 'd2d3'. The clause 'A switch contains at most one `default`, and it must be last' is deliberately NOT covered: any program with two defaults necessarily also has a non-last default, so the ordering rejection fires first and the triggering clause would be implementation-chosen -- see ORACLE_REVIEW.md.",
       "normativeQuotes": [
         "A `break` inside a case is illegal unless it exits a loop nested inside that case.",
-        "Each case body is an implicit block."
+        "Every `case` and `default` body is a real braced lexical scope (section 16): the body's `{` closes the label's line, there is no colon after a label, and bindings declared in one case body are independent of every other body."
       ]
     },
     {
@@ -1644,7 +1645,7 @@
       "id": "REQ-1204",
       "specVersion": "2026.11-draft",
       "section": "21.3 Semicolons and tail expressions",
-      "summary": "Explicit and synthesized semicolons are the same token with the same meaning, token origin is never inspected to decide whether a value exists, and comments and blank lines before `}` do not affect tail selection",
+      "summary": "Statement separation never changes meaning: no separator token carries a value, the tail expression is the last item wherever it sits, and comments and blank lines before `}` do not affect tail selection",
       "kind": "syntax",
       "profile": "full-language",
       "portable": true,
@@ -1653,9 +1654,9 @@
       ],
       "status": "tested",
       "lifecycle": "active",
-      "oracleNotes": "Four spellings of the same block expression must all yield the same value and type, which the spec states directly; a single concatenated stdout proves the equivalence without asserting anything about formatting.",
+      "oracleNotes": "Four spellings of the same block expression -- newline separation, a same-line `;` separating two items, a blank line before the closer, and a comment before the closer -- must all yield the same value and type, which the spec states directly; a single concatenated stdout proves the equivalence without asserting anything about formatting. A trailing `;` before the closer is a different rule (section 16's SOLV-PARS-012, asserted by SOL-TCK-0497) and appears in no spelling here.",
       "normativeQuotes": [
-        "Explicit and synthesized semicolons are the same parser token and have the same language meaning, so token origin is never inspected to decide whether a value exists.",
+        "Separation never changes meaning: no separator token carries a value, and the last item of a value-required block is its tail expression wherever it sits",
         "Comments and blank lines before `}` do not affect tail selection, and a terminal assignment is a statement and never a tail expression."
       ]
     },
@@ -1755,7 +1756,7 @@
       "id": "REQ-1210",
       "specVersion": "2026.11-draft",
       "section": "21.7 Result types",
-      "summary": "A construct's result type is the nearest common declared supertype to which every normally completing branch result is assignable, with no numeric promotion or widening, so `if (c) { 1 } else { 1L }` has type `Number` and is not assignable to `Integer` or `Long`",
+      "summary": "A construct's result type is the nearest common declared supertype to which every normally completing branch result is assignable, with no numeric promotion or widening, so the join of an `Integer` branch and a `Long` branch is `Number` and is not assignable to `Integer` or `Long`",
       "kind": "compile-time",
       "profile": "full-language",
       "portable": true,
@@ -1767,7 +1768,7 @@
       "lifecycle": "active",
       "oracleNotes": "The acceptance half binds the join to `Number`; the rejection half is what proves the join is not `Long`, which any numeric promotion would produce. The rejection is asserted as a bare rejection: the specification names SOLV-TYPE-001 for a static initializer, not for a local initializer, so no code is spec-mandated at this site.",
       "normativeQuotes": [
-        "Every value-producing construct uses one shared join algorithm: the result is the nearest common declared supertype to which every normally completing branch result is assignable, including the existing nullability rules. No numeric promotion or widening, structural typing, dynamic typing, implicit conversion, or inferred union type is introduced: a numeric widening is a coercion at a conversion site, never a join rule, so `if (c) { 1 } else { 1L }` has type `Number`, not `Long`."
+        "Every value-producing construct uses one shared join algorithm: the result is the nearest common declared supertype to which every normally completing branch result is assignable, including the existing nullability rules. No numeric promotion or widening, structural typing, dynamic typing, implicit conversion, or inferred union type is introduced: a numeric widening is a coercion at a conversion site, never a join rule. An `if`/`else` expression whose branches yield an `Integer` and a `Long` is written with each brace on its own line, and its join is `Number`, not `Long`."
       ]
     },
     {
@@ -2308,7 +2309,7 @@
       "id": "REQ-1404",
       "specVersion": "2026.11-draft",
       "section": "1. Design Goals (Lexical basics)",
-      "summary": "Comments are otherwise whitespace, but their physical newlines remain visible to semicolon insertion",
+      "summary": "Comments are otherwise whitespace, but a newline inside a comment is still a physical newline for statement termination",
       "kind": "lexical",
       "profile": "full-language",
       "portable": true,
@@ -2320,7 +2321,7 @@
       "lifecycle": "active",
       "oracleNotes": "Two independent observables are pinned by two programs. A block comment that terminates on the same physical line lets the following statement begin normally, while a block comment whose closing delimiter lands on a later line must still let the newline inside it separate the two statements -- the expected stream is the two values with no separator, which only holds if the comment's embedded newline was seen as a terminator rather than swallowed. A lexer that replaced a block comment with nothing at all, discarding its newlines, merges the statements and fails the second arm.",
       "normativeQuotes": [
-        "Comments are otherwise whitespace, but their physical newlines remain visible to semicolon insertion."
+        "Comments are otherwise whitespace, but a newline inside a comment is still a physical newline for statement termination (section 16)."
       ]
     },
     {
@@ -3139,29 +3140,33 @@
     {
       "id": "REQ-1900",
       "specVersion": "2026.11-draft",
-      "section": "16. Statement Termination",
-      "summary": "A top-level statement must end with an explicit or inserted SEMI: newline-separated and explicitly-semicolon-terminated declarations are both accepted, and a statement with no terminator at all is a compile-time error",
+      "section": "16. Statement Termination and Brace Placement",
+      "summary": "A physical newline ends the construct that precedes it and a `;` only separates two constructs written on the same physical line: newline-separated and same-line-`;`-separated declarations both run, while a `;` followed by another physical line, end of file, or a stand-alone closing brace is rejected at the semicolon as SOLV-PARS-012, and two constructs sharing a line with no separator between them are a compile-time error",
       "kind": "compile-time",
       "profile": "full-language",
       "portable": true,
       "tests": [
         "SOL-TCK-0286",
         "SOL-TCK-0287",
-        "SOL-TCK-0288"
+        "SOL-TCK-0288",
+        "SOL-TCK-0496",
+        "SOL-TCK-0497",
+        "SOL-TCK-0498"
       ],
       "status": "tested",
       "lifecycle": "active",
-      "oracleNotes": "REQ-0403 already owns the equivalence of the two terminators (an explicit `;` and an inserted one introduce bindings the same way). This requirement owns the distinct necessity obligation the specification's insertion conditions force: with no physical newline and no explicit `;`, no SEMI is emitted and the following token is orphaned, so the program is a compile-time error. The two accepted arms are the controls that keep the rejection from being satisfied by an implementation that rejects every multi-statement program. Bare rejection: section 16 names no diagnostic code, and the parse code the implementation prints occurs zero times in the specification.",
+      "oracleNotes": "The two accepted arms are the controls that keep the rejection from being satisfied by an implementation that rejects every multi-statement program; the same-line arm is the specification's own separator example. The three `;`-rejection arms each remove what the semicolon should have separated -- the next physical line, end of file, the stand-alone closing brace of the enclosing block -- and pin the code the specification names, SOLV-PARS-012. The no-separator rejection stays bare: the specification forces only that the program is rejected, not a code.",
       "normativeQuotes": [
-        "Programmers may explicitly write `;`, but normal style uses newlines.",
-        "Explicit `;` and synthesized semicolons must both become the parser's `SEMI` token."
+        "The semicolon is a separator, not a terminator. It may separate two constructs written on the same physical line:",
+        "A `;` that is followed by another physical line, by end of file, or by a stand-alone closing brace did not separate two constructs on its line and is rejected as",
+        "the grammar requires a separator between every two constructs"
       ]
     },
     {
       "id": "REQ-1901",
       "specVersion": "2026.11-draft",
-      "section": "16. Statement Termination",
-      "summary": "Semicolon insertion is suppressed while the unmatched `(` and `[` nesting depth is nonzero, so a newline inside an unclosed parenthesis does not terminate the expression",
+      "section": "16. Statement Termination and Brace Placement",
+      "summary": "A call may spread its arguments across physical lines because the grammar absorbs the boundary after `(`, after a comma, and before `)`, while a complete statement followed by an operator line cannot continue even inside parentheses, because nesting depth grants no continuation",
       "kind": "compile-time",
       "profile": "full-language",
       "portable": true,
@@ -3171,17 +3176,17 @@
       ],
       "status": "tested",
       "lifecycle": "active",
-      "oracleNotes": "The pair `f(1\\n + 2)` (accepted) and `val v = 1\\n + 2` (rejected) has identical tokens around the newline -- a literal before it, `+` after it, at the start of a declaration -- and differs only in the unmatched-paren depth at the newline. That isolates condition 1 exactly: an implementation that emitted a SEMI on the preceding-token rule while ignoring depth would reject the accepted arm, and one that never inserted after a literal would accept the rejected arm. Bare rejection.",
+      "oracleNotes": "The accepted arm breaks only at admitted positions -- after the opening paren, after each comma, and before the closing paren -- and remains a single call whose printed result is the oracle. The rejected arm `val v = 1\\n + 2` puts the newline BEFORE the operator: the first line ended of its own accord after the literal, so `+ 2` is orphaned, and it stays an error inside no parentheses at all because depth grants nothing. An implementation that joined a newline before an operator wherever brackets were open -- the removed depth-suppression design -- accepts the rejected arm and fails. Bare rejection.",
       "normativeQuotes": [
-        "the unmatched `(` and `[` nesting depths are both zero;",
-        "Expressions continue naturally after operators and commas:"
+        "the grammar itself absorbs the boundary tokens at the positions where a construct may spread across lines - after a binary operator, after a comma, before a `.`, `?.`, or `::`, around argument, type-argument, and pattern lists, and before a closing delimiter.",
+        "a line break the grammar does not admit is an error at the break."
       ]
     },
     {
       "id": "REQ-1902",
       "specVersion": "2026.11-draft",
-      "section": "16. Statement Termination",
-      "summary": "Insertion happens only when the token before the newline is a terminator-triggering token, so an expression continues after a trailing operator or comma, while a newline before an operator (identifier before it, operator after) inserts a SEMI and is a compile-time error",
+      "section": "16. Statement Termination and Brace Placement",
+      "summary": "An expression continues across a line whose last token is a binary operator or a comma, while a newline placed before an operator - a complete line followed by an operator line - is a compile-time error, so continuation follows the grammar and not JavaScript's operator-continuation intuition",
       "kind": "compile-time",
       "profile": "full-language",
       "portable": true,
@@ -3193,17 +3198,17 @@
       ],
       "status": "tested",
       "lifecycle": "active",
-      "oracleNotes": "`val b = a +\\n 1` (accepted) and `val b = a\\n + 1` (rejected) are both at depth zero and differ only in which side of the newline the `+` sits: on the accepted side the preceding token is an operator (not a triggering token) so no SEMI is emitted; on the rejected side it is the identifier `a` so a SEMI is emitted and `+ 1` is orphaned. A second rejection uses `*` rather than `+` to show the rule is not about any one operator. Together these are the direct evidence for 'do not use general JavaScript-style heuristics': an implementation that carried over JS operator-continuation would accept both leading-operator programs. Bare rejections.",
+      "oracleNotes": "`val b = a +\\n 1` (accepted) and `val b = a\\n + 1` (rejected) differ only in which side of the newline the `+` sits: on the accepted side the line cannot end after an operator, so the expression continues; on the rejected side the line ended after the identifier, so `+ 1` is orphaned. A second rejection uses `*` rather than `+` to show the rule is not about any one operator, and the multi-line call-argument arm shows the comma position. Together these are the direct evidence against JavaScript-style heuristics: an implementation that carried over JS operator-continuation would accept both leading-operator programs. Bare rejections.",
       "normativeQuotes": [
-        "the preceding significant token is an identifier, a literal, `break`, `continue`, `return`, `)`, `]`, or `}`;",
-        "do not use general JavaScript-style heuristics."
+        "a line break the grammar does not admit is an error at the break.",
+        "There is no lookahead exception table and no heuristic join: a line break the grammar does not admit is an error at the break."
       ]
     },
     {
       "id": "REQ-1903",
       "specVersion": "2026.11-draft",
-      "section": "16. Statement Termination",
-      "summary": "Insertion is suppressed when the token after the newline is `.`, `?.`, or `else` -- the only member-chain lookahead exceptions -- so a leading-dot chain, a leading-safe-call chain, and an `else` on its own line all parse",
+      "section": "16. Statement Termination and Brace Placement",
+      "summary": "A line ending in `.` or `?.` cannot end, so a leading-dot member chain and a leading-safe-call chain continue across lines, and a clause keyword `else` beginning its own physical line is the canonical layout for both statement and expression `if`",
       "kind": "compile-time",
       "profile": "full-language",
       "portable": true,
@@ -3215,18 +3220,18 @@
       ],
       "status": "tested",
       "lifecycle": "active",
-      "oracleNotes": "Each accepted program is accepted ONLY because insertion is suppressed for one specific next-token; removing the suppression for `.`, for `?.`, or for `else` respectively makes that program gain a stray SEMI and fail. The dot and safe-call chains are separate programs because the specification lists them as two exceptions, and the else is tested both as a statement and as the tail of an if-expression. Bare expectations are not needed here: every arm is an acceptance whose stdout is the oracle.",
+      "oracleNotes": "Each accepted program is accepted ONLY because the grammar absorbs the boundary before the member suffix; dropping the continuation for `.`, for `?.`, or for the standalone clause line makes that program break at its first chain newline or its `else`. The dot and safe-call chains are separate programs because the specification lists them as two suffixes, and the `else` is tested both as a statement and as the arm of an if-expression written in the canonical brace layout. Every arm is an acceptance whose stdout is the oracle, so no code assertion is needed.",
       "normativeQuotes": [
-        "the next significant token is not `.`, `?.`, or `else`.",
-        "The semicolon-inserting token stream must suppress insertion when the next significant token is `.` or `?.`. This is the only member-chain lookahead exception; do not use general JavaScript-style heuristics.",
-        "Solvik supports TypeScript/Kotlin-style leading-dot chains:"
+        "A line ending in `.` or `?.` cannot end, so the chain continues.",
+        "Solvik supports TypeScript/Kotlin-style leading-dot chains:",
+        "a clause is written `}` newline `else {`"
       ]
     },
     {
       "id": "REQ-1904",
       "specVersion": "2026.11-draft",
-      "section": "16. Statement Termination",
-      "summary": "A newline contained in a line comment or a block comment is treated as a physical newline, so a statement can be terminated by a newline that appears only inside a comment",
+      "section": "16. Statement Termination and Brace Placement",
+      "summary": "A newline contained in a line comment or a block comment is still a physical newline, so a statement can be terminated by a newline that appears only inside a comment",
       "kind": "compile-time",
       "profile": "full-language",
       "portable": true,
@@ -3236,16 +3241,16 @@
       ],
       "status": "tested",
       "lifecycle": "active",
-      "oracleNotes": "`val a = 1 /* c\\n*/ print(...)` is accepted while the identical program with the comment-newline removed, `val a = 1 print(...)`, is rejected (that rejection is REQ-1900's arm and the contrast is documented in the plan). The accepted arm can only parse if the token-stream stage treats the newline inside the block comment as the physical newline that terminates `val a = 1`; a stage that ignored comment interiors would see no terminator and reject it. A line-comment newline is accepted on the same principle. This is the only direct evidence for the clause, since a portable oracle cannot inspect the token stream.",
+      "oracleNotes": "`val a = 1 /* c\\n*/ print(...)` is accepted while the identical program with the comment-newline removed, `val a = 1 print(...)`, is rejected (that rejection is REQ-1900's arm and the contrast is documented in the plan). The accepted arm can only parse if the stage treats the newline contained in the block comment as the physical boundary that ended `val a = 1`; a stage that ignored comment interiors would see no boundary and reject it. A line-comment newline is accepted on the same principle. This is the only direct evidence for the clause, since a portable oracle cannot inspect the token stream.",
       "normativeQuotes": [
-        "The lexer must preserve physical newline information. The token-stream stage ignores spaces and comments but treats a newline contained in a line comment or block comment as a physical newline."
+        "The lexer preserves every physical newline (including a newline inside a comment, because it is still a physical newline)"
       ]
     },
     {
       "id": "REQ-1905",
       "specVersion": "2026.11-draft",
-      "section": "16. Statement Termination",
-      "summary": "`return` followed by a newline terminates the return statement, so a value placed on the next line is not the returned value and a bare return leaves the function before any following statement",
+      "section": "16. Statement Termination and Brace Placement",
+      "summary": "`return` followed by a newline is a complete bare return, so a value placed on the next line is not the returned value and a bare return leaves the function before any following statement",
       "kind": "compile-time",
       "profile": "full-language",
       "portable": true,
@@ -3256,17 +3261,17 @@
       ],
       "status": "tested",
       "lifecycle": "active",
-      "oracleNotes": "The rejection is a value-returning function whose value sits on the line after `return`, so the return is terminated empty and the function returns no value -- the specification's own worked example. The control `return 7` on one line is accepted. The strongest arm is a value-less function with `return` then `print(\"after\")` on the next line: the observed bytes are 'in' then 'done' with NO 'after', which proves the return terminated the function at the newline (a no-ASI reading would swallow the print as the return value and emit 'after'). That expected output is the direct embodiment of 'do not copy JavaScript's automatic semicolon insertion behavior', and it fails in the safe direction -- an implementation that did copy JS would be caught by the extra 'after'. Bare rejection.",
+      "oracleNotes": "The rejection is a value-returning function whose value sits on the line after `return`, so the return is terminated bare and the function returns no value -- the specification's own worked example. The control `return 7` on one line is accepted. The strongest arm is a value-less function with `return` then `print(\"after\")` on the next line: the expected bytes are 'in' then 'done' with NO 'after', which proves the bare return left the function at the newline (a JavaScript-ASI reading would swallow the print as the return value and emit 'after'). That expected output is the direct embodiment of 'do not copy ... JavaScript's automatic semicolon insertion behavior', and it fails in the safe direction -- an implementation that did copy JS would be caught by the extra 'after'. Bare rejection.",
       "normativeQuotes": [
-        "`return` followed by a newline terminates the return statement:",
+        "`return` followed by a newline is a complete bare return; the next line begins a new statement.",
         "Do not copy TypeScript's unsound `any` behavior or JavaScript's automatic semicolon insertion behavior."
       ]
     },
     {
       "id": "REQ-1906",
       "specVersion": "2026.11-draft",
-      "section": "16. Statement Termination",
-      "summary": "Consecutive blank lines between statements must not emit duplicate semicolons, and at end of file the same insertion rule applies without the next-token exception",
+      "section": "16. Statement Termination and Brace Placement",
+      "summary": "Blank lines between statements never add a second boundary, and the final physical line of a file is terminated by end of file even without a trailing newline",
       "kind": "compile-time",
       "profile": "full-language",
       "portable": true,
@@ -3276,17 +3281,16 @@
       ],
       "status": "tested",
       "lifecycle": "active",
-      "oracleNotes": "The blank-lines program has two consecutive blank lines between two declarations and a trailing blank line before the final statement; if a SEMI were emitted per newline the parser would see empty statements it rejects, so acceptance is the evidence for the no-duplicate clause. The end-of-file program ends after a call with no trailing newline at all, exercising the EOF rule (the final statement is terminated by end of file, not by a following token). Both are accepted and the observable is the printed bytes, so no code assertion is needed.",
+      "oracleNotes": "The blank-lines program has two consecutive blank lines between two declarations and a trailing blank line before the final statement; if a second boundary were emitted per blank line the parser would see empty statements it rejects, so acceptance is the evidence for the single-boundary clause. The end-of-file program ends after a call with no trailing newline at all, exercising end-of-file termination (the final statement is terminated by the end of the file, not by a following token). Both are accepted and the observable is the printed bytes, so no code assertion is needed.",
       "normativeQuotes": [
-        "Consecutive blank lines must not emit duplicate semicolons.",
-        "At end of file, apply the same rule without a next-token exception."
+        "Blank lines and comment lines never add a second boundary, and the final physical line of a file is terminated by end of file, to which the same rule applies without a following token."
       ]
     },
     {
       "id": "REQ-1907",
       "specVersion": "2026.11-draft",
-      "section": "16. Statement Termination",
-      "summary": "A top-level include directive ends with an explicit or inserted SEMI exactly like a statement -- its path is a string or raw-string literal so a following physical newline terminates it -- and an include with no separator is a compile-time error",
+      "section": "20. File Inclusion / 16. Statement Termination and Brace Placement",
+      "summary": "A top-level include directive ends where its physical line ends -- its path is a string or raw-string literal so a following physical newline terminates it -- and an include followed by a statement on the same line is a compile-time error",
       "kind": "compile-time",
       "profile": "full-language",
       "portable": true,
@@ -3297,10 +3301,9 @@
       ],
       "status": "tested",
       "lifecycle": "active",
-      "oracleNotes": "Two accepted arms terminate an include by a plain newline, one with a normal string path and one with a raw-string path, each observable by calling a function declared in the included file -- if the directive were not terminated, the following call statement could not parse. The rejected arm omits any terminator so the include and the next statement collide. The section states explicitly that no include-specific termination rule exists, so the rejection is an ordinary insertion failure and is asserted bare like the other termination rejections; the included helper is the same for every arm so only the terminator differs.",
+      "oracleNotes": "Two accepted arms terminate an include by a plain newline, one with a normal string path and one with a raw-string path, each observable by calling a function declared in the included file -- if the directive were not terminated, the following call statement could not parse. The rejected arm places the call on the include's own line with no separator, so the directive and the statement collide on one physical line. The section states explicitly that no include-specific termination rule exists, so the rejection is an ordinary termination failure and is asserted bare like the other termination rejections; the included helper is the same for every arm so only the termination differs.",
       "normativeQuotes": [
-        "A top-level `include` directive (section 20) ends with an explicit or inserted `SEMI` exactly like a statement.",
-        "Solvik uses Go-style lexical semicolon insertion."
+        "The path is a normal or raw string literal, and the directive ends where its physical line ends, like any construct (section 16)."
       ]
     },
     {

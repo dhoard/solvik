@@ -30,7 +30,7 @@ import org.solvik.parser.generated.SolvikLexer;
 /**
  * Direct lexer-layer tests for {@code docs/LANGUAGE_SPEC.md} section 1 (lexical basics) and the
  * raw-string rules of section 15. Each case drives {@link SolvikLexer} directly (without the
- * semicolon-inserting stage or the parser) and pins the default-channel token types, spellings, and
+ * line-boundary stage or the parser) and pins the default-channel token types, spellings, and
  * source spans, plus the negative cases where the lexer must reject a malformed token. Comment and
  * numeric forms are exercised because they are the most error-prone longest-match rules.
  */

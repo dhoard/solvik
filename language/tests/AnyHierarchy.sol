@@ -32,8 +32,18 @@ func noop() {
 val dog: Any = Dog()
 val animal: Animal = Dog()
 val color: Any = Color.Red
-val joined: Any = if (true) { 1 } else { "text" }
-val numeric: Number = if (true) { 1 } else { 2L }
+val joined: Any = if (true) {
+    1
+}
+else {
+    "text"
+}
+val numeric: Number = if (true) {
+    1
+}
+else {
+    2L
+}
 val pattern: Any = Regex("a")
 val values: Any = List<Integer>(1, 2)
 val unit: Any = noop()

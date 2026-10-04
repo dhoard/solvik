@@ -1,11 +1,14 @@
 func sw1(n: Integer): String {
     switch (n) {
-        case 0:
+        case 0 {
             return "a"
-        case 6:
+        }
+        case 6 {
             return "b"
-        default:
+        }
+        default {
             return "d"
+        }
     }
 }
 

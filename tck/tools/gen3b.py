@@ -241,7 +241,7 @@ add("SOL-TCK-0251", "REQ-1703", "equality",
     PT + 'val a: Point? = Point(3, 4)\nif (a !== null) {\n    print("ne" .. a.x)\n}\n',
     "SUCCESS", stdout="ne3")
 add("SOL-TCK-0252", "REQ-1703", "equality",
-    PT + 'val a: Point? = Point(3, 4)\nif (a === null) {\n    print("isnull")\n} else {\n    print("el" .. a.y)\n}\n',
+    PT + 'val a: Point? = Point(3, 4)\nif (a === null) {\n    print("isnull")\n}\nelse {\n    print("el" .. a.y)\n}\n',
     "SUCCESS", stdout="el4")
 
 # --- REQ-1704 Any must be narrowed first.

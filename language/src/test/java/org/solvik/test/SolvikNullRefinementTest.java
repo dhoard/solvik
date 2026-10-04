@@ -80,7 +80,8 @@ public final class SolvikNullRefinementTest {
                     func reversedElse(b: Box?): Integer {
                         if (null == b) {
                             return 0
-                        } else {
+                        }
+                        else {
                             return b.value
                         }
                     }
@@ -88,7 +89,8 @@ public final class SolvikNullRefinementTest {
                     func negatedType(v: Any): Integer {
                         if (!(v is Box)) {
                             return 0
-                        } else {
+                        }
+                        else {
                             return v.value
                         }
                     }
@@ -119,8 +121,10 @@ public final class SolvikNullRefinementTest {
         assertThat(run(PRELUDE + """
                     func loop(b: Box?): Integer {
                         mutable val total: Integer = 0
-                        for (; b != null; ) {
-                            total = total + b.value
+                        {
+                            while (b != null) {
+                                total = total + b.value
+                            }
                         }
                         return total
                     }
@@ -157,7 +161,8 @@ public final class SolvikNullRefinementTest {
                     func identicalElse(b: Box?): Integer {
                         if (b === null) {
                             return 0
-                        } else {
+                        }
+                        else {
                             return b.value
                         }
                     }

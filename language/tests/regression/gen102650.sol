@@ -25,12 +25,15 @@ println(ifaceValue7.twice6())
 
 func sw8(n: Integer): String {
     switch (n) {
-        case 5:
+        case 5 {
             return "a"
-        case 6:
+        }
+        case 6 {
             return "b"
-        default:
+        }
+        default {
             return "d"
+        }
     }
 }
 

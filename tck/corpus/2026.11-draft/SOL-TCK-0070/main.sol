@@ -7,9 +7,11 @@
 mutable val v: Integer = 3
 
 switch (v) {
-    case 1:
+    case 1 {
         print("one")
+    }
 
-    default:
+    default {
         print("other")
+    }
 }

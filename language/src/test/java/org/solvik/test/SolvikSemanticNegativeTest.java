@@ -242,7 +242,7 @@ public final class SolvikSemanticNegativeTest {
 
     @Test
     public void forConditionMustBeBoolean() {
-        Diagnostic diagnostic = first(checkFails("func f(): Unit {\n    for (; 1; ) {\n        return\n    }\n}\n"));
+        Diagnostic diagnostic = first(checkFails("func f(): Unit {\n    {\n        while (1) {\n            return\n        }\n    }\n}\n"));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_CONDITION_NOT_BOOLEAN);
     }
 
@@ -385,17 +385,6 @@ public final class SolvikSemanticNegativeTest {
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_LOOP_CONTROL_OUTSIDE_LOOP);
     }
 
-    @Test
-    public void forInitializerMustBeADeclarationOrAssignment() {
-        Diagnostic diagnostic = first(checkFails("func f(): Unit {\n    for (1; ; ) {\n        return\n    }\n}\n"));
-        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_FOR_INITIALIZER);
-    }
-
-    @Test
-    public void forUpdateMustBeAnAssignment() {
-        Diagnostic diagnostic = first(checkFails("func f(): Unit {\n    for (; ; 1) {\n        return\n    }\n}\n"));
-        assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_FOR_UPDATE);
-    }
 
     @Test
     public void memberAccessOnNonClassIsRejected() {

@@ -248,7 +248,8 @@ public final class SolvikNullSafetySemanticTest {
                 func f(box: Box?): Integer {
                     if (box == null) {
                         return 0
-                    } else {
+                    }
+                    else {
                         return box.value
                     }
                 }

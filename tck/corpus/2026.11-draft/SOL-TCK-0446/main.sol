@@ -21,8 +21,9 @@ val report: func(Integer): Unit = func(value: Integer) {
 }
 
 val nested: Integer = invoke(func(value: Integer): Integer {
-    return value - 100;
-})
+    return value - 100
+}
+)
 
 print(invoke(double).toString() .. "\n")
 report(7)

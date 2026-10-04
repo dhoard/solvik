@@ -231,8 +231,12 @@ public final class SolvikClassSemanticTest {
                 class Accumulator {
                     mutable val total: Integer = 0
                     func addUpTo(limit: Integer): Integer {
-                        for (mutable val i = 0; i < limit; i = i + 1) {
-                            this.total = this.total + i
+                        {
+                            mutable val i = 0
+                            while (i < limit) {
+                                this.total = this.total + i
+                                i = i + 1
+                            }
                         }
                         return this.total
                     }

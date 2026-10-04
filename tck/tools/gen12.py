@@ -10,7 +10,9 @@ Section 12 is the largest spec section with zero requirement coverage, and it is
 entirely without named diagnostics: `SOLV-SEM-029` and `SOLV-SEM-030` occur ZERO times in
 the specification, even though the implementation emits them for the non-exhaustive match
 and unreachable branch rules that section 12 states. Every one of those rejections
-therefore carries a bare `{}` expectation, because section 12's prose forces the rejection
+therefore carries a bare `{
+}
+` expectation, because section 12's prose forces the rejection
 but never names a code for it, and adopting an implementation-chosen code would make the
 TCK's oracle a transcription of the very implementation it exists to judge.
 

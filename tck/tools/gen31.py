@@ -168,7 +168,7 @@ OK("SOL-TCK-0393", "control", "REQ-2903",
    "The break inside the scope block exits the enclosing range loop, so the loop body does not run "
    "to completion and only the post-loop text appears.")
 OK("SOL-TCK-0394", "control", "REQ-2904",
-   'val x = 9\nswitch (x) {\n    case 1:\n        print("one")\n}\nprint("swafter")\n',
+   'val x = 9\nswitch (x) {\n    case 1 {\n        print("one")\n    }\n}\nprint("swafter")\n',
    "swafter",
    "With no matching case and no default, the statement switch does nothing and the program "
    "continues.")

@@ -8,7 +8,9 @@ copying observed output into the expectation.
 
 Section 1 is the specification's only lexical section, and unlike the diagnostic tables of
 sections 20-23 it names no diagnostic codes at all. Every rejection in this batch therefore
-carries a bare `{}` expectation: the specification normatively forbids the construct but never
+carries a bare `{
+}
+` expectation: the specification normatively forbids the construct but never
 names a code for forbidding it, and inventing one would assert a fact the specification does not
 state. The acceptance tests do the load-bearing work, and each is built so that a *plausible
 alternative lexer* produces different bytes rather than the same bytes in a different order:
@@ -78,10 +80,10 @@ REQS = {
   quotes=["`/* ... */` is a non-nesting block comment."]),
  "REQ-1404": dict(
   section="1. Design Goals (Lexical basics)",
-  summary="Comments are otherwise whitespace, but their physical newlines remain visible to semicolon insertion",
+  summary="Comments are otherwise whitespace, but a newline inside a comment is still a physical newline for statement termination",
   kind="lexical",
   notes="Two independent observables are pinned by two programs. A block comment that terminates on the same physical line lets the following statement begin normally, while a block comment whose closing delimiter lands on a later line must still let the newline inside it separate the two statements -- the expected stream is the two values with no separator, which only holds if the comment's embedded newline was seen as a terminator rather than swallowed. A lexer that replaced a block comment with nothing at all, discarding its newlines, merges the statements and fails the second arm.",
-  quotes=["Comments are otherwise whitespace, but their physical newlines remain visible to semicolon insertion."]),
+  quotes=["Comments are otherwise whitespace, but a newline inside a comment is still a physical newline for statement termination (section 16)."]),
  "REQ-1405": dict(
   section="1. Design Goals (Lexical basics)",
   summary="A decimal integer literal has type Integer in the initial typed core, and a literal outside the signed 32-bit range is a compile-time error",

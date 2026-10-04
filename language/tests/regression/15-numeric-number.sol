@@ -1,7 +1,12 @@
 func asNumber(v: Any): Number {
     return v as Number
 }
-val joined: Number = if (true) { 1 } else { 2L }
+val joined: Number = if (true) {
+    1
+}
+else {
+    2L
+}
 println(joined is Number)
 println(asNumber(5) is Integer)
 println(asNumber(5.5f) is Float)

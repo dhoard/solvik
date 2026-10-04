@@ -30,7 +30,7 @@ import org.solvik.source.SourceSpan;
 
 /**
  * Negative parser tests: malformed declarations, statement-continuation boundaries where
- * semicolon insertion cannot help, rejected SimpleLanguage syntax, out-of-scope syntax, and the
+ * separator can join, rejected SimpleLanguage syntax, out-of-scope syntax, and the
  * guarantee that any error yields no AST.
  */
 public final class SolvikParserNegativeTest {
@@ -61,7 +61,7 @@ public final class SolvikParserNegativeTest {
 
     @Test
     public void simpleLanguageFunctionKeywordIsRejectedAsLegacy() {
-        DiagnosticBag bag = expectErrors("legacy.sol", "function foo(x) {\n  return x;\n}\n");
+        DiagnosticBag bag = expectErrors("legacy.sol", "function foo(x) {\n  return x\n}\n");
         Diagnostic d = first(bag);
         assertThat(d.code()).isEqualTo(DiagnosticCode.PARSER_UNSUPPORTED_LEGACY_SYNTAX);
         assertThat(d.code().stableCode()).isEqualTo("SOLV-PARS-004");
@@ -72,7 +72,7 @@ public final class SolvikParserNegativeTest {
 
     @Test
     public void dynamicFunctionSyntaxIsRejected() {
-        expectErrors("legacy2.sol", "function add(a, b) {\n  return a + b;\n}\n");
+        expectErrors("legacy2.sol", "function add(a, b) {\n  return a + b\n}\n");
     }
 
     /**
@@ -82,7 +82,7 @@ public final class SolvikParserNegativeTest {
      */
     @Test
     public void anUnexpectedFunctionTokenIsStillClassifiedAsLegacySyntax() {
-        String src = "func f(): Unit {\n    g(1 function);\n}\n";
+        String src = "func f(): Unit {\n    g(1 function)\n}\n";
         DiagnosticBag bag = expectErrors("legacy3.sol", src);
         Diagnostic d = first(bag);
         assertThat(d.code()).isEqualTo(DiagnosticCode.PARSER_UNSUPPORTED_LEGACY_SYNTAX);
@@ -97,7 +97,7 @@ public final class SolvikParserNegativeTest {
      */
     @Test
     public void functionRemainsAUsableIdentifier() {
-        SolvikParseResult result = org.solvik.parser.SolvikParser.parse(new SourceFile("ident.sol", "func f(): Unit {\n    val function = 1;\n    g(function);\n}\n"));
+        SolvikParseResult result = org.solvik.parser.SolvikParser.parse(new SourceFile("ident.sol", "func f(): Unit {\n    val function = 1\n    g(function)\n}\n"));
         assertThat(result.isSuccess()).isTrue();
         assertThat(result.diagnostics().all()).isEmpty();
     }
@@ -113,14 +113,14 @@ public final class SolvikParserNegativeTest {
 
     @Test
     public void unterminatedStatementInsideUnclosedParenIsRejected() {
-        // Unmatched '(' keeps suppressing insertion, so the statement cannot terminate at `}`.
+        // An unmatched `(` leaves the declaration incomplete, and the `}` cannot close it.
         DiagnosticBag bag = expectErrors("nosemi.sol", "func f(): Integer {\n    val x: Integer = (1\n}\n");
         assertThat(first(bag).code() == DiagnosticCode.PARSER_UNEXPECTED_TOKEN || first(bag).code() == DiagnosticCode.PARSER_INCOMPLETE_INPUT).isTrue();
     }
 
     @Test
     public void statementsConcatenatedOnOneLineAreRejected() {
-        // No newline and no ';': insertion has no boundary to act on.
+        // No newline and no `;`: the two statements share a line with no separator.
         expectErrors("nosemi2.sol", "func f(): Unit {\n    g(1) h(2)\n}\n");
     }
 
@@ -135,33 +135,33 @@ public final class SolvikParserNegativeTest {
     public void returnTypeColonWithoutATypeIsRejected() {
         // A return type is optional, but a written `:` must be followed by a type
         // (docs/LANGUAGE_SPEC.md section 6).
-        expectErrors("notype.sol", "func f(): {\n    return;\n}\n");
+        expectErrors("notype.sol", "func f(): {\n    return\n}\n");
     }
 
     @Test
     public void untypedParameterIsRejected() {
-        expectErrors("param.sol", "func f(a) : Unit {\n    return;\n}\n");
+        expectErrors("param.sol", "func f(a) : Unit {\n    return\n}\n");
     }
 
     @Test
     public void parameterWithoutNameIsRejected() {
-        expectErrors("param2.sol", "func f(: Integer): Unit {\n    return;\n}\n");
+        expectErrors("param2.sol", "func f(: Integer): Unit {\n    return\n}\n");
     }
 
     @Test
     public void parameterMissingColonIsRejected() {
-        expectErrors("param3.sol", "func f(a Integer): Unit {\n    return;\n}\n");
+        expectErrors("param3.sol", "func f(a Integer): Unit {\n    return\n}\n");
     }
 
     @Test
     public void assignmentIsNotAnExpression() {
         // Assignment is a statement form only; using it inside an expression is a parse error.
-        expectErrors("assign.sol", "func f(x: Integer): Integer {\n    val y = (x = 1);\n    return y;\n}\n");
+        expectErrors("assign.sol", "func f(x: Integer): Integer {\n    val y = (x = 1)\n    return y\n}\n");
     }
 
     @Test
     public void unterminatedBlockIsReportedAsIncompleteInput() {
-        DiagnosticBag bag = expectErrors("eof.sol", "func f(): Unit {\n    return;\n");
+        DiagnosticBag bag = expectErrors("eof.sol", "func f(): Unit {\n    return\n");
         assertThat(first(bag).code()).isEqualTo(DiagnosticCode.PARSER_INCOMPLETE_INPUT);
     }
 
@@ -173,7 +173,7 @@ public final class SolvikParserNegativeTest {
 
     @Test
     public void unclosedCallIsRejected() {
-        expectErrors("eof4.sol", "func f(): Unit {\n    g(1;\n}\n");
+        expectErrors("eof4.sol", "func f(): Unit {\n    g(1\n}\n");
     }
 
     /**
@@ -182,19 +182,19 @@ public final class SolvikParserNegativeTest {
      */
     @Test
     public void trailingCommaWithoutAnArgumentIsRejected() {
-        expectErrors("trailcommaempty.sol", "func f(): Unit {\n    g(,);\n}\n");
+        expectErrors("trailcommaempty.sol", "func f(): Unit {\n    g(,)\n}\n");
     }
 
     @Test
     public void doubledCommaBetweenArgumentsIsRejected() {
-        expectErrors("doublecomma.sol", "func f(): Unit {\n    g(1,, 2);\n}\n");
+        expectErrors("doublecomma.sol", "func f(): Unit {\n    g(1,, 2)\n}\n");
     }
 
     /** A trailing comma is a call-argument-list feature and is not accepted by other lists. */
     @Test
     public void otherCommaSeparatedListsStillRejectTrailingCommas() {
-        expectErrors("paramcomma.sol", "func f(a: Integer,): Unit {\n    return;\n}\n");
-        expectErrors("typeargcomma.sol", "func f(): Unit {\n    val xs: List<Integer,> = List<Integer>();\n}\n");
+        expectErrors("paramcomma.sol", "func f(a: Integer,): Unit {\n    return\n}\n");
+        expectErrors("typeargcomma.sol", "func f(): Unit {\n    val xs: List<Integer,> = List<Integer>()\n}\n");
     }
 
     @Test
@@ -210,7 +210,7 @@ public final class SolvikParserNegativeTest {
 
     @Test
     public void unterminatedStringIsRejected() {
-        String src = "func f(): Unit {\n    val s = \"oops;\n}\n";
+        String src = "func f(): Unit {\n    val s = \"oops\n}\n";
         DiagnosticBag bag = expectErrors("str.sol", src);
         for (Diagnostic d : bag.all()) {
             assertThat(//
@@ -220,7 +220,7 @@ public final class SolvikParserNegativeTest {
 
     @Test
     public void keywordUsedAsParameterNameIsRejected() {
-        expectErrors("kw.sol", "func f(if: Integer): Unit {\n    return;\n}\n");
+        expectErrors("kw.sol", "func f(if: Integer): Unit {\n    return\n}\n");
     }
 
     /** Malformed inputs never yield a partial AST, regardless of where they break. */
@@ -252,7 +252,7 @@ public final class SolvikParserNegativeTest {
 
     @Test
     public void successfulParsesCarryNoDiagnostics() {
-        String ok = "func f(a: Integer): Integer {\n    val t: Integer = a * 2;\n    if (true) {\n        g(t);\n    } else {\n        h(t, obj.f);\n    }\n    return t;\n}\n";
+        String ok = "func f(a: Integer): Integer {\n    val t: Integer = a * 2\n    if (true) {\n        g(t)\n    }\n    else {\n        h(t, obj.f)\n    }\n    return t\n}\n";
         SolvikParseResult r = org.solvik.parser.SolvikParser.parse(new SourceFile("ok.sol", ok));
         assertThat(r.isSuccess()).isTrue();
         assertThat(r.diagnostics().isEmpty()).isTrue();
@@ -269,8 +269,8 @@ public final class SolvikParserNegativeTest {
         record Removed(String source, String keyword, String replacement) {
         }
         List<Removed> cases = List.of( //
-                        new Removed("var x: Integer = 1;\n", "var", "'mutable val'"), //
-                        new Removed("func f(): Unit {\n    var y = 2;\n}\n", "var", "'mutable val'"), //
+                        new Removed("var x: Integer = 1\n", "var", "'mutable val'"), //
+                        new Removed("func f(): Unit {\n    var y = 2\n}\n", "var", "'mutable val'"), //
                         new Removed("open class C {\n}\n", "open", "'mutable'"), //
                         new Removed("sealed class S {\n}\n", "sealed", "'abstract'"), //
                         new Removed("class C {\n    open func f(): Unit {\n    }\n}\n", "open", "'mutable'"));
@@ -294,7 +294,7 @@ public final class SolvikParserNegativeTest {
     public void removedKeywordsRemainReservedAsNames() {
         for (String keyword : List.of("var", "open", "sealed")) {
             expectErrors("reserved.sol", "func " + keyword + "(): Unit {\n}\n");
-            expectErrors("reserved.sol", "val " + keyword + " = 1;\n");
+            expectErrors("reserved.sol", "val " + keyword + " = 1\n");
         }
     }
 
@@ -302,7 +302,7 @@ public final class SolvikParserNegativeTest {
     public void removedKeywordsDoNotShadowTheNewVocabulary() {
         // `mutable` and `abstract` are live, so a program using them must parse; a removed keyword in
         // the same program must still be the only thing reported.
-        String src = "mutable class C {\n    mutable func f(): Unit {\n    }\n}\nabstract class D extends C {\n}\nfunc g(): Unit {\n    mutable val x = 1;\n    x = 2;\n}\n";
+        String src = "mutable class C {\n    mutable func f(): Unit {\n    }\n}\nabstract class D extends C {\n}\nfunc g(): Unit {\n    mutable val x = 1\n    x = 2\n}\n";
         SolvikParseResult ok = org.solvik.parser.SolvikParser.parse(new SourceFile("new.sol", src));
         assertThat(ok.diagnostics().all()).isEmpty();
         assertThat(ok.isSuccess()).isTrue();

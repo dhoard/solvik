@@ -156,13 +156,14 @@ public final class SolvikAstStructureTest {
         Deque<AstNode> stack = new ArrayDeque<>();
         stack.push(parse("""
                 func f(a: Integer): Integer {
-                    val v: Integer = (a + obj.g(1)) * 2;
-                    mutable val w: Integer = h(v, obj.field);
+                    val v: Integer = (a + obj.g(1)) * 2
+                    mutable val w: Integer = h(v, obj.field)
                     if (true) {
-                        obj.store(1);
-                        return v;
-                    } else {
-                        return w;
+                        obj.store(1)
+                        return v
+                    }
+                    else {
+                        return w
                     }
                 }
                 """));
@@ -186,16 +187,18 @@ public final class SolvikAstStructureTest {
         Deque<AstNode> stack = new ArrayDeque<>();
         stack.push(parse("""
                 func f(a: Integer): Integer {
-                    val v: Integer = (a + obj.g(1)) * 2;
-                    mutable val w: Integer = true;
+                    val v: Integer = (a + obj.g(1)) * 2
+                    mutable val w: Integer = true
                     if (true) {
-                        obj.store(1);
-                        return v;
-                    } else if (false) {
-                        plain();
-                        return a;
-                    } else {
-                        return v;
+                        obj.store(1)
+                        return v
+                    }
+                    else if (false) {
+                        plain()
+                        return a
+                    }
+                    else {
+                        return v
                     }
                 }
                 """));
@@ -232,12 +235,16 @@ public final class SolvikAstStructureTest {
         stack.push(parse("""
                 func f(n: Integer): Integer {
                     mutable val total = 0
-                    for (mutable val i = 0; i < n; i = i + 1) {
-                        total = total + i
-                        if (total > 100) {
-                            break
+                    {
+                        mutable val i = 0
+                        while (i < n) {
+                            i = i + 1
+                            total = total + i
+                            if (total > 100) {
+                                break
+                            }
+                            continue
                         }
-                        continue
                     }
                     while (total > 0) {
                         total = total - 1
@@ -254,7 +261,6 @@ public final class SolvikAstStructureTest {
         assertThat(kinds.containsAll(List.of(//
                 AstKind.ASSIGN_STMT, //
                 AstKind.WHILE_STMT, //
-                AstKind.FOR_STMT, //
                 AstKind.BREAK_STMT, //
                 AstKind.CONTINUE_STMT, //
                 AstKind.UNARY_EXPR))).isTrue();
@@ -531,20 +537,25 @@ public final class SolvikAstStructureTest {
         stack.push(parse("""
                 func classify(value: Integer): Unit {
                     switch (value) {
-                        case 1, 2:
+                        case 1, 2 {
                             println("small")
-                        case 3:
+                        }
+                        case 3 {
                             println("three")
-                        default:
+                        }
+                        default {
                             println("other")
+                        }
                     }
                 }
                 func matchText(input: String): Unit {
                     switch (input) {
-                        case regex r#"^\\d+$"#:
+                        case regex r#"^\\d+$"# {
                             println("number")
-                        default:
+                        }
+                        default {
                             println("text")
+                        }
                     }
                 }
                 """));

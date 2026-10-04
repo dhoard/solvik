@@ -159,8 +159,8 @@ public final class SolvikRemovedKeywordCorpusTest {
     /**
      * No committed program delivers a removed keyword token.
      *
-     * <p>Lexing is done through the same semicolon-inserting stage the parser reads from, so a token
-     * that only appears after insertion cannot hide between the two views. Every offender is
+     * <p>Lexing is done through the same line-boundary stage the parser reads from, so a token
+     * that only appears after boundary placement cannot hide between the two views. Every offender is
      * collected into one failure message rather than stopping at the first, because a migration that
      * regressed in several places should say so in one run.
      */

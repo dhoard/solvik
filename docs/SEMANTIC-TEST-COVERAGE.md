@@ -457,9 +457,9 @@ unwinding signal into a failure happens after unwinding has discarded them; the 
 
 | Feature | Positive test | Negative test |
 |---|---|---|
-| Go-style lexical semicolon insertion | `SolvikSemicolonInsertionTest` | **GAP** — semantic-level negative test for mis-termination |
+| Physical-line statement termination | `PhysicalLineTokenStreamTest` | **RESOLVED** — boundary placement decided lexically | ✅ |
 | Member chaining suppresses insertion | `SolvikSemicolonTokenStreamTest.memberChain` | **GAP** — no negative test for broken member chain |
-| Line comments preserve newlines | `SolvikSemicolonInsertionTest.lineCommentNewline` | **GAP** — no test for block comment newline preservation |
+| Line and block comments preserve physical newlines | `PhysicalLineTokenStreamTest` | **RESOLVED** | ✅ |
 
 ### 2.16 §17 Control Flow
 
@@ -740,7 +740,7 @@ JAVA_HOME=/opt/graalvm-25.3.4.1+1.1 ./mvnw -pl language test
 | switch | `SolvikSwitchSemanticTest` | `SolvikSwitchNegativeTest` | ✅ (gaps D5–D7 closed) |
 | Regex | `SolvikRegexSemanticTest` | `SolvikRegexNegativeTest` | ✅ (partial) |
 | Strings/raw strings | `SolvikRawStringTest` | `SolvikRawStringNegativeTest` | ✅ (partial) |
-| Semicolon insertion | `SolvikSemicolonInsertionTest`, `SolvikSemicolonTokenStreamTest` | **RESOLVED** — semantic negative tests now present where required | ✅ |
+| Physical-line separation and brace placement | `PhysicalLineTokenStreamTest`, `SolvikPhysicalLineLayoutTest` | **RESOLVED** | ✅ |
 | Control flow | `SolvikExecutionTest` | `SolvikSemanticNegativeTest` | ✅ |
 | Type tests/casts | `SolvikTypeTestRuntimeTest`, `SolvikNullRefinementTest` | `SolvikGenericsNegativeTest` | ✅ (gap D8 closed) |
 | Expression-oriented | `SolvikExpressionOrientedSemanticTest` | `SolvikExpressionOrientedNegativeTest` | ✅ (gaps B2, B3, D8–D11 closed) |

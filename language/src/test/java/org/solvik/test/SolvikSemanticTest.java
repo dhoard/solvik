@@ -115,8 +115,12 @@ public final class SolvikSemanticTest {
                 "        }\n" + //
                 "        continue\n" + //
                 "    }\n" + //
-                "    for (mutable val i = 0; i < 3; i = i + 1) {\n" + //
-                "        total = total + g(i)\n" + //
+                "    {\n" + //
+                "        mutable val i = 0\n" + //
+                "        while (i < 3) {\n" + //
+                "            total = total + g(i)\n" + //
+                "            i = i + 1\n" + //
+                "        }\n" + //
                 "    }\n" + //
                 "    return total\n" + //
                 "}\n";
@@ -181,7 +185,7 @@ public final class SolvikSemanticTest {
 
     @Test
     public void forInitializerVariableIsScopedToTheLoop() {
-        check("func f(): Integer {\n    for (mutable val i = 0; i < 3; i = i + 1) {\n        return i\n    }\n    val i = 9\n    return i\n}\n");
+        check("func f(): Integer {\n    {\n        mutable val i = 0\n        while (i < 3) {\n            return i\n            i = i + 1\n        }\n    }\n    val i = 9\n    return i\n}\n");
     }
 
     @Test
@@ -271,14 +275,19 @@ public final class SolvikSemanticTest {
                 "        total = total + remaining\n" + //
                 "        remaining = remaining - 1\n" + //
                 "    }\n" + //
-                "    for (mutable val i = 0; i < 3; i = i + 1) {\n" + //
-                "        if (i == 1) {\n" + //
-                "            continue\n" + //
+                "    {\n" + //
+                "        mutable val i = 0\n" + //
+                "        while (i < 3) {\n" + //
+                "            if (i == 1) {\n" + //
+                "                i = i + 1\n" + //
+                "                continue\n" + //
+                "            }\n" + //
+                "            if (i == 2) {\n" + //
+                "                break\n" + //
+                "            }\n" + //
+                "            total = total + i\n" + //
+                "            i = i + 1\n" + //
                 "        }\n" + //
-                "        if (i == 2) {\n" + //
-                "            break\n" + //
-                "        }\n" + //
-                "        total = total + i\n" + //
                 "    }\n" + //
                 "    return total\n" + //
                 "}\n";

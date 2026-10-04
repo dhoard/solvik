@@ -77,7 +77,6 @@ import org.solvik.ast.statement.ContinueStmtNode;
 import org.solvik.ast.statement.ElseBranchNode;
 import org.solvik.ast.statement.ExprStmtNode;
 import org.solvik.ast.statement.ForInStmtNode;
-import org.solvik.ast.statement.ForStmtNode;
 import org.solvik.ast.statement.IfStmtNode;
 import org.solvik.ast.statement.LocalDeclNode;
 import org.solvik.ast.statement.RegexCaseLabelNode;
@@ -137,7 +136,6 @@ import org.solvik.truffle.nodes.SolvikFunctionValueNode;
 import org.solvik.truffle.nodes.SolvikFunctionDispatchNode;
 import org.solvik.truffle.nodes.SolvikFunctionDispatchNodeGen;
 import org.solvik.truffle.nodes.SolvikIndirectCallNode;
-import org.solvik.truffle.nodes.SolvikForNode;
 import org.solvik.truffle.nodes.SolvikForRangeNode;
 import org.solvik.truffle.nodes.SolvikGreaterOrEqualNodeGen;
 import org.solvik.truffle.nodes.SolvikGreaterThanNodeGen;
@@ -850,7 +848,6 @@ public final class SolvikLowering {
             case LOCAL_DECL -> lowerLocalDecl((LocalDeclNode) statement);
             case IF_STMT -> lowerIf((IfStmtNode) statement);
             case WHILE_STMT -> lowerWhile((WhileStmtNode) statement);
-            case FOR_STMT -> lowerFor((ForStmtNode) statement);
             case FOR_IN_STMT -> lowerForIn((ForInStmtNode) statement);
             case SWITCH_STMT -> lowerSwitch((SwitchStmtNode) statement);
             case BLOCK -> lowerBlock((BlockNode) statement);
@@ -962,15 +959,6 @@ public final class SolvikLowering {
         SolvikExpressionNode condition = lowerExpression(statement.condition());
         SolvikStatementNode body = lowerBlock(statement.body());
         SolvikWhileNode node = new SolvikWhileNode(condition, body);
-        return setSource(node, statement);
-    }
-
-    private SolvikStatementNode lowerFor(ForStmtNode statement) {
-        SolvikStatementNode[] initializer = statement.initializer().map(init -> new SolvikStatementNode[]{lowerStatement(init)}).orElse(new SolvikStatementNode[0]);
-        SolvikExpressionNode condition = statement.condition().map(this::lowerExpression).orElse(null);
-        SolvikStatementNode update = statement.update().map(this::lowerStatement).orElse(null);
-        SolvikStatementNode body = lowerBlock(statement.body());
-        SolvikForNode node = new SolvikForNode(initializer, condition, update, body);
         return setSource(node, statement);
     }
 

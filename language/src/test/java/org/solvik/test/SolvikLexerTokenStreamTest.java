@@ -38,7 +38,7 @@ import org.solvik.parser.generated.SolvikLexer;
  * line, column, and channel, plus the exact failing input offset of every lexical error.
  *
  * <p>Assertions were produced by driving {@link SolvikLexer} directly and recording the delivered
- * stream; they are the reference the parser and the semicolon-inserting stage are built on, so an
+ * stream; they are the reference the parser and the line-boundary stage are built on, so an
  * off-by-one in a span or a mislabelled channel fails here rather than in a later phase.
  */
 public final class SolvikLexerTokenStreamTest {
@@ -160,7 +160,7 @@ public final class SolvikLexerTokenStreamTest {
     @Test
     public void whitespaceOnlyInputDeliversNoSignificantTokens() {
         // Spaces and tabs are `WS` (skipped outright); every physical newline stays as a hidden
-        // NEWLINE token so the insertion stage can see the boundary.
+        // NEWLINE token so the line-boundary stage can see the boundary.
         assertThat(rendered(" ")).isEmpty();
         assertThat(rendered("  \t ")).isEmpty();
         assertThat(renderedHidden(" ")).isEmpty();
@@ -188,7 +188,7 @@ public final class SolvikLexerTokenStreamTest {
     @Test
     public void blockCommentBodyNewlinesAreInsideTheCommentToken() {
         // The comment is one hidden token whose body contains the newline: no separate NEWLINE token
-        // is emitted for it, which is why the insertion stage must inspect the comment text itself.
+        // is emitted for it, which is why the line-boundary stage must inspect the comment text itself.
         assertThat(renderedHidden("/*a\nb*/x")).isEqualTo("BLOCK_COMMENT(/*a\\nb*/)@0..6");
         // The line counter still advances across the body, so the following token is positioned on
         // the line the comment ended on, at the column where the comment closed.
@@ -436,7 +436,7 @@ public final class SolvikLexerTokenStreamTest {
     /**
      * The grammar declares exactly these token types. A new lexer rule that no test can reach, or a
      * renamed token, fails here first; the symbolic names are the vocabulary the parser and the
-     * semicolon-insertion tables are written against.
+     * line-boundary tables are written against.
      */
     @Test
     public void grammarDeclaresExactlyTheExpectedTokenVocabulary() {

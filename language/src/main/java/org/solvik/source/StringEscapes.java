@@ -34,8 +34,8 @@ public final class StringEscapes {
     /**
      * The single code unit standing in for {@code \N} in a decoded string until the value is observed
      * on the target runtime. It is a rarely used graphic character with no structural role in Solvik
-     * lexical syntax: a physical U+00A6 never terminates a token, opens a construct, or participates
-     * in semicolon insertion, so carrying it across the AST, lowering, and serialization is inert. A
+     * lexical syntax: a physical U+00A6 never terminates a token, opens a construct, or ends a
+     * physical line, so carrying it across the AST, lowering, and serialization is inert. A
      * program that needs the literal character itself cannot spell it as a Solvik source escape in
      * any case, because {@code \N} is the only mechanism that could produce it before expansion.
      */

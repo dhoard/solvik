@@ -74,7 +74,10 @@ the exact placement under test: `SOLV-SEM-057`, `SOLV-SEM-058`, `SOLV-RESOL-001`
 itself. What is deliberately *not* pinned is any code the section describes in prose without naming: the
 ordinary return diagnostics that "apply inside an anonymous function exactly as they do in a declaration", the
 standalone-statement rejection, the assignment-to-parameter case, and an empty or malformed capture list, whose
-revision sentence says `is a parse error` and no table row covers. Those assert `{"family": ...}` alone -- the
+revision sentence says `is a parse error` and no table row covers. Those assert `{
+    "family": ...
+}
+` alone -- the
 division gen38 draws for SOL-TCK-0439 and SOL-TCK-0441, and for the same reason: pinning a code the document
 never states for that placement makes this implementation's choice look specification-mandated.
 
@@ -331,8 +334,9 @@ val report: func(Integer): Unit = func(value: Integer) {
 }
 
 val nested: Integer = invoke(func(value: Integer): Integer {
-    return value - 100;
-})
+    return value - 100
+}
+)
 
 print(invoke(double).toString() .. "\\n")
 report(7)

@@ -6,7 +6,8 @@
 //
 val x = 9
 switch (x) {
-    case 1:
+    case 1 {
         print("one")
+    }
 }
 print("swafter")

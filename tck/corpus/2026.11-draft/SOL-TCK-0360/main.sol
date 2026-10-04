@@ -6,9 +6,11 @@
 //
 val x = 1
 switch (x) {
-    case x:
+    case x {
         print("same")
-    default:
+    }
+    default {
+    }
         print("default")
 }
 print("EXECUTED-INVALID")

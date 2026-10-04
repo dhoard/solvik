@@ -1,77 +1,95 @@
 #!/usr/bin/env python3
-"""Generate the section 16 TCK batch: Go-style lexical semicolon insertion.
+"""Generate the section 16 TCK batch: physical-line statement termination.
 
 Section 16 is the most rule-dense section in the specification and, before this
-batch, the least covered. Every rule here is a statement about when a synthetic
-SEMI is or is not emitted, and each is observable only through whether a program
-with a particular newline placement parses. Oracles are DERIVED FROM
-LANGUAGE_SPEC.md's insertion conditions and only then compared with the
-implementation.
+batch, the least covered. Every rule here is a statement about where a physical
+line ends and whether a construct may continue across one, and each is observable
+only through whether a program with a particular newline placement parses.
+Oracles are DERIVED FROM LANGUAGE_SPEC.md's termination and continuation rules and
+only then compared with the specification's own examples.
 
-Code-pinning. NO diagnostic code is named anywhere in section 16, and the codes
-the implementation prints for these cases (`SOLV-PARS-001`, `SOLV-TYPE-010`,
-`SOLV-SEM-003`) either occur zero times in the specification or are named only for
-unrelated rules. Every rejection in this batch is therefore asserted BARE: the
-oracle requires a compile-time error and asserts nothing about its code, because
-the specification forces no code and inventing one would transcribe an
-implementation's choice into the conformance suite.
+Code-pinning. Section 16 names exactly one diagnostic code, `SOLV-PARS-012`,
+and names it for the semicolon rule: a `;` followed by another physical line,
+end of file, or a stand-alone closing brace is rejected at the semicolon. Those
+rejections are asserted CODED. NO other code is named in section 16 for
+termination or continuation, and the codes the implementation prints for the
+other cases (`SOLV-PARS-001`, `SOLV-TYPE-010`, `SOLV-SEM-003`) either occur zero
+times in the specification or are named only for unrelated rules, so every other
+rejection in this batch stays asserted BARE: the oracle requires a compile-time
+error and asserts nothing about its code, because the specification forces no
+code and inventing one would transcribe an implementation's choice into the
+conformance suite. The brace-placement rules (SOLV-PARS-007 through
+SOLV-PARS-010) are asserted by the later brace-layout batch, not here; this
+batch owns termination itself.
 
 Discriminating designs. Each rule is isolated by a program pair that differs in
 exactly the one property the rule turns on, so a differing implementation fails an
 arm rather than agreeing by accident:
 
-  * Condition 1 (paren/bracket depth). `f(1\n + 2)` is accepted while `val v = 1\n
-     + 2` is rejected. The two have identical tokens around the newline (a literal
-     precedes it, `+` follows it); the ONLY difference is that in the first the
-     newline sits at unmatched-paren depth one. That single-token difference is the
-     whole depth condition, so an implementation that inserted on the preceding
-     token alone, ignoring depth, rejects the accepted arm.
+  * The semicolon separates, it does not terminate. Newline-separated and
+    same-line-semicolon-separated programs run, while two constructs sharing a
+    line with NO separator between them are a compile-time error and a `;` that
+    ends a physical line, ends the file, or precedes a stand-alone closing brace
+    is rejected at the semicolon with the code section 16 names, `SOLV-PARS-012`.
+    The three rejections are the direct evidence that `;` is only ever the
+    separator between two constructs of one physical line: each arm removes what
+    the semicolon should have separated while keeping the rest of the program
+    legal.
 
-  * Condition 2 (the preceding token must be a terminator-triggering token).
-     `val b = a +\n 1` is accepted while `val b = a\n + 1` is rejected. Both are at
-     depth zero; they differ only in which side of the newline the `+` sits. On the
-     accepted side the token before the newline is an operator (not in the
-     triggering list), so no SEMI is emitted and the expression continues; on the
-     rejected side it is the identifier `a` (a triggering token) with a non-exception
-     token after it, so a SEMI is emitted and `+ 1` is orphaned. A leading `*` is
-     rejected for the same reason, which is what "do not use general
-     JavaScript-style heuristics" makes testable: an implementation carrying over
-     JS's operator-continuation intuition would accept both leading-operator forms.
+  * Continuation is grammar, not lookahead. A call whose arguments sit on their
+    own lines (`f(
+ 1,
+ 2,
+)`) and `val b = a +
+ 1` are accepted while
+    `val v = 1
+ + 2`, `val b = a
+ + 1` and `val b = a
+ * 3` are rejected. The
+    accepted programs break only at positions the grammar admits (after `(`,
+    after a comma, after a binary operator); the rejected programs break a line
+    that had already ended, so the operator line is orphaned. Nesting depth is
+    irrelevant: a newline before an operator is an error inside parentheses
+    exactly as it is at depth zero. A leading `*` is rejected for the same reason
+    as a leading `+`: an implementation carrying over JavaScript's
+    operator-continuation intuition would accept both leading-operator forms.
 
-  * Condition 3 (the next token may not be `.`, `?.`, or `else`). A leading-dot
-     member chain, a leading-`?.` chain, and an `else` on its own line are each
-     accepted. Each is accepted ONLY because insertion is suppressed for that one
-     lookahead token; drop any one exception and that program gains a stray SEMI.
-     A leading-dot chain and a leading-`?.` chain are tested separately because the
-     specification lists them as two distinct exceptions.
+  * Member chains continue. A leading-dot chain and a leading-`?.` chain are
+    separate accepted programs because the specification lists two member
+    suffixes, and each is accepted ONLY because a line ending in that suffix
+    cannot end; drop the grammar rule for one suffix and that program breaks.
 
-  * Comment newlines are physical. `val a = 1 /* c\n*/ print(...)` is accepted
-     where `val a = 1 print(...)` (no newline anywhere) is rejected. The two are
-     identical except for a newline inside a block comment, so the accepted arm can
-     only parse if the token-stream stage treats a newline contained in a comment as
-     a physical newline -- the specification states this and the pair is its only
-     direct evidence. A line-comment newline is accepted on the same principle.
+  * `else` on its own line. A statement `if`/`else` and an expression `if` whose
+    `else` begins a physical line both parse -- the canonical clause layout of
+    section 16, and the exact opposite of the pre-revision one-line `
+    }
+    else {
+        `.
 
-  * `return` followed by a newline terminates the return. A value-returning function
-     that puts the value on the next line is rejected, while `return 7` is accepted.
-     Stronger, a void function with a bare `return` followed by `print("after")` on
-     the next line runs the print only if the return terminated -- and it does not
-     run it, because the return already left the function. The expected bytes are
-     therefore "in" "done" with no "after", which is the exact opposite of a no-ASI
-     reading that would swallow the print as the return value. This arm is the
-     specification's "do not copy JavaScript's automatic semicolon insertion".
+  * Comment newlines are physical. `val a = 1 /* c
+*/ print(...)` is accepted
+    where the same program with the comment-newline removed, `val a = 1
+    print(...)`, is rejected by the no-separator rule; the accepted arm can only
+    parse if the newline inside the block comment ended the first statement's
+    line. A line-comment newline is accepted on the same principle.
+
+  * `return` followed by a newline terminates the return. A value-returning
+    function that puts the value on the next line is rejected, while `return 7`
+    is accepted. Stronger, a void function with a bare `return` followed by
+    `print("after")` on the next line: "after" must NOT appear, because the bare
+    return already left the function. Those expected bytes are the exact opposite
+    of a JavaScript-ASI reading, which would swallow the print as the return
+    value; the specification forbids exactly that.
 
   * Blank lines and end of file. Consecutive blank lines between statements are
-     accepted without duplicate-SEMI failure, and a final statement with no trailing
-     newline is accepted, exercising the "at end of file apply the same rule without
-     a next-token exception" clause.
+    accepted -- they never add a second boundary -- and a final statement with no
+    trailing newline is accepted, exercising end-of-file termination.
 
-  * `include` termination. A top-level include is terminated by an inserted SEMI
-     exactly like a statement -- newline-terminated and raw-string-path forms are
-     accepted, and an include with no separator at all is rejected. Section 16 says
-     explicitly that no include-specific termination rule exists, so these are
-     ordinary-insertion results and the rejection's bare expectation is shared with
-     the other termination rejections.
+  * `include` termination. A top-level include ends where its physical line ends
+    -- newline-terminated and raw-string-path forms are accepted -- and an
+    include with no line boundary before the following statement is rejected.
+    Section 20 states the directive has no include-specific termination rule, so
+    the rejection is an ordinary termination failure asserted bare.
 """
 import base64, json, os, re, sys
 
@@ -93,61 +111,60 @@ LIB = "func two(): Integer {\n    return 2\n}\n"
 
 REQS = {
  "REQ-1900": dict(
-  section="16. Statement Termination",
-  summary="A top-level statement must end with an explicit or inserted SEMI: newline-separated and explicitly-semicolon-terminated declarations are both accepted, and a statement with no terminator at all is a compile-time error",
+  section="16. Statement Termination and Brace Placement",
+  summary="A physical newline ends the construct that precedes it and a `;` only separates two constructs written on the same physical line: newline-separated and same-line-`;`-separated declarations both run, while a `;` followed by another physical line, end of file, or a stand-alone closing brace is rejected at the semicolon as SOLV-PARS-012, and two constructs sharing a line with no separator between them are a compile-time error",
   kind="compile-time",
-  notes="REQ-0403 already owns the equivalence of the two terminators (an explicit `;` and an inserted one introduce bindings the same way). This requirement owns the distinct necessity obligation the specification's insertion conditions force: with no physical newline and no explicit `;`, no SEMI is emitted and the following token is orphaned, so the program is a compile-time error. The two accepted arms are the controls that keep the rejection from being satisfied by an implementation that rejects every multi-statement program. Bare rejection: section 16 names no diagnostic code, and the parse code the implementation prints occurs zero times in the specification.",
-  quotes=["Programmers may explicitly write `;`, but normal style uses newlines.",
-          "Explicit `;` and synthesized semicolons must both become the parser's `SEMI` token."]),
+  notes="The two accepted arms are the controls that keep the rejection from being satisfied by an implementation that rejects every multi-statement program; the same-line arm is the specification's own separator example. The three `;`-rejection arms each remove what the semicolon should have separated -- the next physical line, end of file, the stand-alone closing brace of the enclosing block -- and pin the code the specification names, SOLV-PARS-012. The no-separator rejection puts a second statement on the first statement's line with no separator at all, which the specification's 'the grammar requires a separator between every two constructs' forces; it stays bare because the specification names no code for it.",
+  quotes=["The semicolon is a separator, not a terminator. It may separate two constructs written on the same physical line:",
+          "A `;` that is followed by another physical line, by end of file, or by a stand-alone closing brace did not separate two constructs on its line and is rejected as",
+          "the grammar requires a separator between every two constructs"]),
  "REQ-1901": dict(
-  section="16. Statement Termination",
-  summary="Semicolon insertion is suppressed while the unmatched `(` and `[` nesting depth is nonzero, so a newline inside an unclosed parenthesis does not terminate the expression",
+  section="16. Statement Termination and Brace Placement",
+  summary="A call may spread its arguments across physical lines because the grammar absorbs the boundary after `(`, after a comma, and before `)`, while a complete statement followed by an operator line cannot continue even inside parentheses, because nesting depth grants no continuation",
   kind="compile-time",
-  notes="The pair `f(1\\n + 2)` (accepted) and `val v = 1\\n + 2` (rejected) has identical tokens around the newline -- a literal before it, `+` after it, at the start of a declaration -- and differs only in the unmatched-paren depth at the newline. That isolates condition 1 exactly: an implementation that emitted a SEMI on the preceding-token rule while ignoring depth would reject the accepted arm, and one that never inserted after a literal would accept the rejected arm. Bare rejection.",
-  quotes=["the unmatched `(` and `[` nesting depths are both zero;",
-          "Expressions continue naturally after operators and commas:"]),
+  notes="The accepted arm breaks only at admitted positions -- after the opening paren, after each comma, and before the closing paren -- and remains a single call whose printed result is the oracle. The rejected arm `val v = 1\\n + 2` puts the newline BEFORE the operator: the first line ended of its own accord after the literal, so `+ 2` is orphaned, and it stays an error inside no parentheses at all because depth grants nothing. An implementation that joined a newline before an operator whenever brackets enclose the expression -- the removed depth-suppression design -- accepts the rejected arm and fails. Bare rejection.",
+  quotes=["the grammar itself absorbs the boundary tokens at the positions where a construct may spread across lines - after a binary operator, after a comma, before a `.`, `?.`, or `::`, around argument, type-argument, and pattern lists, and before a closing delimiter.",
+          "a line break the grammar does not admit is an error at the break."]),
  "REQ-1902": dict(
-  section="16. Statement Termination",
-  summary="Insertion happens only when the token before the newline is a terminator-triggering token, so an expression continues after a trailing operator or comma, while a newline before an operator (identifier before it, operator after) inserts a SEMI and is a compile-time error",
+  section="16. Statement Termination and Brace Placement",
+  summary="An expression continues across a line whose last token is a binary operator or a comma, while a newline placed before an operator - a complete line followed by an operator line - is a compile-time error, so continuation follows the grammar and not JavaScript's operator-continuation intuition",
   kind="compile-time",
-  notes="`val b = a +\\n 1` (accepted) and `val b = a\\n + 1` (rejected) are both at depth zero and differ only in which side of the newline the `+` sits: on the accepted side the preceding token is an operator (not a triggering token) so no SEMI is emitted; on the rejected side it is the identifier `a` so a SEMI is emitted and `+ 1` is orphaned. A second rejection uses `*` rather than `+` to show the rule is not about any one operator. Together these are the direct evidence for 'do not use general JavaScript-style heuristics': an implementation that carried over JS operator-continuation would accept both leading-operator programs. Bare rejections.",
-  quotes=["the preceding significant token is an identifier, a literal, `break`, `continue`, `return`, `)`, `]`, or `}`;",
-          "do not use general JavaScript-style heuristics."]),
+  notes="`val b = a +\\n 1` (accepted) and `val b = a\\n + 1` (rejected) differ only in which side of the newline the `+` sits: on the accepted side the line cannot end after an operator, so the expression continues; on the rejected side the line ended after the identifier, so `+ 1` is orphaned. A second rejection uses `*` rather than `+` to show the rule is not about any one operator, and the multi-line call-argument arm shows the comma position. Together these are the direct evidence against JavaScript-style heuristics: an implementation that carried over JS operator-continuation would accept both leading-operator programs. Bare rejections.",
+  quotes=["a line break the grammar does not admit is an error at the break.",
+          "There is no lookahead exception table and no heuristic join: a line break the grammar does not admit is an error at the break."]),
  "REQ-1903": dict(
-  section="16. Statement Termination",
-  summary="Insertion is suppressed when the token after the newline is `.`, `?.`, or `else` -- the only member-chain lookahead exceptions -- so a leading-dot chain, a leading-safe-call chain, and an `else` on its own line all parse",
+  section="16. Statement Termination and Brace Placement",
+  summary="A line ending in `.` or `?.` cannot end, so a leading-dot member chain and a leading-safe-call chain continue across lines, and a clause keyword `else` beginning its own physical line is the canonical layout for both statement and expression `if`",
   kind="compile-time",
-  notes="Each accepted program is accepted ONLY because insertion is suppressed for one specific next-token; removing the suppression for `.`, for `?.`, or for `else` respectively makes that program gain a stray SEMI and fail. The dot and safe-call chains are separate programs because the specification lists them as two exceptions, and the else is tested both as a statement and as the tail of an if-expression. Bare expectations are not needed here: every arm is an acceptance whose stdout is the oracle.",
-  quotes=["the next significant token is not `.`, `?.`, or `else`.",
-          "The semicolon-inserting token stream must suppress insertion when the next significant token is `.` or `?.`. This is the only member-chain lookahead exception; do not use general JavaScript-style heuristics.",
-          "Solvik supports TypeScript/Kotlin-style leading-dot chains:"]),
+  notes="Each accepted program is accepted ONLY because the grammar absorbs the boundary before the member suffix; dropping the continuation for `.`, for `?.`, or for the standalone clause line makes that program break at its first chain newline or its `else`. The dot and safe-call chains are separate programs because the specification lists them as two suffixes, and the `else` is tested both as a statement and as the arm of an if-expression written in the canonical brace layout. Every arm is an acceptance whose stdout is the oracle, so no code assertion is needed.",
+  quotes=["A line ending in `.` or `?.` cannot end, so the chain continues.",
+          "Solvik supports TypeScript/Kotlin-style leading-dot chains:",
+          "a clause is written `}` newline `else {`"]),
  "REQ-1904": dict(
-  section="16. Statement Termination",
-  summary="A newline contained in a line comment or a block comment is treated as a physical newline, so a statement can be terminated by a newline that appears only inside a comment",
+  section="16. Statement Termination and Brace Placement",
+  summary="A newline contained in a line comment or a block comment is still a physical newline, so a statement can be terminated by a newline that appears only inside a comment",
   kind="compile-time",
-  notes="`val a = 1 /* c\\n*/ print(...)` is accepted while the identical program with the comment-newline removed, `val a = 1 print(...)`, is rejected (that rejection is REQ-1900's arm and the contrast is documented in the plan). The accepted arm can only parse if the token-stream stage treats the newline inside the block comment as the physical newline that terminates `val a = 1`; a stage that ignored comment interiors would see no terminator and reject it. A line-comment newline is accepted on the same principle. This is the only direct evidence for the clause, since a portable oracle cannot inspect the token stream.",
-  quotes=["The lexer must preserve physical newline information. The token-stream stage ignores spaces and comments but treats a newline contained in a line comment or block comment as a physical newline."]),
+  notes="`val a = 1 /* c\\n*/ print(...)` is accepted while the identical program with the comment-newline removed, `val a = 1 print(...)`, is rejected (that rejection is REQ-1900's arm and the contrast is documented in the plan). The accepted arm can only parse if the stage treats the newline contained in the block comment as the physical boundary that ended `val a = 1`; a stage that ignored comment interiors would see no boundary and reject it. A line-comment newline is accepted on the same principle. This is the only direct evidence for the clause, since a portable oracle cannot inspect the token stream.",
+  quotes=["The lexer preserves every physical newline (including a newline inside a comment, because it is still a physical newline)"]),
  "REQ-1905": dict(
-  section="16. Statement Termination",
-  summary="`return` followed by a newline terminates the return statement, so a value placed on the next line is not the returned value and a bare return leaves the function before any following statement",
+  section="16. Statement Termination and Brace Placement",
+  summary="`return` followed by a newline is a complete bare return, so a value placed on the next line is not the returned value and a bare return leaves the function before any following statement",
   kind="compile-time",
-  notes="The rejection is a value-returning function whose value sits on the line after `return`, so the return is terminated empty and the function returns no value -- the specification's own worked example. The control `return 7` on one line is accepted. The strongest arm is a value-less function with `return` then `print(\"after\")` on the next line: the observed bytes are 'in' then 'done' with NO 'after', which proves the return terminated the function at the newline (a no-ASI reading would swallow the print as the return value and emit 'after'). That expected output is the direct embodiment of 'do not copy JavaScript's automatic semicolon insertion behavior', and it fails in the safe direction -- an implementation that did copy JS would be caught by the extra 'after'. Bare rejection.",
-  quotes=["`return` followed by a newline terminates the return statement:",
+  notes="The rejection is a value-returning function whose value sits on the line after `return`, so the return is terminated bare and the function returns no value -- the specification's own worked example. The control `return 7` on one line is accepted. The strongest arm is a value-less function with `return` then `print(\"after\")` on the next line: the expected bytes are 'in' then 'done' with NO 'after', which proves the bare return left the function at the newline (a JavaScript-ASI reading would swallow the print as the return value and emit 'after'). That expected output is the direct embodiment of 'do not copy ... JavaScript's automatic semicolon insertion behavior', and it fails in the safe direction -- an implementation that did copy JS would be caught by the extra 'after'. Bare rejection.",
+  quotes=["`return` followed by a newline is a complete bare return; the next line begins a new statement.",
           "Do not copy TypeScript's unsound `any` behavior or JavaScript's automatic semicolon insertion behavior."]),
  "REQ-1906": dict(
-  section="16. Statement Termination",
-  summary="Consecutive blank lines between statements must not emit duplicate semicolons, and at end of file the same insertion rule applies without the next-token exception",
+  section="16. Statement Termination and Brace Placement",
+  summary="Blank lines between statements never add a second boundary, and the final physical line of a file is terminated by end of file even without a trailing newline",
   kind="compile-time",
-  notes="The blank-lines program has two consecutive blank lines between two declarations and a trailing blank line before the final statement; if a SEMI were emitted per newline the parser would see empty statements it rejects, so acceptance is the evidence for the no-duplicate clause. The end-of-file program ends after a call with no trailing newline at all, exercising the EOF rule (the final statement is terminated by end of file, not by a following token). Both are accepted and the observable is the printed bytes, so no code assertion is needed.",
-  quotes=["Consecutive blank lines must not emit duplicate semicolons.",
-          "At end of file, apply the same rule without a next-token exception."]),
+  notes="The blank-lines program has two consecutive blank lines between two declarations and a trailing blank line before the final statement; if a second boundary were emitted per blank line the parser would see empty statements it rejects, so acceptance is the evidence for the single-boundary clause. The end-of-file program ends after a call with no trailing newline at all, exercising end-of-file termination (the final statement is terminated by the end of the file, not by a following token). Both are accepted and the observable is the printed bytes, so no code assertion is needed.",
+  quotes=["Blank lines and comment lines never add a second boundary, and the final physical line of a file is terminated by end of file, to which the same rule applies without a following token."]),
  "REQ-1907": dict(
-  section="16. Statement Termination",
-  summary="A top-level include directive ends with an explicit or inserted SEMI exactly like a statement -- its path is a string or raw-string literal so a following physical newline terminates it -- and an include with no separator is a compile-time error",
+  section="20. File Inclusion / 16. Statement Termination and Brace Placement",
+  summary="A top-level include directive ends where its physical line ends -- its path is a string or raw-string literal so a following physical newline terminates it -- and an include followed by a statement on the same line is a compile-time error",
   kind="compile-time",
-  notes="Two accepted arms terminate an include by a plain newline, one with a normal string path and one with a raw-string path, each observable by calling a function declared in the included file -- if the directive were not terminated, the following call statement could not parse. The rejected arm omits any terminator so the include and the next statement collide. The section states explicitly that no include-specific termination rule exists, so the rejection is an ordinary insertion failure and is asserted bare like the other termination rejections; the included helper is the same for every arm so only the terminator differs.",
-  quotes=["A top-level `include` directive (section 20) ends with an explicit or inserted `SEMI` exactly like a statement.",
-          "Solvik uses Go-style lexical semicolon insertion."]),
+  notes="Two accepted arms terminate an include by a plain newline, one with a normal string path and one with a raw-string path, each observable by calling a function declared in the included file -- if the directive were not terminated, the following call statement could not parse. The rejected arm places the call on the include's own line with no separator, so the directive and the statement collide on one physical line. The section states explicitly that no include-specific termination rule exists, so the rejection is an ordinary termination failure and is asserted bare like the other termination rejections; the included helper is the same for every arm so only the termination differs.",
+  quotes=["The path is a normal or raw string literal, and the directive ends where its physical line ends, like any construct (section 16)."]),
 }
 
 NEG = '\nprint("EXECUTED-INVALID")\n'
@@ -167,25 +184,34 @@ def succ(tid, req, src, out):
     add(tid, req, "syntax", src, "SUCCESS", stdout=out)
 
 
-def rej(tid, req, src, libs=None):
-    add(tid, req, "syntax", src, "COMPILE_ERROR", libs=libs, diag={})
+def rej(tid, req, src, libs=None, code=None):
+    diag = {"family": code.split("-")[1], "code": code} if code else {}
+    add(tid, req, "syntax", src, "COMPILE_ERROR", libs=libs, diag=diag)
 
 
-# --- REQ-1900: a statement must end with an explicit or inserted SEMI.
+# --- REQ-1900: a newline ends a construct; `;` only separates one line.
 succ("SOL-TCK-0286", "REQ-1900",
      'val a = 1\nval b = 2\nprint("n" .. a .. b)\n', "n12")
 succ("SOL-TCK-0287", "REQ-1900",
-     'val a = 1;\nval b = 2;\nprint("x" .. a .. b)\n', "x12")
+     'val a = 1; val b = 2\nprint("x" .. a .. b)\n', "x12")
 rej("SOL-TCK-0288", "REQ-1900",
     'val a = 1 print("a" .. a)\n' + NEG)
+# The three SOLV-PARS-012 arms: the `;` ends its line, ends the file, and
+# precedes the stand-alone closing brace of the block that encloses it.
+rej("SOL-TCK-0496", "REQ-1900",
+    'val a = 1;\nprint("s" .. a)\n' + NEG, code="SOLV-PARS-012")
+rej("SOL-TCK-0497", "REQ-1900",
+    'val v = {\n    42;\n}\nprint("v" .. v)\n' + NEG, code="SOLV-PARS-012")
+rej("SOL-TCK-0498", "REQ-1900",
+    'val a = 1\nprint("e" .. a);', code="SOLV-PARS-012")
 
-# --- REQ-1901: insertion is suppressed at nonzero paren depth.
+# --- REQ-1901: bracketed continuations are grammar, not lookahead.
 succ("SOL-TCK-0289", "REQ-1901",
-     'func f(x: Integer): Integer {\n    return x\n}\nval v = f(1\n    + 2)\nprint("v" .. v)\n', "v3")
+     'func add(x: Integer, y: Integer): Integer {\n    return x + y\n}\nval v = add(\n    1,\n    2,\n)\nprint("v" .. v)\n', "v3")
 rej("SOL-TCK-0290", "REQ-1901",
     'val v = 1\n    + 2\nprint("v" .. v)\n' + NEG)
 
-# --- REQ-1902: insertion only after a triggering token; operators/commas continue.
+# --- REQ-1902: operators and commas continue; operator lines do not join.
 succ("SOL-TCK-0291", "REQ-1902",
      'val a = 1\nval b = a +\n    1\nprint("b" .. b)\n', "b2")
 succ("SOL-TCK-0292", "REQ-1902",
@@ -196,18 +222,18 @@ rej("SOL-TCK-0293", "REQ-1902",
 rej("SOL-TCK-0294", "REQ-1902",
     'val a = 2\nval b = a\n    * 3\nprint("b" .. b)\n' + NEG)
 
-# --- REQ-1903: the `.`, `?.`, `else` lookahead exceptions.
+# --- REQ-1903: member-suffix continuation and the canonical standalone `else`.
 succ("SOL-TCK-0295", "REQ-1903",
-     'class S { S() {\n    }\n\n    func load(): S {\n        return this\n    }\n\n'
+     'class S {\n    S() {\n    }\n\n    func load(): S {\n        return this\n    }\n\n'
      '    func value(): Integer {\n        return 42\n    }\n}\n'
      'val s = S()\nval r = s\n    .load()\n    .value()\nprint("r" .. r)\n', "r42")
 succ("SOL-TCK-0296", "REQ-1903",
-     'class W { W() {\n    }\n\n    func opt(): String? {\n        return "z"\n    }\n}\n'
+     'class W {\n    W() {\n    }\n\n    func opt(): String? {\n        return "z"\n    }\n}\n'
      'val w = W()\nval v = w.opt()\n    ?.hashCode()\nprint("v" .. (v != null))\n', "vtrue")
 succ("SOL-TCK-0297", "REQ-1903",
      'val c = false\nif (c) {\n    print("y")\n}\nelse {\n    print("n")\n}\n', "n")
 succ("SOL-TCK-0298", "REQ-1903",
-     'val c = true\nval r = if (c) { 1 }\nelse { 2 }\nprint("r" .. r)\n', "r1")
+     'val c = true\nval r = if (c) {\n    1\n}\nelse {\n    2\n}\nprint("r" .. r)\n', "r1")
 
 # --- REQ-1904: a newline inside a comment is a physical newline.
 succ("SOL-TCK-0299", "REQ-1904",
@@ -215,24 +241,24 @@ succ("SOL-TCK-0299", "REQ-1904",
 succ("SOL-TCK-0300", "REQ-1904",
      'val a = 1 // note\nprint("lc" .. a)\n', "lc1")
 
-# --- REQ-1905: `return` followed by a newline terminates the return.
+# --- REQ-1905: `return` followed by a newline is a complete bare return.
 rej("SOL-TCK-0301", "REQ-1905",
     'func f(): Integer {\n    return\n    7\n}\nprint("v" .. f())\n' + NEG)
 succ("SOL-TCK-0302", "REQ-1905",
      'func f(): Integer {\n    return 7\n}\nprint("v" .. f())\n', "v7")
-# The bare-return-in-void function: "in" prints, the return leaves the function at the
-# newline, so "after" is unreachable and must NOT appear. A JS-ASI reading emits "after".
+# The bare-return-in-void function: "in" prints, the bare return leaves the function at the
+# newline, so "after" is unreachable and must NOT appear. A JavaScript-ASI reading emits "after".
 succ("SOL-TCK-0303", "REQ-1905",
      'func f() {\n    print("in")\n    return\n    print("after")\n}\nf()\nprint("done")\n',
      "indone")
 
-# --- REQ-1906: no duplicate semicolons across blank lines; EOF applies the rule.
+# --- REQ-1906: blank lines add no second boundary; EOF closes the final line.
 succ("SOL-TCK-0304", "REQ-1906",
      'val a = 1\n\n\nval b = 2\n\nprint("z" .. a .. b)\n', "z12")
 add("SOL-TCK-0305", "REQ-1906", "syntax",
     'val a = 1\nval b = 2\nprint("e" .. a .. b)', "SUCCESS", stdout="e12")
 
-# --- REQ-1907: an include is terminated by an inserted SEMI like any statement.
+# --- REQ-1907: an include ends where its physical line ends.
 LIBDIR = {"lib/m.sol": LIB}
 add("SOL-TCK-0306", "REQ-1907", "syntax",
     'include "lib/m.sol"\nprint("nl" .. two())\n', "SUCCESS", libs=LIBDIR, stdout="nl2")
@@ -249,8 +275,15 @@ def verify():
         for q in r["quotes"]:
             if norm(q) not in SPEC_N:
                 bad.append(("QUOTE", rid, q))
+    # The REQ-1900 separator arm must genuinely put both declarations on ONE physical
+    # line, or it stops testing the separator role and just looks like 0286.
+    if "\n" in S["SOL-TCK-0287"].split("\n")[0].split("print")[0] or ";" not in S["SOL-TCK-0287"].split("\n")[0]:
+        bad.append(("SHAPE", "REQ-1900", "separator arm no longer shares one physical line"))
+    # The end-of-file `;` arm must genuinely end the file with the semicolon.
+    if S["SOL-TCK-0498"].endswith("\n") or not S["SOL-TCK-0498"].endswith(";"):
+        bad.append(("SHAPE", "REQ-1900", "end-of-file semicolon arm does not end the file at the `;`"))
     # The end-of-file arm must genuinely lack a trailing newline, or it stops testing
-    # the EOF clause while still looking like the same test.
+    # the end-of-file clause while still looking like the same test.
     if S["SOL-TCK-0305"].endswith("\n"):
         bad.append(("SHAPE", "REQ-1906", "end-of-file arm ends with a newline"))
     # The comment arm must genuinely have its ONLY newline inside the comment, else it
@@ -264,10 +297,13 @@ def verify():
     # terminator.
     if not EXTRA.get("SOL-TCK-0308"):
         bad.append(("SHAPE", "REQ-1907", "include rejection has no lib/ to include"))
-    # The REQ-1901 pair must differ only by the parentheses, which is what isolates the
-    # depth condition; assert the two programs share their insertion-relevant tokens.
-    if "+ 2" not in S["SOL-TCK-0289"] or "+ 2" not in S["SOL-TCK-0290"]:
-        bad.append(("SHAPE", "REQ-1901", "depth pair no longer shares its operand"))
+    # The REQ-1901 accepted arm must genuinely break only at admitted positions:
+    # after the open paren, after each comma, before the close.
+    if "add(\n    1,\n    2,\n)" not in S["SOL-TCK-0289"]:
+        bad.append(("SHAPE", "REQ-1901", "accepted arm no longer breaks only at admitted positions"))
+    # The REQ-1902 pair must differ only by which side of the newline the `+` sits.
+    if "a +\n" not in S["SOL-TCK-0291"] or "a\n    + 1" not in S["SOL-TCK-0293"]:
+        bad.append(("SHAPE", "REQ-1902", "operator pair no longer differs only by operator side"))
     return bad
 
 

@@ -248,7 +248,7 @@ BAD("SOL-TCK-0348", "exceptions", "REQ-2305",
     'class Simple extends RuntimeException {\n    Simple() {\n    }\n}\n'
     'class MyErr<T> extends RuntimeException {\n    val payload: T\n\n    MyErr(payload: T) {\n'
     '        this.payload = payload\n    }\n}\nfunc f() {\n    throw Simple()\n}\ntry {\n    f()\n'
-    '} catch (e: MyErr<Integer>) {\n    print("caught")\n}\nprint("EXECUTED-INVALID")\n',
+    '}\ncatch (e: MyErr<Integer>) {\n    print("caught")\n}\nprint("EXECUTED-INVALID")\n',
     {"family": "SEM", "code": "SOLV-SEM-054"},
     "The handler names a parameterized generic type, which is not an accepted catch handler type.")
 BAD("SOL-TCK-0349", "exceptions", "REQ-2306",
@@ -261,18 +261,18 @@ BAD("SOL-TCK-0349", "exceptions", "REQ-2306",
 
 # --- section 23.4: Result operation diagnostics.
 BAD("SOL-TCK-0350", "result", "REQ-2307",
-    RESULT + 'func use(): Result<Integer, String> {\n    val r = get()\n    val b = r.nope();\n'
+    RESULT + 'func use(): Result<Integer, String> {\n    val r = get()\n    val b = r.nope()\n'
     '    return Result.Ok(1)\n}\nprint("EXECUTED-INVALID")\n',
     {"family": "RESOL", "code": "SOLV-RESOL-004"},
     "An unknown member on a Result receiver pins the specification-named SOLV-RESOL-004.")
 BAD("SOL-TCK-0351", "result", "REQ-2308",
-    RESULT + 'func use(): Result<Integer, String> {\n    val r = get()\n    val b = r.isOk(1);\n'
+    RESULT + 'func use(): Result<Integer, String> {\n    val r = get()\n    val b = r.isOk(1)\n'
     '    return Result.Ok(1)\n}\nprint("EXECUTED-INVALID")\n',
     {"family": "TYPE", "code": "SOLV-TYPE-003"},
     "isOk takes no arguments, so the extra argument is the wrong argument count and pins "
     "SOLV-TYPE-003.")
 BAD("SOL-TCK-0352", "result", "REQ-2309",
-    RESULT + 'func use(): Result<Integer, String> {\n    val r = get()\n    val f = r.isOk;\n'
+    RESULT + 'func use(): Result<Integer, String> {\n    val r = get()\n    val f = r.isOk\n'
     '    return Result.Ok(1)\n}\nprint("EXECUTED-INVALID")\n',
     {"family": "TYPE", "code": "SOLV-TYPE-014"},
     "A bare member read of a Result operation pins the specification-named SOLV-TYPE-014.")

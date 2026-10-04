@@ -484,8 +484,10 @@ properties therefore hold:
 ```solvik
 format === format // true: canonical named function value
 
-val first = func() {}
-val second = func() {}
+val first = func() {
+}
+val second = func() {
+}
 first === second // false
 first === first  // true
 

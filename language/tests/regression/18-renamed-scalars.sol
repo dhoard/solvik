@@ -25,6 +25,10 @@ func twice(value: Integer): Integer {
     return value * 2
 }
 println(twice(21))
-for (mutable val i: Integer = 0; i < 3; i = i + 1) {
-    println(i)
+{
+    mutable val i: Integer = 0
+    while (i < 3) {
+        println(i)
+        i = i + 1
+    }
 }

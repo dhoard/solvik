@@ -1,5 +1,10 @@
 func num1(flag: Boolean): Number {
-    return if (flag) { 33 } else { 59L }
+    return if (flag) {
+        33
+    }
+    else {
+        59L
+    }
 }
 
 println(num1(true) is Number)

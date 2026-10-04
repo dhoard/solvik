@@ -11,11 +11,13 @@
 // Sentinel per TCK.md section 10; the compile-only phase proves non-execution.
 val mode: Integer = 1
 val label: String = switch (mode) {
-    case 1:
+    case 1 {
         "one"
+    }
 
-    case 2:
+    case 2 {
         "two"
+    }
 }
 
 println("EXECUTED-INVALID")

@@ -32,7 +32,7 @@ import org.solvik.source.SourceFile;
 
 /**
  * The Solvik Truffle language (docs/ARCHITECTURE.md). Its parse entry point runs the required
- * pipeline: Solvik source, semicolon-inserting lexical token stream, ANTLR grammar, syntax AST,
+ * pipeline: Solvik source, physical-line lexical token stream, ANTLR grammar, syntax AST,
  * compile-time include resolution, static semantic analysis, and only then typed lowering to the
  * Truffle AST backend. A program with any compile-time error throws {@link SolvikParseException}
  * before lowering, so no executable call target is produced for ill-typed input.

@@ -88,8 +88,8 @@ public final class SolvikImplicitMainParserTest {
     }
 
     @Test
-    public void topLevelStatementsWithoutSemicolonInsertionBoundariesStillParse() {
-        String src = "val a = 1; val b = 2; println(a + b);\n";
+    public void topLevelStatementsSeparatedBySemicolonsOnOneLineParse() {
+        String src = "val a = 1; val b = 2; println(a + b)\n";
         CompilationUnitNode cu = parseOk("explicit.sol", src);
         assertThat(cu.statements().size()).isEqualTo(3);
     }

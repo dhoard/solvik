@@ -224,7 +224,7 @@ def _in_int32_range(token):
 # it still equals that extraction, so it cannot silently drift from the document. Over-refusal
 # costs this partner coverage and cannot produce a wrong verdict; over-acceptance can.
 _RESERVEDISH = frozenset({
-    "abstract", "add", "alias", "any", "as", "attempts", "break", "catch",
+    "abstract", "add", "alias", "any", "as", "attempts", "break", "case", "catch",
     "class", "code", "common", "const", "contains", "continue", "default", "deferred",
     "delegate", "else", "end", "enum", "equals", "error", "exit", "expect",
     "extends", "factor", "fallthrough", "false", "final", "finally", "find", "for",

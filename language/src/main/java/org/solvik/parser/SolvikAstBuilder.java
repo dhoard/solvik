@@ -87,7 +87,6 @@ import org.solvik.ast.statement.ContinueStmtNode;
 import org.solvik.ast.statement.ElseBranchNode;
 import org.solvik.ast.statement.ExprStmtNode;
 import org.solvik.ast.statement.ForInStmtNode;
-import org.solvik.ast.statement.ForStmtNode;
 import org.solvik.ast.statement.IfStmtNode;
 import org.solvik.ast.statement.LocalDeclNode;
 import org.solvik.ast.statement.RangeOperator;
@@ -135,8 +134,6 @@ import org.solvik.parser.generated.SolvikParser.ExprStmtContext;
 import org.solvik.parser.generated.SolvikParser.ExpressionContext;
 import org.solvik.parser.generated.SolvikParser.FloatingLiteralContext;
 import org.solvik.parser.generated.SolvikParser.ForInStmtContext;
-import org.solvik.parser.generated.SolvikParser.ForInitContext;
-import org.solvik.parser.generated.SolvikParser.ForStmtContext;
 import org.solvik.parser.generated.SolvikParser.FunctionDeclContext;
 import org.solvik.parser.generated.SolvikParser.IfExprContext;
 import org.solvik.parser.generated.SolvikParser.IfStmtContext;
@@ -528,8 +525,11 @@ final class SolvikAstBuilder {
         if (ctx.whileStmt() != null) {
             return buildWhile(ctx.whileStmt());
         }
-        if (ctx.forStmt() != null) {
-            return buildFor(ctx.forStmt());
+        if (ctx.removedForStmt() != null) {
+            // Unreachable by construction: `SolvikParser` reports SOLV-PARS-011 for every removed
+            // three-clause `for` it finds in the tree and fails the compilation before the builder
+            // runs, so no executable node is ever produced for the old form.
+            throw new IllegalStateException("removed three-clause for reached the AST builder");
         }
         if (ctx.forInStmt() != null) {
             return buildForIn(ctx.forInStmt());
@@ -611,18 +611,6 @@ final class SolvikAstBuilder {
 
     private WhileStmtNode buildWhile(WhileStmtContext ctx) {
         return new WhileStmtNode(buildExpression(ctx.expression()), buildBlock(ctx.block()), span(ctx.getStart(), ctx.getStop()));
-    }
-
-    private ForStmtNode buildFor(ForStmtContext ctx) {
-        StatementNode initializer = null;
-        ForInitContext fi = ctx.forInit();
-        if (fi != null) {
-            initializer = fi.localDecl() != null ? buildLocalDecl(fi.localDecl()) : buildAssignable(fi.assignable());
-        }
-        ExpressionNode condition = ctx.forCondition() == null ? null : buildExpression(ctx.forCondition().expression());
-        StatementNode update = ctx.forUpdate() == null ? null : buildAssignable(ctx.forUpdate().assignable());
-        BlockNode body = buildBlock(ctx.block());
-        return new ForStmtNode(initializer, condition, update, body, span(ctx.getStart(), ctx.getStop()));
     }
 
     /** Builds a range for-in loop; the semantic layer declares the loop variable. */

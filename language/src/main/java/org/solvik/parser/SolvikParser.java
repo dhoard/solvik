@@ -167,7 +167,9 @@ public final class SolvikParser {
             parser.setErrorHandler(new BailErrorStrategy());
             parser.getInterpreter().setPredictionMode(PredictionMode.SLL);
             CompilationUnitContext tree = parser.compilationUnit();
-            if (lexerErrors.sawError()) {
+            if (lexerErrors.sawError() || hasRemovedFor(tree)) {
+                // A removed three-clause `for` defers to the reporting stage, which owns the
+                // diagnostic; the fast stage never builds an AST around a rejected construct.
                 return null;
             }
             return SolvikParseResult.success(new SolvikAstBuilder(source).build(tree));
@@ -190,12 +192,74 @@ public final class SolvikParser {
 
         CompilationUnitContext tree = parser.compilationUnit();
         DiagnosticBag bag = listener.build();
+        List<Diagnostic> removedFor = removedForDiagnostics(tree, source);
+        if (!removedFor.isEmpty()) {
+            DiagnosticBag.Builder builder = DiagnosticBag.builder();
+            bag.all().forEach(builder::add);
+            removedFor.forEach(builder::add);
+            return SolvikParseResult.failure(builder.build());
+        }
         if (bag.hasErrors()) {
             return SolvikParseResult.failure(bag);
         }
         CompilationUnitNode ast = new SolvikAstBuilder(source).build(tree);
         return SolvikParseResult.success(ast);
     }
+
+    /**
+     * The removed three-clause {@code for} is matched by the grammar for exactly one reason: so a
+     * program written against the old revision is named at its {@code for} keyword with the
+     * replacement spelled out, instead of failing as a generic syntax error at the first {@code ;}.
+     * The construct has no AST node and no execution path; this detection is the whole of it
+     * (docs/LANGUAGE_SPEC.md section 17).
+     */
+    private static boolean hasRemovedFor(org.antlr.v4.runtime.tree.ParseTree tree) {
+        return !removedForDiagnostics(tree, null).isEmpty();
+    }
+
+    /** One diagnostic per removed {@code for}, anchored at its keyword; empty span skips the bag. */
+    private static List<Diagnostic> removedForDiagnostics(org.antlr.v4.runtime.tree.ParseTree tree, SourceFile source) {
+        List<Diagnostic> found = new java.util.ArrayList<>();
+        org.antlr.v4.runtime.tree.ParseTreeWalker.DEFAULT.walk(new org.antlr.v4.runtime.tree.ParseTreeListener() {
+            @Override
+            public void enterEveryRule(org.antlr.v4.runtime.ParserRuleContext ctx) {
+                if (ctx instanceof org.solvik.parser.generated.SolvikParser.RemovedForStmtContext removed) {
+                    if (source != null) {
+                        found.add(Diagnostic.error(DiagnosticCode.PARSER_REMOVED_THREE_CLAUSE_FOR,
+                                tokenSpan(removed.getStart(), source), REMOVED_FOR_MESSAGE));
+                    } else {
+                        found.add(Diagnostic.error(DiagnosticCode.PARSER_REMOVED_THREE_CLAUSE_FOR,
+                                SourceSpan.of(0, 0, 0), REMOVED_FOR_MESSAGE));
+                    }
+                }
+            }
+
+            @Override
+            public void exitEveryRule(org.antlr.v4.runtime.ParserRuleContext ctx) {
+            }
+
+            @Override
+            public void visitErrorNode(org.antlr.v4.runtime.tree.ErrorNode node) {
+            }
+
+            @Override
+            public void visitTerminal(org.antlr.v4.runtime.tree.TerminalNode node) {
+            }
+        }, tree);
+        return found;
+    }
+
+    /** Character span of a token; mirrors the error listener's anchoring of parser diagnostics. */
+    private static SourceSpan tokenSpan(org.antlr.v4.runtime.Token token, SourceFile source) {
+        int start = token.getStartIndex();
+        int stop = Math.max(token.getStopIndex(), start - 1);
+        return SourceSpan.of(source.id(), start, Math.min(stop + 1, source.textLength()));
+    }
+
+    /** The user-facing removal message; the specification names the two replacements it offers. */
+    private static final String REMOVED_FOR_MESSAGE =
+            "the three-clause `for` syntax was removed in 2026.11-draft; use a range `for` over an "
+            + "integer range or a scope block around a `while` loop";
 
     private static SolvikLexer newLexer(SourceFile source) {
         SolvikLexer lexer = new SolvikLexer(CharStreams.fromString(source.text(), source.name()));

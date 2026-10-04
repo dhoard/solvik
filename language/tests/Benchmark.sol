@@ -3,8 +3,12 @@
 // Collection performance benchmarks live in the top-level benchmarks/ directory; see benchmarks/README.md.
 func sumTo(limit: Integer): Integer {
     mutable val total = 0
-    for (mutable val i = 1; i <= limit; i = i + 1) {
-        total = total + i
+    {
+        mutable val i = 1
+        while (i <= limit) {
+            total = total + i
+            i = i + 1
+        }
     }
     return total
 }

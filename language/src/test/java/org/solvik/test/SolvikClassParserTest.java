@@ -38,7 +38,7 @@ import org.solvik.ast.statement.ReturnStmtNode;
 /**
  * Phase 6 parser tests: class declarations, property declarations, constructors, instance methods,
  * and the {@code this} expression build the expected syntax AST with exact spans, including when
- * statement termination comes from semicolon insertion rather than explicit {@code ;}.
+ * statement termination comes from the physical line boundary rather than an explicit {@code ;}.
  */
 public final class SolvikClassParserTest {
 
@@ -138,9 +138,9 @@ public final class SolvikClassParserTest {
     }
 
     @Test
-    public void semicolonInsertionTerminatesClassMembers() {
+    public void lineBoundariesTerminateClassMembers() {
         // No explicit `;` anywhere: property, constructor body, method body, and class body all rely
-        // on newlines, so a constructor named after its class needs no insertion-table change.
+        // on their line boundaries, each of which ends where the boundary table says it does.
         String src = """
                 class C {
                     val value: Integer

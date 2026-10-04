@@ -8,7 +8,8 @@
 // specification never made.
 val v = if (7) {
     "yes"
-} else {
+}
+else {
     "no"
 }
 print("EXECUTED-INVALID")

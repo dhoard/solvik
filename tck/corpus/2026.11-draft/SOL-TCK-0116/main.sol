@@ -6,28 +6,37 @@
 //
 val a = "hi"
 switch (a) {
-  case regex r#"^\d+$"#:
+  case regex r#"^\d+$"# {
     print("[number] ")
-  case regex r#"^[A-Za-z]+$"#:
+  }
+  case regex r#"^[A-Za-z]+$"# {
     print("[word] ")
-  default:
+  }
+  default {
     print("[other] ")
+  }
 }
 val b = "!!"
 switch (b) {
-  case regex r#"^\d+$"#:
+  case regex r#"^\d+$"# {
     print("[number] ")
-  case regex r#"^[A-Za-z]+$"#:
+  }
+  case regex r#"^[A-Za-z]+$"# {
     print("[word] ")
-  default:
+  }
+  default {
     print("[other] ")
+  }
 }
 val c = "42"
 switch (c) {
-  case regex r#"^\d+$"#:
+  case regex r#"^\d+$"# {
     print("[number] ")
-  case regex r#"^[A-Za-z]+$"#:
+  }
+  case regex r#"^[A-Za-z]+$"# {
     print("[word] ")
-  default:
+  }
+  default {
     print("[other] ")
+  }
 }

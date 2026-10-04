@@ -33,7 +33,12 @@ func nameOf(value: Animal): String {
 // callable function value, its result reaches an `Animal` parameter, and it is accepted by a
 // binding that writes the joined type out.
 val flag: Boolean = true
-val joined = if (flag) { dogToDog } else { animalToAnimal }
+val joined = if (flag) {
+    dogToDog
+}
+else {
+    animalToAnimal
+}
 val joinedWritten: func(Dog): Animal = joined
 
 print(nameOf(joined(Dog())) .. "-" .. nameOf(joinedWritten(Dog())))

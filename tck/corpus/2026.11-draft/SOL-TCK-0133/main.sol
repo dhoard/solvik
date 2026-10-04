@@ -13,11 +13,14 @@ class Probe {
     }
 }
 val result = switch (Probe().tick()) {
-    case "one":
+    case "one" {
         "one"
-    case "two":
+    }
+    case "two" {
         "two"
-    default:
+    }
+    default {
         "other"
+    }
 }
 print(result)

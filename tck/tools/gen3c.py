@@ -7,11 +7,15 @@ Oracles are DERIVED FROM LANGUAGE_SPEC.md and only then compared with the
 implementation.
 
 Why this batch pins locations rather than only codes. The oracle matches a diagnostic
-by finding ANY reported diagnostic satisfying the declared fields, and a bare `{}`
+by finding ANY reported diagnostic satisfying the declared fields, and a bare `{
+}
+`
 therefore accepts any single diagnostic at all. Section 3 makes a countable claim that
 cannot be expressed any other way: "Each violation is a compile-time error reported on
 the single unpaired member, so a class missing one of the two produces one diagnostic."
-A bare `{}` would accept an implementation that reported the violation somewhere else,
+A bare `{
+}
+` would accept an implementation that reported the violation somewhere else,
 or that reported several. Each pairing program below is therefore constructed so the
 rule under test is the ONLY thing that can produce a diagnostic -- the class overrides
 nothing else wrongly, and where an inherited member is re-overridden the parent members

@@ -44,7 +44,8 @@ public final class SolvikExpressionOrientedFlowTest {
                     val x = {
                         if (flag) {
                             print("a")
-                        } else {
+                        }
+                        else {
                             print("b")
                         }
                         if (flag) {
@@ -53,8 +54,12 @@ public final class SolvikExpressionOrientedFlowTest {
                         while (flag) {
                             break
                         }
-                        for (mutable val i: Integer = 0; i < n; i = i + 1) {
-                            continue
+                        {
+                            mutable val i: Integer = 0
+                            while (i < n) {
+                                i = i + 1
+                                continue
+                            }
                         }
                         for (i in 0...n) {
                             break
@@ -63,10 +68,12 @@ public final class SolvikExpressionOrientedFlowTest {
                             print("nested")
                         }
                         switch (n) {
-                            case 1:
+                            case 1 {
                                 print("one")
-                            default:
+                            }
+                            default {
                                 print("other")
+                            }
                         }
                         n + 1
                     }
@@ -82,9 +89,11 @@ public final class SolvikExpressionOrientedFlowTest {
                     val x = {
                         if (a) {
                             print("a")
-                        } else if (b) {
+                        }
+                        else if (b) {
                             print("b")
-                        } else {
+                        }
+                        else {
                             print("c")
                         }
                         1
@@ -100,8 +109,9 @@ public final class SolvikExpressionOrientedFlowTest {
                 func run(n: Integer): Integer {
                     val x = {
                         switch (n) {
-                            case 1:
+                            case 1 {
                                 print("one")
+                            }
                         }
                         2
                     }
@@ -117,9 +127,11 @@ public final class SolvikExpressionOrientedFlowTest {
                     val x = {
                         if (a) {
                             1
-                        } else if (b) {
+                        }
+                        else if (b) {
                             2
-                        } else {
+                        }
+                        else {
                             3
                         }
                     }
@@ -134,10 +146,12 @@ public final class SolvikExpressionOrientedFlowTest {
                 func run(n: Integer): String {
                     val x = {
                         switch (n) {
-                            case 1:
+                            case 1 {
                                 "one"
-                            default:
+                            }
+                            default {
                                 "other"
+                            }
                         }
                     }
                     return x
@@ -152,7 +166,8 @@ public final class SolvikExpressionOrientedFlowTest {
                     val x = {
                         if (flag) {
                             return 1
-                        } else {
+                        }
+                        else {
                             return 2
                         }
                         print("unreachable")

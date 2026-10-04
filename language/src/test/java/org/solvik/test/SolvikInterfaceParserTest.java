@@ -136,9 +136,9 @@ public final class SolvikInterfaceParserTest {
     }
 
     @Test
-    public void interfaceMemberSignaturesSemiTerminateAndDefaultBodiesBraceTerminate() {
-        // A signature ends in an explicit `;`; a default method body ends in `}`, which is itself a
-        // semicolon-insertion terminator, so the grammar tolerates the synthesized `;` after it.
+    public void interfaceMembersTerminateOnTheirLineBoundary() {
+        // A signature ends where its line ends; a default method body ends in a standalone `}` that
+        // ends its own line, so neither member needs an explicit `;`.
         CompilationUnitNode unit = parseOk("terminators.sol", "interface I {\n    func a(): Integer\n    func b(): Integer {\n        return 1\n    }\n\n    func c(): Integer {\n        return 2\n    }\n}\n");
         InterfaceDeclNode declaration = (InterfaceDeclNode) unit.declarations().get(0);
         assertThat(declaration.signatures().size()).isEqualTo(1);

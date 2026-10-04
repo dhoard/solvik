@@ -12,7 +12,7 @@ func get(): Result<Integer, String> {
     return Result.Err("x")
 }
 func use(): Result<Integer, String> {
-    val v = get()?;
+    val v = get()?
     print("AFTER")
     return Result.Ok(v)
 }

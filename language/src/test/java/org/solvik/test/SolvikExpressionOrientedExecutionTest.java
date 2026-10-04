@@ -53,11 +53,13 @@ public final class SolvikExpressionOrientedExecutionTest {
                 }
                 println(answer)
 
-                val same = { 42 }
+                val same = {
+                    42
+                }
                 println(same)
 
                 val semi = {
-                    42;
+                    42
                 }
                 println(semi)
                 """)).isEqualTo("42\n42\n42\n");
@@ -79,9 +81,11 @@ public final class SolvikExpressionOrientedExecutionTest {
                 func describe(value: Integer): String {
                     return if (value < 0) {
                         "negative"
-                    } else if (value == 0) {
+                    }
+                    else if (value == 0) {
                         "zero"
-                    } else {
+                    }
+                    else {
                         "positive"
                     }
                 }
@@ -91,7 +95,12 @@ public final class SolvikExpressionOrientedExecutionTest {
                 println(describe(1))
 
                 mutable val score: Integer = 0
-                score = if (true) { 10 } else { 0 }
+                score = if (true) {
+                    10
+                }
+                else {
+                    0
+                }
                 println(score)
                 """)).isEqualTo("negative\nzero\npositive\n10\n");
     }
@@ -101,12 +110,15 @@ public final class SolvikExpressionOrientedExecutionTest {
         assertThat(run("""
                 func message(status: Integer): String {
                     return switch (status) {
-                        case 1:
+                        case 1 {
                             "ready"
-                        case 2, 3:
+                        }
+                        case 2, 3 {
                             "busy"
-                        default:
+                        }
+                        default {
                             "done"
+                        }
                     }
                 }
 
@@ -144,7 +156,8 @@ public final class SolvikExpressionOrientedExecutionTest {
                 func requireName(name: String?): String {
                     return if (name != null) {
                         name
-                    } else {
+                    }
+                    else {
                         return "fallback"
                     }
                 }
@@ -172,10 +185,12 @@ public final class SolvikExpressionOrientedExecutionTest {
 
                 func label(counter: Counter): String {
                     return switch (counter.next()) {
-                        case 1:
+                        case 1 {
                             "first"
-                        default:
+                        }
+                        default {
                             "later"
+                        }
                     }
                 }
 
@@ -190,12 +205,15 @@ public final class SolvikExpressionOrientedExecutionTest {
         assertThat(run("""
                 func kind(input: String): String {
                     return switch (input) {
-                        case regex r#"^\\d+$"#:
+                        case regex r#"^\\d+$"# {
                             "number"
-                        case regex r#"^[A-Za-z]+$"#:
+                        }
+                        case regex r#"^[A-Za-z]+$"# {
                             "word"
-                        default:
+                        }
+                        default {
                             "other"
+                        }
                     }
                 }
 
@@ -211,12 +229,15 @@ public final class SolvikExpressionOrientedExecutionTest {
                 func classify(value: Integer, flag: Boolean): String {
                     return if (flag) {
                         switch (value) {
-                            case 0:
+                            case 0 {
                                 "zero"
-                            default:
+                            }
+                            default {
                                 "value"
+                            }
                         }
-                    } else {
+                    }
+                    else {
                         "off"
                     }
                 }
@@ -236,8 +257,9 @@ public final class SolvikExpressionOrientedExecutionTest {
                     }
 
                     switch (value) {
-                        case 1:
+                        case 1 {
                             println("one")
+                        }
                     }
                 }
 
@@ -251,14 +273,21 @@ public final class SolvikExpressionOrientedExecutionTest {
     public void ifAndSwitchCanBeBlockTails() {
         assertThat(run("""
                 val fromIf = {
-                    if (true) { 1 } else { 2 }
+                    if (true) {
+                        1
+                    }
+                    else {
+                        2
+                    }
                 }
                 val fromSwitch = {
                     switch (3) {
-                        case 3:
+                        case 3 {
                             "three"
-                        default:
+                        }
+                        default {
                             "other"
+                        }
                     }
                 }
                 println(fromIf)

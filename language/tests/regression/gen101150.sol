@@ -28,7 +28,12 @@ println(kind3('z'))
 println(kind3('z') is String)
 
 func num4(flag: Boolean): Number {
-    return if (flag) { 43 } else { 11L }
+    return if (flag) {
+        43
+    }
+    else {
+        11L
+    }
 }
 
 println(num4(true) is Number)

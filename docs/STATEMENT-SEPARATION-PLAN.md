@@ -1,25 +1,28 @@
-# Statement Separation and Brace Placement — Revision Plan
+# Statement Separation and Brace Placement — Revision Record
 
-Status: **in progress** on branch `feature/physical-line-separation`.
-Language decision approved by the owner (option **C** plus brace/case-body rules).
-The rejected alternative (ban `;` and delete the three-clause `for`) is preserved on
-`wip/physical-line-semantics` (see `git log`) and must not be merged as it stands: it contradicts
-`docs/LANGUAGE_SPEC.md` sections 16 and 17, which `REQ-0403`, `REQ-0501`, `REQ-1204`, `REQ-1404`,
-`REQ-1900`..`REQ-1907` quote normatively.
+Status: **complete** on branch `feature/physical-line-separation`, validated by
+`./build-all.sh` and `./tck/tck-run.sh`.
+Language decision: the final revision bans line-terminating `;` AND removes the three-clause
+`for`. The intermediate design that retained both (`option C`) landed first as the mechanics
+step (boundary token, braced case bodies, brace-layout diagnostics) and was then tightened;
+the earlier revision that had banned `;` is preserved on `wip/physical-line-semantics`
+(see `git log`). The specification (sections 16, 17, 21.3) is authoritative for the final rules
+below, and `REQ-0403`, `REQ-0501`, `REQ-1204`, and `REQ-1900`..`REQ-1907` quote them verbatim.
 
-## Rules being implemented
+## Rules implemented
 
 1. **Statement separation is a physical-line boundary token.** `PhysicalLineTokenSource` moves one
-   `NEWLINE` onto the default channel per line boundary (suppressed while `(`/`[` depth is nonzero;
-   no lookahead exceptions — the grammar writes `NEWLINE*` where a line may continue). The grammar
+   `NEWLINE` onto the default channel per line boundary (bracket depth is not consulted; no
+   lookahead exceptions — the grammar writes `NEWLINE*` where a line may continue). The grammar
    *requires* a separator between statements, declarations, and members: `separator: NEWLINE | SEMI`.
-2. **`;` stays legal as an in-line separator.** It is one of the two separator alternatives, so
-   `val a = 1; val b = 2` is legal and `include "x";` keeps working. It never terminates a line: the
-   boundary after a line-final `;` is what a declaration consumes, and a run of separators between two
-   constructs is tolerated exactly as a blank line is.
+2. **`;` separates two constructs on one physical line and never terminates one.**
+   `val a = 1; val b = 2` is legal. A `;` followed by another physical line, end of file, or a
+   stand-alone closing brace is rejected at the semicolon as `SOLV-PARS-012`, so `include "x";`,
+   `foo();` at a line end, and `{ 42; }` are all errors; the grammar stays line-shape-free and the
+   layout pass states the rule once.
 3. **Brace placement.** After `{` only whitespace and comments may follow on that line
-   (`SOLV-PARS-010`). `}` must begin its physical line and nothing but whitespace/comments may follow
-   it on that line (`SOLV-PARS-007`); that single rule also forbids `} else`, `}`, `};`, `})` and
+   (`SOLV-PARS-010`). `}` must begin its physical line and nothing but whitespace/comments may
+   follow it on that line (`SOLV-PARS-007`); that single rule also forbids `} else`, `};`, `})` and
    `} ,`. A clause keyword (`else`, `catch`, `finally`) must begin its own line
    (`SOLV-PARS-008`) and a body's `{` must sit on the line of the construct introducing the scope
    (`SOLV-PARS-009`). An empty body is written as
@@ -29,73 +32,36 @@ The rejected alternative (ban `;` and delete the three-clause `for`) is preserve
    ```
    — `{}` on one line is illegal. Consequence: a bracketed block closes its brackets on their own
    lines (`println(\n    if (c) {\n        1\n    }\n    else {\n        2\n    }\n)`).
-4. **Case bodies are braced.** `case 1, 2: { ... }` and `default: { ... }` for both the statement and
-   the expression `switch`; the value-producing form keeps its tail expression inside the braces.
-5. **Unchanged:** the three-clause `for` keeps its specified spelling
-   `for (mutable val i: Integer = 0; i < limit; i = i + 1)`, because `;` remains legal. Range
-   `for`-in, `match` arms (`pattern => body`), and every other construct are untouched.
+4. **Case bodies are braced with no colon.** `case 1, 2 { ... }` and `default { ... }` for both the
+   statement and the expression `switch`; each body is a real lexical scope and the value-producing
+   form keeps its tail expression inside the braces.
+5. **The three-clause `for` is removed.** Its header would require semicolons section 16 reserves
+   for separating constructs on one line. The spelling at the `for` keyword is rejected with its own
+   code (`SOLV-PARS-011`) that names the replacements: a range `for` or a scope block around a
+   `while` loop. Range `for`-in, `match` arms (`pattern => body`), and every other construct are
+   untouched.
 
 ## Diagnostics
 
 `SOLV-PARS-007` closing brace shares a line · `008` clause keyword not at line start ·
-`009` body brace not on the introducing line · `010` content after an opening brace.
-`SOLV-PARS-011` (removed three-clause `for`) is **not** implemented; the form is not removed.
+`009` body brace not on the introducing line · `010` content after an opening brace ·
+`011` removed three-clause `for` header · `012` a `;` that terminates rather than separates.
 
-## Measured blast radius
+## Work completed
 
-* `.sol` corpus: 664 files. 64 contain `}` followed by code (45 under `tck/corpus`): 13 `} else {`,
-  3 `} else { expr }`, 8 `} finally {`, ~15 `} catch (e: T) {`, 3 `})`, 1 `{}`.
-* Case bodies: 39 `.sol` files (7 in `language/tests`, 31 in `tck/corpus`).
-* Java test sources with embedded Solvik text blocks: 92 files.
-* Requirements: revise the section-16 group (`REQ-0403`, `REQ-1204`, `REQ-1404`, `REQ-1900`..`1907`),
-  revise `REQ-0801` ("Each case body is an implicit block"), add requirements for the four brace
-  rules and for braced case bodies. `REQ-0501` (three-clause `for`) survives unchanged.
-* Every `solvik` code block in `docs/LANGUAGE_SPEC.md` and the quoted spec sentences must be
-  re-laid-out/re-worded consistently; `./tck/requirements/sync.sh` then re-derives `requirements.md`.
-
-## Ordered work
-
-1. Mechanics: grammar `separator`, three-clause `for` restored, `PhysicalLineTokenSource` treats `;`
-   as a line ending, `PhysicalLineRules` strict (no `{}` deviation, no bracketed-`}` deviation),
-   drop the `statementCore?` tail option that existed only for the removed deviations.
+1. Mechanics: grammar `separator`, `PhysicalLineTokenSource` boundary placement,
+   `PhysicalLineRules` strict (no `{}` deviation, no bracketed-`}` deviation), the
+   `statementCore?` tail option for the removed deviations dropped.
 2. Braced case bodies: grammar, `SolvikAstBuilder`, semantic validation, lowering.
-3. Compile clean, then migrate the corpus: `language/tests`, `language/tests/regression`,
-   `tck/corpus`, and the Solvik text blocks inside Java tests (scripted re-layout; goldens must not
-   change).
-4. Rewrite spec sections 16, 13, 21.2/21.3 and the section-27 diagnostic table; re-lay out every
-   example program in the spec.
-5. Update `tck/requirements/requirements.json` (+ `sync.sh`), re-record orphans, re-run
-   `tck/tck-run.sh` against `standalone/target/solvik`.
-6. Add `language/tests/example.sol` (+ `example.output`) exercising every language construct; it
-   runs under the shipped launcher through `test-corpus.sh`.
-7. Tests for each rule (positive and negative), token-stream tests for `;` plus boundary, parser tests
-   for braced case bodies, three-clause `for` tests.
-8. `./build-all.sh` as the final gate.
-
-## Current state (after the mechanics landed)
-
-Implemented and smoke-verified against a built launcher:
-* `for (mutable val i = 0; i < 4; i = i + 1)` and `val a = 1; val b = 2` both run (3 and 6 printed).
-* `} else {` reports `SOLV-PARS-008`; `1 })` reports `SOLV-PARS-007`; empty bodies written
-  `{` newline `}` are legal.
-* Case bodies must be braced: `case 1: { return 1 }`-style bodies run; an unbraced body is a
-  `SOLV-PARS-001` syntax error (noisier than the other rules - a dedicated diagnostic is a TODO).
-* `PhysicalLineTokenSource` no longer consults bracket depth and treats `;` as a line ending, so a
-  bracketed body separates its statements like any other body, and `val a = 1;` carries one boundary.
-* Consequence of the strict closing-brace rule worth confirming with the owner: a block-valued
-  expression inside a call must close its brackets on their own lines - `})`, `},` and `]` after a
-  `}` are violations, so `print((func(): Integer {\n1\n})())` is rejected and the legal spelling is
-  `print(` / `    (` / `        func(): Integer {` / `            1` / `        }` / `    )()` / `)`.
-
-Done: grammar (`separator`, `assignable`, braced case bodies, capture-list breaks),
-`PhysicalLineTokenSource`, `PhysicalLineRules` (strict; no `PARS-011`), `SolvikParser` wiring
-(plus a guard that fails loudly instead of returning an empty parse result), `SolvikAstBuilder`
-(`statementCore`, braced bodies, restored `for`), `SemicolonInsertingTokenSource` deleted,
-`PhysicalLineTokenStreamTest` extended for `;` and bracketed bodies, three token-stream test users
-pointed at the new stage, agent directories ignored.
-
-Remaining, in order: (1) migrate `language/tests`, `language/tests/regression`, `tck/corpus` and the
-Solvik text blocks inside Java tests to braced case bodies and one-construct-per-line brace style;
-(2) rewrite spec sections 13, 16, 21.2/21.3 and 27 plus every example program; (3) revise the
-requirements and run `sync.sh`; (4) dedicated diagnostic for an unbraced `case` body; (5) the
-`example.sol` construct coverage file; (6) per-rule positive/negative tests; (7) `./build-all.sh`.
+3. Corpus migration: `language/tests`, `language/tests/regression`, `tck/corpus`, and the Solvik
+   text blocks inside Java tests (scripted re-layout; no golden output changed).
+4. Spec sections 16, 17, 13, 21.2/21.3 and the diagnostic tables rewritten; every example program
+   in the spec, README, and architecture re-laid out.
+5. `tck/requirements/requirements.json` revised with the section-16/17/21.3 requirements, the
+   three-clause-`for` requirement re-recorded for the scope-plus-`while` idiom, new coded arms for
+   `SOLV-PARS-012` (`SOL-TCK-0496`..`0498`) and a bare rejection for the removed `for`
+   (`SOL-TCK-0499`); all generators re-run and `verify_regen.py` drift-free.
+6. Per-rule positive and negative tests (`SolvikStatementTerminationTest`,
+   `SolvikPhysicalLineLayoutTest`, `PhysicalLineTokenStreamTest`, switch/control-flow parser tests),
+   token-stream tests for `;` plus boundary, and parser tests for braced case bodies.
+7. `./build-all.sh` as the final gate; `./tck/tck-run.sh` conformance against both distributions.

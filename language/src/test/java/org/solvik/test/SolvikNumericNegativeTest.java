@@ -117,7 +117,7 @@ public final class SolvikNumericNegativeTest {
     public void caseLabelDoesNotWiden() {
         // A `case` label must be the same type as the scrutinee; widening a label would rewrite the case.
         assertThat(first(checkFails(
-                        "func f(n: Long): Integer {\n    switch (n) {\n        case 1: return 0\n        default: return 1\n    }\n}\n")).code())
+                        "func f(n: Long): Integer {\n    switch (n) {\n        case 1 {\n            return 0\n        }\n        default {\n            return 1\n        }\n    }\n}\n")).code())
                         .isEqualTo(DiagnosticCode.TYPE_CASE_LABEL_MISMATCH);
     }
 
@@ -134,7 +134,7 @@ public final class SolvikNumericNegativeTest {
         // A branch join of Integer and Long is Number (nearest common declared supertype), never Long.
         // Asserting the rejected direction here: assigning that join back to Long must be a mismatch.
         assertThat(first(checkFails(
-                        "func f(c: Boolean): Long {\n    return if (c) { 1 } else { 1L }\n}\n")).code())
+                        "func f(c: Boolean): Long {\n    return if (c) {\n        1\n    }\n    else {\n        1L\n    }\n}\n")).code())
                         .isEqualTo(DiagnosticCode.TYPE_RETURN_MISMATCH);
     }
 

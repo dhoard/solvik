@@ -29,6 +29,11 @@ val asAny: Any = format
 // parameter types and identical result types, so the join is that function type and the
 // joined value stays callable.
 val flag: Boolean = true
-val joined = if (flag) { format } else { describe }
+val joined = if (flag) {
+    format
+}
+else {
+    describe
+}
 
 print(takeAny(asAny) .. "|" .. takeAny(joined) .. "|" .. joined(2))

@@ -182,12 +182,15 @@ BAD("SOL-TCK-0112", "regex", "REQ-1105",
 # one position and each oracle is a distinct bracketed sequence.
 SWITCH = ('val %s = "%s"\n'
           'switch (%s) {\n'
-          '  case regex r#"^\\d+$"#:\n'
+          '  case regex r#"^\\d+$"# {\n'
           '    print("[number] ")\n'
-          '  case regex r#"^[A-Za-z]+$"#:\n'
+          '  }\n'
+          '  case regex r#"^[A-Za-z]+$"# {\n'
           '    print("[word] ")\n'
-          '  default:\n'
+          '  }\n'
+          '  default {\n'
           '    print("[other] ")\n'
+          '  }\n'
           '}\n')
 
 
@@ -233,8 +236,9 @@ BAD("SOL-TCK-0114", "types", "REQ-1107",
 BAD("SOL-TCK-0115", "control", "REQ-1108",
     'val input = "42"\n'
     'val v = switch (input) {\n'
-    '  case regex r#"^\\d+$"#:\n'
+    '  case regex r#"^\\d+$"# {\n'
     '    "number"\n'
+    '  }\n'
     '}\n'
     'print(v)\n', {"code": "SOLV-SEM-043"},
     ["Every expression `switch` must contain exactly one `default`, and it must remain last. "

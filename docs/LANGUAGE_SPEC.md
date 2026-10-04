@@ -42,7 +42,7 @@ pre-1.0 specification.
 
 `must` and `must not` define required behavior. Features explicitly marked `deferred` are not part of the language until this document defines them. An implementation must not invent semantics for a deferred or unspecified feature.
 
-Solvik is a strongly and statically typed general-purpose language with familiar TypeScript/Kotlin-like syntax, explicit mutability, safe object-oriented defaults, composition/delegation, controlled inheritance, null safety, exhaustive pattern matching, first-class regular expressions, Rust-style raw strings, and Go-style semicolon insertion.
+Solvik is a strongly and statically typed general-purpose language with familiar TypeScript/Kotlin-like syntax, explicit mutability, safe object-oriented defaults, composition/delegation, controlled inheritance, null safety, exhaustive pattern matching, first-class regular expressions, Rust-style raw strings, and physical-line statement termination.
 
 Solvik source files use the `.sol` extension. The language id is `solvik` and the MIME type is `application/x-solvik`.
 
@@ -64,10 +64,10 @@ Solvik should be:
 
 ### Lexical basics
 
-Identifiers use `[A-Za-z_][A-Za-z0-9_]*`; keywords are reserved and `$` is not an identifier character. `//` starts a line comment. `/* ... */` is a non-nesting block comment. Comments are otherwise whitespace, but their physical newlines remain visible to semicolon insertion.
+Identifiers use `[A-Za-z_][A-Za-z0-9_]*`; keywords are reserved and `$` is not an identifier character. `//` starts a line comment. `/* ... */` is a non-nesting block comment. Comments are otherwise whitespace, but a newline inside a comment is still a physical newline for statement termination (section 16).
 
-`mutable` and `abstract` are keywords and each opens a construct, so neither ever terminates a line for
-semicolon insertion (section 16). The keywords removed by this revision — `var`, `open`, and `sealed` —
+`mutable` and `abstract` are keywords and each opens a construct, so neither ever ends a line
+(section 16). The keywords removed by this revision — `var`, `open`, and `sealed` —
 are not identifiers: a program that writes one is reported as `SOLV-PARS-006` on that token, naming the
 replacement. Reserving them keeps a removed keyword from silently changing what an existing program
 means, which is what would happen if `var x = 1` became an assignment to a variable named `var`.
@@ -938,8 +938,10 @@ reference-identity hash. These operations are fixed and cannot be overridden. Th
 ```solvik
 format === format // true: canonical named function value
 
-val first = func() {}
-val second = func() {}
+val first = func() {
+}
+val second = func() {
+}
 first === second // false
 first === first  // true
 
@@ -1372,28 +1374,35 @@ Cases never implicitly fall through.
 
 ```solvik
 switch (value) {
-    case 1:
+    case 1 {
         print("one")
+    }
 
-    case 2:
+    case 2 {
         print("two")
+    }
 
-    default:
+    default {
         print("other")
+    }
 }
 ```
 
 No `break` is required to terminate a case.
 
-Cases are tested in source order and exactly the first matching case executes. Each case body is an implicit block. A `break` inside a case is illegal unless it exits a loop nested inside that case.
+Cases are tested in source order and exactly the first matching case executes. Every `case` and
+`default` body is a real braced lexical scope (section 16): the body's `{` closes the label's line,
+there is no colon after a label, and bindings declared in one case body are independent of every
+other body. A `break` inside a case is illegal unless it exits a loop nested inside that case.
 
 Constant case expressions must be compile-time constants assignable to the switched value's type. Regex cases require a `String` switch value. A switch contains at most one `default`, and it must be last.
 
 Initial Solvik does not provide a `fallthrough` keyword. Shared cases are expressed directly, for example:
 
 ```solvik
-case 1, 2:
+case 1, 2 {
     print("one or two")
+}
 ```
 
 ## 14. Regex
@@ -1427,14 +1436,17 @@ Regex patterns may be used in `switch` cases:
 
 ```solvik
 switch (input) {
-    case regex r#"^\d+$"#:
+    case regex r#"^\d+$"# {
         print("number")
+    }
 
-    case regex r#"^[A-Za-z]+$"#:
+    case regex r#"^[A-Za-z]+$"# {
         print("word")
+    }
 
-    default:
+    default {
         print("other")
+    }
 }
 ```
 
@@ -1534,39 +1546,67 @@ WHERE name = 'Doug'
 "#
 ```
 
-## 16. Statement Termination
+## 16. Statement Termination and Brace Placement
 
-Solvik uses Go-style lexical semicolon insertion.
-
-Programmers may explicitly write `;`, but normal style uses newlines.
+Solvik is a physical-line language. A physical newline ends the statement, declaration, or member
+that precedes it, and the grammar requires a separator between every two constructs.
 
 ```solvik
 val x = 1
 val y = 2
 ```
 
-is tokenized equivalently to:
+The semicolon is a separator, not a terminator. It may separate two constructs written on the same
+physical line:
+
+```solvik
+val a = 1; val b = 2; print(a + b)
+```
+
+It never ends a line. A `;` that is followed by another physical line, by end of file, or by a
+stand-alone closing brace did not separate two constructs on its line and is rejected as
+`SOLV-PARS-012` (`SEMI_ENDS_LINE`) at the semicolon. So all of these are errors:
 
 ```solvik
 val x = 1;
-val y = 2;
 ```
 
-Semicolon insertion must occur in a token-stream stage after lexing and before parsing. It must not depend on parser errors.
+```solvik
+println("one"); // comment
+```
 
-The lexer must preserve physical newline information. The token-stream stage ignores spaces and comments but treats a newline contained in a line comment or block comment as a physical newline.
+```solvik
+foo(); bar();
+```
 
-At a physical newline, emit one synthetic `SEMI` token when all of these conditions hold:
+```solvik
+val value = {
+    42;
+}
+```
 
-1. the unmatched `(` and `[` nesting depths are both zero;
-2. the preceding significant token is an identifier, a literal, `break`, `continue`, `return`, `)`, `]`, or `}`;
-3. the next significant token is not `.`, `?.`, or `else`.
+and `foo(); val a = 1; val b = 2` is the correct spelling of three statements on one line. A
+construct followed by nothing but comment to the end of its line is complete at the boundary;
+comment cannot make a `;` into a separator.
 
-At end of file, apply the same rule without a next-token exception. Consecutive blank lines must not emit duplicate semicolons. Explicit `;` and synthesized semicolons must both become the parser's `SEMI` token.
+Termination is decided before parsing by a line-boundary stage over the token stream, never by a
+parser error or by any insertion heuristic. The lexer preserves every physical newline (including a
+newline inside a comment, because it is still a physical newline), and the stage forwards exactly one
+parser-visible boundary token per line boundary whose last token ends a line: an identifier, a
+literal, `break`, `continue`, `return`, `)`, `]`, `}`, an explicit `;`, a completed `?` propagation,
+or `this`, `super`, and `null`, end a line; keywords that open a construct (`val`, `else`, `mutable`,
+`class`, `func`, `try`, `throw`, `static`, `case`, `default`, `enum`, `module`, `abstract`, `match`),
+an operator, and a comma do not. Blank lines and comment lines never
+add a second boundary, and the final physical line of a file is terminated by end of file, to which
+the same rule applies without a following token. Indentation has no syntactic meaning.
 
-A top-level `include` directive (section 20) ends with an explicit or inserted `SEMI` exactly like a statement. Its path is a string or raw-string literal, so a following physical newline terminates the directive under this section's ordinary rule; no include-specific termination rule exists.
+### Expression continuation
 
-Expressions continue naturally after operators and commas:
+A line that cannot end is a continuation: the grammar itself absorbs the boundary tokens at the
+positions where a construct may spread across lines - after a binary operator, after a comma, before
+a `.`, `?.`, or `::`, around argument, type-argument, and pattern lists, and before a closing
+delimiter. There is no lookahead exception table and no heuristic join: a line break the grammar
+does not admit is an error at the break.
 
 ```solvik
 val total = price +
@@ -1574,19 +1614,9 @@ val total = price +
     shipping
 ```
 
-`return` followed by a newline terminates the return statement:
-
-```solvik
-return
-value
-```
-
-is equivalent to:
-
-```solvik
-return;
-value;
-```
+`return` followed by a newline is a complete bare return; the next line begins a new statement. The
+same holds of `throw` and every other keyword that ends a line: the newline terminates the
+statement, and the grammar never joins the following line.
 
 ### Member chaining
 
@@ -1598,7 +1628,43 @@ val result = service
     .transform()
 ```
 
-The semicolon-inserting token stream must suppress insertion when the next significant token is `.` or `?.`. This is the only member-chain lookahead exception; do not use general JavaScript-style heuristics.
+A line ending in `.` or `?.` cannot end, so the chain continues. This is grammar, not lookahead: the
+member-suffix position is written to absorb the boundary, and a `.` may never begin a new statement.
+
+### Brace placement
+
+Every multiline construct - a function, method, constructor, static block, control-flow body,
+`case` or `default` body, class body, interface body, enum body, `switch` body, `match` body, block
+expression, and stand-alone scope - is written with its braces on their own physical lines:
+
+```solvik
+if (condition) {
+    work()
+}
+else {
+    recover()
+}
+```
+
+Four rules hold without exception, checked against the token sequence after parsing so each is
+reported once, at its own position:
+
+1. an opening `{` is the last token of the line of the construct that introduces its scope. The
+   body it opens begins on the following line. `if (c) { work()` and `func f() {}` are violations;
+   the diagnostic names the offending token (`SOLV-PARS-010`).
+2. a `{` that begins a physical line never opens the body of a construct whose header ended on an
+   earlier line. The body brace must sit on its header's line (`SOLV-PARS-009`). A stand-alone scope
+   block has no header, so its brace may begin a line, and a scope block may follow any complete
+   construct on the next line.
+3. a closing `}` is the only significant token on its physical line. Nothing but whitespace and a
+   comment may share it (`SOLV-PARS-007`), which makes `} else {`, `};`, `})`, and `foo() }` all the
+   same mistake.
+4. a clause keyword - `else`, `catch`, `finally` - begins its own physical line, so a clause is
+   written `}` newline `else {` and never `} else {` (`SOLV-PARS-008`).
+
+An empty body is written as an opening brace on one line and a closing brace on the next; `{}` is
+rejected by rule 1.
+
 
 ## 17. Control Flow
 
@@ -1607,7 +1673,8 @@ Standard forms:
 ```solvik
 if (condition) {
     ...
-} else {
+}
+else {
     ...
 }
 
@@ -1615,14 +1682,17 @@ while (condition) {
     ...
 }
 
-for (mutable val i: Integer = 0; i < limit; i = i + 1) {
+for (i in 0..<limit) {
     ...
 }
 ```
 
 Parentheses around conditions are retained for TypeScript/Java familiarity.
 
-`if` and loop conditions must have type `Boolean`. `while` is a pre-test loop. `for` uses exactly three clauses: an optional local declaration or assignment, an optional Boolean condition, and an optional assignment. The two separators inside `for (...)` are explicit semicolons. An omitted condition is `true`. `break` and `continue` are valid only inside a loop.
+`if` and loop conditions must have type `Boolean`. `while` is a pre-test loop. There is no
+three-clause `for` statement: it would require semicolons inside its header, which section 16
+reserves for separating constructs on one line. Initializer-scoped counting loops are written as a
+scope block around a `while` loop. `break` and `continue` are valid only inside a loop.
 
 Solvik also supports range `for`-in loops:
 
@@ -1683,13 +1753,13 @@ one statically checked program.
 
 ```solvik
 include "lib/math.sol"
-include r#"lib/generated.sol"#;
+include r#"lib/generated.sol"#
 ```
 
 `include` is a reserved keyword. An include may appear only as an item of a compilation unit: it is
 not a statement and cannot appear in a function, method, constructor, block, loop, `switch`, or
-`match` branch. The path is a normal or raw string literal and the directive ends with an explicit
-or lexically inserted `SEMI` (section 16).
+`match` branch. The path is a normal or raw string literal, and the directive ends where its
+physical line ends, like any construct (section 16).
 
 An include may bind a file-local namespace prefix with an optional `alias` suffix:
 
@@ -1698,8 +1768,8 @@ include "lib/math.sol"
 include "lib/math.sol" alias math
 ```
 
-`alias` is a reserved keyword. The alias name is written after the path and is followed by the same
-explicit or inserted `SEMI`. There is no export or selective-import form. The included declarations
+`alias` is a reserved keyword. The alias name is written after the path on the same line. There is
+no export or selective-import form. The included declarations
 are reached through the prefix with the `::` namespace separator:
 
 ```solvik
@@ -1779,7 +1849,7 @@ are not part of the language.
 ### Expansion, duplicates, and cycles
 
 Expansion is depth-first and left-to-right. Each physical file is parsed with the ordinary lexer,
-semicolon-inserting token stream, and parser. At an `include`, the target is recursively expanded and
+line-boundary token stream, and parser. At an `include`, the target is recursively expanded and
 its resolved top-level items are spliced at the include position; the directive itself is absent from
 the resolved program.
 
@@ -1889,24 +1959,26 @@ tail expression.
 
 ### 21.3 Semicolons and tail expressions
 
-Explicit and synthesized semicolons are the same parser token and have the same language meaning,
-so token origin is never inspected to decide whether a value exists. All three forms below have the
-same value and type:
+Items inside a block are separated by the separator of section 16 - a physical newline or, for items
+sharing a line, an explicit `;` that separates two statements and never terminates one. Separation
+never changes meaning: no separator token carries a value, and the last item of a value-required
+block is its tail expression wherever it sits:
 
 ```solvik
-val a = { 42 }
-
-val b = {
+val a = {
     42
 }
 
-val c = {
-    42;
+val b = {
+    1; 42
 }
 ```
 
-Each is an `Integer` block expression with value `42`. Comments and blank lines before `}` do not
-affect tail selection, and a terminal assignment is a statement and never a tail expression.
+Both are `Integer` block expressions with value `42`: in the second the `;` separates two items on
+one line, and the last item is still the tail. Writing `{ 42; }` is the `SEMI_ENDS_LINE` error of
+section 16 - a `;` may not terminate the item before a line end or before `}`. Comments and blank
+lines before `}` do not affect tail selection, and a terminal assignment is a statement and never a
+tail expression.
 
 ### 21.4 `if` expressions
 
@@ -1915,9 +1987,11 @@ An `if` may be used in expression position:
 ```solvik
 val description = if (value < 0) {
     "negative"
-} else if (value == 0) {
+}
+else if (value == 0) {
     "zero"
-} else {
+}
+else {
     "positive"
 }
 ```
@@ -1931,7 +2005,8 @@ excluded from result joining:
 func requireName(name: String?): String {
     return if (name != null) {
         name
-    } else {
+    }
+    else {
         return "fallback"
     }
 }
@@ -1949,14 +2024,17 @@ produces a value:
 
 ```solvik
 val message = switch (status) {
-    case Status.Ready:
+    case Status.Ready {
         "ready"
+    }
 
-    case Status.Running:
+    case Status.Running {
         "running"
+    }
 
-    default:
+    default {
         "done"
+    }
 }
 ```
 
@@ -1974,14 +2052,17 @@ a case continue to apply. Regex expression cases keep the same spelling and matc
 
 ```solvik
 val kind = switch (input) {
-    case regex r#"^\d+$"#:
+    case regex r#"^\d+$"# {
         "number"
+    }
 
-    case regex r#"^[A-Za-z]+$"#:
+    case regex r#"^[A-Za-z]+$"# {
         "word"
+    }
 
-    default:
+    default {
         "other"
+    }
 }
 ```
 
@@ -2006,14 +2087,20 @@ Every value-producing construct uses one shared join algorithm: the result is th
 declared supertype to which every normally completing branch result is assignable, including the
 existing nullability rules. No numeric promotion or widening, structural typing, dynamic typing,
 implicit conversion, or inferred union type is introduced: a numeric widening is a coercion at a
-conversion site, never a join rule, so `if (c) { 1 } else { 1L }` has type `Number`, not `Long`. If
+conversion site, never a join rule. An `if`/`else` expression whose branches yield an `Integer` and a
+`Long` is written with each brace on its own line, and its join is `Number`, not `Long`. If
 exactly one branch can complete normally, its
 result type is the construct's result type. If no branch can complete normally, the construct has
 type `Nothing`, and no runtime value is invented for it. `Unit` participates in the join as any other
 non-null value type.
 
 ```solvik
-val both = if (flag) { 1 } else { "text" } // type Any
+val both = if (flag) {
+    1
+}
+else {
+    "text"
+} // type Any
 ```
 
 A set of branches whose only shared supertypes are incomparable has no single nearest result and is a
@@ -2029,16 +2116,29 @@ constructs, and `match` branch results:
 
 ```solvik
 mutable val score: Integer = 0
-score = if (enabled) { 10 } else { 0 }
+score = if (enabled) {
+    10
+}
+else {
+    0
+}
 
-println(if (debug) { "debug" } else { "normal" })
+println(if (debug) {
+    "debug"
+}
+else {
+    "normal"
+})
 
 func classify(value: Integer): String {
     return switch (value) {
-        case 0:
+        case 0 {
             "zero"
-        default:
+        }
+
+        default {
             "nonzero"
+        }
     }
 }
 ```
@@ -2097,7 +2197,8 @@ Every guest exception type carries an optional message, following Java's empty-c
 message-constructor pattern. Construction accepts a single optional trailing `String?` argument:
 
 ```solvik
-class ParseError extends RuntimeException { }
+class ParseError extends RuntimeException {
+}
 
 throw ParseError()          // no message
 throw ParseError("bad int") // message
@@ -2153,11 +2254,14 @@ exists, the value reaches the program boundary (section 22.5).
 ```solvik
 try {
     riskyOperation()
-} catch (e: ParseError) {
+}
+catch (e: ParseError) {
     recover(e)
-} catch (e: RuntimeException) {
+}
+catch (e: RuntimeException) {
     report(e)
-} finally {
+}
+finally {
     releaseResources()
 }
 ```
@@ -2212,7 +2316,8 @@ unchecked exceptions carry no `addSuppressed`/`getSuppressed` surface.
 ```solvik
 try {
     throw FirstError()
-} finally {
+}
+finally {
     throw SecondError() // FirstError is discarded; SecondError propagates
 }
 ```
@@ -2233,7 +2338,8 @@ still fall through governs the rule that a value-returning function must return 
 func ok1(): Integer {
     try {
         return 1        // accepted: the try block always returns and no handler can fall through
-    } finally {
+    }
+finally {
         println("cleanup")
     }
 }
@@ -2241,7 +2347,8 @@ func ok1(): Integer {
 func ok2(): Integer {
     try {
         println("body")
-    } finally {
+    }
+finally {
         return 7        // accepted: the finally block always transfers control
     }
 }
@@ -2249,7 +2356,8 @@ func ok2(): Integer {
 func needsMore(): Integer {
     try {
         return 1
-    } catch (e: RuntimeException) {
+    }
+catch (e: RuntimeException) {
         println("handled")  // completes normally, so the statement can fall through
     }
     return 0                // ...and therefore still requires this return

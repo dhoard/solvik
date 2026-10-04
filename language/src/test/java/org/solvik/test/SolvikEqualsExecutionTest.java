@@ -72,7 +72,8 @@ public final class SolvikEqualsExecutionTest {
                         println(true.equals(true))
                         println(Byte(1).equals(Byte(1)))
                         println(Short(-3).equals(Short(-3)))
-                        func noop() {}
+                        func noop() {
+                        }
                         println(noop().equals(noop()))
                         """)).isEqualTo("true\nfalse\ntrue\ntrue\ntrue\ntrue\ntrue\ntrue\ntrue\ntrue\n");
     }

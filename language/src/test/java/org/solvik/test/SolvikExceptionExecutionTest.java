@@ -73,10 +73,12 @@ public final class SolvikExceptionExecutionTest {
     @Test
     public void catchHandlesExactThrownClass() {
         Result result = evaluate(
-                "class AppError extends RuntimeException { }\n"
+                "class AppError extends RuntimeException {\n"
+                        + "}\n"
                         + "try {\n"
                         + "  throw AppError()\n"
-                        + "} catch (e: AppError) {\n"
+                        + "}\n"
+                        + "catch (e: AppError) {\n"
                         + "  println(\"caught-app-error\")\n"
                         + "}\n");
         assertThat(result.failure).as(result.output).isNull();
@@ -88,10 +90,12 @@ public final class SolvikExceptionExecutionTest {
         // A handler typed on a base class catches a thrown subclass, dispatched by the
         // handler's transitive matched set rather than the exact runtime class.
         Result result = evaluate(
-                "class AppError extends RuntimeException { }\n"
+                "class AppError extends RuntimeException {\n"
+                        + "}\n"
                         + "try {\n"
                         + "  throw AppError()\n"
-                        + "} catch (e: RuntimeException) {\n"
+                        + "}\n"
+                        + "catch (e: RuntimeException) {\n"
                         + "  println(\"caught-runtime\")\n"
                         + "}\n");
         assertThat(result.failure).as(result.output).isNull();
@@ -107,10 +111,12 @@ public final class SolvikExceptionExecutionTest {
         // `baseClassCatchMatchesSubclassAtRuntime` passes either way because it stops one level below
         // a built-in base, which is why the two-level case is asserted separately.
         Result result = evaluate(
-                "class ParseError extends RuntimeException { }\n"
+                "class ParseError extends RuntimeException {\n"
+                        + "}\n"
                         + "try {\n"
                         + "  throw ParseError(\"bad int\")\n"
-                        + "} catch (e: Exception) {\n"
+                        + "}\n"
+                        + "catch (e: Exception) {\n"
                         + "  println(\"caught-root\")\n"
                         + "  println(e.getMessage())\n"
                         + "}\n");
@@ -121,10 +127,12 @@ public final class SolvikExceptionExecutionTest {
     @Test
     public void rootExceptionHandlerCatchesClassUnderApplicationBase() {
         Result result = evaluate(
-                "class ConfigError extends ApplicationException { }\n"
+                "class ConfigError extends ApplicationException {\n"
+                        + "}\n"
                         + "try {\n"
                         + "  throw ConfigError(\"no config\")\n"
-                        + "} catch (e: Exception) {\n"
+                        + "}\n"
+                        + "catch (e: Exception) {\n"
                         + "  println(\"caught-application-via-root\")\n"
                         + "}\n");
         assertThat(result.failure).as(result.output).isNull();
@@ -134,11 +142,14 @@ public final class SolvikExceptionExecutionTest {
     @Test
     public void rootExceptionHandlerCatchesATransitivelyDerivedClass() {
         Result result = evaluate(
-                "mutable class ParseError extends RuntimeException { }\n"
-                        + "class DeepError extends ParseError { }\n"
+                "mutable class ParseError extends RuntimeException {\n"
+                        + "}\n"
+                        + "class DeepError extends ParseError {\n"
+                        + "}\n"
                         + "try {\n"
                         + "  throw DeepError(\"deep\")\n"
-                        + "} catch (e: Exception) {\n"
+                        + "}\n"
+                        + "catch (e: Exception) {\n"
                         + "  println(e.getMessage())\n"
                         + "}\n");
         assertThat(result.failure).as(result.output).isNull();
@@ -152,9 +163,11 @@ public final class SolvikExceptionExecutionTest {
         Result result = evaluate(
                 "try {\n"
                         + "  println(\"trying\")\n"
-                        + "} catch (e: Exception) {\n"
+                        + "}\n"
+                        + "catch (e: Exception) {\n"
                         + "  println(\"root\")\n"
-                        + "} catch (e: RuntimeException) {\n"
+                        + "}\n"
+                        + "catch (e: RuntimeException) {\n"
                         + "  println(\"never\")\n"
                         + "}\n");
         assertThat(result.failure).as(result.output).isNotNull();
@@ -166,12 +179,15 @@ public final class SolvikExceptionExecutionTest {
         // RuntimeException and ApplicationException are siblings, not ancestor and descendant, so an
         // Exception-rooted graph must not order them: both clauses remain reachable.
         Result result = evaluate(
-                "class AppError extends ApplicationException { }\n"
+                "class AppError extends ApplicationException {\n"
+                        + "}\n"
                         + "try {\n"
                         + "  throw AppError(\"app\")\n"
-                        + "} catch (e: RuntimeException) {\n"
+                        + "}\n"
+                        + "catch (e: RuntimeException) {\n"
                         + "  println(\"runtime\")\n"
-                        + "} catch (e: ApplicationException) {\n"
+                        + "}\n"
+                        + "catch (e: ApplicationException) {\n"
                         + "  println(\"application\")\n"
                         + "}\n");
         assertThat(result.failure).as(result.output).isNull();
@@ -182,13 +198,17 @@ public final class SolvikExceptionExecutionTest {
     public void firstMatchingHandlerWins() {
         // A non-matching handler is skipped and the next matching handler runs.
         Result result = evaluate(
-                "class AppError extends RuntimeException { }\n"
-                        + "class OtherError extends RuntimeException { }\n"
+                "class AppError extends RuntimeException {\n"
+                        + "}\n"
+                        + "class OtherError extends RuntimeException {\n"
+                        + "}\n"
                         + "try {\n"
                         + "  throw AppError()\n"
-                        + "} catch (e: OtherError) {\n"
+                        + "}\n"
+                        + "catch (e: OtherError) {\n"
                         + "  println(\"wrong-handler\")\n"
-                        + "} catch (e: AppError) {\n"
+                        + "}\n"
+                        + "catch (e: AppError) {\n"
                         + "  println(\"right-handler\")\n"
                         + "}\n");
         assertThat(result.failure).as(result.output).isNull();
@@ -200,13 +220,15 @@ public final class SolvikExceptionExecutionTest {
         // A throw in a called function must cross the call-target boundary (not be swallowed at
         // the callee root) so an enclosing try in the caller can handle it.
         Result result = evaluate(
-                "class ParseError extends RuntimeException { }\n"
+                "class ParseError extends RuntimeException {\n"
+                        + "}\n"
                         + "func parse(): Integer {\n"
                         + "  throw ParseError()\n"
                         + "}\n"
                         + "try {\n"
                         + "  parse()\n"
-                        + "} catch (e: ParseError) {\n"
+                        + "}\n"
+                        + "catch (e: ParseError) {\n"
                         + "  println(\"caught-in-caller\")\n"
                         + "}\n");
         assertThat(result.failure).as(result.output).isNull();
@@ -218,7 +240,8 @@ public final class SolvikExceptionExecutionTest {
         Result result = evaluate(
                 "try {\n"
                         + "  println(\"body\")\n"
-                        + "} finally {\n"
+                        + "}\n"
+                        + "finally {\n"
                         + "  println(\"cleanup\")\n"
                         + "}\n");
         assertThat(result.failure).as(result.output).isNull();
@@ -228,12 +251,15 @@ public final class SolvikExceptionExecutionTest {
     @Test
     public void finallyRunsOnExceptionalCompletion() {
         Result result = evaluate(
-                "class AppError extends RuntimeException { }\n"
+                "class AppError extends RuntimeException {\n"
+                        + "}\n"
                         + "try {\n"
                         + "  throw AppError()\n"
-                        + "} catch (e: AppError) {\n"
+                        + "}\n"
+                        + "catch (e: AppError) {\n"
                         + "  println(\"caught\")\n"
-                        + "} finally {\n"
+                        + "}\n"
+                        + "finally {\n"
                         + "  println(\"cleanup\")\n"
                         + "}\n");
         assertThat(result.failure).as(result.output).isNull();
@@ -244,15 +270,19 @@ public final class SolvikExceptionExecutionTest {
     public void finallyRunsBeforePropagationToOuterHandler() {
         // An inner finally runs while the exception propagates to an outer handler.
         Result result = evaluate(
-                "class AppError extends RuntimeException { }\n"
-                        + "class FinallyError extends RuntimeException { }\n"
+                "class AppError extends RuntimeException {\n"
+                        + "}\n"
+                        + "class FinallyError extends RuntimeException {\n"
+                        + "}\n"
                         + "try {\n"
                         + "  try {\n"
                         + "    throw AppError()\n"
-                        + "  } finally {\n"
+                        + "  }\n"
+                        + "  finally {\n"
                         + "    println(\"inner-cleanup\")\n"
                         + "  }\n"
-                        + "} catch (e: AppError) {\n"
+                        + "}\n"
+                        + "catch (e: AppError) {\n"
                         + "  println(\"outer-caught\")\n"
                         + "}\n");
         assertThat(result.failure).as(result.output).isNull();
@@ -265,13 +295,17 @@ public final class SolvikExceptionExecutionTest {
         // exception becomes the propagated one (suppression): the handler runs to completion and
         // its output is kept, but the finally's new exception escapes to the boundary.
         Result result = evaluate(
-                "class AppError extends RuntimeException { }\n"
-                        + "class FinallyError extends RuntimeException { }\n"
+                "class AppError extends RuntimeException {\n"
+                        + "}\n"
+                        + "class FinallyError extends RuntimeException {\n"
+                        + "}\n"
                         + "try {\n"
                         + "  throw AppError()\n"
-                        + "} catch (e: AppError) {\n"
+                        + "}\n"
+                        + "catch (e: AppError) {\n"
                         + "  println(\"handler\")\n"
-                        + "} finally {\n"
+                        + "}\n"
+                        + "finally {\n"
                         + "  throw FinallyError()\n"
                         + "}\n");
         assertThat(result.failure).as(result.output).isNotNull();
@@ -283,14 +317,17 @@ public final class SolvikExceptionExecutionTest {
     @Test
     public void nestedHandlersResolveInnermostFirst() {
         Result result = evaluate(
-                "class AppError extends RuntimeException { }\n"
+                "class AppError extends RuntimeException {\n"
+                        + "}\n"
                         + "try {\n"
                         + "  try {\n"
                         + "    throw AppError()\n"
-                        + "  } catch (e: AppError) {\n"
+                        + "  }\n"
+                        + "  catch (e: AppError) {\n"
                         + "    println(\"inner\")\n"
                         + "  }\n"
-                        + "} catch (e: RuntimeException) {\n"
+                        + "}\n"
+                        + "catch (e: RuntimeException) {\n"
                         + "  println(\"outer\")\n"
                         + "}\n");
         assertThat(result.failure).as(result.output).isNull();
@@ -300,7 +337,8 @@ public final class SolvikExceptionExecutionTest {
     @Test
     public void uncaughtThrowIsAGuestFailureNotInternalError() {
         Result result = evaluate(
-                "class AppError extends RuntimeException { }\n"
+                "class AppError extends RuntimeException {\n"
+                        + "}\n"
                         + "println(\"start\")\n"
                         + "throw AppError()\n"
                         + "println(\"unreachable\")\n");
@@ -316,14 +354,16 @@ public final class SolvikExceptionExecutionTest {
     public void finallyRunsOnBreakExit() {
         // The finally clause runs when the try body exits via break, and the break still takes effect.
         Result result = evaluate(
-                "class AppError extends RuntimeException { }\n"
+                "class AppError extends RuntimeException {\n"
+                        + "}\n"
                         + "mutable val i: Integer = 0\n"
                         + "while (true) {\n"
                         + "  i = i + 1\n"
                         + "  try {\n"
                         + "    println(\"in-try\")\n"
                         + "    break\n"
-                        + "  } finally {\n"
+                        + "  }\n"
+                        + "  finally {\n"
                         + "    println(\"finally-ran\")\n"
                         + "  }\n"
                         + "  println(\"unreachable-after-break\")\n"
@@ -336,13 +376,15 @@ public final class SolvikExceptionExecutionTest {
     @Test
     public void finallyRunsOnContinueExit() {
         Result result = evaluate(
-                "class AppError extends RuntimeException { }\n"
+                "class AppError extends RuntimeException {\n"
+                        + "}\n"
                         + "mutable val i: Integer = 0\n"
                         + "while (i < 2) {\n"
                         + "  i = i + 1\n"
                         + "  try {\n"
                         + "    continue\n"
-                        + "  } finally {\n"
+                        + "  }\n"
+                        + "  finally {\n"
                         + "    println(\"cleanup-\" .. i)\n"
                         + "  }\n"
                         + "}\n"
@@ -354,11 +396,13 @@ public final class SolvikExceptionExecutionTest {
     @Test
     public void finallyRunsOnReturnExit() {
         Result result = evaluate(
-                "class AppError extends RuntimeException { }\n"
+                "class AppError extends RuntimeException {\n"
+                        + "}\n"
                         + "func g() {\n"
                         + "  try {\n"
                         + "    return\n"
-                        + "  } finally {\n"
+                        + "  }\n"
+                        + "  finally {\n"
                         + "    println(\"finally-on-return\")\n"
                         + "  }\n"
                         + "  println(\"unreachable\")\n"
@@ -374,13 +418,19 @@ public final class SolvikExceptionExecutionTest {
         // A '?' propagation that leaves the try block must still run the finally clause, and the
         // enclosing Result-returning function still receives the propagated Err.
         Result result = evaluate(
-                "enum Result<T, E> {\n    Ok(T)\n    Err(E)\n}\n"
-                        + "func maybeFail(): Result<Integer, String> {\n    return Result.Err(\"nope\")\n}\n"
+                "enum Result<T, E> {\n"
+                        + "    Ok(T)\n"
+                        + "    Err(E)\n"
+                        + "}\n"
+                        + "func maybeFail(): Result<Integer, String> {\n"
+                        + "    return Result.Err(\"nope\")\n"
+                        + "}\n"
                         + "func caller(): Result<Integer, String> {\n"
                         + "  try {\n"
                         + "    val v = maybeFail()?\n"
                         + "    println(\"got-\" .. v)\n"
-                        + "  } finally {\n"
+                        + "  }\n"
+                        + "  finally {\n"
                         + "    println(\"finally-on-prop\")\n"
                         + "  }\n"
                         + "  return Result.Ok(0)\n"
@@ -395,18 +445,21 @@ public final class SolvikExceptionExecutionTest {
     public void finallyThrowSupersedesPendingControlExit() {
         // A pending break is discarded when the finally block throws; the throw escapes to the handler.
         Result result = evaluate(
-                "class AppError extends RuntimeException { }\n"
+                "class AppError extends RuntimeException {\n"
+                        + "}\n"
                         + "mutable val i: Integer = 0\n"
                         + "try {\n"
                         + "  while (true) {\n"
                         + "    i = i + 1\n"
                         + "    try {\n"
                         + "      break\n"
-                        + "    } finally {\n"
+                        + "    }\n"
+                        + "    finally {\n"
                         + "      throw AppError()\n"
                         + "    }\n"
                         + "  }\n"
-                        + "} catch (e: AppError) {\n"
+                        + "}\n"
+                        + "catch (e: AppError) {\n"
                         + "  println(\"caught-break-superseded\")\n"
                         + "}\n");
         assertThat(result.failure).as(result.output).isNull();
@@ -419,17 +472,22 @@ public final class SolvikExceptionExecutionTest {
         // throw entirely (no suppression chain in an unchecked-exception language). The outer
         // handler sees the finally clause's exception, not the original.
         Result result = evaluate(
-                "class AError extends RuntimeException { }\n"
-                        + "class BError extends RuntimeException { }\n"
+                "class AError extends RuntimeException {\n"
+                        + "}\n"
+                        + "class BError extends RuntimeException {\n"
+                        + "}\n"
                         + "try {\n"
                         + "  try {\n"
                         + "    throw AError()\n"
-                        + "  } finally {\n"
+                        + "  }\n"
+                        + "  finally {\n"
                         + "    throw BError()\n"
                         + "  }\n"
-                        + "} catch (a: AError) {\n"
+                        + "}\n"
+                        + "catch (a: AError) {\n"
                         + "  println(\"caught-A\")\n"
-                        + "} catch (b: BError) {\n"
+                        + "}\n"
+                        + "catch (b: BError) {\n"
                         + "  println(\"caught-B\")\n"
                         + "}\n");
         assertThat(result.failure).as(result.output).isNull();
@@ -440,11 +498,13 @@ public final class SolvikExceptionExecutionTest {
     public void finallyReturnReplacesTryReturn() {
         // Java: a finally clause that returns replaces the value being returned by the try block.
         Result result = evaluate(
-                "class AppError extends RuntimeException { }\n"
+                "class AppError extends RuntimeException {\n"
+                        + "}\n"
                         + "func f(): Integer {\n"
                         + "  try {\n"
                         + "    return 1\n"
-                        + "  } finally {\n"
+                        + "  }\n"
+                        + "  finally {\n"
                         + "    return 2\n"
                         + "  }\n"
                         + "}\n"
@@ -457,14 +517,18 @@ public final class SolvikExceptionExecutionTest {
     public void finallyReturnDiscardsHandlerThrow() {
         // Java: the finally clause's return discards a throw raised in the handler.
         Result result = evaluate(
-                "class AppError extends RuntimeException { }\n"
-                        + "class OtherError extends RuntimeException { }\n"
+                "class AppError extends RuntimeException {\n"
+                        + "}\n"
+                        + "class OtherError extends RuntimeException {\n"
+                        + "}\n"
                         + "func f(): Integer {\n"
                         + "  try {\n"
                         + "    throw AppError()\n"
-                        + "  } catch (e: AppError) {\n"
+                        + "  }\n"
+                        + "  catch (e: AppError) {\n"
                         + "    throw OtherError()\n"
-                        + "  } finally {\n"
+                        + "  }\n"
+                        + "  finally {\n"
                         + "    return 9\n"
                         + "  }\n"
                         + "}\n"
@@ -478,11 +542,13 @@ public final class SolvikExceptionExecutionTest {
         // A return inside a try block guarantees the function returns, matching javac's reachability
         // analysis for try statements (the finally clause cannot fall through in this shape).
         Result result = evaluate(
-                "class AppError extends RuntimeException { }\n"
+                "class AppError extends RuntimeException {\n"
+                        + "}\n"
                         + "func f(): Integer {\n"
                         + "  try {\n"
                         + "    return 1\n"
-                        + "  } finally {\n"
+                        + "  }\n"
+                        + "  finally {\n"
                         + "    println(\"fin\")\n"
                         + "  }\n"
                         + "}\n"
@@ -495,11 +561,13 @@ public final class SolvikExceptionExecutionTest {
     public void finallyReturnAloneSatisfiesTheReturnPathRule() {
         // When the finally clause always transfers control, the try block itself needs no return.
         Result result = evaluate(
-                "class AppError extends RuntimeException { }\n"
+                "class AppError extends RuntimeException {\n"
+                        + "}\n"
                         + "func f(): Integer {\n"
                         + "  try {\n"
                         + "    println(\"body\")\n"
-                        + "  } finally {\n"
+                        + "  }\n"
+                        + "  finally {\n"
                         + "    return 7\n"
                         + "  }\n"
                         + "}\n"
@@ -516,7 +584,8 @@ public final class SolvikExceptionExecutionTest {
                 "func f(): Integer {\n"
                         + "  try {\n"
                         + "    return 1\n"
-                        + "  } catch (e: RuntimeException) {\n"
+                        + "  }\n"
+                        + "  catch (e: RuntimeException) {\n"
                         + "    println(\"h\")\n"
                         + "  }\n"
                         + "}\n"
@@ -531,12 +600,14 @@ public final class SolvikExceptionExecutionTest {
         // Java: a finally clause that completes by break discards the in-flight throw; the original
         // exception never reaches the outer handler.
         Result result = evaluate(
-                "class AppError extends RuntimeException { }\n"
+                "class AppError extends RuntimeException {\n"
+                        + "}\n"
                         + "func loop() {\n"
                         + "  while (true) {\n"
                         + "    try {\n"
                         + "      throw AppError()\n"
-                        + "    } finally {\n"
+                        + "    }\n"
+                        + "    finally {\n"
                         + "      println(\"inner-finally\")\n"
                         + "      break\n"
                         + "    }\n"
@@ -544,7 +615,8 @@ public final class SolvikExceptionExecutionTest {
                         + "}\n"
                         + "try {\n"
                         + "  loop()\n"
-                        + "} catch (e: AppError) {\n"
+                        + "}\n"
+                        + "catch (e: AppError) {\n"
                         + "  println(\"outer-caught\")\n"
                         + "}\n"
                         + "println(\"after\")\n");
@@ -557,17 +629,20 @@ public final class SolvikExceptionExecutionTest {
         // The handler only runs with a caught value bound to the name, so reading it is as valid as
         // reading a parameter; a plain rethrow must not be diagnosed as a read-before-initialize.
         Result result = evaluate(
-                "class AppError extends RuntimeException { }\n"
+                "class AppError extends RuntimeException {\n"
+                        + "}\n"
                         + "func raise(): Integer {\n"
                         + "  try {\n"
                         + "    throw AppError()\n"
-                        + "  } catch (e: AppError) {\n"
+                        + "  }\n"
+                        + "  catch (e: AppError) {\n"
                         + "    throw e\n"
                         + "  }\n"
                         + "}\n"
                         + "try {\n"
                         + "  raise()\n"
-                        + "} catch (outer: AppError) {\n"
+                        + "}\n"
+                        + "catch (outer: AppError) {\n"
                         + "  println(\"rethrow-reached-outer\")\n"
                         + "}\n");
         assertThat(result.failure).as(result.output).isNull();
@@ -580,25 +655,32 @@ public final class SolvikExceptionExecutionTest {
         // overwrite the outer value: rethrowing the outer binding still delivers the original
         // Sub instance, not the Fatal one caught in between.
         Result result = evaluate(
-                "mutable class Boom extends RuntimeException { }\n"
-                        + "class Sub extends Boom { }\n"
-                        + "class Fatal extends RuntimeException { }\n"
+                "mutable class Boom extends RuntimeException {\n"
+                        + "}\n"
+                        + "class Sub extends Boom {\n"
+                        + "}\n"
+                        + "class Fatal extends RuntimeException {\n"
+                        + "}\n"
                         + "func raise(): Integer {\n"
                         + "  try {\n"
                         + "    throw Sub()\n"
-                        + "  } catch (e: Boom) {\n"
+                        + "  }\n"
+                        + "  catch (e: Boom) {\n"
                         + "    try {\n"
                         + "      throw Fatal()\n"
-                        + "    } catch (inner: Fatal) {\n"
+                        + "    }\n"
+                        + "    catch (inner: Fatal) {\n"
                         + "      throw e\n"
                         + "    }\n"
                         + "  }\n"
                         + "}\n"
                         + "try {\n"
                         + "  raise()\n"
-                        + "} catch (outer: Fatal) {\n"
+                        + "}\n"
+                        + "catch (outer: Fatal) {\n"
                         + "  println(\"slot-clobbered\")\n"
-                        + "} catch (outer: Sub) {\n"
+                        + "}\n"
+                        + "catch (outer: Sub) {\n"
                         + "  println(\"original-value-intact\")\n"
                         + "}\n");
         assertThat(result.failure).as(result.output).isNull();
@@ -608,18 +690,21 @@ public final class SolvikExceptionExecutionTest {
     @Test
     public void aHandlerBindingCanBeStoredAndRethrown() {
         Result result = evaluate(
-                "class AppError extends RuntimeException { }\n"
+                "class AppError extends RuntimeException {\n"
+                        + "}\n"
                         + "func raise(): Integer {\n"
                         + "  try {\n"
                         + "    throw AppError()\n"
-                        + "  } catch (e: AppError) {\n"
+                        + "  }\n"
+                        + "  catch (e: AppError) {\n"
                         + "    val saved = e\n"
                         + "    throw saved\n"
                         + "  }\n"
                         + "}\n"
                         + "try {\n"
                         + "  raise()\n"
-                        + "} catch (outer: AppError) {\n"
+                        + "}\n"
+                        + "catch (outer: AppError) {\n"
                         + "  println(\"stored-and-rethrown\")\n"
                         + "}\n");
         assertThat(result.failure).as(result.output).isNull();
@@ -629,10 +714,12 @@ public final class SolvikExceptionExecutionTest {
     @Test
     public void anExceptionHandlerCanReadTheMessageOfAThrownValue() {
         Result result = evaluate(
-                "class AppError extends RuntimeException { }\n"
+                "class AppError extends RuntimeException {\n"
+                        + "}\n"
                         + "try {\n"
                         + "  throw AppError(\"disk full\")\n"
-                        + "} catch (e: AppError) {\n"
+                        + "}\n"
+                        + "catch (e: AppError) {\n"
                         + "  println(\"msg=\" .. e.getMessage())\n"
                         + "}\n");
         assertThat(result.failure).as(result.output).isNull();
@@ -643,11 +730,13 @@ public final class SolvikExceptionExecutionTest {
     public void anExceptionCarriesNoMessageUnlessOneIsSupplied() {
         // Both construction forms exist, matching Java's empty constructor and message constructor.
         Result result = evaluate(
-                "class AppError extends RuntimeException { }\n"
+                "class AppError extends RuntimeException {\n"
+                        + "}\n"
                         + "func show(e: AppError) {\n"
                         + "  try {\n"
                         + "    throw e\n"
-                        + "  } catch (caught: AppError) {\n"
+                        + "  }\n"
+                        + "  catch (caught: AppError) {\n"
                         + "    println(\"msg=\" .. caught.getMessage())\n"
                         + "  }\n"
                         + "}\n"
@@ -675,7 +764,8 @@ public final class SolvikExceptionExecutionTest {
                         + "}\n"
                         + "try {\n"
                         + "  throw SubError(7, \"sub message\")\n"
-                        + "} catch (e: SubError) {\n"
+                        + "}\n"
+                        + "catch (e: SubError) {\n"
                         + "  println(\"code=\" .. e.code)\n"
                         + "  println(\"msg=\" .. e.getMessage())\n"
                         + "}\n");
@@ -687,13 +777,15 @@ public final class SolvikExceptionExecutionTest {
     public void theMessageIsReadableThroughABaseTypeHandler() {
         // getMessage() belongs to every guest exception type, so a handler written on a base type reaches it.
         Result result = evaluate(
-                "class AppError extends RuntimeException { }\n"
+                "class AppError extends RuntimeException {\n"
+                        + "}\n"
                         + "func describe(e: Exception): String? {\n"
                         + "  return e.getMessage()\n"
                         + "}\n"
                         + "try {\n"
                         + "  throw AppError(\"via base\")\n"
-                        + "} catch (e: RuntimeException) {\n"
+                        + "}\n"
+                        + "catch (e: RuntimeException) {\n"
                         + "  println(describe(e))\n"
                         + "}\n");
         assertThat(result.failure).as(result.output).isNull();
@@ -703,11 +795,13 @@ public final class SolvikExceptionExecutionTest {
     @Test
     public void aNullMessageArgumentIsAcceptedAndReadsAsNull() {
         Result result = evaluate(
-                "class AppError extends RuntimeException { }\n"
+                "class AppError extends RuntimeException {\n"
+                        + "}\n"
                         + "val none: String? = null\n"
                         + "try {\n"
                         + "  throw AppError(none)\n"
-                        + "} catch (e: AppError) {\n"
+                        + "}\n"
+                        + "catch (e: AppError) {\n"
                         + "  println(\"msg=\" .. e.getMessage())\n"
                         + "}\n");
         assertThat(result.failure).as(result.output).isNull();
@@ -717,12 +811,14 @@ public final class SolvikExceptionExecutionTest {
     @Test
     public void aSafeMessageReadOnANullReceiverIsSafe() {
         Result result = evaluate(
-                "class AppError extends RuntimeException { }\n"
+                "class AppError extends RuntimeException {\n"
+                        + "}\n"
                         + "val none: AppError? = null\n"
                         + "println(\"onNull=\" .. none?.getMessage())\n"
                         + "try {\n"
                         + "  throw AppError(\"safe\")\n"
-                        + "} catch (e: AppError) {\n"
+                        + "}\n"
+                        + "catch (e: AppError) {\n"
                         + "  println(\"onValue=\" .. e?.getMessage())\n"
                         + "}\n");
         assertThat(result.failure).as(result.output).isNull();
@@ -732,7 +828,8 @@ public final class SolvikExceptionExecutionTest {
     @Test
     public void anUncaughtFailureReportsTheMessage() {
         Result result = evaluate(
-                "class AppError extends RuntimeException { }\n"
+                "class AppError extends RuntimeException {\n"
+                        + "}\n"
                         + "println(\"start\")\n"
                         + "throw AppError(\"disk full\")\n");
         assertThat(result.failure).as(result.output).isNotNull();
@@ -745,7 +842,8 @@ public final class SolvikExceptionExecutionTest {
     @Test
     public void theMessageArgumentMustBeAString() {
         Result result = evaluate(
-                "class AppError extends RuntimeException { }\n"
+                "class AppError extends RuntimeException {\n"
+                        + "}\n"
                         + "func raise() {\n"
                         + "  throw AppError(42)\n"
                         + "}\n");
@@ -757,7 +855,8 @@ public final class SolvikExceptionExecutionTest {
     @Test
     public void anExceptionAcceptsAtMostOneMessageArgument() {
         Result result = evaluate(
-                "class AppError extends RuntimeException { }\n"
+                "class AppError extends RuntimeException {\n"
+                        + "}\n"
                         + "func raise() {\n"
                         + "  throw AppError(\"a\", \"b\")\n"
                         + "}\n");
@@ -771,7 +870,8 @@ public final class SolvikExceptionExecutionTest {
         // The storage is private by construction: only the accessor reaches it, so `e.message` is not a
         // member of an exception class at all.
         Result result = evaluate(
-                "class AppError extends RuntimeException { }\n"
+                "class AppError extends RuntimeException {\n"
+                        + "}\n"
                         + "func show(e: AppError) {\n"
                         + "  println(e.message)\n"
                         + "}\n");
@@ -819,7 +919,8 @@ public final class SolvikExceptionExecutionTest {
     @Test
     public void getMessageIsNotAvailableOnNonExceptionClasses() {
         Result result = evaluate(
-                "class Plain { }\n"
+                "class Plain {\n"
+                        + "}\n"
                         + "func show(p: Plain) {\n"
                         + "  println(p.getMessage())\n"
                         + "}\n");

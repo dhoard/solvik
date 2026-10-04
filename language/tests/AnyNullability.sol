@@ -18,8 +18,18 @@ func describe(value: Any?): String {
 }
 
 val boxed: Any = Box(7)
-val joined: Any = if (true) { 1 } else { "text" }
-val numeric: Number = if (true) { 1 } else { 2L }
+val joined: Any = if (true) {
+    1
+}
+else {
+    "text"
+}
+val numeric: Number = if (true) {
+    1
+}
+else {
+    2L
+}
 val cast: Any = 42 as Any
 
 println(describe(boxed))

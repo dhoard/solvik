@@ -158,7 +158,7 @@ public final class SolvikInheritanceNegativeTest {
 
     @Test
     public void bareSuperAsAValueIsRejected() {
-        Diagnostic diagnostic = first(checkFails("mutable class A {\n}\nclass B extends A {\n    func f(): A {\n        val x = super;\n        return x;\n    }\n}\n"));
+        Diagnostic diagnostic = first(checkFails("mutable class A {\n}\nclass B extends A {\n    func f(): A {\n        val x = super\n        return x\n    }\n}\n"));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_SUPER_AS_VALUE);
     }
 

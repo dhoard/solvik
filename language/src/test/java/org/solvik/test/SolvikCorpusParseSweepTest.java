@@ -41,7 +41,7 @@ import org.solvik.source.SourceFile;
  *
  * <p>The execution suites reach these files only through the whole pipeline, so a program rejected
  * for a semantic reason never exercises its parse result here. This sweep therefore covers the
- * lexer, semicolon insertion, and grammar of the entire corpus, including the programs that are
+ * lexer, physical-line separation, and grammar of the entire corpus, including the programs that are
  * expected to be rejected later, and it fails on a span regression in a construct that no
  * execution test prints.
  */

@@ -514,7 +514,8 @@ public final class SolvikFunctionValueTest {
                 func guarded(operation: func(): Integer): String {
                     try {
                         return "returned " .. operation().toString()
-                    } catch (error: Failure) {
+                    }
+                    catch (error: Failure) {
                         return "caught " .. error.getMessage()
                     }
                 }
@@ -915,7 +916,8 @@ public final class SolvikFunctionValueTest {
 
                 val operation = if (flag) {
                     dogToDog
-                } else {
+                }
+                else {
                     animalToAnimal
                 }
 
@@ -937,11 +939,13 @@ public final class SolvikFunctionValueTest {
 
                 func pick(kind: Integer): func(Dog): Animal {
                     return switch (kind) {
-                        case 1:
+                        case 1 {
                             dogToDog
+                        }
 
-                        default:
+                        default {
                             animalToAnimal
+                        }
                     }
                 }
 
@@ -971,7 +975,12 @@ public final class SolvikFunctionValueTest {
         String widerParameter = ANIMAL_HIERARCHY + """
 
                 val flag: Boolean = true
-                val joined = if (flag) { dogToDog } else { animalToAnimal }
+                val joined = if (flag) {
+                    dogToDog
+                }
+                else {
+                    animalToAnimal
+                }
                 val wide: func(Animal): Animal = joined
                 """;
         Diagnostic parameter = onlyDiagnostic(widerParameter);
@@ -981,7 +990,12 @@ public final class SolvikFunctionValueTest {
         String narrowerResult = ANIMAL_HIERARCHY + """
 
                 val flag: Boolean = true
-                val joined = if (flag) { dogToDog } else { animalToAnimal }
+                val joined = if (flag) {
+                    dogToDog
+                }
+                else {
+                    animalToAnimal
+                }
                 val narrow: func(Dog): Dog = joined
                 """;
         Diagnostic result = onlyDiagnostic(narrowerResult);
@@ -1020,7 +1034,8 @@ public final class SolvikFunctionValueTest {
 
                 val operation = if (flag) {
                     takeInteger
-                } else {
+                }
+                else {
                     takeSide
                 }
 
@@ -1054,7 +1069,8 @@ public final class SolvikFunctionValueTest {
 
                 val operation = if (flag) {
                     unary
-                } else {
+                }
+                else {
                     binary
                 }
 

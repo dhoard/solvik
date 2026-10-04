@@ -1,4 +1,5 @@
-class W { W() {
+class W {
+    W() {
     }
 
     func opt(): String? {

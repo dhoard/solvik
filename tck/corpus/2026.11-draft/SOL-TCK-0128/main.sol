@@ -10,23 +10,29 @@ val zero = 0
 val high = 9
 val a = if (low < 0) {
     "negative"
-} else if (low == 0) {
+}
+else if (low == 0) {
     "zero"
-} else {
+}
+else {
     "positive"
 }
 val b = if (zero < 0) {
     "negative"
-} else if (zero == 0) {
+}
+else if (zero == 0) {
     "zero"
-} else {
+}
+else {
     "positive"
 }
 val c = if (high < 0) {
     "negative"
-} else if (high == 0) {
+}
+else if (high == 0) {
     "zero"
-} else {
+}
+else {
     "positive"
 }
 print("[")

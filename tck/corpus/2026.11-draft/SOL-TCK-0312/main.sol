@@ -15,7 +15,7 @@ func get(ok: Boolean): Result<Integer, String> {
     return Result.Err("bad")
 }
 func use(ok: Boolean): Result<Integer, String> {
-    val v = get(ok)?;
+    val v = get(ok)?
     return Result.Ok(v + 1)
 }
 val r = use(false)

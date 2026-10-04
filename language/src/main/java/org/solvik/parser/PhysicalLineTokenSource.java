@@ -58,7 +58,9 @@ import org.solvik.parser.generated.SolvikLexer;
  * explicit {@code ;} ends its line, so a program that writes one at the end of a line gets the one
  * boundary that follows it rather than a separator and a boundary in a shape the grammar would have
  * to ignore; {@code ;} between two constructs of one physical line stays a separator and never
- * becomes a boundary, because no physical newline separates them.
+ * becomes a boundary, because no physical newline separates them. Boundary placement is not a
+ * permission: a {@code ;} that ends a line, ends the file, or precedes a stand-alone closing brace
+ * separates nothing, and {@link PhysicalLineRules} rejects it as {@code SOLV-PARS-012}.
  *
  * <p>Purity contract: the decision reads only the raw token sequence the lexer produces. This class
  * references no parser type, no error strategy, and no diagnostic, so boundary placement is

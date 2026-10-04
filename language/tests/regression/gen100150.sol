@@ -15,7 +15,12 @@ println(box2.get())
 println(box2 is Any)
 
 func either3(flag: Boolean): Any {
-    return if (flag) { 'a' } else { false }
+    return if (flag) {
+        'a'
+    }
+    else {
+        false
+    }
 }
 
 println(either3(true) is Any)

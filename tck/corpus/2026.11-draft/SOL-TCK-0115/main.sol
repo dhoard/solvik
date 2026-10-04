@@ -6,7 +6,8 @@
 //
 val input = "42"
 val v = switch (input) {
-  case regex r#"^\d+$"#:
+  case regex r#"^\d+$"# {
     "number"
+  }
 }
 print(v)

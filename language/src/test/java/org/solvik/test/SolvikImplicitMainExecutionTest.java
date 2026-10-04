@@ -59,8 +59,12 @@ public final class SolvikImplicitMainExecutionTest {
     public void topLevelLocalsAndLoopsRun() {
         assertThat(run("""
                 mutable val total = 0
-                for (mutable val i = 1; i <= 3; i = i + 1) {
-                    total = total + i
+                {
+                    mutable val i = 1
+                    while (i <= 3) {
+                        total = total + i
+                        i = i + 1
+                    }
                 }
                 println(total)
                 """)).isEqualTo("6\n");

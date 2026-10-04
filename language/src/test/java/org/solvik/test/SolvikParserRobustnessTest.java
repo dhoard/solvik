@@ -107,26 +107,26 @@ public final class SolvikParserRobustnessTest {
 
     @Test
     public void unclosedParenthesisNestingIsDiagnosedInsteadOfOverflowingTheStack() {
-        String src = "func f(): Unit {\n    val x = " + repeat("(", FORMERLY_FATAL_DEPTH) + "1;\n}\n";
+        String src = "func f(): Unit {\n    val x = " + repeat("(", FORMERLY_FATAL_DEPTH) + "1\n}\n";
         SolvikParseResult result = checkContract("deep-open.sol", src);
         assertThat(result.isSuccess()).isFalse();
     }
 
     @Test
     public void unclosedCallChainNestingIsDiagnosedInsteadOfOverflowingTheStack() {
-        String src = "func f(): Unit {\n    " + repeat("f(", FORMERLY_FATAL_DEPTH) + "1;\n}\n";
+        String src = "func f(): Unit {\n    " + repeat("f(", FORMERLY_FATAL_DEPTH) + "1\n}\n";
         assertThat(checkContract("deep-call.sol", src).isSuccess()).isFalse();
     }
 
     @Test
     public void unclosedVariantPatternNestingIsDiagnosedInsteadOfOverflowingTheStack() {
-        String src = "func f(v: Any): Unit {\n    val y = match v { " + repeat("A(", FORMERLY_FATAL_DEPTH) + " };\n}\n";
+        String src = "func f(v: Any): Unit {\n    val y = match v { " + repeat("A(", FORMERLY_FATAL_DEPTH) + " }\n}\n";
         assertThat(checkContract("deep-pattern.sol", src).isSuccess()).isFalse();
     }
 
     @Test
     public void unclosedTypeArgumentNestingIsDiagnosedInsteadOfOverflowingTheStack() {
-        String src = "func f(): Unit {\n    val x: " + repeat("List<", FORMERLY_FATAL_DEPTH) + "Integer;\n}\n";
+        String src = "func f(): Unit {\n    val x: " + repeat("List<", FORMERLY_FATAL_DEPTH) + "Integer\n}\n";
         assertThat(checkContract("deep-typeargs.sol", src).isSuccess()).isFalse();
     }
 
@@ -158,7 +158,7 @@ public final class SolvikParserRobustnessTest {
     public void strayClosingDelimitersFarBeyondTheStackLimitAreDiagnosed() {
         // A stream far longer than the former fatal depth of stray closers must still only produce
         // diagnostics: the parser must not recurse per stray token.
-        assertThat(checkContract("stray-parens.sol", "func f(): Unit {\n    " + repeat(")", FORMERLY_FATAL_DEPTH) + "1;\n}\n").isSuccess()).isFalse();
+        assertThat(checkContract("stray-parens.sol", "func f(): Unit {\n    " + repeat(")", FORMERLY_FATAL_DEPTH) + "1\n}\n").isSuccess()).isFalse();
         assertThat(checkContract("stray-braces.sol", "func f(): Unit " + repeat("}", FORMERLY_FATAL_DEPTH) + "\n").isSuccess()).isFalse();
     }
 
@@ -166,14 +166,14 @@ public final class SolvikParserRobustnessTest {
 
     @Test
     public void balancedNestingFarBeyondTheFormerStackLimitParses() {
-        String src = "func f(): Integer {\n    val x = " + repeat("(", FORMERLY_FATAL_BALANCED_DEPTH) + "1" + repeat(")", FORMERLY_FATAL_BALANCED_DEPTH) + ";\n    return x;\n}\n";
+        String src = "func f(): Integer {\n    val x = " + repeat("(", FORMERLY_FATAL_BALANCED_DEPTH) + "1" + repeat(")", FORMERLY_FATAL_BALANCED_DEPTH) + "\n    return x\n}\n";
         SolvikParseResult result = checkContract("balanced-parens.sol", src);
         assertThat(result.isSuccess()).as("a valid program must parse at this depth").isTrue();
     }
 
     @Test
     public void deepCallChainInAValidProgramParses() {
-        String src = "func f(): Unit {\n    " + repeat("f(", FORMERLY_FATAL_BALANCED_DEPTH) + repeat(")", FORMERLY_FATAL_BALANCED_DEPTH) + ";\n}\n";
+        String src = "func f(): Unit {\n    " + repeat("f(", FORMERLY_FATAL_BALANCED_DEPTH) + repeat(")", FORMERLY_FATAL_BALANCED_DEPTH) + "\n}\n";
         assertThat(checkContract("balanced-call.sol", src).isSuccess()).isTrue();
     }
 
@@ -194,7 +194,7 @@ public final class SolvikParserRobustnessTest {
     public void deeplyNestedBlockAndSwitchBodiesParseWithoutUnboundedCost() {
         for (int depth : new int[] {100, FORMERLY_FATAL_BALANCED_DEPTH}) {
             String blocks = "func f(): Unit {\n" + repeat("{\n", depth) + repeat("}\n", depth) + "}\n";
-            String switches = "func f(v: Integer): Unit {\n" + repeat("switch (v) {\ncase 1: 1\n", depth) + repeat("}\n", depth) + "}\n";
+            String switches = "func f(v: Integer): Unit {\n" + repeat("switch (v) {\ncase 1 {\n", depth) + "1\n" + repeat("}\n}\n", depth) + "}\n";
             for (String src : List.of(blocks, switches)) {
                 long started = System.nanoTime();
                 assertThat(checkContract("nested.sol", src).isSuccess()).as("nested construct at depth " + depth).isTrue();
@@ -210,7 +210,7 @@ public final class SolvikParserRobustnessTest {
     public void nestingBeyondCompilerCapacityIsReportedAsADiagnosticNotAResourceFailure() {
         // Past the reserved front-end stack the compiler cannot read the file at all. The outcome
         // must be a normal parse failure naming the problem, never an escaping StackOverflowError.
-        String src = "func f(): Unit {\n    val x = " + repeat("(", 400_000) + "1" + repeat(")", 400_000) + ";\n}\n";
+        String src = "func f(): Unit {\n    val x = " + repeat("(", 400_000) + "1" + repeat(")", 400_000) + "\n}\n";
         SolvikParseResult result = checkContract("too-deep.sol", src);
         assertThat(result.isSuccess()).isFalse();
         List<String> codes = new ArrayList<>();
@@ -224,7 +224,7 @@ public final class SolvikParserRobustnessTest {
     public void theNestingDiagnosticSpansTheWholeFileAndNamesTheProblem() {
         // A call chain recurses through a different grammar rule than a parenthesized expression, so
         // the capacity diagnostic is pinned for more than one right-recursive path.
-        String src = "func f(): Unit {\n    " + repeat("f(", 400_000) + repeat(")", 400_000) + ";\n}\n";
+        String src = "func f(): Unit {\n    " + repeat("f(", 400_000) + repeat(")", 400_000) + "\n}\n";
         SolvikParseResult result = parse("span.sol", src);
         Diagnostic tooDeep = null;
         for (Diagnostic d : result.diagnostics().all()) {
@@ -264,7 +264,7 @@ public final class SolvikParserRobustnessTest {
      * An anonymous function nests a complete callable body inside an expression, which is the deepest
      * expression nesting the language allows, so the balanced direction is pinned for it too. The
      * program is deliberately a chain of declarations whose initializers are anonymous functions, each
-     * body written on its own lines so semicolon insertion terminates it.
+     * body written on its own lines so the line boundary terminates it.
      */
     @Test
     public void deeplyNestedAnonymousFunctionBodiesParseWithoutUnboundedCost() {
@@ -308,18 +308,18 @@ public final class SolvikParserRobustnessTest {
     @Test
     public void singleCharacterMutationsOfWellFormedProgramsNeverThrow() {
         String[] seeds = { //
-                "func add(a: Integer, b: Integer): Integer {\n    return a + b;\n}\nprintln(add(1, 2));\n", //
-                "class Point {\n    val x: Integer = 0;\n    Point(theX: Integer) {\n        x = theX;\n    }\n    func getX(): Integer {\n        return x;\n    }\n}\n", //
-                "interface Shape {\n    func area(): Integer;\n    func name(): String {\n        return \"shape\";\n    }\n}\n", //
-                "enum Color {\n    Red;\n    Green(Integer);\n}\nfunc f(c: Color): Integer {\n    return match c {\n        Red => 1,\n        Green(v) => v\n    };\n}\n", //
-                "func f(): Unit {\n    switch (1) {\n    case 1, 2:\n        println(1);\n        break;\n    default:\n        println(0);\n    }\n}\n", //
-                "func f(v: Any): Unit {\n    if (v is String) {\n        println(v);\n    } else {\n        println(v as Integer);\n    }\n}\n", //
-                "func f(): Unit {\n    val s = r#\"raw \"value\"\"# .. \"tail\"\n    println(s);\n}\n", //
-                "func id<T>(v: T): T {\n    return v;\n}\nfunc f(): Unit {\n    println(id<Integer>(3));\n}\n", //
-                "func f(v: Integer?): Unit {\n    val x = v ?? 0;\n    println(x);\n}\n", //
-                "func f(): Unit {\n    for (i in 0...10) {\n        if (i == 5) {\n            continue;\n        }\n        println(i);\n    }\n}\n", //
-                "module app\nfunc f(): Unit {\n    val x = if (true) { 1 } else { 2 };\n}\n", //
-                "interface I {\n    func ping(): Integer;\n}\nclass C {\n    delegate val d: I;\n}\n"};
+                "func add(a: Integer, b: Integer): Integer {\n    return a + b\n}\nprintln(add(1, 2))\n", //
+                "class Point {\n    val x: Integer = 0\n    Point(theX: Integer) {\n        x = theX\n    }\n    func getX(): Integer {\n        return x\n    }\n}\n", //
+                "interface Shape {\n    func area(): Integer\n    func name(): String {\n        return \"shape\"\n    }\n}\n", //
+                "enum Color {\n    Red\n    Green(Integer)\n}\nfunc f(c: Color): Integer {\n    return match c {\n        Red => 1,\n        Green(v) => v\n    }\n}\n", //
+                "func f(): Unit {\n    switch (1) {\n    case 1, 2:\n        println(1)\n        break\n    default:\n        println(0)\n    }\n}\n", //
+                "func f(v: Any): Unit {\n    if (v is String) {\n        println(v)\n    } else {\n        println(v as Integer)\n    }\n}\n", //
+                "func f(): Unit {\n    val s = r#\"raw \"value\"\"# .. \"tail\"\n    println(s)\n}\n", //
+                "func id<T>(v: T): T {\n    return v\n}\nfunc f(): Unit {\n    println(id<Integer>(3))\n}\n", //
+                "func f(v: Integer?): Unit {\n    val x = v ?? 0\n    println(x)\n}\n", //
+                "func f(): Unit {\n    for (i in 0...10) {\n        if (i == 5) {\n            continue\n        }\n        println(i)\n    }\n}\n", //
+                "module app\nfunc f(): Unit {\n    val x = if (true) { 1 } else { 2 }\n}\n", //
+                "interface I {\n    func ping(): Integer\n}\nclass C {\n    delegate val d: I\n}\n"};
         char[] mutations = {'(', ')', '{', '}', ';', ',', ':', '.', '<', '>', '=', '?', '!', '*', '+', '-', '/', '&', '|', '@', '#', '\\', '\'', '"', '\n', ' ', '\t', 'r', '1', 'x', 'e', 'a', 'v', 'f', 'i', '\r'};
         Random random = new Random(9_999L);
         for (String seed : seeds) {
@@ -343,7 +343,7 @@ public final class SolvikParserRobustnessTest {
     /** The parser is a function of its input: the same source must give the same outcome. */
     @Test
     public void parsingIsRepeatableForAcceptedAndRejectedInput() {
-        String accepted = "func f(): Integer {\n    val x = 1 + 2;\n    return x;\n}\n";
+        String accepted = "func f(): Integer {\n    val x = 1 + 2\n    return x\n}\n";
         String rejected = "func f(): Unit {\n    g(1) h(2)\n}\n";
         for (int run = 0; run < 3; run++) {
             assertThat(render(parse("a.sol", accepted))).isEqualTo(render(parse("a.sol", accepted)));
@@ -375,7 +375,7 @@ public final class SolvikParserRobustnessTest {
     /** An accepted parse carries no diagnostics; a rejected parse carries no AST. */
     @Test
     public void acceptedAndRejectedResultsAreMutuallyExclusive() {
-        List<String> sources = List.of("", "\n", "func f(): Unit {\n}\n", "func f(): Unit {\n    @\n}\n", "func f(): Unit {\n    val x = (1;\n}\n");
+        List<String> sources = List.of("", "\n", "func f(): Unit {\n}\n", "func f(): Unit {\n    @\n}\n", "func f(): Unit {\n    val x = (1\n}\n");
         for (String src : sources) {
             SolvikParseResult result = checkContract("exclusive.sol", src);
             assertThat(result.isSuccess() ^ result.diagnostics().hasErrors()).as("exactly one outcome for " + preview(src)).isTrue();

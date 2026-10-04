@@ -95,7 +95,6 @@ import org.solvik.ast.statement.ContinueStmtNode;
 import org.solvik.ast.statement.ElseBranchNode;
 import org.solvik.ast.statement.ExprStmtNode;
 import org.solvik.ast.statement.ForInStmtNode;
-import org.solvik.ast.statement.ForStmtNode;
 import org.solvik.ast.statement.IfStmtNode;
 import org.solvik.ast.statement.LocalDeclNode;
 import org.solvik.ast.statement.RegexCaseLabelNode;
@@ -2033,7 +2032,6 @@ public final class SolvikSemanticAnalyzer {
             case LOCAL_DECL -> checkLocalDecl((LocalDeclNode) statement);
             case IF_STMT -> checkIf((IfStmtNode) statement);
             case WHILE_STMT -> checkWhile((WhileStmtNode) statement);
-            case FOR_STMT -> checkFor((ForStmtNode) statement);
             case FOR_IN_STMT -> checkForIn((ForInStmtNode) statement);
             case SWITCH_STMT -> checkSwitch((SwitchStmtNode) statement);
             case BLOCK -> checkBlock((BlockNode) statement);
@@ -2146,50 +2144,6 @@ public final class SolvikSemanticAnalyzer {
         restoreNarrowing(narrowingBefore);
         dropWrittenSince(writtenBefore);
         definitelyInitialized = before;
-    }
-
-    private void checkFor(ForStmtNode statement) {
-        symbols.enterScope();
-        if (statement.initializer().isPresent()) {
-            StatementNode initializer = statement.initializer().get();
-            if (initializer instanceof LocalDeclNode local) {
-                checkLocalDecl(local);
-            } else if (initializer instanceof AssignStmtNode assign) {
-                checkAssign(assign);
-            } else if (initializer instanceof ExprStmtNode expressionStatement) {
-                checkExpression(expressionStatement.expression());
-                error(DiagnosticCode.SEM_FOR_INITIALIZER, initializer.span(), "for initializer must be a local declaration or an assignment");
-            }
-        }
-        Set<PropertySymbol> before = copyInitialized();
-        Map<VariableSymbol, Type> narrowingBefore = copyNarrowing();
-        Set<VariableSymbol> writtenBefore = new HashSet<>(writtenVariables);
-        if (statement.condition().isPresent()) {
-            Type condition = checkExpression(statement.condition().get());
-            requireBoolean(condition, statement.condition().get());
-            Refinement refinement = refinementOf(statement.condition().get());
-            if (refinement != null) {
-                applyRefinement(refinement, refinement.whenTrue);
-            }
-        }
-        loopDepth++;
-        breakDepth++;
-        checkBlock(statement.body());
-        breakDepth--;
-        loopDepth--;
-        if (statement.update().isPresent()) {
-            StatementNode update = statement.update().get();
-            if (update instanceof AssignStmtNode assign) {
-                checkAssign(assign);
-            } else if (update instanceof ExprStmtNode expressionStatement) {
-                checkExpression(expressionStatement.expression());
-                error(DiagnosticCode.SEM_FOR_UPDATE, update.span(), "for update clause must be an assignment");
-            }
-        }
-        restoreNarrowing(narrowingBefore);
-        dropWrittenSince(writtenBefore);
-        definitelyInitialized = before;
-        symbols.exitScope();
     }
 
     /**
@@ -5872,8 +5826,6 @@ public final class SolvikSemanticAnalyzer {
             }
             case WHILE_STMT:
                 return loopCompletion(((WhileStmtNode) statement).body());
-            case FOR_STMT:
-                return loopCompletion(((ForStmtNode) statement).body());
             case FOR_IN_STMT:
                 return loopCompletion(((ForInStmtNode) statement).body());
             default:

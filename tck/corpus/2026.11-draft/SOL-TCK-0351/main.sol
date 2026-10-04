@@ -14,7 +14,7 @@ func get(): Result<Integer, String> {
 }
 func use(): Result<Integer, String> {
     val r = get()
-    val b = r.isOk(1);
+    val b = r.isOk(1)
     return Result.Ok(1)
 }
 print("EXECUTED-INVALID")

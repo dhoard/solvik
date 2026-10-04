@@ -219,7 +219,7 @@ public final class SolvikLexerDiagnosticSpanTest {
 
     @Test
     public void multiCharacterLiteralSpansCoverBothReportedFailures() {
-        String text = "func f(): Unit {\n    val c = 'ab';\n}\n";
+        String text = "func f(): Unit {\n    val c = 'ab'\n}\n";
         SourceFile file = source(text);
         SolvikParseResult result = SolvikParser.parse(file);
         List<Diagnostic> lexical = new ArrayList<>();
@@ -238,7 +238,7 @@ public final class SolvikLexerDiagnosticSpanTest {
     public void unterminatedRawStringKeepsItsOpeningDelimiterSpan() {
         // The raw-string diagnostic is a distinct code positioned at the opening delimiter, and it
         // names the exact closing delimiter that was expected.
-        String text = "func f(): Unit {\n    val s = r#\"abc;\n}\n";
+        String text = "func f(): Unit {\n    val s = r#\"abc\n}\n";
         SourceFile file = source(text);
         SolvikParseResult result = SolvikParser.parse(file);
         Diagnostic d = firstWithCode(result, DiagnosticCode.LEXER_UNTERMINATED_RAW_STRING);
@@ -276,7 +276,7 @@ public final class SolvikLexerDiagnosticSpanTest {
         // the parser reports nothing. SOLV-LEX-003 is raised against the whole literal by the
         // semantic layer (see SolvikExecutionNegativeTest), which is why the one-character
         // lexical-span rule above does not apply to it.
-        String text = "func f(): Unit {\n    val s = \"bad\\q\";\n}\n";
+        String text = "func f(): Unit {\n    val s = \"bad\\q\"\n}\n";
         SolvikParseResult result = SolvikParser.parse(source(text));
         assertThat(result.isSuccess()).isTrue();
         assertThat(result.diagnostics().all()).isEmpty();

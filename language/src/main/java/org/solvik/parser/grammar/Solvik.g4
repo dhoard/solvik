@@ -17,27 +17,27 @@
 // Generated sources are produced by generate_parser.sh; do not edit generated files by hand.
 //
 // Phase 1 supported constructs: top-level `func` declarations with typed parameters and explicit
-// return types; blocks; `val` and `mutable val` locals with initializers and `;` termination;
-// call-expression statements; integer, Boolean, and normal-string literals; name references,
+// return types; blocks; `val` and `mutable val` locals with initializers; call-expression
+// statements; integer, Boolean, and normal-string literals; name references,
 // ordinary member access, calls, parentheses, and `+`, `-`, `*`, `/`; `if`/`else`; `return`.
 // SimpleLanguage `function` is intentionally not accepted.
 //
 // Statements are separated by physical lines (docs/LANGUAGE_SPEC.md section 16):
 //   * the lexer keeps physical newlines as hidden NEWLINE tokens and comments as hidden comment
 //     tokens instead of discarding them, so org.solvik.parser.PhysicalLineTokenSource can observe
-//     line boundaries and synthesize one NEWLINE token per boundary on the default channel before
+//     line boundaries and forward one NEWLINE token per boundary on the default channel before
 //     the parser ever runs (a combined grammar cannot declare custom channels, so the retained
 //     tokens live on HIDDEN);
-//   * a boundary NEWLINE is the only separator the grammar admits, and it is required: `statement`
-//     consumes one, and every declaration and member list demands one after each entry, so two
-//     constructs sharing a physical line have no separator between them and are rejected. `;` is not in the language, so no rule accepts a SEMI token and a written `;` is a
-//     parse error at its own position rather than a silently ignored one;
-//   * NULLABLE_DOT ('?.') is lexed as one token so boundary suppression can refuse termination before
-//     it. Nullable member access itself is not grammar until Phase 10, so '?.' is lexed and then
+//   * the grammar requires a separator between two constructs, and `separator` offers the physical
+//     line boundary and `;`. A `;` is only ever a separator between two constructs written on one
+//     physical line and never a terminator: a `;` that ends a line, ends the file, or precedes a
+//     stand-alone closing brace is rejected after parsing by PhysicalLineRules (SOLV-PARS-012),
+//     so the grammar stays line-shape free while no line-final `;` is ever accepted;
+//   * NULLABLE_DOT ('?.') is lexed as one token so a line cannot break between `?` and `.`.
+//     Nullable member access itself is not grammar until Phase 10, so '?.' is lexed and then
 //     rejected by the parser.
-//   * LBRACKET/RBRACKET exist for the mirror-image reason on the other side of the algorithm:
-//     specification condition 1 tracks unmatched '[' and ']' depth. No rule consumes them until
-//     bracket syntax lands in a later phase, so programs using them are lexed and then rejected
+//   * LBRACKET/RBRACKET exist for the anonymous-function capture list and for rejection: bracket
+//     indexing syntax is not in the language, so programs using it are lexed and then rejected
 //     by the parser.
 //
 // Phase 3 adds Rust-style raw strings (docs/LANGUAGE_SPEC.md section 15):
@@ -45,7 +45,7 @@
 //     and its action scans the counted body, because ANTLR cannot express an arbitrary counted '#'
 //     delimiter directly;
 //   * the body closes on the first '"' followed by exactly N '#' characters, so the whole literal
-//     is one token and its internal physical newlines can never participate in semicolon insertion;
+//     is one token and its internal physical newlines can never end a line;
 //   * an unterminated raw string consumes to end of input and reports a lexical diagnostic at the
 //     opening delimiter naming the expected closing delimiter.
 //
@@ -58,8 +58,8 @@
 //   * assignment is a statement, never an expression: `exprStmt` accepts one optional `=`, and the
 //     `for` clause rules accept the same shape. The static semantic pass rejects an assignment
 //     whose target is not a mutable local.
-//   * `BREAK` and `CONTINUE` are terminators for semicolon insertion; that table lives in
-//     org.solvik.parser.SemicolonInsertingTokenSource.
+//   * `BREAK` and `CONTINUE` are words that end their physical line; the line-end token table lives
+//     in org.solvik.parser.PhysicalLineTokenSource.
 //
 // Phase 6 adds classes and objects (docs/LANGUAGE_SPEC.md section 7): a class declaration with
 // property declarations, at most one constructor, and instance methods, plus the `this` expression.
@@ -71,8 +71,8 @@
 //     ordinary postfix suffix machinery (member access and calls).
 //   * property declarations require an explicit type annotation, matching the specification's rule
 //     that only local variables may infer a type from an initializer.
-//   * `this` is a value-producing atom; THIS joins the semicolon-insertion terminator table so a
-//     statement ending in `this` terminates like one ending in an identifier or literal.
+//   * `this` is a value-producing atom, so a line ending in `this` ends its line like one ending
+//     in an identifier or a literal.
 //
 // Phase 7 adds the root type hierarchy and single inheritance (docs/LANGUAGE_SPEC.md sections 4
 // and 7):
@@ -111,8 +111,8 @@
 //   * a delegate's declared type must be an interface, because delegation forwards interface
 //     members; the semantic layer, not the grammar, decides which members a delegate supplies and
 //     rejects a non-interface, class-typed, or ambiguous delegate.
-//   * `delegate` is not a semicolon-insertion terminator (like `class`, `implements`, and `mutable`):
-//     a delegate declaration always ends in `;`, which is the token that terminates it.
+//   * `delegate` opens a declaration and never ends a line (like `class`, `implements`, and
+//     `mutable`): a delegate declaration ends at its physical line's boundary.
 // Phase 11 adds nominal generics (docs/LANGUAGE_SPEC.md section 11):
 //   * `classDecl`, `interfaceDecl`, `functionDecl`, `methodDecl`, `signatureDecl`, and
 //     `defaultMethodDecl` accept a `typeParameterList` after the declared name, so a generic
@@ -138,23 +138,23 @@
 //     subclass may extend. Unlike the `sealed` keyword it replaced, it carries no closed subtype set
 //     and no same-file extension boundary: an abstract class may be extended from any file, so no
 //     class type has a knowable subtype set and `match` over a class type requires a wildcard.
-//   * `enum`, `abstract`, and a variant name are not semicolon-insertion terminators: `enum` and
+//   * `enum`, `abstract`, and a variant name end no line: `enum` and
 //     `abstract` open a construct, and a variant already ends in `)` or an identifier, both of which
-//     are terminators already.
+//     end their line already.
 //
 // Phase 10 adds null safety (docs/LANGUAGE_SPEC.md sections 5 and 18):
 //   * `typeRef` accepts an optional `?`, so `T?` is a written nullable type. The type name resolves
 //     as before and the semantic layer wraps the resolved type in `NullableType`, which keeps
 //     identity comparison reliable because the view is canonical per type instance.
-//   * `null` joins the literal forms as a keyword. It is a value-producing atom, so NULL joins the
-//     semicolon-insertion terminator table.
-//   * `?.` is now a member-suffix operator as well as an insertion lookahead token; a nullable
+//   * `null` joins the literal forms as a keyword. It is a value-producing atom, so a line ending
+//     in `null` ends its line.
+//   * `?.` is now a member-suffix operator and a token that cannot end a line; a nullable
 //     receiver may only be dereferenced through `?.` or after a null check.
 //   * `??` is the lowest-precedence binary operator, below `||`, and is lexed as one token so it can
 //     never be confused with a nullable type reference.
 //   * `is` and `as` join the ordering tier as keywords whose right operand is a type reference, not an
-//     expression. They are non-terminators for semicolon insertion, but QUESTION joins the terminator
-//     table because a newline after `T?` must terminate the statement the type reference belongs to.
+//     expression. Neither ends a line, but QUESTION does: a newline after `T?` terminates the
+//     statement the type reference belongs to.
 //
 // Phase 13 adds exhaustive `match` (docs/LANGUAGE_SPEC.md section 12):
 //   * `matchExpr` joins `primary` as an expression: `match <expression> { <branch>* }`. A branch is
@@ -166,7 +166,7 @@
 //     and a bare name as a value-less variant at the top level or a binding inside a variant. The
 //     wildcard `_` is the bare name `_`, matching the specification's identifier grammar rather
 //     than reserving a new keyword.
-//   * `ARROW` and `MATCH` are new tokens; neither is a semicolon-insertion terminator (`match`
+//   * `ARROW` and `MATCH` are new tokens; neither ends a line (`match`
 //     opens a construct and `=>` is always followed by the branch expression).
 //
 // Phase 15 adds the non-fallthrough `switch` statement (docs/LANGUAGE_SPEC.md section 13):
@@ -177,9 +177,9 @@
 //     is its own alternative so the semantic layer can enforce "at most one and last".
 //   * `regexCaseLabel` is `regex <string literal>`: the reserved `regex` keyword plus a normal or
 //     raw string pattern, matching the specification's `case regex r#"..."#` surface.
-//   * `SWITCH`, `CASE`, `DEFAULT`, and `REGEX_KW` are new tokens. `switch` and `case` open a
-//     construct; `default` and `regex` are followed by `:` and a string literal respectively, so
-//     none is a semicolon-insertion terminator.
+//   * `SWITCH`, `CASE`, `DEFAULT`, and `REGEX_KW` are new tokens. `switch`, `case`, and `default`
+//     open a construct, and `regex` is followed by a string literal, so
+//     none of the four ever ends a line.
 grammar Solvik;
 
 @lexer::members {
@@ -210,8 +210,7 @@ grammar Solvik;
      * opening delimiter. The opening hash count is recovered from the matched text; scanning stops
      * at the first '"' followed by exactly that many '#' characters or at end of input, where an
      * unterminated-literal diagnostic is reported at the opening delimiter. Because the complete
-     * literal is consumed as one token, its embedded newlines never reach the semicolon-inserting
-     * token stream.
+     * literal is consumed as one token, its embedded newlines can never end a line.
      */
     private void lexRawStringBody() {
         int hashes = getText().length() - 2;
@@ -255,13 +254,13 @@ grammar Solvik;
 compilationUnit: moduleDecl? (includeDecl | functionDecl separator | classDecl separator | interfaceDecl separator | enumDecl separator | errorDecl separator | statement | separator)* EOF ;
 
 // Phase 17: an optional module declaration naming the file's namespace. It must be the first item in
-// a physical file and is terminated by a real or lexically inserted SEMI. The written name is a
+// a physical file and is terminated by its line's separator. The written name is a
 // single identifier with no dots; the semantic layer enforces the lowercase, underscore-separated
 // naming rule and rejects a reserved word.
 moduleDecl: MODULE Identifier separator ;
 
-// A compile-time include directive. It takes a normal or raw string path and is terminated by a real
-// or lexically inserted SEMI. It is not a statement and may only appear at the top level. Phase 17
+// A compile-time include directive. It takes a normal or raw string path and is terminated by its
+// line's separator. It is not a statement and may only appear at the top level. Phase 17
 // adds an optional `alias <name>` suffix that binds a file-local prefix to the included file's
 // module instead of splicing its declarations into the flat program scope.
 includeDecl: INCLUDE (stringLiteral | rawStringLiteral) (ALIAS Identifier)? separator ;
@@ -278,8 +277,8 @@ classDecl: (ABSTRACT | MUTABLE)? CLASS Identifier typeParameterList? (EXTENDS ty
 interfaceDecl: INTERFACE Identifier typeParameterList? (EXTENDS typeRefList)? NEWLINE? LBRACE (interfaceMember separator | separator)* RBRACE ;
 
 // An enum declaration (docs/LANGUAGE_SPEC.md section 12). Variants are nested nominal
-// constructors that may carry positional values; every variant is terminated by a real or inserted
-// SEMI, because the grammar tolerates a variant list spread across physical lines.
+// constructors that may carry positional values; every variant is terminated by its line's
+// separator, because the grammar tolerates a variant list spread across physical lines.
 enumDecl: ENUM Identifier typeParameterList? NEWLINE? LBRACE (enumVariant separator | separator)* RBRACE ;
 // An `error` declaration is an enum-shaped closed value type whose variants are the concrete error
 // values. Its grammar mirrors `enumDecl` so it reuses the enum semantic/lowering machinery; the
@@ -291,9 +290,9 @@ enumVariant: Identifier (LPAREN typeRefList? RPAREN)? ;
 
 interfaceMember: signatureDecl | defaultMethodDecl ;
 
-// An abstract interface signature: no body, terminated by `;`, which is a real SEMI token, so a
-// default-method body's `}` and this `;` are the two interface-member terminators. Like every
-// callable, its return type is optional and defaults to `Unit`.
+// An abstract interface signature: no body, so no scope and no braces; its line's separator ends
+// it. A default-method body's `}` and this separator are the two interface-member terminators. Like
+// every callable, its return type is optional and defaults to `Unit`.
 signatureDecl: FUNC Identifier typeParameterList? LPAREN parameterList? RPAREN (COLON typeRef)? ;
 
 defaultMethodDecl: FUNC Identifier typeParameterList? LPAREN parameterList? RPAREN (COLON typeRef)? NEWLINE? block ;
@@ -314,8 +313,8 @@ classMember: propertyDecl | delegateDecl | constructorDecl | methodDecl | static
 staticMember: STATIC (propertyDecl | methodDecl) ;
 
 // The class initializer: a statement list in a block, at most one per class (SOLV-SEM-046). A
-// block ends in `}`, which is itself a semicolon-insertion terminator, so the block needs no
-// trailing SEMI and the class body's stand-alone SEMI tolerance covers an explicit one.
+// block ends in `}`, which ends its own line, so the block needs no
+// trailing separator and the class body's stand-alone separator tolerance covers an explicit one.
 staticBlock: STATIC NEWLINE? block ;
 
 // A delegate (docs/LANGUAGE_SPEC.md section 9): an immutable, explicitly typed property that the
@@ -372,24 +371,21 @@ typeArguments: LT NEWLINE* typeRef (NEWLINE* COMMA NEWLINE* typeRef)* NEWLINE* G
 // rule per line shape and would spread one rule's content over the whole grammar.
 block: LBRACE (statement | separator)* statementCore? RBRACE ;
 
-// The alternatives are one statement each. The three-clause `for` the 2026.10 revision spelled
-// `for (init; condition; update)` is absent: its separators are the `;` this grammar no longer inserts,
-// and the form is removed rather than re-pointed. A `for` header still written with those separators is
-// named by SOLV-PARS-011, and an empty `for ()` by SOLV-PARS-001.
+// The alternatives are one statement each.
 // A separator between two statements, declarations, or class/interface members. Section 16 makes the
-// physical line boundary the mandatory terminator and keeps `;` as the separator a program may write
-// between two constructs of one physical line, so the two are interchangeable here and a run of them
-// between constructs is tolerated exactly as a blank line is.
+// physical line boundary the mandatory terminator; `;` appears here only so that two constructs of one
+// physical line can be written, and PhysicalLineRules then rejects every `;` that ends a line instead
+// of separating two constructs on one. A run of boundaries between constructs is tolerated exactly as
+// a blank line is.
 separator: NEWLINE | SEMI ;
 
 statement: statementCore separator ;
 
-// A statement without its separator. A block's last statement is the one place a separator can be
-// absent: when the block's `}` sits inside brackets - an argument list, a subscript - the boundary
-// that would follow that statement is suppressed, because bracket nesting is what lets a wrapped
-// expression continue across lines. The body of a bracketed anonymous function therefore ends with a
-// `statementCore`, and every other position still demands its boundary.
-statementCore: localDecl | ifStmt | whileStmt | forStmt | forInStmt | switchStmt | block | breakStmt | continueStmt | returnStmt | throwStmt | tryStmt | exprStmt ;
+// A statement without its separator. The option exists at the end of a `block` and a `valueBlock`
+// only: it lets a program that writes its last statement on the closing brace's line still parse,
+// so the layout stage can name the mistake as the dedicated SOLV-PARS-007 or SOLV-PARS-010
+// diagnostic instead of the parser's generic complaint. Every other position demands its boundary.
+statementCore: localDecl | ifStmt | whileStmt | forInStmt | removedForStmt | switchStmt | block | breakStmt | continueStmt | returnStmt | throwStmt | tryStmt | exprStmt ;
 
 localDecl: bindingKind Identifier (COLON typeRef)? ASSIGN expression ;
 
@@ -401,23 +397,23 @@ elseBranch: ELSE NEWLINE? ifStmt | ELSE NEWLINE? block ;
 
 whileStmt: WHILE LPAREN expression RPAREN NEWLINE? block ;
 
-// The three-clause `for` (docs/LANGUAGE_SPEC.md section 17): an optional local declaration or
-// assignment, an optional Boolean condition, and an optional assignment, separated by the two explicit
-// semicolons the section names. The separators are inside the header's parentheses, where the line
-// boundary never appears, so they are unambiguous with the `separator` between statements. An omitted
-// condition is `true`.
-forStmt: FOR LPAREN forInit? SEMI forCondition? SEMI forUpdate? RPAREN NEWLINE? block ;
+// The three-clause `for` was removed by the 2026.11 physical-line revision. A statement-shaped
+// production matches its header -- its two semicolons belong to the old form and to nothing else in
+// the language, since `;` only separates constructs on one line -- so that `SolvikAstBuilder` can
+// report the dedicated SOLV-PARS-011 diagnostic at the `for` keyword and name the replacement, the
+// same service the reserved-keyword tokens give to removed keywords. The production is parse-only:
+// the builder never emits an executable node for it, and the statement is rejected, not reinterpreted.
+// docs/LANGUAGE_SPEC.md section 17.
+removedForStmt: FOR LPAREN removedForClause? SEMI removedForClause? SEMI removedForClause? RPAREN NEWLINE? block? ;
 
-forInit: localDecl | assignable ;
+// One header clause of the removed form: a declaration, or any expression optionally followed by
+// `=` and a value, which covers both the initializer and the update of the old syntax; the middle
+// clause is the old condition, an expression.
+removedForClause: localDecl | assignable ;
 
-forCondition: expression ;
-
-forUpdate: assignable ;
-
-// An assignment-shaped clause: an expression optionally followed by `=` and a value. The `for`
-// clauses accept it and the semantic pass rejects a clause that is neither an assignment nor a
-// declaration (SOLV-SEM-004, SOLV-SEM-005); an assignment is a statement and never an expression, so
-// this shape exists only where the grammar needs it.
+// An assignment-shaped clause: an expression optionally followed by `=` and a value. The removed
+// three-clause `for` header is shaped from it; an assignment is a statement and never an expression,
+// so this shape exists only where the grammar needs it.
 assignable: expression (ASSIGN expression)? ;
 
 // A range for-in loop: `for (name in start <op> end) block`. The three range operators are
@@ -431,7 +427,8 @@ rangeOperator: DOTDOTDOT | DOTDOTLT | DOTDOTGT ;
 
 // Phase 15: `switch` is a statement for value dispatch with no implicit fallthrough. A case body is a
 // braced block, so it obeys the same brace and separator rules as any other body: the `{` closes the
-// label's line and the `}` stands on its own. `default` is a separate alternative so the semantic
+// label's line and the `}` stands on its own. Because the body's brace marks the end of the label, the
+// label carries no colon: `case 1 {`, `default {`. `default` is a separate alternative so the semantic
 // layer can enforce at most one and last. A `regex` case label carries a normal or raw string literal
 // pattern.
 switchStmt: SWITCH LPAREN expression RPAREN NEWLINE? LBRACE (switchCase | defaultCase | separator)* RBRACE ;
@@ -439,8 +436,8 @@ switchStmt: SWITCH LPAREN expression RPAREN NEWLINE? LBRACE (switchCase | defaul
 // Phase 18: block, `if`, and `switch` expressions (docs/LANGUAGE_SPEC.md section 21). The
 // surface syntax is shared with the statement forms; the syntactic context selects the expression
 // node. A value-required block accepts an optional unterminated terminal expression (`valueTail`)
-// so `{ 42 }` and `{ 42; }` and a newline-inserted equivalent all parse to the same result. The
-// AST builder still identifies the tail structurally, so explicit and synthesized semicolons are
+// so `{` newline `42` newline `}` and a `;`-separated equivalent all parse to the same result. The
+// AST builder identifies the tail structurally, so both separator spellings are
 // interchangeable. An expression `if` retains an optional `else` so a missing `else` can be
 // reported with a dedicated diagnostic.
 blockExpr: valueBlock ;
@@ -457,13 +454,13 @@ valueBlock: LBRACE (statement | separator)* valueTail? separator? RBRACE ;
 
 valueTail: expression ;
 
-valueSwitchCase: CASE caseLabel (NEWLINE* COMMA NEWLINE* caseLabel)* COLON NEWLINE? valueBlock ;
+valueSwitchCase: CASE caseLabel (NEWLINE* COMMA NEWLINE* caseLabel)* NEWLINE? valueBlock ;
 
-valueDefaultCase: DEFAULT COLON NEWLINE? valueBlock ;
+valueDefaultCase: DEFAULT NEWLINE? valueBlock ;
 
-switchCase: CASE caseLabel (NEWLINE* COMMA NEWLINE* caseLabel)* COLON NEWLINE? block ;
+switchCase: CASE caseLabel (NEWLINE* COMMA NEWLINE* caseLabel)* NEWLINE? block ;
 
-defaultCase: DEFAULT COLON NEWLINE? block ;
+defaultCase: DEFAULT NEWLINE? block ;
 
 caseLabel: regexCaseLabel | expression ;
 
@@ -545,7 +542,7 @@ captureItemList: captureItem (NEWLINE* COMMA NEWLINE* captureItem)* ;
 captureItem: Identifier | THIS ;
 
 // Phase 13: `match` is expression-oriented and exhaustive for a known closed variant set. A branch
-// result is terminated by a real or inserted SEMI, which the enclosing branch list consumes.
+// result ends its line, which the enclosing branch list consumes as a separator.
 matchExpr: MATCH expression NEWLINE? LBRACE (matchBranch | separator)* RBRACE ;
 
 matchBranch: pattern ARROW NEWLINE* expression ;
@@ -607,13 +604,13 @@ nullLiteral: NULL ;
 
 FUNC: 'func' ;
 // `static` is reserved for class-level members and the class initializer (docs/LANGUAGE_SPEC.md
-// section 7). It is not a semicolon-insertion terminator: `static` opens a member declaration or a
-// block, and neither form can end a statement.
+// section 7). It ends no line: `static` opens a member declaration or a
+// block, and neither form can be complete before it.
 STATIC: 'static' ;
 // Phase 16: `include` introduces a compile-time file inclusion; reserved so it cannot be an identifier.
 INCLUDE: 'include' ;
 // Phase 17: `module` names a file's namespace and `alias` binds a file-local include prefix. Both are
-// reserved so they cannot be identifiers. Neither is a semicolon-insertion terminator: a module
+// reserved so they cannot be identifiers. Neither ends a line: a module
 // declaration ends in its name and an include alias ends in its alias name, both identifiers.
 MODULE: 'module' ;
 ALIAS: 'alias' ;
@@ -624,7 +621,7 @@ INTERFACE: 'interface' ;
 // revision removes the keyword `sealed` it replaced; `SEALED` below stays a reserved token.
 ENUM: 'enum' ;
 // Error-handling phases: `error` introduces a closed nominal value-carrying error type. Like an
-// enum it opens a construct, so it terminates no line for semicolon insertion; its variants already
+// enum it opens a construct, so it ends no line; its variants already
 // end in an identifier or a closing paren, both of which terminate.
 // `mutable` is the language's single unlock marker (docs/LANGUAGE_SPEC.md section 1.1 of
 // KEYWORD_CHANGES.md): `mutable val` for a writable binding, `mutable class` for an extendable class,
@@ -655,8 +652,8 @@ IN: 'in' ;
 BREAK: 'break' ;
 CONTINUE: 'continue' ;
 RETURN: 'return' ;
-// Error handling phases: `throw`, `try`, `catch`, and `finally`. None is a semicolon-insertion
-// terminator, because a throw already ends in its operand (a value) and the other three open a
+// Error handling phases: `throw`, `try`, `catch`, and `finally`. None ends a line,
+// because a throw already ends in its operand (a value) and the other three open a
 // construct that cannot be closed by a bare line boundary.
 THROW: 'throw' ;
 TRY: 'try' ;
@@ -666,9 +663,8 @@ FINALLY: 'finally' ;
 // pattern from its result.
 MATCH: 'match' ;
 ARROW: '=>' ;
-// Phase 15: the non-fallthrough `switch` statement. `switch` and `case` open a construct, and
-// `default`/`regex` are followed by `:` and a string literal respectively, so none terminates a line
-// for semicolon insertion.
+// Phase 15: the non-fallthrough `switch` statement. `switch`, `case`, and `default` open a
+// construct, and `regex` is followed by its pattern literal, so none of the four ends a line.
 SWITCH: 'switch' ;
 CASE: 'case' ;
 DEFAULT: 'default' ;
@@ -709,15 +705,15 @@ DOTDOT: '..' ;
 DOTDOTDOT: '...' ;
 DOTDOTLT: '..<' ;
 DOTDOTGT: '..>' ;
-// Lexed for semicolon-insertion lookahead only (Phase 2): its presence must suppress insertion.
-// Phase 10 makes it the safe member-access operator as well.
+// Lexed as one token so a line cannot break between `?` and `.` (Phase 2); Phase 10 makes it the
+// safe member-access operator as well.
 NULLABLE_DOT: '?.' ;
 // Phase 10: `??` is null coalescing; it is lexed as one token so it is never read as `T?` plus `?`.
 NULL_COALESCE: '??' ;
 // Phase 10: `?` marks a nullable type reference.
 QUESTION: '?' ;
-// Lexed so insertion can track unmatched '[' depth (specification condition 1). Bracket syntax
-// itself arrives in a later phase, so no grammar rule consumes these tokens yet.
+// Lexed for the anonymous-function capture list. Bracket indexing syntax
+// itself is not in the language, so no grammar rule consumes these tokens otherwise.
 LBRACKET: '[' ;
 RBRACKET: ']' ;
 ADD: '+' ;
@@ -745,6 +741,5 @@ BLOCK_COMMENT: '/*' .*? '*/' -> channel(HIDDEN) ;
 
 // Phase 3: the counted raw-string delimiter is owned by the hand-written helper above. The rule
 // matches the contiguous 'r' '#'* '"' opening delimiter and its action scans the body so the
-// complete literal is emitted as one token; embedded newlines therefore never reach the
-// semicolon-inserting token stream.
+// complete literal is emitted as one token; embedded newlines therefore never end a line.
 RAW_STRING_LITERAL: 'r' '#'* '"' { lexRawStringBody(); } ;

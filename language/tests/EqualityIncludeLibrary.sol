@@ -26,11 +26,14 @@ class Coordinate {
 
 func label(keyword: String): String {
     switch (keyword) {
-        case "one":
+        case "one" {
             return "1"
-        case "two":
+        }
+        case "two" {
             return "2"
-        default:
+        }
+        default {
             return "?"
+        }
     }
 }

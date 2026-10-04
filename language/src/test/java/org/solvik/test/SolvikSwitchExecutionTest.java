@@ -53,12 +53,15 @@ public final class SolvikSwitchExecutionTest {
         assertThat(run("""
                 func label(value: Integer): String {
                     switch (value) {
-                        case 1:
+                        case 1 {
                             return "one"
-                        case 2:
+                        }
+                        case 2 {
                             return "two"
-                        default:
+                        }
+                        default {
                             return "other"
+                        }
                     }
                 }
 
@@ -73,10 +76,12 @@ public final class SolvikSwitchExecutionTest {
         assertThat(run("""
                 func classify(value: Integer): String {
                     switch (value) {
-                        case 1, 2, 3:
+                        case 1, 2, 3 {
                             return "small"
-                        default:
+                        }
+                        default {
                             return "big"
+                        }
                     }
                 }
 
@@ -91,10 +96,12 @@ public final class SolvikSwitchExecutionTest {
     public void defaultRunsWhenNothingMatches() {
         assertThat(run("""
                     switch (99) {
-                        case 1:
+                        case 1 {
                             println("one")
-                        default:
+                        }
+                        default {
                             println("other")
+                        }
                     }
                 """)).isEqualTo("other\n");
     }
@@ -103,12 +110,15 @@ public final class SolvikSwitchExecutionTest {
     public void noImplicitFallthrough() {
         assertThat(run("""
                     switch (1) {
-                        case 1:
+                        case 1 {
                             println("one")
-                        case 2:
+                        }
+                        case 2 {
                             println("two")
-                        default:
+                        }
+                        default {
                             println("other")
+                        }
                     }
                 """)).isEqualTo("one\n");
     }
@@ -118,12 +128,15 @@ public final class SolvikSwitchExecutionTest {
         assertThat(run("""
                 func name(value: String): String {
                     switch (value) {
-                        case "a":
+                        case "a" {
                             return "alpha"
-                        case "b":
+                        }
+                        case "b" {
                             return "beta"
-                        default:
+                        }
+                        default {
                             return "other"
+                        }
                     }
                 }
 
@@ -138,12 +151,15 @@ public final class SolvikSwitchExecutionTest {
         assertThat(run("""
                 func describe(value: String?): String {
                     switch (value) {
-                        case null:
+                        case null {
                             return "none"
-                        case "x":
+                        }
+                        case "x" {
                             return "x"
-                        default:
+                        }
+                        default {
                             return "other"
+                        }
                     }
                 }
 
@@ -157,10 +173,12 @@ public final class SolvikSwitchExecutionTest {
         assertThat(run("""
                 func classify(input: String): String {
                     switch (input) {
-                        case regex r#"a"#:
+                        case regex r#"a"# {
                             return "match"
-                        default:
+                        }
+                        default {
                             return "other"
+                        }
                     }
                 }
 
@@ -182,10 +200,12 @@ public final class SolvikSwitchExecutionTest {
                         return "missing"
                     }
                     switch (input) {
-                        case regex r#"^\\d+$"#:
+                        case regex r#"^\\d+$"# {
                             return "number"
-                        default:
+                        }
+                        default {
                             return "other"
+                        }
                     }
                 }
 
@@ -200,12 +220,15 @@ public final class SolvikSwitchExecutionTest {
         assertThat(run("""
                 func classify(input: String): String {
                     switch (input) {
-                        case regex r#"p"#:
+                        case regex r#"p"# {
                             return "plain"
-                        case regex r#"q"#:
+                        }
+                        case regex r#"q"# {
                             return "q"
-                        default:
+                        }
+                        default {
                             return "default"
+                        }
                     }
                 }
 
@@ -219,12 +242,15 @@ public final class SolvikSwitchExecutionTest {
         assertThat(run("""
                 func classify(input: String): String {
                     switch (input) {
-                        case "exact":
+                        case "exact" {
                             return "constant"
-                        case regex r#"^\\d+$"#:
+                        }
+                        case regex r#"^\\d+$"# {
                             return "regex"
-                        default:
+                        }
+                        default {
                             return "other"
+                        }
                     }
                 }
 
@@ -252,10 +278,12 @@ public final class SolvikSwitchExecutionTest {
 
                     val counter = Counter()
                     switch (counter.next()) {
-                        case 1:
+                        case 1 {
                             println("one")
-                        default:
+                        }
+                        default {
                             println("other")
+                        }
                     }
                     println(counter.count)
                 """)).isEqualTo("one\n1\n");
@@ -266,15 +294,21 @@ public final class SolvikSwitchExecutionTest {
         assertThat(run("""
                     mutable val total = 0
                     switch (1) {
-                        case 1:
-                            for (mutable val i = 0; i < 5; i = i + 1) {
-                                if (i == 2) {
-                                    break
+                        case 1 {
+                            {
+                                mutable val i = 0
+                                while (i < 5) {
+                                    if (i == 2) {
+                                        break
+                                    }
+                                    total = total + i
+                                    i = i + 1
                                 }
-                                total = total + i
                             }
-                        default:
+                        }
+                        default {
                             total = 0 - 1
+                        }
                     }
                     println(total)
                 """)).isEqualTo("1\n");
@@ -283,15 +317,22 @@ public final class SolvikSwitchExecutionTest {
     @Test
     public void continueInsideACaseTargetsTheEnclosingLoop() {
         assertThat(run("""
-                    for (mutable val i = 0; i < 3; i = i + 1) {
-                        switch (i) {
-                            case 1:
+                    mutable val v: Integer = 0
+
+                    while (v < 3) {
+                        v = v + 1
+
+                        switch (v) {
+                            case 1 {
                                 continue
-                            default:
-                                println(i)
+                            }
+
+                            default {
+                                println(v)
+                            }
                         }
                     }
-                """)).isEqualTo("0\n2\n");
+                """)).isEqualTo("2\n3\n");
     }
 
     @Test
@@ -299,15 +340,19 @@ public final class SolvikSwitchExecutionTest {
         assertThat(run("""
                 func classify(a: Integer, b: Integer): String {
                     switch (a) {
-                        case 1:
+                        case 1 {
                             switch (b) {
-                                case 1:
+                                case 1 {
                                     return "inner-one"
-                                default:
+                                }
+                                default {
                                     return "inner-other"
+                                }
                             }
-                        default:
+                        }
+                        default {
                             return "outer"
+                        }
                     }
                 }
 
@@ -320,8 +365,9 @@ public final class SolvikSwitchExecutionTest {
     public void anUnmatchedSwitchWithoutADefaultDoesNothing() {
         assertThat(run("""
                     switch (99) {
-                        case 1:
+                        case 1 {
                             println("one")
+                        }
                     }
                     println("after")
                 """)).isEqualTo("after\n");

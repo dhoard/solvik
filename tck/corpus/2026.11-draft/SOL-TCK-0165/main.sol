@@ -9,7 +9,8 @@ func middle() {
 func driver() {
     try {
         middle()
-    } catch (e: Exception) {
+    }
+    catch (e: Exception) {
         print("handled")
         print("[" .. e.getMessage() .. "]")
     }

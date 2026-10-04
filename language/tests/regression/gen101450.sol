@@ -23,7 +23,12 @@ println(total)
 println(n)
 
 func num2(flag: Boolean): Number {
-    return if (flag) { 17 } else { 26L }
+    return if (flag) {
+        17
+    }
+    else {
+        26L
+    }
 }
 
 println(num2(true) is Number)

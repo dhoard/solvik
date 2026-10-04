@@ -61,10 +61,12 @@ public final class SolvikSwitchSemanticTest {
         CheckedProgram program = check("""
                 func run(value: Integer): Unit {
                     switch (value) {
-                        case 1:
+                        case 1 {
                             print("one")
-                        default:
+                        }
+                        default {
                             print("other")
+                        }
                     }
                 }
                 """);
@@ -78,10 +80,12 @@ public final class SolvikSwitchSemanticTest {
         CheckedProgram program = check("""
                 func run(value: Integer): Unit {
                     switch (value) {
-                        case -1, 0, 1:
+                        case -1, 0, 1 {
                             print("unit")
-                        default:
+                        }
+                        default {
                             print("other")
+                        }
                     }
                 }
                 """);
@@ -95,10 +99,12 @@ public final class SolvikSwitchSemanticTest {
         CheckedProgram program = check("""
                 func run(value: Long): Unit {
                     switch (value) {
-                        case 1L:
+                        case 1L {
                             print("one")
-                        default:
+                        }
+                        default {
                             print("other")
+                        }
                     }
                 }
                 """);
@@ -111,12 +117,15 @@ public final class SolvikSwitchSemanticTest {
         CheckedProgram program = check("""
                 func run(value: String?): Unit {
                     switch (value) {
-                        case null:
+                        case null {
                             print("none")
-                        case "x":
+                        }
+                        case "x" {
                             print("x")
-                        default:
+                        }
+                        default {
                             print("other")
+                        }
                     }
                 }
                 """);
@@ -130,10 +139,12 @@ public final class SolvikSwitchSemanticTest {
         CheckedProgram program = check("""
                 func run(input: String): Unit {
                     switch (input) {
-                        case regex r#"^\\d+$"#:
+                        case regex r#"^\\d+$"# {
                             print("number")
-                        default:
+                        }
+                        default {
                             print("other")
+                        }
                     }
                 }
                 """);
@@ -146,10 +157,12 @@ public final class SolvikSwitchSemanticTest {
         CheckedProgram program = check("""
                 func run(input: String): Unit {
                     switch (input) {
-                        case regex "[a-z]+":
+                        case regex "[a-z]+" {
                             print("word")
-                        default:
+                        }
+                        default {
                             print("other")
+                        }
                     }
                 }
                 """);
@@ -162,9 +175,11 @@ public final class SolvikSwitchSemanticTest {
         CheckedProgram program = check("""
                 func run(value: Integer): Unit {
                     switch (value) {
-                        case 1:
+                        case 1 {
                             print("one")
-                        default:
+                        }
+                        default {
+                        }
                     }
                 }
                 """);
@@ -176,12 +191,14 @@ public final class SolvikSwitchSemanticTest {
         check("""
                 func run(value: Integer): Unit {
                     switch (value) {
-                        case 1:
+                        case 1 {
                             while (true) {
                                 break
                             }
-                        default:
+                        }
+                        default {
                             print("other")
+                        }
                     }
                 }
                 """);
@@ -191,12 +208,20 @@ public final class SolvikSwitchSemanticTest {
     public void aContinueInACaseTargetsAnEnclosingLoop() {
         check("""
                 func run(value: Integer): Unit {
-                    for (mutable val i = 0; i < 3; i = i + 1) {
-                        switch (value) {
-                            case 1:
-                                continue
-                            default:
-                                print("other")
+                    {
+                        mutable val i = 0
+                        while (i < 3) {
+                            i = i + 1
+
+                            switch (value) {
+                                case 1 {
+                                    continue
+                                }
+
+                                default {
+                                    print("other")
+                                }
+                            }
                         }
                     }
                 }
@@ -208,12 +233,15 @@ public final class SolvikSwitchSemanticTest {
         CheckedProgram program = check("""
                 func run(value: String): Unit {
                     switch (value) {
-                        case "a":
+                        case "a" {
                             print("a")
-                        case "b":
+                        }
+                        case "b" {
                             print("b")
-                        default:
+                        }
+                        default {
                             print("other")
+                        }
                     }
                 }
                 """);

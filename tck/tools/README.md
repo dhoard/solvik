@@ -12,9 +12,9 @@ so they are kept separate in `verify_regen.py` and reported separately:
 
 | Relationship | Count | Test IDs | Meaning |
 |---|---|---|---|
-| self-contained | 402 | `SOL-TCK-0092..0493` | the tool writes `main.sol` **and** the manifest; running it from an empty corpus reproduces the whole directory byte-for-byte |
+| self-contained | 405 | `SOL-TCK-0092..0493 plus 0496..0498` | the tool writes `main.sol` **and** the manifest; running it from an empty corpus reproduces the whole directory byte-for-byte |
 | manifest-only | 16 | `SOL-TCK-0076..0091` | `gen11.py` writes manifests over `main.sol` sources that were **hand-authored and read, not produced**; the programs are not reproducible by anything here |
-| unowned | 75 | `SOL-TCK-0001..0075` | no committed tool writes these at all — the earliest batches, whose per-batch steps were not preserved as tools |
+| unowned | 76 | `SOL-TCK-0001..0075, 0499` | no committed tool writes these at all — the earliest batches, whose per-batch steps were not preserved as tools |
 
 ## `verify_regen.py`
 
@@ -61,7 +61,7 @@ to a self-contained program, corrupting a manifest-only manifest, editing an own
 requirement away from its generator's record, and adding a test directory with no
 generator. Each produced exactly the intended failure; a corrupted *unowned*
 program correctly does not fail, because no committed generator claims to produce
-it — which is precisely why those 75 directories are named on every run instead of
+it — which is precisely why those 76 directories are named on every run instead of
 being counted as covered.
 
 ## `sync_counts.py`

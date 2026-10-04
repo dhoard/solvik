@@ -58,7 +58,7 @@ public final class SolvikClassModifierGrammarTest {
         return onlyClass(parseOk(name, source));
     }
 
-    /** Delivered token stream of one source, through the same insertion stage the parser reads. */
+    /** Delivered token stream of one source, through the same physical-line stage the parser reads. */
     private static List<Token> delivered(String source) {
         SolvikLexer lexer = new SolvikLexer(CharStreams.fromString(source));
         lexer.removeErrorListeners();
@@ -248,16 +248,16 @@ public final class SolvikClassModifierGrammarTest {
     }
 
     /**
-     * A modifier at a line end is not a semicolon-insertion point.
+     * A modifier at a line end does not end its line.
      *
-     * <p>Insertion is purely lexical, and {@code mutable} followed by a newline is the one shape where
-     * an "identifier at end of line inserts a semicolon" rule would fire on a marker still waiting for
-     * the declaration it modifies. That synthetic {@code SEMI} would split the declaration in two, and
-     * because insertion happens before the parser sees anything, the resulting error would be reported
+     * <p>Boundary placement is purely lexical, and {@code mutable} followed by a newline is the one shape
+     * where a "line ending in a word ends its line" rule would fire on a marker still waiting for
+     * the declaration it modifies. A line boundary there would split the declaration in two, and
+     * because placement happens before the parser sees anything, the resulting error would be reported
      * far from its cause.
      */
     @Test
-    public void aModifierAtALineEndIsNotASemicolonInsertionPoint() {
+    public void aModifierAtALineEndDoesNotEndItsLine() {
         assertThat(spellings("mutable\n")).containsExactly("mutable");
         assertThat(spellings("abstract\n")).containsExactly("abstract");
     }
@@ -274,12 +274,12 @@ public final class SolvikClassModifierGrammarTest {
     /**
      * An ordinary statement at a line end still terminates.
      *
-     * <p>Without this arm the previous test would be satisfied by an insertion stage that inserted
+     * <p>Without this arm the previous test would be satisfied by a boundary stage that placed
      * nothing at all -- a regression the rest of the suite would report as a wave of unrelated parse
      * errors rather than as the specific thing that broke.
      */
     @Test
     public void anOrdinaryStatementAtALineEndStillTerminates() {
-        assertThat(spellings("val x: Integer = 1\nval y: Integer = 2\n")).contains(";");
+        assertThat(names("val x: Integer = 1\nval y: Integer = 2\n")).contains("NEWLINE");
     }
 }

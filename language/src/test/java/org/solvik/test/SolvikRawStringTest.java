@@ -43,7 +43,7 @@ import org.solvik.source.SourceSpan;
 /**
  * Phase 3 tests for Rust-style raw strings (docs/LANGUAGE_SPEC.md section 15): lexer token shape,
  * counted delimiters, exact semantic values, precise unterminated diagnostics, and the absence of
- * any interaction between raw-string internal newlines and semicolon insertion.
+ * any interaction between raw-string internal newlines and line-boundary placement.
  */
 public final class SolvikRawStringTest {
 
@@ -55,7 +55,7 @@ public final class SolvikRawStringTest {
         return new ArrayList<>(lexer.getAllTokens());
     }
 
-    /** Default-channel tokens after semicolon insertion; synthesized semicolons render as `~;~`. */
+    /** Default-channel tokens after boundary placement; a placed line boundary renders as `~nl~`. */
     private static String rendered(String src) {
         SolvikLexer lexer = new SolvikLexer(CharStreams.fromString(src));
         lexer.removeErrorListeners();
@@ -64,8 +64,8 @@ public final class SolvikRawStringTest {
         while (true) {
             Token t = stream.nextToken();
             if (t.getChannel() == Token.DEFAULT_CHANNEL) {
-                if (PhysicalLineTokenSource.isSyntheticSemi(t)) {
-                    sb.append("~;~");
+                if (PhysicalLineTokenSource.isLineBoundary(t)) {
+                    sb.append("~nl~");
                 } else if (t.getType() == Token.EOF) {
                     sb.append("<EOF>");
                 } else {
@@ -305,16 +305,16 @@ public final class SolvikRawStringTest {
         assertThat(rawLiteral(sqlSrc, 0).value()).isEqualTo("\nSELECT *\nFROM users\nWHERE name = 'Doug'\n");
     }
 
-    // --- semicolon insertion ---------------------------------------------------------------
+    // --- line boundaries -------------------------------------------------------------------
 
     /**
-     * Newlines inside a raw string are part of one token, so the token stream sees exactly the two
-     * statement boundaries outside it and never a boundary inside it.
+     * Newlines inside a raw string are part of one token, so the boundary stage sees exactly the two
+     * line endings outside it and never a boundary inside the literal.
      */
     @Test
-    public void rawStringInternalNewlinesAreInvisibleToSemicolonInsertion() {
+    public void rawStringInternalNewlinesAreInvisibleToBoundaryPlacement() {
         String src = "val s = r#\"a\nb\nc\"#\nval t = 2\n";
-        assertThat(rendered(src)).isEqualTo("val s = r#\"a\nb\nc\"# ~;~ val t = 2 ~;~ <EOF>");
+        assertThat(rendered(src)).isEqualTo("val s = r#\"a\nb\nc\"# ~nl~ val t = 2 ~nl~ <EOF>");
     }
 
     /** A physical newline directly after a raw string terminates the statement like any literal. */
@@ -336,7 +336,7 @@ public final class SolvikRawStringTest {
     /** A raw string that ends at end of file still terminates its statement exactly once. */
     @Test
     public void rawStringAtEndOfFileTerminates() {
-        assertThat(rendered("val s = r\"abc\"")).isEqualTo("val s = r\"abc\" ~;~ <EOF>");
+        assertThat(rendered("val s = r\"abc\"")).isEqualTo("val s = r\"abc\" ~nl~ <EOF>");
     }
 
     /** A raw string containing newlines is still one statement, not several. */

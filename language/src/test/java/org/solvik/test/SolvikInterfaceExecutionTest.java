@@ -306,8 +306,12 @@ public final class SolvikInterfaceExecutionTest {
                 }
                 func total(counter: Counter, limit: Integer): Integer {
                     mutable val sum = 0
-                    for (mutable val i = 0; i < limit; i = i + 1) {
-                        sum = sum + counter.tick(i)
+                    {
+                        mutable val i = 0
+                        while (i < limit) {
+                            sum = sum + counter.tick(i)
+                            i = i + 1
+                        }
                     }
                     return sum
                 }

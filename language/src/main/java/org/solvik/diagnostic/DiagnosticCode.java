@@ -70,6 +70,21 @@ public enum DiagnosticCode {
     /** A token other than a comment follows an opening brace on its physical line (section 16). */
     PARSER_CONTENT_AFTER_OPEN_BRACE("SOLV-PARS-010"),
 
+    /**
+     * The three-clause {@code for} was removed by the 2026.11 physical-line revision; the form is
+     * rejected at the {@code for} keyword with the replacement named (docs/LANGUAGE_SPEC.md section
+     * 17). Like {@link #PARSER_UNSUPPORTED_REMOVED_SYNTAX} for removed keywords, this reports a
+     * removed construct rather than silently reinterpreting it.
+     */
+    PARSER_REMOVED_THREE_CLAUSE_FOR("SOLV-PARS-011"),
+
+    /**
+     * A {@code ;} did not separate two constructs written on one physical line: another physical
+     * line, end of file, or a stand-alone closing brace followed it, so it tried to terminate a
+     * construct rather than separate two (docs/LANGUAGE_SPEC.md section 16).
+     */
+    PARSER_SEMI_ENDS_LINE("SOLV-PARS-012"),
+
     /** Name resolution: no declaration is visible for the referenced name. */
     RESOL_UNKNOWN_NAME("SOLV-RESOL-001"),
     /** Name resolution: the same name is declared twice in one scope. */
@@ -195,10 +210,6 @@ public enum DiagnosticCode {
     SEM_LOOP_CONTROL_OUTSIDE_LOOP("SOLV-SEM-002"),
     /** Semantic validation: a value-producing expression is used as a statement and is not a call. */
     SEM_VALUE_EXPRESSION_STATEMENT("SOLV-SEM-003"),
-    /** Semantic validation: a {@code for} initializer is neither a local declaration nor an assignment. */
-    SEM_FOR_INITIALIZER("SOLV-SEM-004"),
-    /** Semantic validation: a {@code for} update clause is not an assignment. */
-    SEM_FOR_UPDATE("SOLV-SEM-005"),
     /** Semantic validation: a class without a constructor has a property without an initializer. */
     SEM_CLASS_REQUIRES_INITIALIZER("SOLV-SEM-006"),
     /** Semantic validation: a class declares more than one constructor. */

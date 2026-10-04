@@ -56,24 +56,35 @@ public final class SolvikExpressionOrientedSemanticTest {
     public void blockExpressionResultTypes() {
         assertThat(initializerType(check("""
                 func a(): Integer {
-                    val x = { 1 }
+                    val x = {
+                        1
+                    }
                     return x
                 }
                 """), "a")).isSameAs(IntegerType.INSTANCE);
         assertThat(initializerType(check("""
                 func a(): Integer {
-                    val x = { val local = 10; local + 20 }
+                    val x = {
+                        val local = 10; local + 20
+                    }
                     return x
                 }
                 """), "a")).isSameAs(IntegerType.INSTANCE);
         assertThat(initializerType(check("""
                 func a(): Unit {
-                    val x: Unit = { println("done") }
+                    val x: Unit = {
+                        println("done")
+                    }
                 }
                 """), "a")).isSameAs(UnitType.INSTANCE);
         assertThat(initializerType(check("""
                 func a(): Integer {
-                    val x = { val inner = { 20 }; inner + 22 }
+                    val x = {
+                        val inner = {
+                            20
+                        }
+                        ; inner + 22
+                    }
                     return x
                 }
                 """), "a")).isSameAs(IntegerType.INSTANCE);
@@ -83,7 +94,12 @@ public final class SolvikExpressionOrientedSemanticTest {
     public void ifExpressionJoinsIntegerAndStringToAny() {
         Type type = initializerType(check("""
                 func a(flag: Boolean): Integer {
-                    val x = if (flag) { 1 } else { "text" }
+                    val x = if (flag) {
+                        1
+                    }
+                    else {
+                        "text"
+                    }
                     return 1
                 }
                 """), "a");
@@ -94,13 +110,23 @@ public final class SolvikExpressionOrientedSemanticTest {
     public void ifExpressionJoinsExactSubtypeAndNullable() {
         assertThat(initializerType(check("""
                 func a(flag: Boolean): Integer {
-                    val x = if (flag) { 1 } else { 2 }
+                    val x = if (flag) {
+                        1
+                    }
+                    else {
+                        2
+                    }
                     return x
                 }
                 """), "a")).isSameAs(IntegerType.INSTANCE);
         assertThat(initializerType(check("""
                 func a(flag: Boolean, value: String?): String? {
-                    val x = if (flag) { value } else { "fallback" }
+                    val x = if (flag) {
+                        value
+                    }
+                    else {
+                        "fallback"
+                    }
                     return x
                 }
                 """), "a")).isSameAs(StringType.INSTANCE.nullableView());
@@ -110,7 +136,12 @@ public final class SolvikExpressionOrientedSemanticTest {
     public void unitTailResultsJoinToUnit() {
         assertThat(initializerType(check("""
                 func a(flag: Boolean): Unit {
-                    val x: Unit = if (flag) { println("a") } else { println("b") }
+                    val x: Unit = if (flag) {
+                        println("a")
+                    }
+                    else {
+                        println("b")
+                    }
                 }
                 """), "a")).isSameAs(UnitType.INSTANCE);
     }
@@ -121,7 +152,8 @@ public final class SolvikExpressionOrientedSemanticTest {
                 func a(name: String?): String {
                     val x = if (name != null) {
                         name
-                    } else {
+                    }
+                    else {
                         return "fallback"
                     }
                     return x
@@ -135,7 +167,8 @@ public final class SolvikExpressionOrientedSemanticTest {
                 func a(flag: Boolean): Integer {
                     val x = if (flag) {
                         return 1
-                    } else {
+                    }
+                    else {
                         return 2
                     }
                     return 0
@@ -148,10 +181,12 @@ public final class SolvikExpressionOrientedSemanticTest {
         assertThat(initializerType(check("""
                 func a(value: Integer): String {
                     val x = switch (value) {
-                        case 1:
+                        case 1 {
                             "one"
-                        default:
+                        }
+                        default {
                             "other"
+                        }
                     }
                     return x
                 }
@@ -162,19 +197,38 @@ public final class SolvikExpressionOrientedSemanticTest {
     public void expressionConstructsAreAcceptedAsArgumentsAssignmentsAndReturns() {
         CheckedProgram program = check("""
                 func classify(value: Integer): String {
-                    return if (value == 0) { "zero" } else { "nonzero" }
+                    return if (value == 0) {
+                        "zero"
+                    }
+                    else {
+                        "nonzero"
+                    }
                 }
 
                 mutable val score: Integer = 0
-                score = if (true) { 10 } else { 0 }
-                print(if (true) { "a" } else { "b" })
+                score = if (true) {
+                    10
+                }
+                else {
+                    0
+                }
+                print(if (true) {
+                    "a"
+                }
+                else {
+                    "b"
+                }
+                )
                 print(classify(score))
                 print(switch (score) {
-                    case 10:
+                    case 10 {
                         "ten"
-                    default:
+                    }
+                    default {
                         "other"
-                })
+                    }
+                }
+                )
                 """);
         assertThat(program.entryPoint()).isPresent();
     }
@@ -187,8 +241,9 @@ public final class SolvikExpressionOrientedSemanticTest {
                         print("debug")
                     }
                     switch (value) {
-                        case 1:
+                        case 1 {
                             print("one")
+                        }
                     }
                 }
                 """);
@@ -226,7 +281,8 @@ public final class SolvikExpressionOrientedSemanticTest {
                 func a(value: String?): Integer {
                     val x = if (value != null) {
                         need(value)
-                    } else {
+                    }
+                    else {
                         0
                     }
                     return x
@@ -239,10 +295,12 @@ public final class SolvikExpressionOrientedSemanticTest {
         assertThat(initializerType(check("""
                 func a(value: Integer): String {
                     val x = switch (value) {
-                        case 0:
+                        case 0 {
                             return "zero"
-                        default:
+                        }
+                        default {
                             "nonzero"
+                        }
                     }
                     return x
                 }
@@ -266,7 +324,12 @@ public final class SolvikExpressionOrientedSemanticTest {
                     }
                 }
                 func f(flag: Boolean): Named {
-                    val x = if (flag) { A() } else { B() }
+                    val x = if (flag) {
+                        A()
+                    }
+                    else {
+                        B()
+                    }
                     return x
                 }
                 """), "f");

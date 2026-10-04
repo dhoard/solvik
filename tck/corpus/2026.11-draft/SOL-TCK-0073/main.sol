@@ -7,15 +7,18 @@
 mutable val v: Integer = 2
 
 switch (v) {
-    case 1:
+    case 1 {
         print("one")
+    }
 
-    case 2:
+    case 2 {
         while (true) {
             print("inner")
             break
         }
+    }
 
-    default:
+    default {
         print("other")
+    }
 }

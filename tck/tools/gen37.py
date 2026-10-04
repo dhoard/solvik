@@ -388,7 +388,12 @@ val asAny: Any = format
 // parameter types and identical result types, so the join is that function type and the
 // joined value stays callable.
 val flag: Boolean = true
-val joined = if (flag) { format } else { describe }
+val joined = if (flag) {
+    format
+}
+else {
+    describe
+}
 
 print(takeAny(asAny) .. "|" .. takeAny(joined) .. "|" .. joined(2))
 """,
@@ -416,7 +421,12 @@ func fromUnrelated(value: Unrelated): String {
 // value is not of a function type and invoking it is an invocation whose callee is not a
 // function type -- the code the section names verbatim for that shape.
 val flag: Boolean = true
-val joined = if (flag) { format } else { fromUnrelated }
+val joined = if (flag) {
+    format
+}
+else {
+    fromUnrelated
+}
 print(joined(1))
 print("EXECUTED-INVALID")
 """,
@@ -490,7 +500,12 @@ func nameOf(value: Animal): String {
 // callable function value, its result reaches an `Animal` parameter, and it is accepted by a
 // binding that writes the joined type out.
 val flag: Boolean = true
-val joined = if (flag) { dogToDog } else { animalToAnimal }
+val joined = if (flag) {
+    dogToDog
+}
+else {
+    animalToAnimal
+}
 val joinedWritten: func(Dog): Animal = joined
 
 print(nameOf(joined(Dog())) .. "-" .. nameOf(joinedWritten(Dog())))
@@ -522,7 +537,12 @@ func animalToAnimal(animal: Animal): Animal {
 }
 
 class WiderParameter {
-    static val wide: func(Animal): Animal = if (true) { dogToDog } else { animalToAnimal }
+    static val wide: func(Animal): Animal = if (true) {
+        dogToDog
+    }
+    else {
+        animalToAnimal
+    }
 }
 
 print("EXECUTED-INVALID")
@@ -553,7 +573,12 @@ func animalToAnimal(animal: Animal): Animal {
 }
 
 class NarrowerResult {
-    static val narrow: func(Dog): Dog = if (true) { dogToDog } else { animalToAnimal }
+    static val narrow: func(Dog): Dog = if (true) {
+        dogToDog
+    }
+    else {
+        animalToAnimal
+    }
 }
 
 print("EXECUTED-INVALID")

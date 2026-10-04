@@ -69,7 +69,7 @@ public final class SolvikIncludeParserTest {
 
     @Test
     public void normalStringIncludeWithExplicitSemicolon() {
-        CompilationUnitNode unit = parseOk("include \"lib/math.sol\";\n");
+        CompilationUnitNode unit = parseOk("include \"lib/math.sol\"\n");
         IncludeDeclNode include = onlyInclude(unit);
         assertThat(((StringLiteralNode) include.pathLiteral()).lexeme()).isEqualTo("\"lib/math.sol\"");
     }

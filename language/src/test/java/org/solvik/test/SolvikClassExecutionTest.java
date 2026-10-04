@@ -242,11 +242,11 @@ public final class SolvikClassExecutionTest {
                     }
                 }
 
-                mutable val counter: Counter = Counter();
-                println(counter.add(4));
-                println(counter.sum());
-                println(counter.add(1));
-                println(counter.sum());
+                mutable val counter: Counter = Counter()
+                println(counter.add(4))
+                println(counter.sum())
+                println(counter.add(1))
+                println(counter.sum())
                 """)).isEqualTo("8\n4\n2\n5\n");
     }
 
@@ -260,31 +260,31 @@ public final class SolvikClassExecutionTest {
                     val counts: Map<String, Integer> = Map<String, Integer>()
 
                     func add(value: Integer): Unit {
-                        this.items.add(value);
+                        this.items.add(value)
                     }
 
                     func hit(key: String): Integer {
-                        mutable val next: Integer = 1;
+                        mutable val next: Integer = 1
                         if (this.counts.containsKey(key)) {
-                            next = this.counts.get(key) + 1;
+                            next = this.counts.get(key) + 1
                         }
-                        this.counts.put(key, next);
-                        return next;
+                        this.counts.put(key, next)
+                        return next
                     }
 
                     func size(): Integer {
-                        return this.items.size;
+                        return this.items.size
                     }
                 }
 
-                mutable val bag: Bag = Bag();
-                bag.add(1);
-                bag.add(2);
-                bag.add(1);
-                println(bag.size());
-                println(bag.hit("x"));
-                println(bag.hit("x"));
-                println(bag.hit("y"));
+                mutable val bag: Bag = Bag()
+                bag.add(1)
+                bag.add(2)
+                bag.add(1)
+                println(bag.size())
+                println(bag.hit("x"))
+                println(bag.hit("x"))
+                println(bag.hit("y"))
                 """)).isEqualTo("2\n1\n2\n1\n");
     }
 
@@ -299,11 +299,11 @@ public final class SolvikClassExecutionTest {
                     mutable val extra: Integer = 2
 
                     func show(): Integer {
-                        return this.id + this.extra;
+                        return this.id + this.extra
                     }
                 }
 
-                println(Derived().show());
+                println(Derived().show())
                 """)).isEqualTo("7\n");
     }
 

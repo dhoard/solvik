@@ -6,9 +6,11 @@
 //
 val x = 1
 switch (x) {
-    default:
+    default {
         print("d")
-    case 2:
+    }
+    case 2 {
         print("two")
+    }
 }
 print("EXECUTED-INVALID")

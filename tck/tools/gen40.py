@@ -107,7 +107,10 @@ name in a value position, `SOLV-TYPE-030` for an unconstrained generic method re
 for the deferred callables the required-diagnostics paragraph enumerates by name -- a static method reference,
 a constructor, an enum variant, a bare read of a fixed language-defined member, and a synthesized `Result`
 operation. The universal-member and `super` refusals land on that same code in this implementation but assert
-`{"family": "TYPE"}` rather than the code, because section 6 routes them to the compile-time error that
+`{
+    "family": "TYPE"
+}
+` rather than the code, because section 6 routes them to the compile-time error that
 section 3 and section 23.4 already require, those sections' own bare-member-read sentences name no code, and
 REQ-1805 already carries that family-only choice for the same reason. The nullable-receiver refusal likewise
 asserts the family, since the sentence says only "is illegal" and states no code at all. A category that

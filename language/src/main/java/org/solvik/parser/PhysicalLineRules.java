@@ -31,7 +31,10 @@ import org.solvik.parser.generated.SolvikLexer;
  * and a closing brace stands alone on its line - the only things that may share that line are
  * whitespace and comments. A clause keyword ({@code else}, {@code catch}, {@code finally}) therefore
  * begins its own line, a body brace never begins one, and an empty body is written as an opening
- * brace on one line and a closing brace on the next rather than as {@code {}}.
+ * brace on one line and a closing brace on the next rather than as {@code {}}. The same scan states
+ * the semicolon rule once: a {@code ;} separates two constructs written on one physical line, so a
+ * {@code ;} followed by another physical line, end of file, or the stand-alone closing brace of the
+ * enclosing scope is rejected at the semicolon itself.
  *
  * <p>These are facts about physical lines, not about phrase structure: {@code Solvik.g4} absorbs the
  * line breaks a program writes so that a body can be read at all, which means a wrongly placed brace
@@ -52,7 +55,7 @@ import org.solvik.parser.generated.SolvikLexer;
  * <p>One omission is deliberate and stated rather than hidden. A stand-alone scope block writes its
  * {@code &#123;} as the first token of its line, which is legal, so a brace that opens a line is
  * reported only when the token before it could have introduced a body - {@code try}, {@code else},
- * {@code static}, or a {@code case} label's {@code :}. A header's {@code )}, by contrast, can legally
+ * {@code static}, or a {@code case} label's last token. A header's {@code )}, by contrast, can legally
  * be followed by a scope block on the next line, and only the parse tree can tell that block from a
  * declaration's body, so that case is left to the parse error a program that needs it already
  * produces.
@@ -80,9 +83,28 @@ public final class PhysicalLineRules {
                 misplacedBodyBrace(source, code, i, found);
             } else if (token.getType() == SolvikLexer.RBRACE) {
                 closingBrace(source, code, i, found);
+            } else if (token.getType() == SolvikLexer.SEMI) {
+                separatingSemi(source, code, i, found);
             }
         }
         return found;
+    }
+
+    /**
+     * A {@code ;} separates two constructs written on one physical line and never terminates one.
+     * It is therefore wrong wherever the next thing in the significant token sequence is another
+     * physical line, end of file, or the stand-alone closing brace of the enclosing scope: in each
+     * case the {@code ;} closed the construct it should only have separated from a next one.
+     */
+    private static void separatingSemi(SourceFile source, List<Token> code, int index, List<Diagnostic> found) {
+        Token semi = code.get(index);
+        Token after = next(code, index);
+        boolean endsConstruct = after == null || after.getLine() != semi.getLine() || after.getType() == SolvikLexer.RBRACE;
+        if (endsConstruct) {
+            found.add(Diagnostic.expectedFound(DiagnosticCode.PARSER_SEMI_ENDS_LINE, span(source, semi), //
+                    "`;` separates two constructs written on the same physical line; it does not terminate one, and none follows it on its line", //
+                    "a construct on the same line", after == null ? "end of file" : text(after))); 
+        }
     }
 
     /** Nothing but a comment or whitespace may follow an opening brace on its line. */
@@ -99,17 +121,38 @@ public final class PhysicalLineRules {
     /**
      * A body brace that opens a physical line after something that could only have introduced a body.
      * A stand-alone scope block has no introducer, so its brace legitimately opens a line and the
-     * introducer test is what keeps the two apart.
+     * introducer test is what keeps the two apart. A {@code case} label ends with an expression, so
+     * for a case line the introducer is found at the start of the label's line rather than in the
+     * single token before the brace.
      */
     private static void misplacedBodyBrace(SourceFile source, List<Token> code, int index, List<Diagnostic> found) {
         Token open = code.get(index);
         Token previous = previous(code, index);
-        if (previous == null || previous.getLine() == open.getLine() || !introducesBody(previous.getType())) {
+        if (previous == null || previous.getLine() == open.getLine() //
+                || previous.getType() == SolvikLexer.LBRACE //
+                || !(introducesBody(previous.getType()) || beginsLabelLine(code, index - 1))) {
             return;
         }
         found.add(Diagnostic.expectedFound(DiagnosticCode.PARSER_BRACE_NOT_ON_INTRODUCING_LINE, span(source, open), //
                 "an opening brace must sit on the physical line of the construct that introduces its scope; the body it opens starts on the next line", //
                 "'{' on the line of its construct", "'{' on its own line"));
+    }
+
+    /**
+     * Whether the physical line holding {@code position} - the token before a line-initial brace -
+     * begins with {@code case} or {@code default}. The label of such a line is an expression, so the
+     * token before the brace is a literal or a name and only the line's first token names the
+     * construct. A label continued over several lines is matched on its last line only, which is the
+     * shape a misplaced brace follows.
+     */
+    private static boolean beginsLabelLine(List<Token> code, int position) {
+        int line = code.get(position).getLine();
+        int first = position;
+        while (first > 0 && code.get(first - 1).getLine() == line) {
+            first--;
+        }
+        int type = code.get(first).getType();
+        return type == SolvikLexer.CASE || type == SolvikLexer.DEFAULT;
     }
 
     /**
@@ -152,7 +195,7 @@ public final class PhysicalLineRules {
      */
     private static boolean introducesBody(int type) {
         return type == SolvikLexer.TRY || type == SolvikLexer.ELSE || type == SolvikLexer.STATIC //
-                || type == SolvikLexer.COLON || type == SolvikLexer.ARROW;
+                || type == SolvikLexer.CASE || type == SolvikLexer.DEFAULT || type == SolvikLexer.ARROW;
     }
 
     private static boolean clause(int type) {

@@ -72,151 +72,151 @@ public class SolvikHashKindCoverageTest {
                 Four(Scalar)
             }
 
-            mutable val boolSeen: Set<Boolean> = Set();
-            println(true.hashCode() == false.hashCode());
-            boolSeen.add(true);
-            boolSeen.add(true);
-            boolSeen.add(false);
-            println(boolSeen.size);
+            mutable val boolSeen: Set<Boolean> = Set()
+            println(true.hashCode() == false.hashCode())
+            boolSeen.add(true)
+            boolSeen.add(true)
+            boolSeen.add(false)
+            println(boolSeen.size)
 
-            mutable val charSeen: Set<Character> = Set();
-            println('a'.hashCode() == 'a'.hashCode());
-            charSeen.add('a');
-            charSeen.add('b');
-            println(charSeen.size);
+            mutable val charSeen: Set<Character> = Set()
+            println('a'.hashCode() == 'a'.hashCode())
+            charSeen.add('a')
+            charSeen.add('b')
+            println(charSeen.size)
 
-            mutable val intSeen: Set<Integer> = Set();
-            println((7).hashCode() == (7).hashCode());
-            intSeen.add(7);
-            intSeen.add(7);
-            intSeen.add(8);
-            println(intSeen.size);
+            mutable val intSeen: Set<Integer> = Set()
+            println((7).hashCode() == (7).hashCode())
+            intSeen.add(7)
+            intSeen.add(7)
+            intSeen.add(8)
+            println(intSeen.size)
 
-            mutable val longSeen: Set<Long> = Set();
-            println(9L.hashCode() == 9L.hashCode());
-            longSeen.add(9L);
-            longSeen.add(9L);
-            longSeen.add(10L);
-            println(longSeen.size);
+            mutable val longSeen: Set<Long> = Set()
+            println(9L.hashCode() == 9L.hashCode())
+            longSeen.add(9L)
+            longSeen.add(9L)
+            longSeen.add(10L)
+            println(longSeen.size)
 
-            mutable val byteSeen: Set<Byte> = Set();
-            println(Byte(3).hashCode() == Byte(3).hashCode());
-            byteSeen.add(Byte(3));
-            byteSeen.add(Byte(3));
-            println(byteSeen.size);
+            mutable val byteSeen: Set<Byte> = Set()
+            println(Byte(3).hashCode() == Byte(3).hashCode())
+            byteSeen.add(Byte(3))
+            byteSeen.add(Byte(3))
+            println(byteSeen.size)
 
-            mutable val shortSeen: Set<Short> = Set();
-            println(Short(4).hashCode() == Short(4).hashCode());
-            shortSeen.add(Short(4));
-            shortSeen.add(Short(4));
-            println(shortSeen.size);
+            mutable val shortSeen: Set<Short> = Set()
+            println(Short(4).hashCode() == Short(4).hashCode())
+            shortSeen.add(Short(4))
+            shortSeen.add(Short(4))
+            println(shortSeen.size)
 
-            mutable val doubleSeen: Set<Double> = Set();
-            println(1.5.hashCode() == 1.5.hashCode());
-            doubleSeen.add(1.5);
-            doubleSeen.add(1.5);
-            doubleSeen.add(2.5);
-            println(doubleSeen.size);
+            mutable val doubleSeen: Set<Double> = Set()
+            println(1.5.hashCode() == 1.5.hashCode())
+            doubleSeen.add(1.5)
+            doubleSeen.add(1.5)
+            doubleSeen.add(2.5)
+            println(doubleSeen.size)
 
-            mutable val zeroSeen: Set<Double> = Set();
-            println(0.0.hashCode() == -0.0.hashCode());
-            zeroSeen.add(0.0);
-            zeroSeen.add(-0.0);
-            println(zeroSeen.size);
+            mutable val zeroSeen: Set<Double> = Set()
+            println(0.0.hashCode() == -0.0.hashCode())
+            zeroSeen.add(0.0)
+            zeroSeen.add(-0.0)
+            println(zeroSeen.size)
 
-            mutable val floatSeen: Set<Float> = Set();
-            println(Float(1.5).hashCode() == Float(1.5).hashCode());
-            floatSeen.add(Float(1.5));
-            floatSeen.add(Float(1.5));
-            println(floatSeen.size);
+            mutable val floatSeen: Set<Float> = Set()
+            println(Float(1.5).hashCode() == Float(1.5).hashCode())
+            floatSeen.add(Float(1.5))
+            floatSeen.add(Float(1.5))
+            println(floatSeen.size)
 
-            mutable val stringSeen: Set<String> = Set();
-            println("ab".hashCode() == "ab".hashCode());
-            stringSeen.add("ab");
-            stringSeen.add("ab");
-            stringSeen.add("cd");
-            println(stringSeen.size);
+            mutable val stringSeen: Set<String> = Set()
+            println("ab".hashCode() == "ab".hashCode())
+            stringSeen.add("ab")
+            stringSeen.add("ab")
+            stringSeen.add("cd")
+            println(stringSeen.size)
 
-            mutable val unitSeen: Set<Unit> = Set();
-            mutable val unitValue: Unit = println("");
-            unitSeen.add(unitValue);
-            println(unitSeen.size);
+            mutable val unitSeen: Set<Unit> = Set()
+            mutable val unitValue: Unit = println("")
+            unitSeen.add(unitValue)
+            println(unitSeen.size)
 
-            mutable val enumSeen: Set<Payload> = Set();
-            println(Payload.One.hashCode() == Payload.One.hashCode());
-            enumSeen.add(Payload.One);
-            enumSeen.add(Payload.One);
-            enumSeen.add(Payload.Two(1));
-            enumSeen.add(Payload.Two(1));
-            enumSeen.add(Payload.Three(1, "x"));
-            println(enumSeen.size);
+            mutable val enumSeen: Set<Payload> = Set()
+            println(Payload.One.hashCode() == Payload.One.hashCode())
+            enumSeen.add(Payload.One)
+            enumSeen.add(Payload.One)
+            enumSeen.add(Payload.Two(1))
+            enumSeen.add(Payload.Two(1))
+            enumSeen.add(Payload.Three(1, "x"))
+            println(enumSeen.size)
 
-            mutable val payloadSeen: Set<Payload> = Set();
-            payloadSeen.add(Payload.Four(Scalar(3)));
-            payloadSeen.add(Payload.Four(Scalar(3)));
-            println(payloadSeen.size);
-            println(Payload.Four(Scalar(3)).hashCode() == Payload.Four(Scalar(3)).hashCode());
+            mutable val payloadSeen: Set<Payload> = Set()
+            payloadSeen.add(Payload.Four(Scalar(3)))
+            payloadSeen.add(Payload.Four(Scalar(3)))
+            println(payloadSeen.size)
+            println(Payload.Four(Scalar(3)).hashCode() == Payload.Four(Scalar(3)).hashCode())
 
-            mutable val regexSeen: Set<Regex> = Set();
-            mutable val pattern: Regex = Regex("a+");
-            regexSeen.add(pattern);
-            regexSeen.add(Regex("a+"));
-            println(regexSeen.size);
+            mutable val regexSeen: Set<Regex> = Set()
+            mutable val pattern: Regex = Regex("a+")
+            regexSeen.add(pattern)
+            regexSeen.add(Regex("a+"))
+            println(regexSeen.size)
 
-            mutable val maybeFound: RegexMatch? = pattern.find("aaa");
+            mutable val maybeFound: RegexMatch? = pattern.find("aaa")
             if (maybeFound != null) {
-                mutable val found: RegexMatch = maybeFound;
-                mutable val maybeAgain: RegexMatch? = pattern.find("aaa");
-                mutable val matchSeen: Set<RegexMatch> = Set(found);
+                mutable val found: RegexMatch = maybeFound
+                mutable val maybeAgain: RegexMatch? = pattern.find("aaa")
+                mutable val matchSeen: Set<RegexMatch> = Set(found)
                 if (maybeAgain != null) {
-                    matchSeen.add(maybeAgain);
+                    matchSeen.add(maybeAgain)
                 }
-                println(matchSeen.size);
-                println(found.start.hashCode() == found.start.hashCode());
-                println(found.value.hashCode() == "aaa".hashCode());
+                println(matchSeen.size)
+                println(found.start.hashCode() == found.start.hashCode())
+                println(found.value.hashCode() == "aaa".hashCode())
             }
 
-            mutable val listOne: List<Integer> = List(1, 2);
-            mutable val listTwo: List<Integer> = List(1, 2);
-            mutable val listSeen: Set<List<Integer>> = Set(listOne);
-            listSeen.add(listOne);
-            listSeen.add(listTwo);
-            println(listSeen.size);
+            mutable val listOne: List<Integer> = List(1, 2)
+            mutable val listTwo: List<Integer> = List(1, 2)
+            mutable val listSeen: Set<List<Integer>> = Set(listOne)
+            listSeen.add(listOne)
+            listSeen.add(listTwo)
+            println(listSeen.size)
 
-            mutable val innerList: List<Integer> = List(1);
-            mutable val innerSet: Set<Integer> = Set(1);
-            mutable val innerMap: Map<Integer, Integer> = Map();
-            mutable val innerStack: Stack<Integer> = Stack();
-            mutable val mixedSeen: Set<Any> = Set(innerSet, innerMap, innerStack);
-            println(mixedSeen.size);
+            mutable val innerList: List<Integer> = List(1)
+            mutable val innerSet: Set<Integer> = Set(1)
+            mutable val innerMap: Map<Integer, Integer> = Map()
+            mutable val innerStack: Stack<Integer> = Stack()
+            mutable val mixedSeen: Set<Any> = Set(innerSet, innerMap, innerStack)
+            println(mixedSeen.size)
 
-            mutable val scalarSeen: Set<Scalar> = Set();
-            scalarSeen.add(Scalar(1));
-            scalarSeen.add(Scalar(1));
-            println(scalarSeen.size);
+            mutable val scalarSeen: Set<Scalar> = Set()
+            scalarSeen.add(Scalar(1))
+            scalarSeen.add(Scalar(1))
+            println(scalarSeen.size)
 
-            mutable val nothing: Any? = null;
-            println(nothing?.hashCode() == null);
-            mutable val nullSeen: Set<Any?> = Set();
-            nullSeen.add(null);
-            nullSeen.add(null);
-            println(nullSeen.size);
+            mutable val nothing: Any? = null
+            println(nothing?.hashCode() == null)
+            mutable val nullSeen: Set<Any?> = Set()
+            nullSeen.add(null)
+            nullSeen.add(null)
+            println(nullSeen.size)
 
-            mutable val keys: Map<Any?, Integer> = Map();
-            keys.put(1, 1);
-            keys.put("one", 2);
-            keys.put(Scalar(5), 3);
-            keys.put(Payload.Two(2), 4);
-            keys.put(null, 5);
-            println(keys.size);
-            println(keys.get(Scalar(5)));
-            println(keys.get(null));
+            mutable val keys: Map<Any?, Integer> = Map()
+            keys.put(1, 1)
+            keys.put("one", 2)
+            keys.put(Scalar(5), 3)
+            keys.put(Payload.Two(2), 4)
+            keys.put(null, 5)
+            println(keys.size)
+            println(keys.get(Scalar(5)))
+            println(keys.get(null))
 
-            mutable val deepKey: List<Integer> = List(1, 2);
-            mutable val deep: Map<List<Integer>, Integer> = Map(deepKey: 6);
+            mutable val deepKey: List<Integer> = List(1, 2)
+            mutable val deep: Map<List<Integer>, Integer> = Map(deepKey: 6)
             // Collections key by reference identity, so only the same instance finds the entry.
-            println(deep.get(deepKey));
-            println(deep.size);
+            println(deep.get(deepKey))
+            println(deep.size)
         """;
 
     /**

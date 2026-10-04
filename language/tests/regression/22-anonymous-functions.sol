@@ -126,7 +126,9 @@ try {
     }
     raiser()
     println("no exception")
-} catch (error: Boom) {
+}
+
+catch (error: Boom) {
     println("caught " .. error.getMessage())
 }
 

@@ -42,7 +42,6 @@ public enum AstKind {
     SWITCH_EXPR,
     ELSE_BRANCH,
     WHILE_STMT,
-    FOR_STMT,
     FOR_IN_STMT,
     SWITCH_STMT,
     SWITCH_CASE,

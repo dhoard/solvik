@@ -8,15 +8,19 @@
 mutable val v: Integer = 9
 
 switch (v) {
-    case 1:
+    case 1 {
         print("one")
+    }
 
-    case 9:
+    case 9 {
         print("nine")
+    }
 
-    case 9:
+    case 9 {
         print("nine again")
+    }
 
-    default:
+    default {
         print("other")
+    }
 }

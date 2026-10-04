@@ -44,7 +44,7 @@ semantics:
 - Rust-style raw strings;
 - `..` string concatenation;
 - range-based `for` loops;
-- Go-style lexical semicolon insertion;
+- physical-line statement termination with `;` as a same-line separator only;
 - compile-time `include` and lightweight module namespaces;
 - a statically validated compiler pipeline that lowers to an optimized Truffle AST.
 
@@ -176,7 +176,7 @@ mainstream languages while making a more conservative trade-off around semantic 
 | **Rust** | raw strings, exhaustiveness, explicit semantics, preference for compile-time validation | garbage-collected managed runtime; no borrow checker, lifetimes, or ownership model |
 | **Dart** | approachable modern syntax, object orientation, application-language focus | stronger emphasis on strict compile-time semantics and fewer dynamic escape hatches |
 | **Scala** | expression-oriented ideas and JVM/GraalVM ecosystem proximity | deliberately avoids Scala's advanced type-system and metaprogramming complexity |
-| **Go** | lexical semicolon insertion, simplicity as a design constraint | richer static type system, classes/interfaces, null safety, pattern-oriented features |
+| **Go** | newline-terminated statements, simplicity as a design constraint | richer static type system, classes/interfaces, null safety, pattern-oriented features |
 | **C#** | modern nominal OO and strong static typing | substantially smaller feature surface and fewer historical compatibility constraints |
 | **Gleam / Roc** | emphasis on predictable semantics and compile-time correctness | Solvik retains a familiar nominal OO programming model rather than a primarily functional one |
 | **Zig / Mojo** | explicitness and modern language-design goals | Solvik targets managed application programming rather than systems programming or heterogeneous compute |
@@ -380,12 +380,13 @@ for (i in 0..<10) {
 
 The language also defines descending-exclusive range syntax with `..>`.
 
-### Semicolon insertion
+### Statement termination and brace placement
 
-Solvik accepts explicit semicolons but does not require them at ordinary line endings.
-
-The lexer performs deterministic, Go-style semicolon insertion before parsing. This is a lexical
-rule, not JavaScript-style parser recovery.
+A physical newline ends the construct that precedes it; `;` only separates constructs written on the
+same line and never ends a line. Every multiline construct writes its braces on their own lines -
+a body's `{` closes the line of its header, and a `}` stands alone - so `} else {` and `func f() {}`
+are compile errors, not style preferences. The rules are decided deterministically from real lines
+before and during parsing, never by parser-error recovery.
 
 ---
 
@@ -400,7 +401,7 @@ Source
 Lexer
   |
   v
-Semicolon-Inserting Token Stream
+Physical-Line Separation
   |
   v
 ANTLR Parser
@@ -523,7 +524,7 @@ This preserves:
 
 - source identity;
 - diagnostics;
-- semicolon boundaries;
+- physical-line boundaries;
 - instrumentation locations;
 - deterministic include behavior.
 
@@ -760,7 +761,7 @@ GraalVM, so it reports the true state of the build.
 pom.xml
 ├── language/
 │   ├── src/main/java/org/solvik/
-│   │   ├── parser/          lexer support, semicolon insertion, ANTLR parser
+│   │   ├── parser/          lexer support, physical-line separation, ANTLR parser
 │   │   ├── ast/             source-level syntax AST
 │   │   ├── type/            compiler type model
 │   │   ├── semantic/        resolution, typing, flow, validation

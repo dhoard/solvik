@@ -7,9 +7,11 @@
 // "offending block or case body", which is exactly this position.
 val n = 1
 val m = switch (n) {
-    case 1:
+    case 1 {
         val q = 1
-    default:
+    }
+    default {
         "other"
+    }
 }
 print("EXECUTED-INVALID")

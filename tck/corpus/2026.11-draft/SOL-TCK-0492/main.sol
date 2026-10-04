@@ -25,7 +25,12 @@ func animalToAnimal(animal: Animal): Animal {
 }
 
 class WiderParameter {
-    static val wide: func(Animal): Animal = if (true) { dogToDog } else { animalToAnimal }
+    static val wide: func(Animal): Animal = if (true) {
+        dogToDog
+    }
+    else {
+        animalToAnimal
+    }
 }
 
 print("EXECUTED-INVALID")

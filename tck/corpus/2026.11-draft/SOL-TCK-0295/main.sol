@@ -1,4 +1,5 @@
-class S { S() {
+class S {
+    S() {
     }
 
     func load(): S {

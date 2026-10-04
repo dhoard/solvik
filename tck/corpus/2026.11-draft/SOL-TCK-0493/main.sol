@@ -25,7 +25,12 @@ func animalToAnimal(animal: Animal): Animal {
 }
 
 class NarrowerResult {
-    static val narrow: func(Dog): Dog = if (true) { dogToDog } else { animalToAnimal }
+    static val narrow: func(Dog): Dog = if (true) {
+        dogToDog
+    }
+    else {
+        animalToAnimal
+    }
 }
 
 print("EXECUTED-INVALID")

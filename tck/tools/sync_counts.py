@@ -43,13 +43,78 @@ def validate_counts():
     return int(m.group(1)), int(m.group(2)), int(c.group(1)), int(c.group(2))
 
 
+def _id_spans(text):
+    """Expand an ID list like `SOL-TCK-0001..0075, SOL-TCK-0499` into a sorted int list."""
+    ids = []
+    for m in re.finditer(r"SOL-TCK-(\d{4})(?:\.\.(\d{4}))?", text):
+        start = int(m.group(1))
+        end = int(m.group(2) or m.group(1))
+        ids.extend(range(start, end + 1))
+    return sorted(set(ids))
+
+
+def _compress(ids):
+    """Compress a sorted int list into [(first, last), ...] spans."""
+    spans = []
+    for i in ids:
+        if spans and i == spans[-1][1] + 1:
+            spans[-1][1] = i
+        else:
+            spans.append([i, i])
+    return [tuple(s) for s in spans]
+
+
+def _fmt_spans(spans, sep):
+    """Format spans the way verify_regen names them: first span prefixed, singles bare."""
+    parts = []
+    for index, (first, last) in enumerate(spans):
+        prefix = "SOL-TCK-" if index == 0 else ""
+        if first == last:
+            parts.append("%s%04d" % (prefix, first))
+        else:
+            parts.append("%s%04d..%04d" % (prefix, first, last))
+    return sep.join(parts)
+
+
 def provenance_counts():
+    """The three-tier split, derived from verify_regen's own words -- never hardcoded.
+
+    verify_regen states the self-contained count, the manifest-only ID list, and the
+    unowned ID list. The self-contained *IDs* are the complement of those two lists in
+    the corpus directory set, so the README's ID ranges stay exact when a batch lands
+    IDs out of sequence (an in-place count bump would silently misname the ranges).
+    """
     out = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "verify_regen.py")],
                          capture_output=True, text=True, cwd=ROOT).stdout
     m = re.search(r"(\d+)/(\d+) committed test directories", out)
-    if not m:
+    mo = re.search(r"(\d+) further directories have their manifest reproduced[^:]*: (\S[^\n]*)",
+                   out)
+    un = re.search(r"(\d+) committed test directories are not reproducible[^:]*: (\S[^\n]*)", out)
+    if not m or not mo or not un:
         raise SystemExit("could not parse verify_regen output:\n" + out[-1500:])
-    return int(m.group(1)), int(m.group(2))
+    selfcont, total = int(m.group(1)), int(m.group(2))
+    manifest_only, unowned = _id_spans(mo.group(2)), _id_spans(un.group(2))
+    if int(mo.group(1)) != len(manifest_only) or int(un.group(1)) != len(unowned):
+        raise SystemExit("verify_regen's ID lists disagree with its counts:\n" + out[-1500:])
+    corpus = set()
+    for entry in os.listdir(os.path.join(ROOT, "corpus")):
+        base = os.path.join(ROOT, "corpus", entry)
+        if not os.path.isdir(base):
+            continue
+        for name in os.listdir(base):
+            d = re.fullmatch(r"SOL-TCK-(\d{4})", name)
+            if d and os.path.isdir(os.path.join(base, name)):
+                corpus.add(int(d.group(1)))
+    claimed = set(manifest_only) | set(unowned)
+    self_ids = sorted(corpus - claimed)
+    if len(self_ids) != selfcont:
+        raise SystemExit("self-contained ID set (%d) disagrees with verify_regen (%d)"
+                         % (len(self_ids), selfcont))
+    return {"self-contained": selfcont, "total": total,
+            "manifest-only": len(manifest_only), "unowned": len(unowned),
+            "self-contained-ids": _compress(self_ids),
+            "manifest-only-ids": _compress(manifest_only),
+            "unowned-ids": _compress(unowned)}
 
 
 def selftest_counts():
@@ -72,7 +137,7 @@ def selftest_counts():
     raise SystemExit("could not determine the executed self-test totals:\n" + out[-2500:])
 
 
-def plan_patterns(reqs, manifests, cov, active, selftotal, quotes, selfcont, total_dirs):
+def plan_patterns(reqs, manifests, cov, active, selftotal, quotes, tiers):
     """The figures IMPLEMENTATION_PLAN.md restates. The reference-adapter refusal count is
     `manifests - compared`, where `compared` is the 16 programs the subset adapter judges."""
     refusal = manifests - 16
@@ -89,7 +154,8 @@ def plan_patterns(reqs, manifests, cov, active, selftotal, quotes, selfcont, tot
          "refuses %d programs it does not implement, reported as an absence of observation "
          "rather than %d fabricated" % (refusal, refusal)),
         (r"Today \d+ of the \d+ portable test directories",
-         "Today %d of the %d portable test directories" % (selfcont, total_dirs)),
+         "Today %d of the %d portable test directories"
+         % (tiers["self-contained"], tiers["total"])),
         (r"\*\*\d+ self-test assertions\*\*", "**%d self-test assertions**" % selftotal),
         (r"\d+/\d+ passed \(every quoted normative passage",
          "%d/%d passed (every quoted normative passage" % (quotes, quotes)),
@@ -123,14 +189,22 @@ def plan_patterns(reqs, manifests, cov, active, selftotal, quotes, selfcont, tot
     ]
 
 
-def tools_readme_patterns(selfcont):
-    """The three-tier provenance split. The self-contained range is derived, not guessed: unowned
-    and manifest-only occupy SOL-TCK-0001..0091, so self-contained ends where the corpus ends."""
-    unowned, manifest_only = 75, 16
-    last = unowned + manifest_only + selfcont
+def tools_readme_patterns(tiers):
+    """The three-tier provenance split table and the prose that restates the unowned count.
+    The ID ranges are the exact complements computed from verify_regen's own lists, so a
+    batch landing IDs outside the contiguous run (or a hand-authored unowned test at a
+    fresh ID) keeps the table truthful instead of silently misnaming the ranges."""
+    selfc = _fmt_spans(tiers["self-contained-ids"], " plus ")
+    unowned = _fmt_spans(tiers["unowned-ids"], ", ")
     return [
-        (r"\| self-contained \| \d+ \| `SOL-TCK-\d+\.\.\d+` \|",
-         "| self-contained | %d | `SOL-TCK-0092..%04d` |" % (selfcont, last)),
+        (r"\| self-contained \| \d+ \| `[^|`]*`[^|]*\|",
+         "| self-contained | %d | `%s` |" % (tiers["self-contained"], selfc)),
+        (r"\| manifest-only \| \d+ \| `[^|`]*`[^|]*\|",
+         "| manifest-only | %d | `%s` |" % (tiers["manifest-only"],
+                                            _fmt_spans(tiers["manifest-only-ids"], ", "))),
+        (r"\| unowned \| \d+ \| `[^|`]*`[^|]*\|",
+         "| unowned | %d | `%s` |" % (tiers["unowned"], unowned)),
+        (r"those \d+ directories are named", "those %d directories are named" % tiers["unowned"]),
     ]
 
 
@@ -148,11 +222,10 @@ def apply(path, mapping):
 def main():
     reqs, manifests, cov, active = validate_counts()
     selftotal, quotes = selftest_counts()
-    selfcont, total_dirs = provenance_counts()
+    tiers = provenance_counts()
 
-    stale = apply(PLAN, plan_patterns(reqs, manifests, cov, active, selftotal, quotes,
-                                      selfcont, total_dirs))
-    stale += apply(TOOLS_README, tools_readme_patterns(selfcont))
+    stale = apply(PLAN, plan_patterns(reqs, manifests, cov, active, selftotal, quotes, tiers))
+    stale += apply(TOOLS_README, tools_readme_patterns(tiers))
     for pattern in stale:
         print("WARNING: a stated figure no longer matches /%s/ -- the sentence rotted and the "
               "count guard may have stopped checking it" % pattern)
@@ -168,7 +241,7 @@ def main():
         return 1
     print("synced: %d requirements, %d manifests, coverage %d/%d, %d self-test assertions, "
           "%d oracle quotes, %d self-contained directories"
-          % (reqs, manifests, cov, active, selftotal, quotes, selfcont))
+          % (reqs, manifests, cov, active, selftotal, quotes, tiers["self-contained"]))
     return 0
 
 

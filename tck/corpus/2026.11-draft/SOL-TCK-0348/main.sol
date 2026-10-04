@@ -21,7 +21,8 @@ func f() {
 }
 try {
     f()
-} catch (e: MyErr<Integer>) {
+}
+catch (e: MyErr<Integer>) {
     print("caught")
 }
 print("EXECUTED-INVALID")

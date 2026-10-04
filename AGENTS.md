@@ -12,7 +12,7 @@ The compilation pipeline is:
 
 ```text
 Solvik source
-  -> lexer / semicolon insertion
+  -> lexer / physical-line separation
   -> parser
   -> language AST
   -> symbol/name resolution
@@ -63,7 +63,9 @@ The confidence goal for any and all work is **100%**. Never report a task as com
 - Keep class inheritance single only.
 - Prefer composition/delegation for behavior reuse.
 - Do not add implicit fallthrough to `switch`.
-- Do not implement JavaScript-style ASI. Use the lexical semicolon insertion rules in the language spec.
+- Do not implement JavaScript-style ASI. A physical newline ends a complete statement; `;` only
+  separates statements written on the same physical line and may never terminate one. Use the
+  physical-line rules in the language spec.
 - Raw strings must follow the Rust-style delimiter model specified in the language spec.
 - Do not preserve SimpleLanguage syntax or dynamic-language behavior for compatibility.
 - Use the Truffle AST backend as the Solvik backend. Do not introduce a second execution backend.

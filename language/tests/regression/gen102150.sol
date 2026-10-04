@@ -7,7 +7,12 @@ println(arith1(91.0f, 48.0f))
 println(arith1(56.0f, 91.0f))
 
 func num2(flag: Boolean): Number {
-    return if (flag) { 34 } else { 0L }
+    return if (flag) {
+        34
+    }
+    else {
+        0L
+    }
 }
 
 println(num2(true) is Number)

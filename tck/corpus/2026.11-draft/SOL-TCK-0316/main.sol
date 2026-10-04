@@ -12,6 +12,6 @@ enum Result<T, E> {
 func get(): Result<Integer, String> {
     return Result.Ok(1)
 }
-val v = get()?;
+val v = get()?
 
 print("EXECUTED-INVALID")

@@ -1,5 +1,10 @@
 func either1(flag: Boolean): Any {
-    return if (flag) { true } else { 'a' }
+    return if (flag) {
+        true
+    }
+    else {
+        'a'
+    }
 }
 
 println(either1(true) is Any)

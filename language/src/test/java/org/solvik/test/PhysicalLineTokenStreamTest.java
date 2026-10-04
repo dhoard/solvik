@@ -104,11 +104,14 @@ public final class PhysicalLineTokenStreamTest {
     }
 
     @Test
-    public void aLineThatMustContinueCarriesNoBoundary() {
-        // A break continues a construct whenever the token before it cannot end a line: after a
-        // comma or an `=` the stream stays boundary-free, and the argument list below ends once, after
-        // the `)` that closes it.
-        assertThat(boundaries("val xs = foo(\n    1,\n    2\n)\n")).isEqualTo(1);
+    public void aContinuationLineCarriesABoundaryOnlyWhenItsLastTokenEndsALine() {
+        // Placement consults only the token before the break. Inside the argument list the lines after
+        // `(` and after `1,` carry none, because `(` and `,` cannot end a line; the line holding `2`
+        // ends on its value and the line holding `)` ends on the closer, so the grammar absorbs the
+        // break before the `)` from its own `NEWLINE*`.
+        assertThat(boundaries("val xs = foo(\n    1,\n    2\n)\n")).isEqualTo(2);
+        // The line broken after `=` carries no boundary - an assignment line cannot end there - and only
+        // the line the value closes ends.
         assertThat(boundaries("val x =\n    1\n")).isEqualTo(1);
     }
 
@@ -138,12 +141,12 @@ public final class PhysicalLineTokenStreamTest {
 
     @Test
     public void anExplicitSeparatorClosingALineCarriesOneBoundary() {
-        assertThat(boundaries("val a = 1;\n")).isEqualTo(1);
-        assertThat(boundaries("val a = 1;\nval b = 2;\n")).isEqualTo(2);
-        // Two constructs on one line separated by `;` and one line break: one boundary, two separators.
-        List<Token> tokens = delivered("val a = 1; val b = 2;\n");
-        assertThat(tokens.stream().filter(t -> t.getType() == SolvikLexer.SEMI).count()).isEqualTo(2);
-        assertThat(boundaries("val a = 1; val b = 2;\n")).isEqualTo(1);
+        assertThat(boundaries("val a = 1\n")).isEqualTo(1);
+        assertThat(boundaries("val a = 1\nval b = 2\n")).isEqualTo(2);
+        // Two constructs on one line separated by `;` and one line break: one boundary, one `;`.
+        List<Token> tokens = delivered("val a = 1; val b = 2\n");
+        assertThat(tokens.stream().filter(t -> t.getType() == SolvikLexer.SEMI).count()).isEqualTo(1);
+        assertThat(boundaries("val a = 1; val b = 2\n")).isEqualTo(1);
     }
 
     @Test
