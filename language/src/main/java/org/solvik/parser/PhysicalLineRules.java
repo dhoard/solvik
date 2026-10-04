@@ -27,9 +27,11 @@ import org.solvik.parser.generated.SolvikLexer;
 
 /**
  * The physical-line rules of {@code docs/LANGUAGE_SPEC.md} section 16 that the phrase grammar cannot
- * state: an opening brace is the last token on the line of the construct that introduces its scope, a
- * closing brace is the only significant token on its line, a clause keyword begins its line, and the
- * {@code for} header the 2026.10 revision separated with {@code ;} is gone.
+ * state: an opening brace is the last token on the line of the construct that introduces its scope,
+ * and a closing brace stands alone on its line - the only things that may share that line are
+ * whitespace and comments. A clause keyword ({@code else}, {@code catch}, {@code finally}) therefore
+ * begins its own line, a body brace never begins one, and an empty body is written as an opening
+ * brace on one line and a closing brace on the next rather than as {@code {}}.
  *
  * <p>These are facts about physical lines, not about phrase structure: {@code Solvik.g4} absorbs the
  * line breaks a program writes so that a body can be read at all, which means a wrongly placed brace
@@ -37,18 +39,23 @@ import org.solvik.parser.generated.SolvikLexer;
  * per line shape. Checking the token sequence instead states each rule once, locates it exactly, and
  * leaves the grammar free to describe what a program means.
  *
+ * <p>Because the rule holds everywhere, a bracketed body closes its brackets on their own lines:
+ * {@code f(}, the body, {@code )}. That is the same fact the closing-brace rule already states - a
+ * {@code )} written after a {@code }} shares the brace's line - so no separate bracket rule exists.
+ *
  * <p>The stage runs after a successful parse and reads only the default-channel token sequence - the
  * same sequence the parser saw, with comments and blank lines removed - so it never contradicts the
  * parser and never reports on text inside a comment or a literal. Because the line-boundary stream
  * already decided which breaks end a line, a token pair on one physical line here means the programmer
  * wrote them on one physical line.
  *
- * <p>Two omissions are deliberate and stated rather than hidden. A stand-alone scope block writes its
+ * <p>One omission is deliberate and stated rather than hidden. A stand-alone scope block writes its
  * {@code &#123;} as the first token of its line, which is legal, so a brace that opens a line is
- * reported only when the token before it could have introduced a body - a header's {@code )},
- * {@code try}, {@code else}, or {@code static}. And a `;` left at the end of a
- * line is redundant rather than wrong: {@code ;} separates statements of one line and the grammar
- * tolerates closing a line with one.
+ * reported only when the token before it could have introduced a body - {@code try}, {@code else},
+ * {@code static}, or a {@code case} label's {@code :}. A header's {@code )}, by contrast, can legally
+ * be followed by a scope block on the next line, and only the parse tree can tell that block from a
+ * declaration's body, so that case is left to the parse error a program that needs it already
+ * produces.
  */
 public final class PhysicalLineRules {
 
@@ -78,28 +85,10 @@ public final class PhysicalLineRules {
         return found;
     }
 
-    /**
-     * The removed syntax this stage can still name from the token stream alone, before any parse has
-     * run. A program containing it is rejected with these diagnostics rather than with the generic
-     * syntax errors its removed spelling would otherwise produce, because the removed spelling is the
-     * thing the programmer should be told about.
-     */
-    public static List<Diagnostic> removedSyntax(SourceFile source, BufferedTokenStream tokens) {
-        tokens.fill();
-        List<Token> code = significant(tokens);
-        List<Diagnostic> found = new ArrayList<>();
-        for (int i = 0; i < code.size(); i++) {
-            if (code.get(i).getType() == SolvikLexer.FOR) {
-                threeClauseForHeader(source, code, i, found);
-            }
-        }
-        return found;
-    }
-
-    /** A `{` may be followed on its line by nothing, or by the `}` of an empty body. */
+    /** Nothing but a comment or whitespace may follow an opening brace on its line. */
     private static void openingBrace(SourceFile source, List<Token> code, int index, List<Diagnostic> found) {
         Token next = next(code, index);
-        if (next == null || next.getLine() != code.get(index).getLine() || next.getType() == SolvikLexer.RBRACE) {
+        if (next == null || next.getLine() != code.get(index).getLine()) {
             return;
         }
         found.add(Diagnostic.expectedFound(DiagnosticCode.PARSER_CONTENT_AFTER_OPEN_BRACE, span(source, next), //
@@ -123,11 +112,15 @@ public final class PhysicalLineRules {
                 "'{' on the line of its construct", "'{' on its own line"));
     }
 
-    /** A `}` shares its line with nothing; a clause keyword after it on one line names itself. */
+    /**
+     * A `}` shares its physical line with nothing: the token before it must be on an earlier line and
+     * the token after it on a later one. A clause keyword after the brace names itself, because the
+     * program is writing a clause the brace rule would otherwise report as a stray token.
+     */
     private static void closingBrace(SourceFile source, List<Token> code, int index, List<Diagnostic> found) {
         Token close = code.get(index);
         Token next = next(code, index);
-        if (next != null && next.getLine() == close.getLine() && !closesEnclosingBracket(next.getType())) {
+        if (next != null && next.getLine() == close.getLine()) {
             found.add(Diagnostic.expectedFound(clause(next.getType()) ? DiagnosticCode.PARSER_CLAUSE_NOT_AT_LINE_START //
                     : DiagnosticCode.PARSER_BRACE_SHARES_LINE, span(source, close), //
                     clause(next.getType()) //
@@ -136,46 +129,14 @@ public final class PhysicalLineRules {
                     "end of line", next.getText()));
             return;
         }
+        // A `}` written on its brace's own line is already named by the opening-brace rule, which
+        // reports the token after `{`; reporting it twice would split one mistake over two codes.
         Token previous = previous(code, index);
         if (previous != null && previous.getLine() == close.getLine() && previous.getType() != SolvikLexer.LBRACE) {
             found.add(Diagnostic.expectedFound(DiagnosticCode.PARSER_BRACE_SHARES_LINE, span(source, close), //
                     "closing `}` must be the only significant token on its physical line; " + text(previous) + " precedes it on the same line", //
                     "end of line", previous.getText()));
         }
-    }
-
-    /**
-     * A three-clause `for` header is a `for` whose parenthesized header holds a `;`. The separators are
-     * the ones the language removed, so the diagnostic names the shape rather than letting the parser
-     * fail somewhere inside the header.
-     */
-    private static void threeClauseForHeader(SourceFile source, List<Token> code, int index, List<Diagnostic> found) {
-        int depth = 0;
-        for (int i = index + 1; i < code.size(); i++) {
-            Token token = code.get(i);
-            if (token.getType() == SolvikLexer.LPAREN) {
-                depth++;
-            } else if (token.getType() == SolvikLexer.RPAREN) {
-                depth--;
-                if (depth == 0) {
-                    return;
-                }
-            } else if (depth > 0 && token.getType() == SolvikLexer.SEMI) {
-                found.add(Diagnostic.expectedFound(DiagnosticCode.PARSER_UNSUPPORTED_FOR_CLAUSES, span(source, code.get(index)), //
-                        "the three-clause `for (init; condition; update)` was removed in 2026.11-draft; write the initializer, then a `while` loop whose body ends with the update", //
-                        "for (name in range) or while (condition)", "for (clauses separated by ';')"));
-                return;
-            }
-        }
-    }
-
-    /**
-     * A closing brace may be followed on its line only by the brackets and separator that close what
-     * surrounds its body: they cannot begin a statement, so they carry no risk of a second statement
-     * reading as one, and no other spelling lets a call argument list close.
-     */
-    private static boolean closesEnclosingBracket(int type) {
-        return type == SolvikLexer.RPAREN || type == SolvikLexer.RBRACKET || type == SolvikLexer.COMMA;
     }
 
     /**
@@ -190,7 +151,8 @@ public final class PhysicalLineRules {
      * error a program that needs it already produces.
      */
     private static boolean introducesBody(int type) {
-        return type == SolvikLexer.TRY || type == SolvikLexer.ELSE || type == SolvikLexer.STATIC;
+        return type == SolvikLexer.TRY || type == SolvikLexer.ELSE || type == SolvikLexer.STATIC //
+                || type == SolvikLexer.COLON || type == SolvikLexer.ARROW;
     }
 
     private static boolean clause(int type) {

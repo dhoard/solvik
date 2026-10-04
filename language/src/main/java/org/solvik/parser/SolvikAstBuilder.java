@@ -146,7 +146,6 @@ import org.solvik.parser.generated.SolvikParser.InterfaceDeclContext;
 import org.solvik.parser.generated.SolvikParser.InterfaceMemberContext;
 import org.solvik.parser.generated.SolvikParser.IntegerLiteralContext;
 import org.solvik.parser.generated.SolvikParser.LocalDeclContext;
-import org.solvik.parser.generated.SolvikParser.LocalDeclNoSemiContext;
 import org.solvik.parser.generated.SolvikParser.LogicalAndContext;
 import org.solvik.parser.generated.SolvikParser.LogicalOrContext;
 import org.solvik.parser.generated.SolvikParser.LongLiteralContext;
@@ -176,6 +175,7 @@ import org.solvik.parser.generated.SolvikParser.RelationContext;
 import org.solvik.parser.generated.SolvikParser.RelationalContext;
 import org.solvik.parser.generated.SolvikParser.ReturnStmtContext;
 import org.solvik.parser.generated.SolvikParser.SignatureDeclContext;
+import org.solvik.parser.generated.SolvikParser.StatementCoreContext;
 import org.solvik.parser.generated.SolvikParser.StatementContext;
 import org.solvik.parser.generated.SolvikParser.StaticBlockContext;
 import org.solvik.parser.generated.SolvikParser.StaticMemberContext;
@@ -193,7 +193,6 @@ import org.solvik.parser.generated.SolvikParser.TypeRefContext;
 import org.solvik.parser.generated.SolvikParser.TypeRefListContext;
 import org.solvik.parser.generated.SolvikParser.UnaryContext;
 import org.solvik.parser.generated.SolvikParser.ValueBlockContext;
-import org.solvik.parser.generated.SolvikParser.ValueCaseBodyContext;
 import org.solvik.parser.generated.SolvikParser.ValueDefaultCaseContext;
 import org.solvik.parser.generated.SolvikParser.ValueSwitchCaseContext;
 import org.solvik.parser.generated.SolvikParser.ValueTailContext;
@@ -505,10 +504,21 @@ final class SolvikAstBuilder {
         for (StatementContext s : ctx.statement()) {
             statements.add(buildStatement(s));
         }
+        if (ctx.statementCore() != null) {
+            // A body whose `}` shares its closing line with the last thing in it keeps that last
+            // statement unseparated. The grammar accepts it so the brace rule of section 16 can name
+            // the misplaced brace itself rather than a generic syntax error inside the body.
+            statements.add(buildStatementCore(ctx.statementCore()));
+        }
         return new BlockNode(statements, span(ctx.getStart(), ctx.getStop()));
     }
 
     private StatementNode buildStatement(StatementContext ctx) {
+        return buildStatementCore(ctx.statementCore());
+    }
+
+    /** A statement without its separator: the phrase, without the line boundary that ends it. */
+    private StatementNode buildStatementCore(StatementCoreContext ctx) {
         if (ctx.localDecl() != null) {
             return buildLocalDecl(ctx.localDecl());
         }
@@ -565,10 +575,6 @@ final class SolvikAstBuilder {
         return buildLocalDecl(ctx.bindingKind(), ctx.Identifier(), ctx.typeRef(), ctx.expression(), span(ctx.getStart(), ctx.getStop()));
     }
 
-    private LocalDeclNode buildLocalDeclNoSemi(LocalDeclNoSemiContext ctx) {
-        return buildLocalDecl(ctx.bindingKind(), ctx.Identifier(), ctx.typeRef(), ctx.expression(), span(ctx.getStart(), ctx.getStop()));
-    }
-
     private LocalDeclNode buildLocalDecl(org.solvik.parser.generated.SolvikParser.BindingKindContext kindCtx, TerminalNode identifier, TypeRefContext typeRefCtx, ExpressionContext initCtx, SourceSpan span) {
         BindingKind kind = BindingKind.fromMutable(kindCtx.MUTABLE() != null);
         TypeRef declaredType = typeRefCtx == null ? null : buildTypeRef(typeRefCtx);
@@ -611,7 +617,7 @@ final class SolvikAstBuilder {
         StatementNode initializer = null;
         ForInitContext fi = ctx.forInit();
         if (fi != null) {
-            initializer = fi.localDeclNoSemi() != null ? buildLocalDeclNoSemi(fi.localDeclNoSemi()) : buildAssignable(fi.assignable());
+            initializer = fi.localDecl() != null ? buildLocalDecl(fi.localDecl()) : buildAssignable(fi.assignable());
         }
         ExpressionNode condition = ctx.forCondition() == null ? null : buildExpression(ctx.forCondition().expression());
         StatementNode update = ctx.forUpdate() == null ? null : buildAssignable(ctx.forUpdate().assignable());
@@ -639,7 +645,8 @@ final class SolvikAstBuilder {
     /**
      * Builds a non-fallthrough {@code switch}. The generated context keeps the cases in source
      * order, so iterating its children preserves the specification's first-match order; the
-     * semantic pass enforces "at most one default, and last".
+     * semantic pass enforces "at most one default, and last". Each case body is a braced block, so it
+     * carries its own span and needs no anchoring against its colon.
      */
     private SwitchStmtNode buildSwitch(SwitchStmtContext ctx) {
         ExpressionNode scrutinee = buildExpression(ctx.expression());
@@ -657,7 +664,7 @@ final class SolvikAstBuilder {
 
     /**
      * Builds a {@code switch} expression (docs/LANGUAGE_SPEC.md section 21). The surface syntax is
-     * shared with the statement form; every case body is built as a value-required body so a
+     * shared with the statement form; every case body is a braced, value-required block, so a
      * terminal expression becomes the case result.
      */
     private SwitchExprNode buildSwitchExpr(SwitchExprContext ctx) {
@@ -679,11 +686,11 @@ final class SolvikAstBuilder {
         for (CaseLabelContext label : ctx.caseLabel()) {
             labels.add(buildCaseLabel(label));
         }
-        return new SwitchCaseNode(false, labels, buildCaseBody(ctx.statement(), ctx.COLON().getSymbol()), span(ctx.getStart(), ctx.getStop()));
+        return new SwitchCaseNode(false, labels, buildBlock(ctx.block()), span(ctx.getStart(), ctx.getStop()));
     }
 
     private SwitchCaseNode buildDefaultCase(DefaultCaseContext ctx) {
-        return new SwitchCaseNode(true, List.of(), buildCaseBody(ctx.statement(), ctx.COLON().getSymbol()), span(ctx.getStart(), ctx.getStop()));
+        return new SwitchCaseNode(true, List.of(), buildBlock(ctx.block()), span(ctx.getStart(), ctx.getStop()));
     }
 
     private SwitchCaseNode buildValueSwitchCase(ValueSwitchCaseContext ctx) {
@@ -691,49 +698,11 @@ final class SolvikAstBuilder {
         for (CaseLabelContext label : ctx.caseLabel()) {
             labels.add(buildCaseLabel(label));
         }
-        return new SwitchCaseNode(false, labels, buildValueCaseBody(ctx.valueCaseBody(), ctx.COLON().getSymbol()), span(ctx.getStart(), ctx.getStop()));
+        return new SwitchCaseNode(false, labels, buildValueBlock(ctx.valueBlock()), span(ctx.getStart(), ctx.getStop()));
     }
 
     private SwitchCaseNode buildValueDefaultCase(ValueDefaultCaseContext ctx) {
-        return new SwitchCaseNode(true, List.of(), buildValueCaseBody(ctx.valueCaseBody(), ctx.COLON().getSymbol()), span(ctx.getStart(), ctx.getStop()));
-    }
-
-    /**
-     * Builds the implicit block forming a statement case body. The body has no braces, so its span
-     * runs from the first statement to the last; an empty body is anchored just after its colon.
-     */
-    private BlockNode buildCaseBody(List<StatementContext> statements, Token colon) {
-        List<StatementNode> built = new ArrayList<>();
-        for (StatementContext statement : statements) {
-            built.add(buildStatement(statement));
-        }
-        return new BlockNode(built, caseBodySpan(built, colon));
-    }
-
-    /** Builds the value-required implicit block forming an expression {@code switch} case body. */
-    private BlockNode buildValueCaseBody(ValueCaseBodyContext ctx, Token colon) {
-        List<StatementNode> built = new ArrayList<>();
-        for (StatementContext statement : ctx.statement()) {
-            built.add(buildStatement(statement));
-        }
-        ValueTailContext tail = ctx.valueTail();
-        if (tail != null) {
-            // The terminal expression is part of the body, so the body span must reach its end: a
-            // body of only a tail expression would otherwise have an empty span that does not
-            // contain its own child. A body that also has statements starts at the first of them.
-            ExpressionNode tailExpression = buildExpression(tail.expression());
-            SourceSpan statementsSpan = caseBodySpan(built, colon);
-            return new BlockNode(built, tailExpression, sourceSpan(statementsSpan.startOffset(), tailExpression.span().endOffset()));
-        }
-        return valueBlock(built, caseBodySpan(built, colon));
-    }
-
-    private SourceSpan caseBodySpan(List<StatementNode> built, Token colon) {
-        if (built.isEmpty()) {
-            int offset = colon.getStopIndex() + 1;
-            return sourceSpan(offset, offset);
-        }
-        return sourceSpan(built.get(0).span().startOffset(), built.get(built.size() - 1).span().endOffset());
+        return new SwitchCaseNode(true, List.of(), buildValueBlock(ctx.valueBlock()), span(ctx.getStart(), ctx.getStop()));
     }
 
     private CaseLabelNode buildCaseLabel(CaseLabelContext ctx) {

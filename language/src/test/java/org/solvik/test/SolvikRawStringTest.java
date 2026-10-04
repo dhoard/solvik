@@ -36,7 +36,7 @@ import org.solvik.ast.statement.LocalDeclNode;
 import org.solvik.diagnostic.Diagnostic;
 import org.solvik.diagnostic.DiagnosticBag;
 import org.solvik.diagnostic.DiagnosticCode;
-import org.solvik.parser.SemicolonInsertingTokenSource;
+import org.solvik.parser.PhysicalLineTokenSource;
 import org.solvik.parser.generated.SolvikLexer;
 import org.solvik.source.SourceSpan;
 
@@ -59,12 +59,12 @@ public final class SolvikRawStringTest {
     private static String rendered(String src) {
         SolvikLexer lexer = new SolvikLexer(CharStreams.fromString(src));
         lexer.removeErrorListeners();
-        SemicolonInsertingTokenSource stream = new SemicolonInsertingTokenSource(lexer);
+        PhysicalLineTokenSource stream = new PhysicalLineTokenSource(lexer);
         StringBuilder sb = new StringBuilder();
         while (true) {
             Token t = stream.nextToken();
             if (t.getChannel() == Token.DEFAULT_CHANNEL) {
-                if (SemicolonInsertingTokenSource.isSyntheticSemi(t)) {
+                if (PhysicalLineTokenSource.isSyntheticSemi(t)) {
                     sb.append("~;~");
                 } else if (t.getType() == Token.EOF) {
                     sb.append("<EOF>");

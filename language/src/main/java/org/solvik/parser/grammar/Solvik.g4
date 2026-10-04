@@ -408,11 +408,17 @@ whileStmt: WHILE LPAREN expression RPAREN NEWLINE? block ;
 // condition is `true`.
 forStmt: FOR LPAREN forInit? SEMI forCondition? SEMI forUpdate? RPAREN NEWLINE? block ;
 
-forInit: localDecl | assignment ;
+forInit: localDecl | assignable ;
 
 forCondition: expression ;
 
-forUpdate: assignment ;
+forUpdate: assignable ;
+
+// An assignment-shaped clause: an expression optionally followed by `=` and a value. The `for`
+// clauses accept it and the semantic pass rejects a clause that is neither an assignment nor a
+// declaration (SOLV-SEM-004, SOLV-SEM-005); an assignment is a statement and never an expression, so
+// this shape exists only where the grammar needs it.
+assignable: expression (ASSIGN expression)? ;
 
 // A range for-in loop: `for (name in start <op> end) block`. The three range operators are
 // distinct tokens, so `..` remains string concatenation outside a for-in header. The loop variable
@@ -423,11 +429,11 @@ rangeExpr: expression rangeOperator expression ;
 
 rangeOperator: DOTDOTDOT | DOTDOTLT | DOTDOTGT ;
 
-// Phase 15: `switch` is a statement for value dispatch with no implicit fallthrough. A case body is
-// an implicit block: a sequence of statements that ends where the next `case`, `default`, or the
-// switch's closing `}` begins, because those keywords cannot start a statement. `default` is a
-// separate alternative so the semantic layer can enforce at most one and last. A `regex` case label
-// carries a normal or raw string literal pattern.
+// Phase 15: `switch` is a statement for value dispatch with no implicit fallthrough. A case body is a
+// braced block, so it obeys the same brace and separator rules as any other body: the `{` closes the
+// label's line and the `}` stands on its own. `default` is a separate alternative so the semantic
+// layer can enforce at most one and last. A `regex` case label carries a normal or raw string literal
+// pattern.
 switchStmt: SWITCH LPAREN expression RPAREN NEWLINE? LBRACE (switchCase | defaultCase | separator)* RBRACE ;
 
 // Phase 18: block, `if`, and `switch` expressions (docs/LANGUAGE_SPEC.md section 21). The
@@ -447,19 +453,17 @@ switchExpr: SWITCH LPAREN expression RPAREN NEWLINE? LBRACE (valueSwitchCase | v
 
 // A value-required braced body: ordinary terminated statements followed by an optional
 // unterminated terminal expression. The terminal expression is the block or case result.
-valueBlock: LBRACE (statement | separator)* valueTail? RBRACE ;
+valueBlock: LBRACE (statement | separator)* valueTail? separator? RBRACE ;
 
 valueTail: expression ;
 
-valueSwitchCase: CASE caseLabel (NEWLINE* COMMA NEWLINE* caseLabel)* COLON valueCaseBody ;
+valueSwitchCase: CASE caseLabel (NEWLINE* COMMA NEWLINE* caseLabel)* COLON NEWLINE? valueBlock ;
 
-valueDefaultCase: DEFAULT COLON valueCaseBody ;
+valueDefaultCase: DEFAULT COLON NEWLINE? valueBlock ;
 
-valueCaseBody: (statement | separator)* valueTail? ;
+switchCase: CASE caseLabel (NEWLINE* COMMA NEWLINE* caseLabel)* COLON NEWLINE? block ;
 
-switchCase: CASE caseLabel (NEWLINE* COMMA NEWLINE* caseLabel)* COLON (statement | separator)* ;
-
-defaultCase: DEFAULT COLON (statement | separator)* ;
+defaultCase: DEFAULT COLON NEWLINE? block ;
 
 caseLabel: regexCaseLabel | expression ;
 
@@ -534,7 +538,7 @@ primary: literal | paren | thisExpr | superExpr | matchExpr | ifExpr | switchExp
 // `this` is a token and not an `Identifier`, so it is named explicitly as an alternative. An item is
 // one token wide, which is what keeps an arbitrary capture expression (`func [base + 1](...)`) out of
 // the language for the same reason capture aliases are out: there is no shape for it here.
-anonymousFunctionExpr: FUNC (LBRACKET captureItemList RBRACKET)? LPAREN parameterList? RPAREN (COLON typeRef)? NEWLINE? block ;
+anonymousFunctionExpr: FUNC (LBRACKET NEWLINE* captureItemList NEWLINE* RBRACKET)? LPAREN parameterList? RPAREN (COLON typeRef)? NEWLINE? block ;
 
 captureItemList: captureItem (NEWLINE* COMMA NEWLINE* captureItem)* ;
 

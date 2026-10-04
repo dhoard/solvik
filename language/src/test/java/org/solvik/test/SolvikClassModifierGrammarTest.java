@@ -30,7 +30,7 @@ import org.solvik.ast.declaration.DelegateDeclNode;
 import org.solvik.ast.declaration.FunctionDeclNode;
 import org.solvik.ast.declaration.PropertyDeclNode;
 import org.solvik.ast.statement.BindingKind;
-import org.solvik.parser.SemicolonInsertingTokenSource;
+import org.solvik.parser.PhysicalLineTokenSource;
 import org.solvik.parser.generated.SolvikLexer;
 
 /**
@@ -62,7 +62,7 @@ public final class SolvikClassModifierGrammarTest {
     private static List<Token> delivered(String source) {
         SolvikLexer lexer = new SolvikLexer(CharStreams.fromString(source));
         lexer.removeErrorListeners();
-        CommonTokenStream stream = new CommonTokenStream(new SemicolonInsertingTokenSource(lexer));
+        CommonTokenStream stream = new CommonTokenStream(new PhysicalLineTokenSource(lexer));
         stream.fill();
         return stream.getTokens();
     }

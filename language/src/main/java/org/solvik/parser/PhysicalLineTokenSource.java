@@ -34,30 +34,31 @@ import org.solvik.parser.generated.SolvikLexer;
  * <p>The Solvik lexer keeps every physical newline as a hidden {@code NEWLINE} token and hides
  * comment bodies instead of skipping them, because a newline inside a comment is still a physical
  * newline. This stage observes that raw sequence and, at a line boundary, forwards one
- * {@code NEWLINE} token on the default channel when all of these hold:
+ * {@code NEWLINE} token on the default channel when both of these hold:
  * <ol>
- * <li>the unmatched {@code (} and {@code [} nesting depths are both zero (curly braces are
- * deliberately not tracked, because a body's statements must terminate on their own lines);</li>
  * <li>the preceding significant token ends a line &mdash; an identifier, a literal, {@code break},
- * {@code continue}, {@code return}, {@code )}, {@code ]}, {@code }}, or a completed {@code ?}
- * propagation; see {@link #endsLine};</li>
- * <li>end of file, which closes the final physical line and applies the same rule without requiring
- * a following token.</li>
+ * {@code continue}, {@code return}, an explicit {@code ;}, {@code )}, {@code ]}, {@code }}, or a
+ * completed {@code ?} propagation; see {@link #endsLine};</li>
+ * <li>end of file, which closes the final physical line and applies the same rule without requiring a
+ * following token.</li>
  * </ol>
  *
- * <p>There is deliberately no lookahead exception for the token that follows. A line break that
- * continues an expression - after a binary operator, after a comma, before a {@code .} or a
- * {@code ::} - still forwards its {@code NEWLINE}, and the grammar absorbs it because
- * {@code Solvik.g4} writes {@code NEWLINE*} only at the positions where section 16 permits a line to
- * continue. That is the whole point of the arrangement: the grammar, not a heuristic table, decides
- * which continuations exist, so a line break where the specification allows none is a parse error at
- * the break rather than a silently joined expression.
+ * <p>Nesting depth is deliberately not consulted. A boundary is placed at every line break the
+ * language admits a separator at, including inside parentheses and brackets, so a statement inside a
+ * bracketed body terminates exactly like a statement anywhere else. There is equally no lookahead
+ * exception for the token that follows: a line break that continues an expression - after a binary
+ * operator, after a comma, before a {@code .} or a {@code ::} - still forwards its {@code NEWLINE},
+ * and the grammar absorbs it because {@code Solvik.g4} writes {@code NEWLINE*} only at the positions
+ * where section 16 permits a line to continue. That is the whole point of the arrangement: the
+ * grammar, not a heuristic table, decides which continuations exist, so a line break where the
+ * specification allows none is a parse error at the break rather than a silently joined expression.
  *
  * <p>A run of newlines, blank lines, and comment newlines between two significant tokens is a single
- * boundary carrying at most one {@code NEWLINE}, so blank lines never duplicate a boundary and an
- * explicit {@code ;} suppresses the boundary that follows it because {@code SEMI} is not itself a
- * line-ending token. {@code ;} therefore survives only as the separator between two statements of one
- * physical line, exactly as section 16 states, and is never produced here.
+ * boundary carrying at most one {@code NEWLINE}, so blank lines never duplicate a boundary. An
+ * explicit {@code ;} ends its line, so a program that writes one at the end of a line gets the one
+ * boundary that follows it rather than a separator and a boundary in a shape the grammar would have
+ * to ignore; {@code ;} between two constructs of one physical line stays a separator and never
+ * becomes a boundary, because no physical newline separates them.
  *
  * <p>Purity contract: the decision reads only the raw token sequence the lexer produces. This class
  * references no parser type, no error strategy, and no diagnostic, so boundary placement is
@@ -116,6 +117,7 @@ public final class PhysicalLineTokenSource implements TokenSource {
             SolvikLexer.RPAREN, //
             SolvikLexer.RBRACKET, //
             SolvikLexer.RBRACE, //
+            SolvikLexer.SEMI, //
     };
 
     private final TokenSource lexer;
@@ -123,8 +125,6 @@ public final class PhysicalLineTokenSource implements TokenSource {
     private final Deque<Token> pending = new ArrayDeque<>();
     /** Last delivered significant token; comments and newlines never replace it. */
     private Token previousSignificant;
-    private int unmatchedParenDepth;
-    private int unmatchedBracketDepth;
     /** True while a line boundary (possibly many newlines and comment lines deep) awaits its next token. */
     private boolean boundaryPending;
     private int boundaryStart;
@@ -183,7 +183,7 @@ public final class PhysicalLineTokenSource implements TokenSource {
                 // End of file closes the final physical line, so the last line is terminated exactly
                 // once whether or not the file ends with a newline. Once consumed, EOF never triggers
                 // a second boundary even though lexers re-deliver it.
-                if (!eofProcessed && endsAt(previousSignificant) && atZeroNesting()) {
+                if (!eofProcessed && endsAt(previousSignificant)) {
                     eofProcessed = true;
                     return new LineBoundaryToken(lexer, previousSignificant.getStopIndex() + 1, previousSignificant.getStopIndex(), //
                             boundaryPending ? boundaryLine : token.getLine(), boundaryPending ? boundaryColumn : token.getCharPositionInLine());
@@ -210,31 +210,11 @@ public final class PhysicalLineTokenSource implements TokenSource {
 
             // Significant token: resolve the pending boundary before this token becomes the new
             // predecessor. The boundary is returned first and queues this token behind it.
-            boolean boundary = boundaryPending && endsAt(previousSignificant) && atZeroNesting();
+            boolean boundary = boundaryPending && endsAt(previousSignificant);
             int start = boundaryStart;
             int stop = boundaryStop;
             int line = boundaryLine;
             int column = boundaryColumn;
-            switch (type) {
-            case SolvikLexer.LPAREN:
-                unmatchedParenDepth++;
-                break;
-            case SolvikLexer.RPAREN:
-                if (unmatchedParenDepth > 0) {
-                    unmatchedParenDepth--;
-                }
-                break;
-            case SolvikLexer.LBRACKET:
-                unmatchedBracketDepth++;
-                break;
-            case SolvikLexer.RBRACKET:
-                if (unmatchedBracketDepth > 0) {
-                    unmatchedBracketDepth--;
-                }
-                break;
-            default:
-                break;
-            }
             previousSignificant = token;
             boundaryPending = false;
             if (boundary) {
@@ -243,11 +223,6 @@ public final class PhysicalLineTokenSource implements TokenSource {
             }
             return token;
         }
-    }
-
-    /** Condition 1: no {@code (} or {@code [} nesting is currently open. */
-    private boolean atZeroNesting() {
-        return unmatchedParenDepth == 0 && unmatchedBracketDepth == 0;
     }
 
     private static boolean endsAt(Token previous) {

@@ -16,6 +16,7 @@
 package org.solvik.parser;
 
 import java.util.Objects;
+import java.util.List;
 import org.antlr.v4.runtime.BailErrorStrategy;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
@@ -59,9 +60,9 @@ import org.solvik.source.SourceSpan;
  * must be a source-located compile-time diagnostic, never a VM resource failure.
  *
  * <p>Statement termination follows docs/LANGUAGE_SPEC.md section 16: the raw lexer stream passes
- * through {@link SemicolonInsertingTokenSource}, which injects synthetic {@code SEMI} tokens at
- * physical line boundaries purely lexically. Parser errors therefore cannot influence where
- * statements terminate.
+ * through {@link PhysicalLineTokenSource}, which places {@code NEWLINE} boundary tokens at physical
+ * line boundaries purely lexically. Parser errors therefore cannot influence where statements
+ * terminate.
  */
 public final class SolvikParser {
 
@@ -112,6 +113,12 @@ public final class SolvikParser {
             builder.add(tooDeep(source));
             return SolvikParseResult.failure(builder.build());
         }
+        if (parsed[0] == null) {
+            // The thread ended without producing a result and without overflowing its stack, so a
+            // stage failed outright. That is a compiler defect, and it is reported as one rather than
+            // traded for a diagnostic that would blame the program for the front end's own failure.
+            throw new IllegalStateException("parse of " + source.name() + " produced no result");
+        }
         return parsed[0];
     }
 
@@ -120,13 +127,26 @@ public final class SolvikParser {
         return Diagnostic.error(DiagnosticCode.PARSER_NESTING_TOO_DEEP, SourceSpan.of(source.id(), 0, source.textLength()), NESTING_TOO_DEEP_MESSAGE);
     }
 
-    /** Fast first-stage parse when it completes cleanly; the reporting parse otherwise. */
+    /**
+     * Fast first-stage parse when it completes cleanly; the reporting parse otherwise. Both stages
+     * parse phrase structure only. The physical-line rules of section 16 are then checked over a
+     * freshly lexed token stream, because a program can parse perfectly while placing a brace or a
+     * clause keyword on the wrong physical line; those violations are added to whatever the parse
+     * itself reported rather than replacing it.
+     */
     private static SolvikParseResult parseFile(SourceFile source) {
-        SolvikParseResult fast = tryFirstStageParse(source);
-        if (fast != null) {
-            return fast;
+        SolvikParseResult parsed = tryFirstStageParse(source);
+        if (parsed == null) {
+            parsed = parseForReporting(source);
         }
-        return parseForReporting(source);
+        List<Diagnostic> layout = PhysicalLineRules.check(source, new CommonTokenStream(new PhysicalLineTokenSource(newLexer(source))));
+        if (layout.isEmpty() || !parsed.isSuccess()) {
+            return parsed;
+        }
+        DiagnosticBag.Builder builder = DiagnosticBag.builder();
+        parsed.diagnostics().all().forEach(builder::add);
+        layout.forEach(builder::add);
+        return SolvikParseResult.failure(builder.build());
     }
 
     /**
@@ -141,7 +161,7 @@ public final class SolvikParser {
             SolvikLexer lexer = newLexer(source);
             LexerErrorFlag lexerErrors = new LexerErrorFlag();
             lexer.addErrorListener(lexerErrors);
-            CommonTokenStream tokens = new CommonTokenStream(new SemicolonInsertingTokenSource(lexer));
+            CommonTokenStream tokens = new CommonTokenStream(new PhysicalLineTokenSource(lexer));
             org.solvik.parser.generated.SolvikParser parser = new org.solvik.parser.generated.SolvikParser(tokens);
             parser.removeErrorListeners();
             parser.setErrorHandler(new BailErrorStrategy());
@@ -161,7 +181,7 @@ public final class SolvikParser {
     /** The reporting stage: full-context prediction and ANTLR's default recovering error strategy. */
     private static SolvikParseResult parseForReporting(SourceFile source) {
         SolvikLexer lexer = newLexer(source);
-        CommonTokenStream tokens = new CommonTokenStream(new SemicolonInsertingTokenSource(lexer));
+        CommonTokenStream tokens = new CommonTokenStream(new PhysicalLineTokenSource(lexer));
         org.solvik.parser.generated.SolvikParser parser = new org.solvik.parser.generated.SolvikParser(tokens);
         parser.removeErrorListeners();
         SolvikErrorListener listener = new SolvikErrorListener(source);

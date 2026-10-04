@@ -71,3 +71,31 @@ The rejected alternative (ban `;` and delete the three-clause `for`) is preserve
 7. Tests for each rule (positive and negative), token-stream tests for `;` plus boundary, parser tests
    for braced case bodies, three-clause `for` tests.
 8. `./build-all.sh` as the final gate.
+
+## Current state (after the mechanics landed)
+
+Implemented and smoke-verified against a built launcher:
+* `for (mutable val i = 0; i < 4; i = i + 1)` and `val a = 1; val b = 2` both run (3 and 6 printed).
+* `} else {` reports `SOLV-PARS-008`; `1 })` reports `SOLV-PARS-007`; empty bodies written
+  `{` newline `}` are legal.
+* Case bodies must be braced: `case 1: { return 1 }`-style bodies run; an unbraced body is a
+  `SOLV-PARS-001` syntax error (noisier than the other rules - a dedicated diagnostic is a TODO).
+* `PhysicalLineTokenSource` no longer consults bracket depth and treats `;` as a line ending, so a
+  bracketed body separates its statements like any other body, and `val a = 1;` carries one boundary.
+* Consequence of the strict closing-brace rule worth confirming with the owner: a block-valued
+  expression inside a call must close its brackets on their own lines - `})`, `},` and `]` after a
+  `}` are violations, so `print((func(): Integer {\n1\n})())` is rejected and the legal spelling is
+  `print(` / `    (` / `        func(): Integer {` / `            1` / `        }` / `    )()` / `)`.
+
+Done: grammar (`separator`, `assignable`, braced case bodies, capture-list breaks),
+`PhysicalLineTokenSource`, `PhysicalLineRules` (strict; no `PARS-011`), `SolvikParser` wiring
+(plus a guard that fails loudly instead of returning an empty parse result), `SolvikAstBuilder`
+(`statementCore`, braced bodies, restored `for`), `SemicolonInsertingTokenSource` deleted,
+`PhysicalLineTokenStreamTest` extended for `;` and bracketed bodies, three token-stream test users
+pointed at the new stage, agent directories ignored.
+
+Remaining, in order: (1) migrate `language/tests`, `language/tests/regression`, `tck/corpus` and the
+Solvik text blocks inside Java tests to braced case bodies and one-construct-per-line brace style;
+(2) rewrite spec sections 13, 16, 21.2/21.3 and 27 plus every example program; (3) revise the
+requirements and run `sync.sh`; (4) dedicated diagnostic for an unbraced `case` body; (5) the
+`example.sol` construct coverage file; (6) per-rule positive/negative tests; (7) `./build-all.sh`.

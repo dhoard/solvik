@@ -32,7 +32,7 @@ import org.antlr.v4.runtime.Token;
 import org.junit.jupiter.api.Test;
 import org.solvik.diagnostic.Diagnostic;
 import org.solvik.diagnostic.DiagnosticCode;
-import org.solvik.parser.SemicolonInsertingTokenSource;
+import org.solvik.parser.PhysicalLineTokenSource;
 import org.solvik.parser.SolvikParseResult;
 import org.solvik.parser.SolvikParser;
 import org.solvik.parser.generated.SolvikLexer;
@@ -179,7 +179,7 @@ public final class SolvikRemovedKeywordCorpusTest {
     private static List<String> removedTokenViolations(String source) {
         SolvikLexer lexer = new SolvikLexer(CharStreams.fromString(source));
         lexer.removeErrorListeners();
-        CommonTokenStream tokens = new CommonTokenStream(new SemicolonInsertingTokenSource(lexer));
+        CommonTokenStream tokens = new CommonTokenStream(new PhysicalLineTokenSource(lexer));
         tokens.fill();
         List<String> violations = new ArrayList<>();
         for (Token token : tokens.getTokens()) {
