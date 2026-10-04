@@ -57,6 +57,19 @@ public enum DiagnosticCode {
      */
     PARSER_UNSUPPORTED_REMOVED_SYNTAX("SOLV-PARS-006"),
 
+    /** A closing brace shares its physical line with another significant token (section 16). */
+    PARSER_BRACE_SHARES_LINE("SOLV-PARS-007"),
+    /** A clause keyword - {@code else}, {@code catch}, {@code finally} - does not begin its physical line. */
+    PARSER_CLAUSE_NOT_AT_LINE_START("SOLV-PARS-008"),
+    /**
+     * A body's opening brace begins a physical line instead of sitting on the line of the construct
+     * that introduces the scope. A stand-alone scope block writes its brace this way legally, which is
+     * why the rule is reported only for an introducer that can only be followed by a body.
+     */
+    PARSER_BRACE_NOT_ON_INTRODUCING_LINE("SOLV-PARS-009"),
+    /** A token other than a comment follows an opening brace on its physical line (section 16). */
+    PARSER_CONTENT_AFTER_OPEN_BRACE("SOLV-PARS-010"),
+
     /** Name resolution: no declaration is visible for the referenced name. */
     RESOL_UNKNOWN_NAME("SOLV-RESOL-001"),
     /** Name resolution: the same name is declared twice in one scope. */

@@ -22,17 +22,18 @@
 // ordinary member access, calls, parentheses, and `+`, `-`, `*`, `/`; `if`/`else`; `return`.
 // SimpleLanguage `function` is intentionally not accepted.
 //
-// Phase 2 adds Go-style lexical semicolon insertion (docs/LANGUAGE_SPEC.md section 16):
+// Statements are separated by physical lines (docs/LANGUAGE_SPEC.md section 16):
 //   * the lexer keeps physical newlines as hidden NEWLINE tokens and comments as hidden comment
-//     tokens instead of discarding them, so org.solvik.parser.SemicolonInsertingTokenSource can
-//     observe line boundaries and inject synthetic SEMI tokens before the parser ever runs
-//     (combined grammars cannot declare custom channels, so all three live on HIDDEN);
-//   * explicit `;` and synthesized `;` share this grammar's single SEMI token type;
-//   * statement lists therefore tolerate redundant stand-alone SEMI tokens (insertion is purely
-//     lexical and cannot know whether a statement is already explicitly terminated); stand-alone
-//     SEMIs produce no AST nodes;
-//   * NULLABLE_DOT ('?.') is lexed as one token so insertion can suppress termination before it.
-//     Nullable member access itself is not grammar until Phase 10, so '?.' is lexed and then
+//     tokens instead of discarding them, so org.solvik.parser.PhysicalLineTokenSource can observe
+//     line boundaries and synthesize one NEWLINE token per boundary on the default channel before
+//     the parser ever runs (a combined grammar cannot declare custom channels, so the retained
+//     tokens live on HIDDEN);
+//   * a boundary NEWLINE is the only separator the grammar admits, and it is required: `statement`
+//     consumes one, and every declaration and member list demands one after each entry, so two
+//     constructs sharing a physical line have no separator between them and are rejected. `;` is not in the language, so no rule accepts a SEMI token and a written `;` is a
+//     parse error at its own position rather than a silently ignored one;
+//   * NULLABLE_DOT ('?.') is lexed as one token so boundary suppression can refuse termination before
+//     it. Nullable member access itself is not grammar until Phase 10, so '?.' is lexed and then
 //     rejected by the parser.
 //   * LBRACKET/RBRACKET exist for the mirror-image reason on the other side of the algorithm:
 //     specification condition 1 tracks unmatched '[' and ']' depth. No rule consumes them until
@@ -64,8 +65,8 @@
 // property declarations, at most one constructor, and instance methods, plus the `this` expression.
 //   * `classDecl` joins `functionDecl` at the top level; class members are `propertyDecl`,
 //     `constructorDecl`, or a method declaration. A class body tolerates
-//     stand-alone SEMI tokens because a method/constructor body ends in `}`, which is itself a
-//     semicolon-insertion terminator, so a synthetic `;` may follow it before the class's `}`.
+//     boundary tokens because a method/constructor body ends in `}` on its own line, whose boundary
+//     token therefore sits between the member and the class's closing `}`.
 //   * `thisExpr` joins `primary`, so `this`, `this.name`, and `this.method(...)` parse through the
 //     ordinary postfix suffix machinery (member access and calls).
 //   * property declarations require an explicit type annotation, matching the specification's rule
@@ -130,7 +131,7 @@
 // (docs/LANGUAGE_SPEC.md section 12):
 //   * `enumDecl` joins the top-level declarations: `enum Name<T, ...> { Variant(Type, ...) ... }`.
 //     Each `enumVariant` is a positional, value-carrying nested constructor name terminated by a
-//     real or inserted SEMI, exactly like an interface signature. A variant with no values omits the
+//     own physical line, exactly like an interface signature. A variant with no values omits the
 //     parentheses.
 //   * `classDecl` accepts an optional leading `abstract` modifier. An abstract class is never
 //     constructible (SOLV-SEM-028) and, with `mutable`, is one of the two declaration kinds a
@@ -158,8 +159,8 @@
 // Phase 13 adds exhaustive `match` (docs/LANGUAGE_SPEC.md section 12):
 //   * `matchExpr` joins `primary` as an expression: `match <expression> { <branch>* }`. A branch is
 //     `pattern => expression`; its result expression is a value-producing expression. Newlines
-//     after a branch result already insert a SEMI because a result ends in an identifier, literal,
-//     or `)`, so the branch list tolerates stand-alone SEMI tokens exactly like a block.
+//     after a branch result already carry a boundary because a result ends in an identifier, literal,
+//     or `)`, so the branch list is separated by boundary tokens exactly like a block.
 //   * `pattern` is `Identifier (':' typeRef | '(' patternList? ')')?`. The semantic layer interprets
 //     a colon form as a subtype binding, a parenthesized form as an enum variant pattern,
 //     and a bare name as a value-less variant at the top level or a binding inside a variant. The
@@ -170,7 +171,7 @@
 //
 // Phase 15 adds the non-fallthrough `switch` statement (docs/LANGUAGE_SPEC.md section 13):
 //   * `switchStmt` joins `statement`: `switch (value) { cases }`. A case body is an implicit block,
-//     written as a `(statement | SEMI)*` sequence that ends where the next `case`, `default`, or
+//     written as a `(statement | NEWLINE)*` sequence that ends where the next `case`, `default`, or
 //     the switch's closing `}` begins, because neither `case` nor `default` can start a statement.
 //   * a non-default case carries one or more comma-separated labels (`case 1, 2:`), and `default`
 //     is its own alternative so the semantic layer can enforce "at most one and last".
@@ -251,53 +252,53 @@ grammar Solvik;
 // Phase 16 adds compile-time `include` (docs/LANGUAGE_SPEC.md section 20): a top-level-only
 // directive `include <string literal>` whose target file is parsed and spliced into the program
 // before semantic analysis. `include` is reserved so it can no longer be an identifier.
-compilationUnit: moduleDecl? (includeDecl | functionDecl | classDecl | interfaceDecl | enumDecl | errorDecl | statement | SEMI)* EOF ;
+compilationUnit: moduleDecl? (includeDecl | functionDecl separator | classDecl separator | interfaceDecl separator | enumDecl separator | errorDecl separator | statement | separator)* EOF ;
 
 // Phase 17: an optional module declaration naming the file's namespace. It must be the first item in
 // a physical file and is terminated by a real or lexically inserted SEMI. The written name is a
 // single identifier with no dots; the semantic layer enforces the lowercase, underscore-separated
 // naming rule and rejects a reserved word.
-moduleDecl: MODULE Identifier SEMI ;
+moduleDecl: MODULE Identifier separator ;
 
 // A compile-time include directive. It takes a normal or raw string path and is terminated by a real
 // or lexically inserted SEMI. It is not a statement and may only appear at the top level. Phase 17
 // adds an optional `alias <name>` suffix that binds a file-local prefix to the included file's
 // module instead of splicing its declarations into the flat program scope.
-includeDecl: INCLUDE (stringLiteral | rawStringLiteral) (ALIAS Identifier)? SEMI ;
+includeDecl: INCLUDE (stringLiteral | rawStringLiteral) (ALIAS Identifier)? separator ;
 
 // A callable's return type is optional (docs/LANGUAGE_SPEC.md section 6): a declaration that
 // returns a value writes `: Type`, while a declaration that returns no value omits it and is
 // typed `Unit`. The AST builder synthesizes the omitted `Unit` reference, so the parser and the
 // semantic layer see a return type on every callable and need no special case. Parameter types
 // remain mandatory.
-functionDecl: FUNC Identifier typeParameterList? LPAREN parameterList? RPAREN (COLON typeRef)? block ;
+functionDecl: FUNC Identifier typeParameterList? LPAREN parameterList? RPAREN (COLON typeRef)? NEWLINE? block ;
 
-classDecl: (ABSTRACT | MUTABLE)? CLASS Identifier typeParameterList? (EXTENDS typeRef)? (IMPLEMENTS typeRefList)? LBRACE (classMember | SEMI)* RBRACE ;
+classDecl: (ABSTRACT | MUTABLE)? CLASS Identifier typeParameterList? (EXTENDS typeRef)? (IMPLEMENTS typeRefList)? NEWLINE? LBRACE (classMember separator | separator)* RBRACE ;
 
-interfaceDecl: INTERFACE Identifier typeParameterList? (EXTENDS typeRefList)? LBRACE (interfaceMember | SEMI)* RBRACE ;
+interfaceDecl: INTERFACE Identifier typeParameterList? (EXTENDS typeRefList)? NEWLINE? LBRACE (interfaceMember separator | separator)* RBRACE ;
 
 // An enum declaration (docs/LANGUAGE_SPEC.md section 12). Variants are nested nominal
 // constructors that may carry positional values; every variant is terminated by a real or inserted
 // SEMI, because the grammar tolerates a variant list spread across physical lines.
-enumDecl: ENUM Identifier typeParameterList? LBRACE (enumVariant | SEMI)* RBRACE ;
+enumDecl: ENUM Identifier typeParameterList? NEWLINE? LBRACE (enumVariant separator | separator)* RBRACE ;
 // An `error` declaration is an enum-shaped closed value type whose variants are the concrete error
 // values. Its grammar mirrors `enumDecl` so it reuses the enum semantic/lowering machinery; the
 // keyword is reserved so it cannot be an identifier.
-errorDecl: ERROR Identifier typeParameterList? LBRACE (errorVariant | SEMI)* RBRACE ;
-errorVariant: Identifier (LPAREN typeRefList? RPAREN)? SEMI ;
+errorDecl: ERROR Identifier typeParameterList? NEWLINE? LBRACE (errorVariant separator | separator)* RBRACE ;
+errorVariant: Identifier (LPAREN typeRefList? RPAREN)? ;
 
-enumVariant: Identifier (LPAREN typeRefList? RPAREN)? SEMI ;
+enumVariant: Identifier (LPAREN typeRefList? RPAREN)? ;
 
 interfaceMember: signatureDecl | defaultMethodDecl ;
 
 // An abstract interface signature: no body, terminated by `;`, which is a real SEMI token, so a
 // default-method body's `}` and this `;` are the two interface-member terminators. Like every
 // callable, its return type is optional and defaults to `Unit`.
-signatureDecl: FUNC Identifier typeParameterList? LPAREN parameterList? RPAREN (COLON typeRef)? SEMI ;
+signatureDecl: FUNC Identifier typeParameterList? LPAREN parameterList? RPAREN (COLON typeRef)? ;
 
-defaultMethodDecl: FUNC Identifier typeParameterList? LPAREN parameterList? RPAREN (COLON typeRef)? block ;
+defaultMethodDecl: FUNC Identifier typeParameterList? LPAREN parameterList? RPAREN (COLON typeRef)? NEWLINE? block ;
 
-typeRefList: typeRef (COMMA typeRef)* ;
+typeRefList: typeRef (NEWLINE* COMMA NEWLINE* typeRef)* ;
 
 classMember: propertyDecl | delegateDecl | constructorDecl | methodDecl | staticMember | staticBlock ;
 
@@ -315,33 +316,33 @@ staticMember: STATIC (propertyDecl | methodDecl) ;
 // The class initializer: a statement list in a block, at most one per class (SOLV-SEM-046). A
 // block ends in `}`, which is itself a semicolon-insertion terminator, so the block needs no
 // trailing SEMI and the class body's stand-alone SEMI tolerance covers an explicit one.
-staticBlock: STATIC block ;
+staticBlock: STATIC NEWLINE? block ;
 
 // A delegate (docs/LANGUAGE_SPEC.md section 9): an immutable, explicitly typed property that the
 // compiler forwards unresolved interface members to. The type annotation is required and must name
 // an interface; the optional initializer is permitted because a delegate is initialized under the
 // normal constructor rules, exactly like any other property.
-delegateDecl: DELEGATE VAL Identifier COLON typeRef (ASSIGN expression)? SEMI ;
+delegateDecl: DELEGATE VAL Identifier COLON typeRef (ASSIGN expression)? ;
 
-methodDecl: methodModifier* FUNC Identifier typeParameterList? LPAREN parameterList? RPAREN (COLON typeRef)? block ;
+methodDecl: methodModifier* FUNC Identifier typeParameterList? LPAREN parameterList? RPAREN (COLON typeRef)? NEWLINE? block ;
 
 methodModifier: MUTABLE | OVERRIDE ;
 
-propertyDecl: bindingKind Identifier COLON typeRef (ASSIGN expression)? SEMI ;
+propertyDecl: bindingKind Identifier COLON typeRef (ASSIGN expression)? ;
 
 // A constructor (docs/LANGUAGE_SPEC.md section 7): a class member named after the enclosing class
 // with no `func` keyword and no return type. Calling the class name invokes it. The grammar accepts
 // any identifier here; the semantic layer requires it to match the enclosing class name, reports a
 // declaration whose name does not match, and rejects a non-constructor member named after the class.
-constructorDecl: Identifier LPAREN parameterList? RPAREN block ;
+constructorDecl: Identifier LPAREN parameterList? RPAREN NEWLINE? block ;
 
-parameterList: parameter (COMMA parameter)* ;
+parameterList: NEWLINE* parameter (NEWLINE* COMMA NEWLINE* parameter)* NEWLINE* ;
 
 parameter: Identifier COLON typeRef ;
 
 // A generic declaration's type parameter list, e.g. `<T>` or `<K, V>`. Bounds are not part of the
 // initial language, so each parameter is a bare name.
-typeParameterList: LT Identifier (COMMA Identifier)* GT ;
+typeParameterList: LT NEWLINE* Identifier (NEWLINE* COMMA NEWLINE* Identifier)* NEWLINE* GT ;
 
 // A written type: an optional module prefix, a name, optional type arguments, and an optional
 // nullable marker. The prefix is a single identifier separated by `::` (Phase 17); `::` is
@@ -357,47 +358,77 @@ typeRef: Identifier (COLONCOLON Identifier)? typeArguments? QUESTION?
 // a `Unit` type ref). Nullability of the whole function value is a separate grammar element handled
 // by the grouped form below, so `func(...): T?` always means a function whose result is nullable,
 // never a nullable function; `(func(...): T)?` is the only way to spell a nullable function value.
-functionTypeRef: FUNC LPAREN typeRefList? RPAREN (COLON typeRef)? ;
+functionTypeRef: FUNC LPAREN NEWLINE* typeRefList? NEWLINE* RPAREN (COLON typeRef)? ;
 
-typeArguments: LT typeRef (COMMA typeRef)* GT ;
+typeArguments: LT NEWLINE* typeRef (NEWLINE* COMMA NEWLINE* typeRef)* NEWLINE* GT ;
 
-block: LBRACE (statement | SEMI)* RBRACE ;
+// `block` closes a scope, and every brace-delimited body of the language is written in its shape: the
+// line breaks a program contains are absorbed here, so a body may be spread over lines or - because no
+// line break is demanded anywhere in the rule - written entirely on the line of the construct that
+// introduced it. What the rule cannot say is that a `{` must end its line, that a `}` must stand alone,
+// and that a clause keyword must begin a line; those three are facts about physical lines rather than
+// about phrase structure, and org.solvik.parser.PhysicalLineRules reports them as SOLV-PARS-010,
+// SOLV-PARS-007 and SOLV-PARS-008, and SOLV-PARS-009 after the parse succeeds. Writing them into the grammar would need a
+// rule per line shape and would spread one rule's content over the whole grammar.
+block: LBRACE (statement | separator)* statementCore? RBRACE ;
 
-statement: localDecl | ifStmt | whileStmt | forStmt | forInStmt | switchStmt | block | breakStmt | continueStmt | returnStmt | throwStmt | tryStmt | exprStmt ;
+// The alternatives are one statement each. The three-clause `for` the 2026.10 revision spelled
+// `for (init; condition; update)` is absent: its separators are the `;` this grammar no longer inserts,
+// and the form is removed rather than re-pointed. A `for` header still written with those separators is
+// named by SOLV-PARS-011, and an empty `for ()` by SOLV-PARS-001.
+// A separator between two statements, declarations, or class/interface members. Section 16 makes the
+// physical line boundary the mandatory terminator and keeps `;` as the separator a program may write
+// between two constructs of one physical line, so the two are interchangeable here and a run of them
+// between constructs is tolerated exactly as a blank line is.
+separator: NEWLINE | SEMI ;
 
-localDecl: bindingKind Identifier (COLON typeRef)? ASSIGN expression SEMI ;
+statement: statementCore separator ;
+
+// A statement without its separator. A block's last statement is the one place a separator can be
+// absent: when the block's `}` sits inside brackets - an argument list, a subscript - the boundary
+// that would follow that statement is suppressed, because bracket nesting is what lets a wrapped
+// expression continue across lines. The body of a bracketed anonymous function therefore ends with a
+// `statementCore`, and every other position still demands its boundary.
+statementCore: localDecl | ifStmt | whileStmt | forStmt | forInStmt | switchStmt | block | breakStmt | continueStmt | returnStmt | throwStmt | tryStmt | exprStmt ;
+
+localDecl: bindingKind Identifier (COLON typeRef)? ASSIGN expression ;
 
 bindingKind: MUTABLE? VAL ;
 
-ifStmt: IF LPAREN expression RPAREN block elseBranch? ;
+ifStmt: IF LPAREN expression RPAREN NEWLINE? block (NEWLINE? elseBranch)? ;
 
-elseBranch: ELSE ifStmt | ELSE block ;
+elseBranch: ELSE NEWLINE? ifStmt | ELSE NEWLINE? block ;
 
-whileStmt: WHILE LPAREN expression RPAREN block ;
+whileStmt: WHILE LPAREN expression RPAREN NEWLINE? block ;
 
-forStmt: FOR LPAREN forInit? SEMI forCondition? SEMI forUpdate? RPAREN block ;
+// The three-clause `for` (docs/LANGUAGE_SPEC.md section 17): an optional local declaration or
+// assignment, an optional Boolean condition, and an optional assignment, separated by the two explicit
+// semicolons the section names. The separators are inside the header's parentheses, where the line
+// boundary never appears, so they are unambiguous with the `separator` between statements. An omitted
+// condition is `true`.
+forStmt: FOR LPAREN forInit? SEMI forCondition? SEMI forUpdate? RPAREN NEWLINE? block ;
+
+forInit: localDecl | assignment ;
+
+forCondition: expression ;
+
+forUpdate: assignment ;
 
 // A range for-in loop: `for (name in start <op> end) block`. The three range operators are
 // distinct tokens, so `..` remains string concatenation outside a for-in header. The loop variable
 // is implicitly declared by the semantic layer; bounds are Integer expressions evaluated once.
-forInStmt: FOR LPAREN Identifier IN rangeExpr RPAREN block ;
+forInStmt: FOR LPAREN Identifier IN rangeExpr RPAREN NEWLINE? block ;
 
 rangeExpr: expression rangeOperator expression ;
 
 rangeOperator: DOTDOTDOT | DOTDOTLT | DOTDOTGT ;
-
-forInit: localDeclNoSemi | assignable ;
-
-forCondition: expression ;
-
-forUpdate: assignable ;
 
 // Phase 15: `switch` is a statement for value dispatch with no implicit fallthrough. A case body is
 // an implicit block: a sequence of statements that ends where the next `case`, `default`, or the
 // switch's closing `}` begins, because those keywords cannot start a statement. `default` is a
 // separate alternative so the semantic layer can enforce at most one and last. A `regex` case label
 // carries a normal or raw string literal pattern.
-switchStmt: SWITCH LPAREN expression RPAREN LBRACE (switchCase | defaultCase | SEMI)* RBRACE ;
+switchStmt: SWITCH LPAREN expression RPAREN NEWLINE? LBRACE (switchCase | defaultCase | separator)* RBRACE ;
 
 // Phase 18: block, `if`, and `switch` expressions (docs/LANGUAGE_SPEC.md section 21). The
 // surface syntax is shared with the statement forms; the syntactic context selects the expression
@@ -408,64 +439,60 @@ switchStmt: SWITCH LPAREN expression RPAREN LBRACE (switchCase | defaultCase | S
 // reported with a dedicated diagnostic.
 blockExpr: valueBlock ;
 
-ifExpr: IF LPAREN expression RPAREN valueBlock elseExprBranch? ;
+ifExpr: IF LPAREN expression RPAREN NEWLINE? valueBlock (NEWLINE? elseExprBranch)? ;
 
-elseExprBranch: ELSE ifExpr | ELSE valueBlock ;
+elseExprBranch: ELSE NEWLINE? ifExpr | ELSE NEWLINE? valueBlock ;
 
-switchExpr: SWITCH LPAREN expression RPAREN LBRACE (valueSwitchCase | valueDefaultCase | SEMI)* RBRACE ;
+switchExpr: SWITCH LPAREN expression RPAREN NEWLINE? LBRACE (valueSwitchCase | valueDefaultCase | separator)* RBRACE ;
 
 // A value-required braced body: ordinary terminated statements followed by an optional
 // unterminated terminal expression. The terminal expression is the block or case result.
-valueBlock: LBRACE (statement | SEMI)* valueTail? RBRACE ;
+valueBlock: LBRACE (statement | separator)* valueTail? RBRACE ;
 
 valueTail: expression ;
 
-valueSwitchCase: CASE caseLabel (COMMA caseLabel)* COLON valueCaseBody ;
+valueSwitchCase: CASE caseLabel (NEWLINE* COMMA NEWLINE* caseLabel)* COLON valueCaseBody ;
 
 valueDefaultCase: DEFAULT COLON valueCaseBody ;
 
-valueCaseBody: (statement | SEMI)* valueTail? ;
+valueCaseBody: (statement | separator)* valueTail? ;
 
-switchCase: CASE caseLabel (COMMA caseLabel)* COLON (statement | SEMI)* ;
+switchCase: CASE caseLabel (NEWLINE* COMMA NEWLINE* caseLabel)* COLON (statement | separator)* ;
 
-defaultCase: DEFAULT COLON (statement | SEMI)* ;
+defaultCase: DEFAULT COLON (statement | separator)* ;
 
 caseLabel: regexCaseLabel | expression ;
 
 regexCaseLabel: REGEX_KW (stringLiteral | rawStringLiteral) ;
 
-localDeclNoSemi: bindingKind Identifier (COLON typeRef)? ASSIGN expression ;
+breakStmt: BREAK ;
 
-assignable: expression (ASSIGN expression)? ;
+continueStmt: CONTINUE ;
 
-breakStmt: BREAK SEMI ;
-
-continueStmt: CONTINUE SEMI ;
-
-returnStmt: RETURN expression? SEMI ;
+returnStmt: RETURN expression? ;
 
 // Error handling phases. A `throw` terminates the enclosing scope; a try statement groups an
 // operation with zero or more catch clauses and at most one finally clause (section 21.9).
-throwStmt: THROW expression SEMI ;
+throwStmt: THROW expression ;
 
-tryStmt: TRY block catchClause* finallyClause? ;
+tryStmt: TRY NEWLINE? block (NEWLINE? catchClause)* (NEWLINE? finallyClause)? ;
 
-catchClause: CATCH LPAREN Identifier COLON typeRef RPAREN block ;
+catchClause: CATCH LPAREN Identifier COLON typeRef RPAREN NEWLINE? block ;
 
-finallyClause: FINALLY block ;
+finallyClause: FINALLY NEWLINE? block ;
 
-exprStmt: expression (ASSIGN expression)? SEMI ;
+exprStmt: expression (ASSIGN expression)? ;
 
 expression: nullCoalescing ;
 
 // Phase 10: `??` is the lowest-precedence binary operator (docs/LANGUAGE_SPEC.md section 3).
-nullCoalescing: logicalOr (NULL_COALESCE logicalOr)* ;
+nullCoalescing: logicalOr (NEWLINE* NULL_COALESCE NEWLINE* logicalOr)* ;
 
-logicalOr: logicalAnd (OR logicalAnd)* ;
+logicalOr: logicalAnd (OR NEWLINE* logicalAnd)* ;
 
-logicalAnd: equality (AND equality)* ;
+logicalAnd: equality (AND NEWLINE* equality)* ;
 
-equality: relational ((EQ | NEQ | EQEQ | NEQEQ) relational)* ;
+equality: relational ((EQ | NEQ | EQEQ | NEQEQ) NEWLINE* relational)* ;
 
 // A binary expression tier for string concatenation `..`, which binds looser than arithmetic but
 // tighter than comparison (docs/LANGUAGE_SPEC.md section 3). Each operand is rendered through
@@ -474,15 +501,15 @@ relational: concat relation* ;
 
 // Phase 10: `is` and `as` share the ordering tier, but their right operand is a written type rather
 // than an expression. A separate `relation` alternative keeps the left-associative fold explicit.
-relation: (LT | LE | GT | GE) concat | IS typeRef | AS typeRef ;
+relation: (LT | LE | GT | GE) NEWLINE* concat | IS NEWLINE* typeRef | AS NEWLINE* typeRef ;
 
-concat: additive (DOTDOT additive)* ;
+concat: additive (DOTDOT NEWLINE* additive)* ;
 
-additive: multiplicative ((ADD | SUB) multiplicative)* ;
+additive: multiplicative ((ADD | SUB) NEWLINE* multiplicative)* ;
 
-multiplicative: unary ((MUL | DIV) unary)* ;
+multiplicative: unary ((MUL | DIV) NEWLINE* unary)* ;
 
-unary: (BANG | SUB) unary | postfix ;
+unary: (BANG | SUB) NEWLINE* unary | postfix ;
 
 postfix: primary suffix* ;
 
@@ -507,23 +534,23 @@ primary: literal | paren | thisExpr | superExpr | matchExpr | ifExpr | switchExp
 // `this` is a token and not an `Identifier`, so it is named explicitly as an alternative. An item is
 // one token wide, which is what keeps an arbitrary capture expression (`func [base + 1](...)`) out of
 // the language for the same reason capture aliases are out: there is no shape for it here.
-anonymousFunctionExpr: FUNC (LBRACKET captureItemList RBRACKET)? LPAREN parameterList? RPAREN (COLON typeRef)? block ;
+anonymousFunctionExpr: FUNC (LBRACKET captureItemList RBRACKET)? LPAREN parameterList? RPAREN (COLON typeRef)? NEWLINE? block ;
 
-captureItemList: captureItem (COMMA captureItem)* ;
+captureItemList: captureItem (NEWLINE* COMMA NEWLINE* captureItem)* ;
 
 captureItem: Identifier | THIS ;
 
 // Phase 13: `match` is expression-oriented and exhaustive for a known closed variant set. A branch
 // result is terminated by a real or inserted SEMI, which the enclosing branch list consumes.
-matchExpr: MATCH expression LBRACE (matchBranch | SEMI)* RBRACE ;
+matchExpr: MATCH expression NEWLINE? LBRACE (matchBranch | separator)* RBRACE ;
 
-matchBranch: pattern ARROW expression ;
+matchBranch: pattern ARROW NEWLINE* expression ;
 
-pattern: Identifier (COLON typeRef | LPAREN patternList? RPAREN)? ;
+pattern: Identifier (COLON typeRef | LPAREN NEWLINE* patternList? NEWLINE* RPAREN)? ;
 
-patternList: pattern (COMMA pattern)* ;
+patternList: pattern (NEWLINE* COMMA NEWLINE* pattern)* ;
 
-paren: LPAREN expression RPAREN ;
+paren: LPAREN NEWLINE* expression NEWLINE* RPAREN ;
 
 thisExpr: THIS ;
 
@@ -538,21 +565,21 @@ name: Identifier ;
 suffix: memberSuffix | namespaceSuffix | callSuffix | propagationSuffix ;
 propagationSuffix: QUESTION ;
 
-memberSuffix: (DOT | NULLABLE_DOT) Identifier ;
+memberSuffix: NEWLINE* (DOT | NULLABLE_DOT) Identifier ;
 
 // A module-qualified name `prefix::name`. `::` is the namespace separator and is distinct from the
 // `.` member-access operator, so a qualified reference is unambiguous without name-based
 // heuristics. It chains, so `math::Result::Ok` is a valid path.
-namespaceSuffix: COLONCOLON Identifier ;
+namespaceSuffix: NEWLINE* COLONCOLON Identifier ;
 
-callSuffix: typeArguments? LPAREN argumentList? RPAREN ;
+callSuffix: typeArguments? LPAREN NEWLINE* argumentList? NEWLINE* RPAREN ;
 
 // A call argument. A `key: value` entry names a key/value pair and is meaningful only in a
 // built-in `Map` construction; the semantic pass rejects an entry in any other argument list.
 // A trailing comma is permitted after the last argument (for example a multiline argument list
 // that ends in `,\n)`), and it contributes no argument. A list still requires at least one
 // argument, so `f(,)` is a parse error; `f()` takes the empty path through `callSuffix` instead.
-argumentList: callArgument (COMMA callArgument)* COMMA? ;
+argumentList: callArgument (NEWLINE* COMMA NEWLINE* callArgument)* COMMA? ;
 callArgument: expression (COLON expression)? ;
 
 literal: integerLiteral | longLiteral | floatingLiteral | boolLiteral | characterLiteral | stringLiteral | rawStringLiteral | nullLiteral ;
