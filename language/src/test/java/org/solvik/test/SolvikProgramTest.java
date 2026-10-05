@@ -26,6 +26,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.stream.Stream;
 import org.graalvm.polyglot.Context;
+import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Source;
 import org.junit.jupiter.api.TestFactory;
 import org.junit.jupiter.api.DynamicTest;
@@ -86,6 +87,12 @@ public final class SolvikProgramTest {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         try (Context context = Context.newBuilder("solvik").out(out).err(out).allowAllAccess(true).build()) {
             context.eval(source);
+        } catch (PolyglotException e) {
+            // A program may end with the predeclared `exit(0)`; through the launcher that is a normal
+            // termination, so the embedded run must accept it identically. Any other failure propagates.
+            if (!e.isExit() || e.getExitStatus() != 0) {
+                throw e;
+            }
         }
         return out.toString(StandardCharsets.UTF_8);
     }

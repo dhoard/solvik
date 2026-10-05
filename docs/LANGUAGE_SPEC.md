@@ -1204,7 +1204,7 @@ interface Named {
     func name(): String
 
     func greeting(): String {
-        return "Hello " + name()
+        return "Hello " .. name()
     }
 }
 ```
@@ -1226,21 +1226,22 @@ Composition is a primary language design mechanism.
 Delegation removes forwarding boilerplate.
 
 ```solvik
-interface Repository<T> {
-    func find(id: Long): T?
-    func save(value: T)
+interface UserRepository {
+    func find(id: Long): User?
+
+    func save(value: User)
 }
 
-class UserService implements Repository<User> {
-    delegate val repository: Repository<User>
+class UserService implements UserRepository {
+    delegate val repository: UserRepository
 
-    UserService(repository: Repository<User>) {
+    UserService(repository: UserRepository) {
         this.repository = repository
     }
 }
 ```
 
-The compiler synthesizes forwarding behavior for interface members supplied by a delegate. A delegate is an immutable, explicitly typed property that must be initialized under the normal constructor rules.
+The compiler synthesizes forwarding behavior for interface members supplied by a delegate. A delegate is an immutable, explicitly typed property that must be initialized under the normal constructor rules. The declared type of a delegate property must be an interface type written without type arguments: forwarding is synthesized from the declared interface contract, so a delegate whose type annotation instantiates a generic interface is rejected as `SOLV-SEM-025` (`SEM_INVALID_DELEGATE_TYPE`).
 
 Explicit methods declared on the class take precedence over delegated members.
 
@@ -1278,7 +1279,7 @@ class Box<T> {
     mutable val value: T
 }
 
-val names: List<String>
+val names: List<String> = List("a", "b")
 ```
 
 Generic type arguments are invariant. The initial runtime uses erasure while preserving complete compile-time checking. A runtime type test against a non-reified type argument is a compile-time error.
@@ -1336,8 +1337,8 @@ brace-delimited block for multiple statements followed by a tail result.
 
 ```solvik
 val message = match result {
-    Ok(value) => "value=" + value
-    Err(error) => "error=" + error
+    Ok(value) => "value=" .. value
+    Err(error) => "error=" .. error
 }
 ```
 
@@ -2023,12 +2024,12 @@ The `switch` statement remains valid and unchanged. In expression position the s
 produces a value:
 
 ```solvik
-val message = switch (status) {
-    case Status.Ready {
+val message = switch (code) {
+    case 200 {
         "ready"
     }
 
-    case Status.Running {
+    case 201, 202 {
         "running"
     }
 
@@ -2123,12 +2124,13 @@ else {
     0
 }
 
-println(if (debug) {
+val mode = if (debug) {
     "debug"
 }
 else {
     "normal"
-})
+}
+println(mode)
 
 func classify(value: Integer): String {
     return switch (value) {
