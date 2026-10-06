@@ -9,10 +9,10 @@
 // and each variant was computed rather than assumed: removing the `!= 3` guard yields
 // operands 0..5 (total 15); removing the `break` guard yields 0,1,2,4..9 (total 42);
 // removing both yields 0..9 (total 45).
-mutable val total: Integer = 0
+var mutable total: Integer = 0
 
 {
-    mutable val i: Integer = 0
+    var mutable i: Integer = 0
 
     while (i < 10) {
         if (i == 6) {

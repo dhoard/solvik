@@ -29,18 +29,18 @@ SPEC_N = normalize(open(SPEC, encoding="utf-8").read())
 
 # ---------------------------------------------------------------- requirements
 Q = {
-    "list_ops": ("`List<T>`: `val isEmpty: Boolean`, `val size: Integer`, "
+    "list_ops": ("`List<T>`: `var isEmpty: Boolean`, `var size: Integer`, "
                  "`func add(element: T)`, `func get(index: Integer): T`, "
                  "`func removeAt(index: Integer): T`, `func set(index: Integer, element: T)`, "
                  "`func clear()`. An invalid index\nraises a Solvik runtime bounds error."),
-    "set_ops": ("`Set<T>`: `val isEmpty: Boolean`, `val size: Integer`, "
+    "set_ops": ("`Set<T>`: `var isEmpty: Boolean`, `var size: Integer`, "
                 "`func add(element: T): Boolean`,\n`func contains(element: T): Boolean`, "
                 "`func remove(element: T): Boolean`, `func clear()`."),
-    "map_ops": ("`Map<K, V>`: `val isEmpty: Boolean`, `val size: Integer`, "
+    "map_ops": ("`Map<K, V>`: `var isEmpty: Boolean`, `var size: Integer`, "
                 "`func put(key: K, value: V)`,\n`func get(key: K): V`, "
                 "`func containsKey(key: K): Boolean`, `func remove(key: K): Boolean`,\n"
                 "`func clear()`. `get` for a missing key raises a Solvik collection error."),
-    "stack_ops": ("`Stack<T>`: `val isEmpty: Boolean`, `val size: Integer`, "
+    "stack_ops": ("`Stack<T>`: `var isEmpty: Boolean`, `var size: Integer`, "
                   "`func push(element: T)`, `func peek(): T`,\n`func pop(): T`, `func clear()`. "
                   "`peek` and `pop` on an empty stack raise a Solvik collection error."),
     "construction": ("A collection is constructed with a class-style call. The type arguments may be written explicitly\n"
@@ -164,8 +164,8 @@ REQUIREMENTS = [
       kind="runtime",
       quotes=[Q["invariant"]],
       tests=["SOL-TCK-0089"],
-      notes=("Section 11's own `class Box<T> { mutable val value: T }` example is the declaration under test; the program "
-             "adds the constructor that section 7 requires because section 2 rejects a `mutable val` property with no "
+      notes=("Section 11's own `class Box<T> { var mutable value: T }` example is the declaration under test; the program "
+             "adds the constructor that section 7 requires because section 2 rejects a `var mutable` property with no "
              "initializer, which changes no generics semantics. Two different type arguments on the same declared "
              "class are the point: a runtime that shared one storage cell across instantiations could not print "
              "both the `String` and the incremented `Integer`. The type-test sentence is quoted because it is the "

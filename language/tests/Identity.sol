@@ -6,8 +6,8 @@
 // service, while `===` is restricted to identity-bearing types and compares guest references only.
 
 class Point {
-    val x: Integer
-    val y: Integer
+    var x: Integer
+    var y: Integer
 
     Point(x: Integer, y: Integer) {
         this.x = x
@@ -15,9 +15,9 @@ class Point {
     }
 }
 
-val first = Point(1, 2)
-val second = Point(1, 2)
-val aliasPoint = first
+var first = Point(1, 2)
+var second = Point(1, 2)
+var aliasPoint = first
 
 // Semantic equality for a class without an `equals` override is reference identity.
 println(first == second)
@@ -34,17 +34,17 @@ println(1 == 1)
 println("solvik" == "solvik")
 
 // Nullable identity operands, and the null-safe null rules shared with `==`.
-val missing: Point? = null
-val present: Point? = first
+var missing: Point? = null
+var present: Point? = first
 println(missing === null)
 println(present !== null)
 println(missing == null)
 println(present === missing)
 
 // Mutable built-in collections have allocation identity, never structural equality.
-val left: List<Integer> = List(1, 2)
-val right: List<Integer> = List(1, 2)
-val same = left
+var left: List<Integer> = List(1, 2)
+var right: List<Integer> = List(1, 2)
+var same = left
 println(left == right)
 println(left === right)
 println(left === same)

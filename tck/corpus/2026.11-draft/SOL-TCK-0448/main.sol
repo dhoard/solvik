@@ -9,7 +9,7 @@
 //   - A bare anonymous function or function reference used as an expression statement remains invalid, because creating and discarding a function value is not a call.
 //
 class Form {
-    static val h: func(Integer): Integer = func(value: Integer) {
+    static var h: func(Integer): Integer = func(value: Integer) {
         print(value.toString())
     }
 }

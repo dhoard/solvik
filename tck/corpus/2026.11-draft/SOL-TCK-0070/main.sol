@@ -4,7 +4,7 @@
 // Obligation: with no matching constant case, the trailing `default` runs and nothing
 // else does. The exact value "other" distinguishes it from the case body ("one") and
 // from a switch that ran both.
-mutable val v: Integer = 3
+var mutable v: Integer = 3
 
 switch (v) {
     case 1 {

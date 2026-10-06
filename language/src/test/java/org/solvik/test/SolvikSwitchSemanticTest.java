@@ -209,7 +209,7 @@ public final class SolvikSwitchSemanticTest {
         check("""
                 func run(value: Integer): Unit {
                     {
-                        mutable val i = 0
+                        var mutable i = 0
                         while (i < 3) {
                             i = i + 1
 

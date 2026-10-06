@@ -1,2 +1,2 @@
-val func = 5
+var func = 5
 print("EXECUTED-INVALID")

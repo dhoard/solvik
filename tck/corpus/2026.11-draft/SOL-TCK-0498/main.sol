@@ -1,2 +1,2 @@
-val a = 1
+var a = 1
 print("e" .. a);

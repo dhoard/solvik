@@ -2,8 +2,8 @@ enum Color {
     RED
     GREEN
 }
-val c = Color.RED
-val v: Integer = match c {
+var c = Color.RED
+var v: Integer = match c {
     RED => 1
     GREEN => 2L
 }

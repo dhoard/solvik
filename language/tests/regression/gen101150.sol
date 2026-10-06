@@ -1,5 +1,5 @@
 class C1 {
-    val f2: String
+    var f2: String
     C1(f2: String) {
         this.f2 = f2
     }

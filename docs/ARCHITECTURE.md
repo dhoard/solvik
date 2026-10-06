@@ -268,7 +268,7 @@ Compile-time facts, all recorded before lowering so lowering redoes no analysis:
 **Capture analysis** runs at the anonymous-function expression, before its parameter and body scope
 are entered, and preserves written order. It rejects a duplicate item, a capture/parameter name
 collision, an item that is not an eligible immutable local, parameter, function value, or `this`, a
-`mutable val` item, and a self-reference to the binding being initialized. Body checking then resolves only
+`var mutable` item, and a self-reference to the binding being initialized. Body checking then resolves only
 parameters, body locals, written captures, and top-level/module declarations; an eligible enclosing
 binding reached without being listed is `SEM_UNLISTED_CAPTURE`, and after an invalid capture item is
 reported a poisoned placeholder must prevent the same root cause from re-reporting as an unknown
@@ -383,7 +383,7 @@ For:
 
 ```solvik
 class Service implements Logger {
-    delegate val logger: Logger
+    delegate var logger: Logger
 }
 ```
 

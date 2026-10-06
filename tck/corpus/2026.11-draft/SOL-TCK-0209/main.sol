@@ -1,5 +1,5 @@
 class A {
-    val v: Integer
+    var v: Integer
 
     A(n: Integer) {
         this.v = n
@@ -9,5 +9,5 @@ class A {
         return this.v
     }
 }
-val x: A = A(4)
+var x: A = A(4)
 print("own" .. x.get())

@@ -1,5 +1,5 @@
-val s = "ab"
-val f = s.equals
+var s = "ab"
+var f = s.equals
 print(1)
 
 print("EXECUTED-INVALID")

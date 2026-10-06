@@ -47,18 +47,18 @@ public final class SolvikExpressionOrientedExecutionTest {
     @Test
     public void blockExpressionComputesValue() {
         assertThat(run("""
-                val answer = {
-                    val base = 20
+                var answer = {
+                    var base = 20
                     base + 22
                 }
                 println(answer)
 
-                val same = {
+                var same = {
                     42
                 }
                 println(same)
 
-                val semi = {
+                var semi = {
                     42
                 }
                 println(semi)
@@ -68,7 +68,7 @@ public final class SolvikExpressionOrientedExecutionTest {
     @Test
     public void unitBlockExpressionIsDistinguishedFromMissingTail() {
         assertThat(run("""
-                val logged: Unit = {
+                var logged: Unit = {
                     println("done")
                 }
                 println(logged)
@@ -94,7 +94,7 @@ public final class SolvikExpressionOrientedExecutionTest {
                 println(describe(0))
                 println(describe(1))
 
-                mutable val score: Integer = 0
+                var mutable score: Integer = 0
                 score = if (true) {
                     10
                 }
@@ -171,7 +171,7 @@ public final class SolvikExpressionOrientedExecutionTest {
     public void switchExpressionEvaluatesItsScrutineeOnce() {
         assertThat(run("""
                 class Counter {
-                    mutable val value: Integer
+                    var mutable value: Integer
 
                     Counter() {
                         this.value = 0
@@ -194,7 +194,7 @@ public final class SolvikExpressionOrientedExecutionTest {
                     }
                 }
 
-                val counter = Counter()
+                var counter = Counter()
                 println(label(counter))
                 println(counter.value)
                 """)).isEqualTo("first\n1\n");
@@ -272,7 +272,7 @@ public final class SolvikExpressionOrientedExecutionTest {
     @Test
     public void ifAndSwitchCanBeBlockTails() {
         assertThat(run("""
-                val fromIf = {
+                var fromIf = {
                     if (true) {
                         1
                     }
@@ -280,7 +280,7 @@ public final class SolvikExpressionOrientedExecutionTest {
                         2
                     }
                 }
-                val fromSwitch = {
+                var fromSwitch = {
                     switch (3) {
                         case 3 {
                             "three"

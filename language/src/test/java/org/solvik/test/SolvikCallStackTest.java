@@ -81,7 +81,7 @@ public final class SolvikCallStackTest {
             }
 
             class Box {
-                val tag: Integer = 8
+                var tag: Integer = 8
 
                 func scaled(value: Integer): Integer {
                     return this.tag / value
@@ -343,7 +343,7 @@ public final class SolvikCallStackTest {
     public void anAnonymousFunctionWrittenInTheEvaluatedFileNamesThatFile() {
         // The tail begins at line 19 of the composed program, so the anonymous body's division is line 20.
         List<PolyglotException.StackFrame> frames = guestFrames(program("""
-                val half: func(Integer): Integer = func (value: Integer): Integer {
+                var half: func(Integer): Integer = func (value: Integer): Integer {
                     return 100 / value
                 }
 

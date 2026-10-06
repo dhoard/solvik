@@ -22,4 +22,4 @@ func bad(): Result<Integer, String> {
     return Result.Err("boom")
 }
 
-val n: Integer = bad().unwrap()
+var n: Integer = bad().unwrap()

@@ -54,7 +54,7 @@ public final class SolvikInheritanceExecutionTest {
     public void inheritedPropertyAndMethodAreAvailable() {
         assertThat(run("""
                 mutable class Animal {
-                    val name: String
+                    var name: String
 
                     Animal(name: String) {
                         this.name = name
@@ -69,7 +69,7 @@ public final class SolvikInheritanceExecutionTest {
                         super("Rex")
                     }
                 }
-                    val dog = Dog()
+                    var dog = Dog()
                     println(dog.describe())
                 """)).isEqualTo("Rex\n");
     }
@@ -87,7 +87,7 @@ public final class SolvikInheritanceExecutionTest {
                         return "woof"
                     }
                 }
-                    val animal: Animal = Dog()
+                    var animal: Animal = Dog()
                     println(animal.speak())
                 """)).isEqualTo("woof\n");
     }
@@ -134,21 +134,21 @@ public final class SolvikInheritanceExecutionTest {
     public void explicitSuperConstructorRunsBeforeSubclassInitialization() {
         assertThat(run("""
                 mutable class Animal {
-                    val legs: Integer
+                    var legs: Integer
 
                     Animal(legs: Integer) {
                         this.legs = legs
                     }
                 }
                 class Dog extends Animal {
-                    val name: String
+                    var name: String
 
                     Dog(name: String) {
                         super(4)
                         this.name = name
                     }
                 }
-                    val dog = Dog("Rex")
+                    var dog = Dog("Rex")
                     println(dog.legs)
                     println(dog.name)
                 """)).isEqualTo("4\nRex\n");
@@ -158,7 +158,7 @@ public final class SolvikInheritanceExecutionTest {
     public void implicitSuperConstructorRunsForAZeroArgumentSuperclass() {
         assertThat(run("""
                 mutable class Animal {
-                    val kind: String
+                    var kind: String
 
                     Animal() {
                         this.kind = "animal"
@@ -176,7 +176,7 @@ public final class SolvikInheritanceExecutionTest {
     public void superPropertyReadsTheInheritedField() {
         assertThat(run("""
                 mutable class Animal {
-                    val name: String
+                    var name: String
 
                     Animal(name: String) {
                         this.name = name
@@ -199,12 +199,12 @@ public final class SolvikInheritanceExecutionTest {
     public void declarationInitializersRunAfterTheSuperConstructor() {
         assertThat(run("""
                 mutable class Animal {
-                    mutable val energy: Integer = 10
+                    var mutable energy: Integer = 10
                 }
                 class Dog extends Animal {
-                    val name: String = "Rex"
+                    var name: String = "Rex"
                 }
-                    val dog = Dog()
+                    var dog = Dog()
                     dog.energy = dog.energy + 5
                     println(dog.energy)
                     println(dog.name)
@@ -223,7 +223,7 @@ public final class SolvikInheritanceExecutionTest {
     public void anAbstractClassIsNotConstructibleButItsSubtypeIs() {
         String shared = """
                 abstract class Shape {
-                    val sides: Integer
+                    var sides: Integer
 
                     Shape(sides: Integer) {
                         this.sides = sides
@@ -236,9 +236,9 @@ public final class SolvikInheritanceExecutionTest {
                 }
                 """;
         assertThatExceptionOfType(PolyglotException.class)
-                .isThrownBy(() -> run(shared + "    val s = Shape()\n    println(s.sides)\n"))
+                .isThrownBy(() -> run(shared + "    var s = Shape()\n    println(s.sides)\n"))
                 .withMessageContaining("SOLV-SEM-028");
-        assertThat(run(shared + "    val c = Circle()\n    println(c.sides)\n")).isEqualTo("1\n");
+        assertThat(run(shared + "    var c = Circle()\n    println(c.sides)\n")).isEqualTo("1\n");
     }
 
     /**
@@ -254,8 +254,8 @@ public final class SolvikInheritanceExecutionTest {
     public void aSubclassReachesAnAbstractSuperclassConstructorThroughSuper() {
         assertThat(run("""
                 abstract class Shape {
-                    val sides: Integer
-                    val label: String
+                    var sides: Integer
+                    var label: String
 
                     Shape(sides: Integer, label: String) {
                         this.sides = sides
@@ -271,7 +271,7 @@ public final class SolvikInheritanceExecutionTest {
                         super(0, "shape")
                     }
                 }
-                    val c = Circle()
+                    var c = Circle()
                     println(c.sides .. " / " .. c.describe())
                 """)).isEqualTo("0 / shape\n");
     }

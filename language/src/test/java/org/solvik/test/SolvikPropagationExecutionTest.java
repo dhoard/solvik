@@ -71,11 +71,11 @@ public final class SolvikPropagationExecutionTest {
                     return Result.Ok(4)
                 }
                 func addOne(): Result<Integer, Integer> {
-                    val source: Integer = four()?
+                    var source: Integer = four()?
                     return Result.Ok(source + 1)
                 }
 
-                    val message = match addOne() {
+                    var message = match addOne() {
                         Ok(value) => "ok " .. value
                         Err(code) => "err " .. code
                     }
@@ -94,11 +94,11 @@ public final class SolvikPropagationExecutionTest {
                     return Result.Err("boom")
                 }
                 func propagate(): Result<Integer, String> {
-                    val source: Integer = boom()?
+                    var source: Integer = boom()?
                     return Result.Ok(source)
                 }
 
-                    val message = match propagate() {
+                    var message = match propagate() {
                         Ok(value) => "ok " .. value
                         Err(messageText) => "err " .. messageText
                     }
@@ -117,15 +117,15 @@ public final class SolvikPropagationExecutionTest {
                     return Result.Err(42)
                 }
                 func middle(): Result<Integer, Integer> {
-                    val source: Integer = deepest()?
+                    var source: Integer = deepest()?
                     return Result.Ok(source + 1)
                 }
                 func top(): Result<Integer, Integer> {
-                    val source: Integer = middle()?
+                    var source: Integer = middle()?
                     return Result.Ok(source + 1)
                 }
 
-                    val message = match top() {
+                    var message = match top() {
                         Ok(value) => "ok " .. value
                         Err(code) => "err " .. code
                     }
@@ -145,11 +145,11 @@ public final class SolvikPropagationExecutionTest {
                     return Result.Err("missing file")
                 }
                 func propagate(): Result<String, String> {
-                    val source: String = config()?
+                    var source: String = config()?
                     return Result.Ok(source)
                 }
 
-                    val message = match propagate() {
+                    var message = match propagate() {
                         Ok(value) => "ok " .. value
                         Err(messageText) => "err " .. messageText
                     }
@@ -170,11 +170,11 @@ public final class SolvikPropagationExecutionTest {
                     return Result.Err(1)
                 }
                 func work(): Result<Integer, Integer> {
-                    val source: Integer = boom()?
+                    var source: Integer = boom()?
                     return Result.Ok(source + 100)
                 }
 
-                    val message = match work() {
+                    var message = match work() {
                         Ok(value) => "ok " .. value
                         Err(code) => "err " .. code
                     }

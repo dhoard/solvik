@@ -4,8 +4,8 @@ class Sq extends Shape {
 }
 class Ci extends Shape {
 }
-val s: Shape = Ci()
-val n = match s {
+var s: Shape = Ci()
+var n = match s {
     _ => 5
 }
 print("under" .. n)

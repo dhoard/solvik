@@ -4,7 +4,7 @@
 // Obligation: a comma-separated shared case list matches any of its values, and this is
 // the specified replacement for fallthrough. The expected text is the shared body's own
 // literal, taken from the specification's example rather than observed.
-mutable val v: Integer = 2
+var mutable v: Integer = 2
 
 switch (v) {
     case 1, 2 {

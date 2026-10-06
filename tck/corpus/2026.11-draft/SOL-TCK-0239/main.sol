@@ -11,6 +11,6 @@ class Loud {
         return 4
     }
 }
-val p = Loud()
-val q = Loud()
+var p = Loud()
+var q = Loud()
 print("id" .. (p === q))

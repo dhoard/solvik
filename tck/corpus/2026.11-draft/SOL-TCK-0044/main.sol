@@ -9,10 +9,10 @@
 // Discriminating value: an implementation whose `break` did not exit the enclosing loop
 // runs forever or mis-counts instead of printing the derived 3. The oracle is the
 // derived integer 3, not an observed value.
-mutable val n: Integer = 0
+var mutable n: Integer = 0
 
 {
-    mutable val i: Integer = 0
+    var mutable i: Integer = 0
 
     while (true) {
         if (i >= 3) {

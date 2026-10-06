@@ -12,7 +12,7 @@ func format(value: Integer): String {
 }
 
 class Left {
-    val name: String = "left"
+    var name: String = "left"
 
     func value(): Integer {
         return 1
@@ -20,7 +20,7 @@ class Left {
 }
 
 class Right {
-    val name: String = "left"
+    var name: String = "left"
 
     func value(): Integer {
         return 1
@@ -31,7 +31,7 @@ class Right {
 // property name and type and the same method, and remain assignment-incompatible; that
 // nominal half is the non-assignable static initializer, which the section pins.
 class Boundary {
-    static val copied: Right = Left()
+    static var copied: Right = Left()
 }
 
 print(format(1))

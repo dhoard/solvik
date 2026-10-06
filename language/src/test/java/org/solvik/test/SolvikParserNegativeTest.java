@@ -97,7 +97,7 @@ public final class SolvikParserNegativeTest {
      */
     @Test
     public void functionRemainsAUsableIdentifier() {
-        SolvikParseResult result = org.solvik.parser.SolvikParser.parse(new SourceFile("ident.sol", "func f(): Unit {\n    val function = 1\n    g(function)\n}\n"));
+        SolvikParseResult result = org.solvik.parser.SolvikParser.parse(new SourceFile("ident.sol", "func f(): Unit {\n    var function = 1\n    g(function)\n}\n"));
         assertThat(result.isSuccess()).isTrue();
         assertThat(result.diagnostics().all()).isEmpty();
     }
@@ -114,7 +114,7 @@ public final class SolvikParserNegativeTest {
     @Test
     public void unterminatedStatementInsideUnclosedParenIsRejected() {
         // An unmatched `(` leaves the declaration incomplete, and the `}` cannot close it.
-        DiagnosticBag bag = expectErrors("nosemi.sol", "func f(): Integer {\n    val x: Integer = (1\n}\n");
+        DiagnosticBag bag = expectErrors("nosemi.sol", "func f(): Integer {\n    var x: Integer = (1\n}\n");
         assertThat(first(bag).code() == DiagnosticCode.PARSER_UNEXPECTED_TOKEN || first(bag).code() == DiagnosticCode.PARSER_INCOMPLETE_INPUT).isTrue();
     }
 
@@ -156,7 +156,7 @@ public final class SolvikParserNegativeTest {
     @Test
     public void assignmentIsNotAnExpression() {
         // Assignment is a statement form only; using it inside an expression is a parse error.
-        expectErrors("assign.sol", "func f(x: Integer): Integer {\n    val y = (x = 1)\n    return y\n}\n");
+        expectErrors("assign.sol", "func f(x: Integer): Integer {\n    var y = (x = 1)\n    return y\n}\n");
     }
 
     @Test
@@ -194,7 +194,7 @@ public final class SolvikParserNegativeTest {
     @Test
     public void otherCommaSeparatedListsStillRejectTrailingCommas() {
         expectErrors("paramcomma.sol", "func f(a: Integer,): Unit {\n    return\n}\n");
-        expectErrors("typeargcomma.sol", "func f(): Unit {\n    val xs: List<Integer,> = List<Integer>()\n}\n");
+        expectErrors("typeargcomma.sol", "func f(): Unit {\n    var xs: List<Integer,> = List<Integer>()\n}\n");
     }
 
     @Test
@@ -210,7 +210,7 @@ public final class SolvikParserNegativeTest {
 
     @Test
     public void unterminatedStringIsRejected() {
-        String src = "func f(): Unit {\n    val s = \"oops\n}\n";
+        String src = "func f(): Unit {\n    var s = \"oops\n}\n";
         DiagnosticBag bag = expectErrors("str.sol", src);
         for (Diagnostic d : bag.all()) {
             assertThat(//
@@ -231,7 +231,7 @@ public final class SolvikParserNegativeTest {
                 "func f", //
                 "func f(", //
                 "func f(:){", //
-                "func f(): Unit { val }", //
+                "func f(): Unit { var }", //
                 "func f(): Unit { 1 + }", //
                 "func f(): Unit {} func", //
         };
@@ -252,7 +252,7 @@ public final class SolvikParserNegativeTest {
 
     @Test
     public void successfulParsesCarryNoDiagnostics() {
-        String ok = "func f(a: Integer): Integer {\n    val t: Integer = a * 2\n    if (true) {\n        g(t)\n    }\n    else {\n        h(t, obj.f)\n    }\n    return t\n}\n";
+        String ok = "func f(a: Integer): Integer {\n    var t: Integer = a * 2\n    if (true) {\n        g(t)\n    }\n    else {\n        h(t, obj.f)\n    }\n    return t\n}\n";
         SolvikParseResult r = org.solvik.parser.SolvikParser.parse(new SourceFile("ok.sol", ok));
         assertThat(r.isSuccess()).isTrue();
         assertThat(r.diagnostics().isEmpty()).isTrue();
@@ -261,16 +261,16 @@ public final class SolvikParserNegativeTest {
     /**
      * The keywords removed in 2026.11-draft stay reserved and appear in no production, so a program
      * written against 2026.10-draft fails at the keyword itself with the replacement named, rather
-     * than being silently reinterpreted -- which is what would happen if `var` were merely deleted
-     * from the lexer and `var x = 1` became an assignment to an identifier named `var`.
+     * than being silently reinterpreted -- which is what would happen if `val` were merely deleted
+     * from the lexer and `val x = 1` became an assignment to an identifier named `val`.
      */
     @Test
     public void eachRemovedKeywordIsReportedAtItsOwnSpanWithItsReplacement() {
         record Removed(String source, String keyword, String replacement) {
         }
         List<Removed> cases = List.of( //
-                        new Removed("var x: Integer = 1\n", "var", "'mutable val'"), //
-                        new Removed("func f(): Unit {\n    var y = 2\n}\n", "var", "'mutable val'"), //
+                        new Removed("val x: Integer = 1\n", "val", "'var'"), //
+                        new Removed("func f(): Unit {\n    val y = 2\n}\n", "val", "'var'"), //
                         new Removed("open class C {\n}\n", "open", "'mutable'"), //
                         new Removed("sealed class S {\n}\n", "sealed", "'abstract'"), //
                         new Removed("class C {\n    open func f(): Unit {\n    }\n}\n", "open", "'mutable'"));
@@ -292,9 +292,9 @@ public final class SolvikParserNegativeTest {
      */
     @Test
     public void removedKeywordsRemainReservedAsNames() {
-        for (String keyword : List.of("var", "open", "sealed")) {
+        for (String keyword : List.of("val", "open", "sealed")) {
             expectErrors("reserved.sol", "func " + keyword + "(): Unit {\n}\n");
-            expectErrors("reserved.sol", "val " + keyword + " = 1\n");
+            expectErrors("reserved.sol", "var " + keyword + " = 1\n");
         }
     }
 
@@ -302,7 +302,7 @@ public final class SolvikParserNegativeTest {
     public void removedKeywordsDoNotShadowTheNewVocabulary() {
         // `mutable` and `abstract` are live, so a program using them must parse; a removed keyword in
         // the same program must still be the only thing reported.
-        String src = "mutable class C {\n    mutable func f(): Unit {\n    }\n}\nabstract class D extends C {\n}\nfunc g(): Unit {\n    mutable val x = 1\n    x = 2\n}\n";
+        String src = "mutable class C {\n    mutable func f(): Unit {\n    }\n}\nabstract class D extends C {\n}\nfunc g(): Unit {\n    var mutable x = 1\n    x = 2\n}\n";
         SolvikParseResult ok = org.solvik.parser.SolvikParser.parse(new SourceFile("new.sol", src));
         assertThat(ok.diagnostics().all()).isEmpty();
         assertThat(ok.isSuccess()).isTrue();

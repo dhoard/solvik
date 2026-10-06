@@ -60,11 +60,11 @@ final class SolvikErrorListener extends BaseErrorListener {
      * Spellings reserved by an earlier Solvik revision and removed by a later one, each mapped to the
      * syntax that replaced it. They are still lexer tokens so they cannot become identifiers, and each
      * appears in no parser production, so a program written against the old revision fails here with the
-     * replacement named rather than being reinterpreted. {@code var} became {@code mutable val},
+     * replacement named rather than being reinterpreted. {@code val} became {@code var},
      * {@code open} became {@code mutable}, and {@code sealed} became {@code abstract}
      * (docs/LANGUAGE_SPEC.md, "Lexical basics").
      */
-    private static final Map<String, String> REMOVED_KEYWORDS = Map.of("var", "'mutable val'", //
+    private static final Map<String, String> REMOVED_KEYWORDS = Map.of("val", "'var'", //
                     "open", "'mutable'", //
                     "sealed", "'abstract'");
 

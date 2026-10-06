@@ -1,7 +1,7 @@
 func asNumber(v: Any): Number {
     return v as Number
 }
-val joined: Number = if (true) {
+var joined: Number = if (true) {
     1
 }
 else {

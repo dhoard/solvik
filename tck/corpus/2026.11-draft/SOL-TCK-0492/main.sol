@@ -10,7 +10,7 @@
 //   - A static declaration initializer that is not assignable to the declared type is `SOLV-TYPE-001`.
 //
 mutable class Animal {
-    val name: String = "animal"
+    var name: String = "animal"
 }
 
 class Dog extends Animal {
@@ -25,7 +25,7 @@ func animalToAnimal(animal: Animal): Animal {
 }
 
 class WiderParameter {
-    static val wide: func(Animal): Animal = if (true) {
+    static var wide: func(Animal): Animal = if (true) {
         dogToDog
     }
     else {

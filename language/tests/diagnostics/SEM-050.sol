@@ -4,6 +4,6 @@ enum Result<T, E> {
     Err(E)
 }
 func run(): Unit {
-    val result: Result<Integer, Integer> = Result.Ok(1)
+    var result: Result<Integer, Integer> = Result.Ok(1)
     result?
 }

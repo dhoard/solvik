@@ -1,2 +1,2 @@
-val a: Integer = 5L
+var a: Integer = 5L
 print("EXECUTED-INVALID")

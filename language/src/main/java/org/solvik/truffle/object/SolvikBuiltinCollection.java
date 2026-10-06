@@ -42,7 +42,7 @@ public abstract class SolvikBuiltinCollection {
         return typeName;
     }
 
-    /** The number of elements, exposed as the read-only {@code val size: Integer}. */
+    /** The number of elements, exposed as the read-only {@code var size: Integer}. */
     public abstract int size();
 
     /**

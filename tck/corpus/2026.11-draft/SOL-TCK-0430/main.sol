@@ -18,7 +18,7 @@ func widenResult(value: Long): Long {
 // as a static initializer because that is the placement whose diagnostic the section names
 // verbatim.
 class Boundary {
-    static val widened: func(Integer): Integer = widenResult
+    static var widened: func(Integer): Integer = widenResult
 }
 
 print("EXECUTED-INVALID")

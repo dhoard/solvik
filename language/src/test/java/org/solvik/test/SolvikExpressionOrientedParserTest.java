@@ -59,8 +59,8 @@ public final class SolvikExpressionOrientedParserTest {
     public void blockExpressionInitializerBuildsBlockExprNodeWithTail() {
         CompilationUnitNode unit = parseOk("b.sol", """
                 func f(): Integer {
-                    val x = {
-                        val base = 20
+                    var x = {
+                        var base = 20
                         base + 22
                     }
                     return x
@@ -77,7 +77,7 @@ public final class SolvikExpressionOrientedParserTest {
         CompilationUnitNode unit = parseOk("b.sol", """
                 func f(): Unit {
                     {
-                        val local = 1
+                        var local = 1
                         print(local)
                     }
                 }
@@ -91,7 +91,7 @@ public final class SolvikExpressionOrientedParserTest {
     public void explicitSynthesizedAndAbsentTailSemicolonsAgree() {
         String inlineFunction = """
                 func f(): Integer {
-                    val x = {
+                    var x = {
                         42
                     }
                     return x
@@ -99,7 +99,7 @@ public final class SolvikExpressionOrientedParserTest {
                 """;
         String explicitFunction = """
                 func f(): Integer {
-                    val x = {
+                    var x = {
                         42
                     }
                     return x
@@ -107,7 +107,7 @@ public final class SolvikExpressionOrientedParserTest {
                 """;
         String newlineFunction = """
                 func f(): Integer {
-                    val x = {
+                    var x = {
                         42
                     }
                     return x
@@ -128,7 +128,7 @@ public final class SolvikExpressionOrientedParserTest {
     public void ifExpressionAndStatementHaveDistinctKinds() {
         CompilationUnitNode expression = parseOk("e.sol", """
                 func f(flag: Boolean): Integer {
-                    val x = if (flag) {
+                    var x = if (flag) {
                         1
                     }
                     else {
@@ -156,7 +156,7 @@ public final class SolvikExpressionOrientedParserTest {
     public void elseIfChainIsNestedExpression() {
         CompilationUnitNode unit = parseOk("e.sol", """
                 func f(value: Integer): String {
-                    val label = if (value < 0) {
+                    var label = if (value < 0) {
                         "negative"
                     }
                     else if (value == 0) {
@@ -178,7 +178,7 @@ public final class SolvikExpressionOrientedParserTest {
     public void switchExpressionAndStatementHaveDistinctKinds() {
         CompilationUnitNode expression = parseOk("e.sol", """
                 func f(value: Integer): String {
-                    val label = switch (value) {
+                    var label = switch (value) {
                         case 1 {
                             "one"
                         }
@@ -235,7 +235,7 @@ public final class SolvikExpressionOrientedParserTest {
     public void blockExpressionCarriesCompleteSpan() {
         String source = """
                 func f(): Integer {
-                    val x = {
+                    var x = {
                         42
                     }
                     return x
@@ -243,7 +243,7 @@ public final class SolvikExpressionOrientedParserTest {
                 """;
         CompilationUnitNode unit = parseOk("span.sol", source);
         BlockExprNode block = (BlockExprNode) initializer(unit, "f");
-        int open = source.indexOf("val x = {") + "val x = ".length();
+        int open = source.indexOf("var x = {") + "var x = ".length();
         int close = source.indexOf('}', open);
         assertThat(source.substring(block.span().startOffset(), block.span().endOffset()))
                 .isEqualTo(source.substring(open, close + 1));
@@ -279,19 +279,19 @@ public final class SolvikExpressionOrientedParserTest {
     public void newNodesExposeStructuralChildren() {
         CompilationUnitNode unit = parseOk("children.sol", """
                 func f(flag: Boolean): Integer {
-                    val a = {
+                    var a = {
                         1
                     }
-                    val b = if (flag) {
+                    var b = if (flag) {
                         1
                     }
                     else {
                         2
                     }
-                    val c = if (flag) {
+                    var c = if (flag) {
                         1
                     }
-                    val d = switch (1) {
+                    var d = switch (1) {
                         case 1 {
                             1
                         }

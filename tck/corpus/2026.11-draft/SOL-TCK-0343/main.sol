@@ -23,5 +23,5 @@ class DogMaker implements Maker {
         return Dog()
     }
 }
-val m: Maker = DogMaker()
+var m: Maker = DogMaker()
 print("covok")

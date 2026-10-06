@@ -11,7 +11,7 @@ func identity<T>(value: T): T {
 }
 
 func use<R>() {
-    val slot: R = identity
+    var slot: R = identity
     print(slot)
 }
 

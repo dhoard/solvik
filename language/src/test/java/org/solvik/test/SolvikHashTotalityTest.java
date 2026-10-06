@@ -69,7 +69,7 @@ public class SolvikHashTotalityTest {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         try (Context context = hostAccessContext(out)) {
             assertThatThrownBy(() -> eval(context, """
-                    mutable val viaBinding: Any = hostList
+                    var mutable viaBinding: Any = hostList
                     println(viaBinding.hashCode())
                     """)).isInstanceOf(PolyglotException.class)
                             .hasMessageContaining("SOLV-RESOL-001")
@@ -86,7 +86,7 @@ public class SolvikHashTotalityTest {
         try (Context context = hostAccessContext(out)) {
             assertThat(eval(context, """
                     class Key {
-                        val id: Integer
+                        var id: Integer
 
                         Key(id: Integer) {
                             this.id = id
@@ -104,7 +104,7 @@ public class SolvikHashTotalityTest {
                         }
                     }
 
-                    mutable val keys: Set<Key> = Set()
+                    var mutable keys: Set<Key> = Set()
                     keys.add(Key(1))
                     println(keys.contains(Key(1)))
                     println(keys.contains(Key(2)))

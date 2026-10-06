@@ -73,7 +73,7 @@ public final class SolvikCompileOnlyTest {
         try {
             Path source = directory.resolve("bad.sol");
             // The trailing println is a sentinel: it must never run, so stdout stays empty.
-            Files.writeString(source, "val x: Integer = \"no\"\nprintln(\"NEVER\")\n", StandardCharsets.UTF_8);
+            Files.writeString(source, "var x: Integer = \"no\"\nprintln(\"NEVER\")\n", StandardCharsets.UTF_8);
             Path json = directory.resolve("diag.json");
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             ByteArrayOutputStream err = new ByteArrayOutputStream();
@@ -96,7 +96,7 @@ public final class SolvikCompileOnlyTest {
         Path directory = Files.createTempDirectory("solvik-compile-only-human");
         try {
             Path source = directory.resolve("bad.sol");
-            Files.writeString(source, "val x: Integer = \"no\"\n", StandardCharsets.UTF_8);
+            Files.writeString(source, "var x: Integer = \"no\"\n", StandardCharsets.UTF_8);
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             ByteArrayOutputStream err = new ByteArrayOutputStream();
             int code = runArgs(new String[]{"--compile-only", source.toAbsolutePath().toString()}, "", out, err);
@@ -112,7 +112,7 @@ public final class SolvikCompileOnlyTest {
     public void compileOnlyReadsTheProgramFromStandardInput() throws IOException {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         ByteArrayOutputStream err = new ByteArrayOutputStream();
-        int code = runArgs(new String[]{"--compile-only"}, "val ok: Integer = 5\nprintln(\"no\")\n", out, err);
+        int code = runArgs(new String[]{"--compile-only"}, "var ok: Integer = 5\nprintln(\"no\")\n", out, err);
         assertThat(code).isEqualTo(0);
         assertThat(out.toString(StandardCharsets.UTF_8)).isEmpty();
     }

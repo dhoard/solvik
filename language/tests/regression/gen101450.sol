@@ -1,4 +1,4 @@
-val xs1: List<String> = List("b2", "x9")
+var xs1: List<String> = List("b2", "x9")
 
 xs1.add("text0")
 
@@ -6,13 +6,13 @@ println(xs1.size)
 
 println(xs1.get(0))
 
-mutable val total = 0
+var mutable total = 0
 
 for (i in 2...4) {
     total = total + i
 }
 
-mutable val n = 0
+var mutable n = 0
 
 while (n < 3) {
     n = n + 1

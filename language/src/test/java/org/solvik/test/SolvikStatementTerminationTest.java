@@ -56,25 +56,25 @@ public final class SolvikStatementTerminationTest {
     /** LANGUAGE_SPEC.md section 16 headline example inside a function body. */
     @Test
     public void newlineLocalsMatchSemicolonLocals() {
-        String newlines = "func f(): Integer {\n    val x = 1\n    val y = 2\n    return x\n}\n";
-        String explicit = "func f(): Integer {\n    val x = 1; val y = 2; return x\n}\n";
+        String newlines = "func f(): Integer {\n    var x = 1\n    var y = 2\n    return x\n}\n";
+        String explicit = "func f(): Integer {\n    var x = 1; var y = 2; return x\n}\n";
         FunctionDeclNode fn = parseEquivalent("asi1.sol", newlines, explicit);
         assertThat(local(fn, 0).name()).isEqualTo("x");
         assertThat(local(fn, 1).name()).isEqualTo("y");
         // Spans stop at the literal: neither the newline nor a `;` is included.
-        assertThat(slice(newlines, local(fn, 0))).isEqualTo("val x = 1");
-        assertThat(slice(newlines, local(fn, 1))).isEqualTo("val y = 2");
+        assertThat(slice(newlines, local(fn, 0))).isEqualTo("var x = 1");
+        assertThat(slice(newlines, local(fn, 1))).isEqualTo("var y = 2");
         assertThat(slice(newlines, ret(fn, 2))).isEqualTo("return x");
     }
 
     /** Multiline expressions after operators survive intact. */
     @Test
     public void multilineExpressionAfterOperatorsIsOneStatement() {
-        String newlines = "func f(price: Integer, tax: Integer, shipping: Integer): Integer {\n    val total = price +\n        tax +\n        shipping\n    return total\n}\n";
-        String explicit = "func f(price: Integer, tax: Integer, shipping: Integer): Integer {\n    val total = price + tax + shipping; return total\n}\n";
+        String newlines = "func f(price: Integer, tax: Integer, shipping: Integer): Integer {\n    var total = price +\n        tax +\n        shipping\n    return total\n}\n";
+        String explicit = "func f(price: Integer, tax: Integer, shipping: Integer): Integer {\n    var total = price + tax + shipping; return total\n}\n";
         FunctionDeclNode fn = parseEquivalent("asi2.sol", newlines, explicit);
         assertThat(body(fn).statements().size()).isEqualTo(2);
-        assertThat(slice(newlines, local(fn, 0))).isEqualTo("val total = price +\n        tax +\n        shipping");
+        assertThat(slice(newlines, local(fn, 0))).isEqualTo("var total = price +\n        tax +\n        shipping");
     }
 
     /** `return` followed by a newline terminates the return; the next line is a new statement. */
@@ -94,8 +94,8 @@ public final class SolvikStatementTerminationTest {
     /** Leading-dot chains fold into one member-chain expression. */
     @Test
     public void leadingDotChainParsesAsSingleExpression() {
-        String newlines = "func f(service: Service): Result {\n    val result = service\n        .load()\n        .transform()\n    return result\n}\n";
-        String explicit = "func f(service: Service): Result {\n    val result = service.load().transform(); return result\n}\n";
+        String newlines = "func f(service: Service): Result {\n    var result = service\n        .load()\n        .transform()\n    return result\n}\n";
+        String explicit = "func f(service: Service): Result {\n    var result = service.load().transform(); return result\n}\n";
         FunctionDeclNode fn = parseEquivalent("asi4.sol", newlines, explicit);
         CallExprNode outer = (CallExprNode) local(fn, 0).initializer();
         MemberAccessExprNode chain = (MemberAccessExprNode) outer.callee();
@@ -115,12 +115,12 @@ public final class SolvikStatementTerminationTest {
     /** Blank lines and comment-only lines between statements change nothing structural. */
     @Test
     public void blankAndCommentLinesDoNotChangeTheTree() {
-        String spaced = "func f(): Integer {\n\n    val x = 1\n\n    // a note\n\n    val y = 2\n\n    /* block\n       note */\n\n    return x\n\n}\n";
-        String tight = "func f(): Integer {\n    val x = 1\n    val y = 2\n    return x\n}\n";
+        String spaced = "func f(): Integer {\n\n    var x = 1\n\n    // a note\n\n    var y = 2\n\n    /* block\n       note */\n\n    return x\n\n}\n";
+        String tight = "func f(): Integer {\n    var x = 1\n    var y = 2\n    return x\n}\n";
         FunctionDeclNode fn = parseEquivalent("asi6.sol", spaced, tight);
         assertThat(body(fn).statements().size()).isEqualTo(3);
-        assertThat(slice(spaced, local(fn, 0))).isEqualTo("val x = 1");
-        assertThat(slice(spaced, local(fn, 1))).isEqualTo("val y = 2");
+        assertThat(slice(spaced, local(fn, 0))).isEqualTo("var x = 1");
+        assertThat(slice(spaced, local(fn, 1))).isEqualTo("var y = 2");
         assertThat(slice(spaced, ret(fn, 2))).isEqualTo("return x");
     }
 
@@ -136,23 +136,23 @@ public final class SolvikStatementTerminationTest {
     /** Mixed same-line separation and newline termination compose without empty statements. */
     @Test
     public void mixedTerminationProducesNoEmptyStatements() {
-        String src = "func f(): Integer {\n    val x = 1; val y = 2\n    val z = 3\n    return x\n}\n";
+        String src = "func f(): Integer {\n    var x = 1; var y = 2\n    var z = 3\n    return x\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("asi8.sol", src));
         assertThat(body(fn).statements().size()).as("standalone semis produce no AST statements").isEqualTo(4);
         // The separators sit outside the statement: every form of termination leaves the span on
         // the code.
-        assertThat(slice(src, local(fn, 2))).as("separators never belong to the statement span").isEqualTo("val z = 3");
+        assertThat(slice(src, local(fn, 2))).as("separators never belong to the statement span").isEqualTo("var z = 3");
     }
 
     /** Carriage-return line endings terminate identically to LF and keep valid spans. */
     @Test
     public void crlfSourceMatchesLfSource() {
-        String lf = "func f(): Integer {\n    val x = 1\n    return x\n}\n";
+        String lf = "func f(): Integer {\n    var x = 1\n    return x\n}\n";
         String crlf = lf.replace("\n", "\r\n");
         FunctionDeclNode fromLf = onlyFunction(parseOk("asi9.sol", lf));
         CompilationUnitNode fromCrlf = parseOk("asi9.sol", crlf);
         assertThat(onlyFunction(fromCrlf).shapeTree()).isEqualTo(fromLf.shapeTree());
-        assertThat(slice(crlf, local(onlyFunction(fromCrlf), 0))).isEqualTo("val x = 1");
+        assertThat(slice(crlf, local(onlyFunction(fromCrlf), 0))).isEqualTo("var x = 1");
         assertThat(slice(crlf, ret(onlyFunction(fromCrlf), 1))).isEqualTo("return x");
     }
 
@@ -160,26 +160,26 @@ public final class SolvikStatementTerminationTest {
     @Test
     public void statementsConcatenatedOnOneLineAreRejected() {
         parseFails("bad1.sol", "func f(): Unit {\n    g(1) h(2)\n}\n");
-        parseFails("bad2.sol", "func f(): Unit {\n    val x = 1 val y = 2\n}\n");
+        parseFails("bad2.sol", "func f(): Unit {\n    var x = 1 var y = 2\n}\n");
     }
 
     /** A line ending in an operator continues: it can never terminate and so stays rejected. */
     @Test
     public void operatorBeforeNewlineCannotTerminate() {
         parseFails("bad3.sol", "func f(a: Integer): Integer {\n    return a +\n}\n");
-        parseFails("bad4.sol", "func f(): Unit {\n    val x =\n    val y = 1\n}\n");
+        parseFails("bad4.sol", "func f(): Unit {\n    var x =\n    var y = 1\n}\n");
     }
 
     /** An unclosed `(` has no line that may end, so its statement never terminates. */
     @Test
     public void unclosedParenthesisNeverTerminatesAtEndOfFile() {
-        parseFails("bad5.sol", "func f(): Integer {\n    val x = (1\n}\n");
+        parseFails("bad5.sol", "func f(): Integer {\n    var x = (1\n}\n");
     }
 
     /** `?.` chains stay one statement and are accepted as safe member access from Phase 10. */
     @Test
     public void nullableChainStaysOneStatementAndParses() {
-        String src = "func f(service: Service): Result {\n    val result = service\n        ?.load()\n    return result\n}\n";
+        String src = "func f(service: Service): Result {\n    var result = service\n        ?.load()\n    return result\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("nullable.sol", src));
         assertThat(body(fn).statements().size()).isEqualTo(2);
         CallExprNode call = (CallExprNode) local(fn, 0).initializer();
@@ -191,17 +191,17 @@ public final class SolvikStatementTerminationTest {
     /** Bracket tokens exist for depth tracking only; bracket syntax is still rejected. */
     @Test
     public void bracketSyntaxIsLexedButStillRejected() {
-        parseFails("brackets.sol", "func f(): Integer {\n    val x = g[1]\n    return x\n}\n");
+        parseFails("brackets.sol", "func f(): Integer {\n    var x = g[1]\n    return x\n}\n");
     }
 
     /** Programs with no explicit semicolons at all parse purely through physical-line termination. */
     @Test
     public void programsWithoutAnyExplicitSemicolonParse() {
-        String src = "func add(a: Integer, b: Integer): Integer {\n    val sum = a + b\n    return sum\n}\n";
+        String src = "func add(a: Integer, b: Integer): Integer {\n    var sum = a + b\n    return sum\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("asi10.sol", src));
         assertThat(src.chars().filter(c -> c == ';').count()).isEqualTo(0);
         assertThat(body(fn).statements().size()).isEqualTo(2);
-        assertThat(slice(src, local(fn, 0))).isEqualTo("val sum = a + b");
+        assertThat(slice(src, local(fn, 0))).isEqualTo("var sum = a + b");
     }
 
     /** Empty and whitespace-only inputs remain valid units under newline termination. */
@@ -228,11 +228,11 @@ public final class SolvikStatementTerminationTest {
     @Test
     public void semicolonSeparatesAndNeverTerminates() {
         // Valid: the specification's own same-line spellings.
-        parseOk("semi1.sol", "val a = 1; val b = 2\n");
+        parseOk("semi1.sol", "var a = 1; var b = 2\n");
         parseOk("semi2.sol", "func f(): Unit {\n    foo(); bar(); baz()\n}\n");
-        parseOk("semi3.sol", "func f(): Integer {\n    val v = {\n        1; 42\n    }\n    return v\n}\n");
+        parseOk("semi3.sol", "func f(): Integer {\n    var v = {\n        1; 42\n    }\n    return v\n}\n");
         // Invalid: the semicolon ends its line, with and without a trailing comment.
-        assertThat(parseFails("semi4.sol", "val x = 1;\n").all().get(0).code())
+        assertThat(parseFails("semi4.sol", "var x = 1;\n").all().get(0).code())
                 .isEqualTo(org.solvik.diagnostic.DiagnosticCode.PARSER_SEMI_ENDS_LINE);
         assertThat(parseFails("semi5.sol", "println(\"one\"); // comment\n").all().get(0).code())
                 .isEqualTo(org.solvik.diagnostic.DiagnosticCode.PARSER_SEMI_ENDS_LINE);
@@ -240,13 +240,13 @@ public final class SolvikStatementTerminationTest {
         assertThat(parseFails("semi6.sol", "func f(): Unit {\n    foo(); bar();\n}\n").all().get(0).code())
                 .isEqualTo(org.solvik.diagnostic.DiagnosticCode.PARSER_SEMI_ENDS_LINE);
         // Invalid: the `;` before the stand-alone closing brace of the enclosing block.
-        assertThat(parseFails("semi7.sol", "func f(): Integer {\n    val v = {\n        42;\n    }\n    return v\n}\n").all().get(0).code())
+        assertThat(parseFails("semi7.sol", "func f(): Integer {\n    var v = {\n        42;\n    }\n    return v\n}\n").all().get(0).code())
                 .isEqualTo(org.solvik.diagnostic.DiagnosticCode.PARSER_SEMI_ENDS_LINE);
         // Invalid: the `;` that ends the file.
         assertThat(parseFails("semi8.sol", "print(1);").all().get(0).code())
                 .isEqualTo(org.solvik.diagnostic.DiagnosticCode.PARSER_SEMI_ENDS_LINE);
         // The diagnostic points at the semicolon itself.
-        org.solvik.diagnostic.Diagnostic first = parseFails("semi9.sol", "val x = 1;\nprint(x)\n").all().get(0);
+        org.solvik.diagnostic.Diagnostic first = parseFails("semi9.sol", "var x = 1;\nprint(x)\n").all().get(0);
         assertThat(first.code()).isEqualTo(org.solvik.diagnostic.DiagnosticCode.PARSER_SEMI_ENDS_LINE);
         assertThat(first.message()).contains(";");
     }

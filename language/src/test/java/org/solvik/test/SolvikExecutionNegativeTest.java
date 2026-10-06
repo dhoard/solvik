@@ -64,7 +64,7 @@ public final class SolvikExecutionNegativeTest {
 
     @Test
     public void typeErrorIsReportedBeforeAnyOutput() {
-        Result result = evaluate("  println(1)\n  val x: Integer = \"no\"\n");
+        Result result = evaluate("  println(1)\n  var x: Integer = \"no\"\n");
         assertThat(result.failure).isNotNull();
         assertThat(result.failure.isSyntaxError()).isTrue();
         assertThat(result.failure.getMessage().contains("SOLV-TYPE-001")).isTrue();
@@ -130,7 +130,7 @@ public final class SolvikExecutionNegativeTest {
 
     @Test
     public void assignmentAsExpressionIsRejected() {
-        Result result = evaluate("  mutable val x = 1\n  val y = (x = 2)\n  println(y)\n");
+        Result result = evaluate("  var mutable x = 1\n  var y = (x = 2)\n  println(y)\n");
         assertThat(result.failure).isNotNull();
         assertThat(result.failure.isSyntaxError()).isTrue();
         assertThat(result.output).isEqualTo("");

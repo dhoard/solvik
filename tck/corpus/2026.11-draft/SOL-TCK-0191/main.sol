@@ -2,8 +2,8 @@ enum Color {
     RED
     GREEN
 }
-val c = Color.GREEN
-val n = match c {
+var c = Color.GREEN
+var n = match c {
     _ => 9
 }
 print("wild" .. n)

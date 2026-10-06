@@ -39,36 +39,36 @@ class Bottom extends Middle {
 }
 
 class Holder {
-    val member: func(Integer): Integer = identity
-    static mutable val shared: func(String): String = identity
+    var member: func(Integer): Integer = identity
+    static var mutable shared: func(String): String = identity
 }
 
 // A declared local type is the expected function type, so each binding gets its own instantiation.
-val integerIdentity: func(Integer): Integer = identity
-val stringIdentity: func(String): String = identity
+var integerIdentity: func(Integer): Integer = identity
+var stringIdentity: func(String): String = identity
 println(integerIdentity(41))
 println(stringIdentity("ab"))
 
 // A multi-parameter declaration, and one whose parameter appears only in a result position.
-val pick: func(Integer, String): String = second
+var pick: func(Integer, String): String = second
 println(pick(1, "two"))
-val boxed: func(Integer): List<Integer> = wrap
+var boxed: func(Integer): List<Integer> = wrap
 println(boxed(3).size)
 
 // Positions whose expected types are themselves function types.
-val applied: func(func(Integer): Integer, Integer): Integer = apply
+var applied: func(func(Integer): Integer, Integer): Integer = apply
 println(applied(identity, 42))
-val made: func(String): String = compose(identity)
+var made: func(String): String = compose(identity)
 println(made("cd"))
 
 // Property, static property, and assignment positions all supply the expected type.
-val holder = Holder()
+var holder = Holder()
 println(holder.member(5))
 Holder.shared = identity
-val taken: func(String): String = Holder.shared
+var taken: func(String): String = Holder.shared
 println(taken("ef"))
 
-mutable val slot: func(Integer): Integer = identity
+var mutable slot: func(Integer): Integer = identity
 slot = identity
 println(slot(6))
 
@@ -78,20 +78,20 @@ println(apply(identity, 43))
 // A call the analyzer resolves from a declaration supplies the same expected type: a collection member's
 // parameter type comes from the substituted element type, and a `super` call's from the declaration named
 // in the qualifier, which section 3 fixes as non-virtual.
-val callbacks = List<func(Integer): Integer>()
+var callbacks = List<func(Integer): Integer>()
 callbacks.add(identity)
 println(callbacks.get(0)(8).toString())
 println(Bottom().viaSuper())
 
 // Instantiation changes static typing only: every instantiation of one declaration is one value, and
 // a function value is identity-bearing, so two bindings of one declaration are the same value.
-val again: func(Integer): Integer = identity
+var again: func(Integer): Integer = identity
 println(integerIdentity === again)
 println(integerIdentity.equals(stringIdentity))
 println(integerIdentity.hashCode() == stringIdentity.hashCode())
 
 // A different declaration is a different value, whatever its type parameter is named.
-val other: func(Integer): Integer = alsoIdentity
+var other: func(Integer): Integer = alsoIdentity
 println(integerIdentity.equals(other))
 
 // Direct calls keep their existing resolution, with and without written type arguments.
@@ -102,7 +102,7 @@ println(identity<String>("ten"))
 println(integerIdentity.toString())
 
 // A nullable function type instantiates and remains refinable.
-mutable val optional: (func(Integer): Integer)? = identity
+var mutable optional: (func(Integer): Integer)? = identity
 if (optional != null) {
     println(optional(7))
 }

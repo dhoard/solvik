@@ -3,9 +3,9 @@ println(1 + 1L)
 println(1L + 1)
 println(1 + 1.5)
 println(1.5f + 2.0)
-val widenedLong: Long = 1
-val widenedDouble: Double = 1.5f
-val widenedInteger: Integer = Byte(7)
+var widenedLong: Long = 1
+var widenedDouble: Double = 1.5f
+var widenedInteger: Integer = Byte(7)
 println(widenedLong)
 println(widenedDouble)
 println(widenedInteger)
@@ -20,9 +20,9 @@ func takes(a: Long, b: Double): Long {
 println(takes(1, 1.5f))
 
 // The least common widened type of Long and Integer is Long (not Double, which would lose precision).
-val asLong: Long = 1L - 1
+var asLong: Long = 1L - 1
 println(asLong)
 
 // A widening never overflows: 2147483647 (Integer) widens to Long, then + 1 stays a Long.
-val big: Long = 2147483647
+var big: Long = 2147483647
 println(big + 1)

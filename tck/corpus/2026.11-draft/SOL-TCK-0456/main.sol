@@ -2,9 +2,9 @@
 // Top-level function declarations are globally resolved and need no capture entry, and a closure body may recurse through one, which no capture list could supply
 //
 // Oracle quotations verified verbatim against docs/LANGUAGE_SPEC.md:
-//   - A capture item is an identifier or `this`. It must resolve at the closure-creation site to one of: a `val` local declared in an enclosing function scope; an immutable parameter of an enclosing function; another function value held by an immutable binding; or `this` in an enclosing instance method or constructor.
+//   - A capture item is an identifier or `this`. It must resolve at the closure-creation site to one of: a `var` local declared in an enclosing function scope; an immutable parameter of an enclosing function; another function value held by an immutable binding; or `this` in an enclosing instance method or constructor.
 //   - Each listed binding's value is captured when evaluation reaches the anonymous-function expression.
-//   - Capturing an object copies the reference, not the reachable object graph, so later mutation of that object's `mutable val` properties remains observable through the captured reference.
+//   - Capturing an object copies the reference, not the reachable object graph, so later mutation of that object's `var mutable` properties remains observable through the captured reference.
 //   - Capture is transitive only through explicit values.
 //   - A closure that captures another closure lists that function-valued binding and stores the function value; it does not duplicate or flatten the captured closure's environment.
 //   - In nested closures, a name used in an inner capture list counts as a use by the enclosing closure, so every intervening closure must list and forward that value explicitly.
@@ -24,10 +24,10 @@ func fact(n: Integer): Integer {
 }
 
 func run(): String {
-    val usesGlobal = func(value: Integer): Integer {
+    var usesGlobal = func(value: Integer): Integer {
         return twice(value)
     }
-    val recursive = func(n: Integer): Integer {
+    var recursive = func(n: Integer): Integer {
         return fact(n)
     }
     return usesGlobal(21).toString() .. "|" .. recursive(5).toString()

@@ -1,18 +1,18 @@
 class Holder {
-    val name: String?
+    var name: String?
     Holder(name: String?) {
         this.name = name
     }
 }
 func show(h: Holder): String {
-    val name = h.name
+    var name = h.name
     if (name == null) {
         return "none"
     }
     return name.toString()
 }
-val present = Holder("abc")
-val missing = Holder(null)
+var present = Holder("abc")
+var missing = Holder(null)
 println(show(present))
 println(show(missing))
 println(missing.name ?? "none")

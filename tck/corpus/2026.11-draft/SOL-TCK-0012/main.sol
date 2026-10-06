@@ -9,8 +9,8 @@
 // Arm syntax follows section 21.5 exactly (`case <label>:` / `default:` arms, each body
 // ending in a tail expression); the default arm is the one whose omission is required.
 // Sentinel per TCK.md section 10; the compile-only phase proves non-execution.
-val mode: Integer = 1
-val label: String = switch (mode) {
+var mode: Integer = 1
+var label: String = switch (mode) {
     case 1 {
         "one"
     }

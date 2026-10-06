@@ -49,11 +49,11 @@ public final class SolvikStaticMemberSemanticTest {
     public void staticMembersAreRecordedSeparatelyFromInstanceMembers() {
         ClassSymbol counter = check("""
                 class Counter {
-                    static val limit: Integer = 10
+                    static var limit: Integer = 10
                     static func reset() {
                         println("reset")
                     }
-                    val id: Integer = 1
+                    var id: Integer = 1
                     func describe(): String {
                         return "counter"
                     }
@@ -79,8 +79,8 @@ public final class SolvikStaticMemberSemanticTest {
     public void aStaticPropertyHasNoInstanceFieldSlot() {
         ClassSymbol counter = check("""
                 class Counter {
-                    val id: Integer = 1
-                    static val limit: Integer = 10
+                    var id: Integer = 1
+                    static var limit: Integer = 10
                 }
                 """).classSymbol("Counter").orElseThrow();
 
@@ -95,8 +95,8 @@ public final class SolvikStaticMemberSemanticTest {
     public void aStaticPropertyKeepsItsOwnDeclaredTypeAndMutability() {
         ClassSymbol counter = check("""
                 class Counter {
-                    static val limit: Integer = 10
-                    static mutable val attempts: String = "none"
+                    static var limit: Integer = 10
+                    static var mutable attempts: String = "none"
                 }
                 """).classSymbol("Counter").orElseThrow();
 
@@ -132,7 +132,7 @@ public final class SolvikStaticMemberSemanticTest {
     public void theClassInitializerBlockIsRecordedOnTheClassSymbol() {
         ClassSymbol counter = check("""
                 class Counter {
-                    static val limit: Integer = 10
+                    static var limit: Integer = 10
                     static {
                         println("initializing")
                     }
@@ -147,7 +147,7 @@ public final class SolvikStaticMemberSemanticTest {
     public void aClassWithoutStaticMembersHasEmptyStaticCollections() {
         ClassSymbol plain = check("""
                 class Plain {
-                    val id: Integer = 1
+                    var id: Integer = 1
                     func describe(): String {
                         return "plain"
                     }
@@ -165,8 +165,8 @@ public final class SolvikStaticMemberSemanticTest {
         // rule is reported for instance properties only, never for a static without one.
         CheckedProgram program = check("""
                 class Counter {
-                    static val limit: Integer
-                    val id: Integer = 1
+                    static var limit: Integer
+                    var id: Integer = 1
                 }
                 """);
         ClassSymbol counter = program.classSymbol("Counter").orElseThrow();
@@ -202,7 +202,7 @@ public final class SolvikStaticMemberSemanticTest {
                         return 1
                     }
                     static {
-                        val ignored: Integer = initialize()
+                        var ignored: Integer = initialize()
                     }
                 }
                 """);
@@ -230,10 +230,10 @@ public final class SolvikStaticMemberSemanticTest {
         // a static name are two independent members rather than a shadowing conflict.
         CheckedProgram program = check("""
                 mutable class Base {
-                    static val label: String = "base"
+                    static var label: String = "base"
                 }
                 class Derived extends Base {
-                    static val label: String = "derived"
+                    static var label: String = "derived"
                 }
                 """);
         ClassSymbol base = program.classSymbol("Base").orElseThrow();
@@ -253,7 +253,7 @@ public final class SolvikStaticMemberSemanticTest {
         // instance method through an unqualified call and still uses `this`.
         check("""
                 class Counter {
-                    val id: Integer = 1
+                    var id: Integer = 1
                     func count(): Integer {
                         return this.id
                     }
@@ -271,10 +271,10 @@ public final class SolvikStaticMemberSemanticTest {
     public void aStaticMemberInOneClassDoesNotLeakIntoAnUnrelatedClass() {
         ClassSymbol other = check("""
                 class Counter {
-                    static val limit: Integer = 10
+                    static var limit: Integer = 10
                 }
                 class Other {
-                    val id: Integer = 1
+                    var id: Integer = 1
                 }
                 """).classSymbol("Other").orElseThrow();
 
@@ -289,7 +289,7 @@ public final class SolvikStaticMemberSemanticTest {
         // must not displace or corrupt the recorded entry point.
         CheckedProgram program = check("""
                 class Counter {
-                    static val limit: Integer = 10
+                    static var limit: Integer = 10
                     static func reset() {
                         println("reset")
                     }

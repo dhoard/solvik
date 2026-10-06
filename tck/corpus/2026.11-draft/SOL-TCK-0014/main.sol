@@ -15,4 +15,4 @@ func good(): Result<Integer, String> {
     return Result.Ok(42)
 }
 
-val e: String = good().unwrapErr()
+var e: String = good().unwrapErr()

@@ -128,7 +128,7 @@ public final class SolvikEqualsOverrideNegativeTest {
     public void propertyCannotBeNamedEquals() {
         String text = """
                 class Point {
-                    val equals: Integer
+                    var equals: Integer
 
                     Point() {
                         this.equals = 1
@@ -176,8 +176,8 @@ public final class SolvikEqualsOverrideNegativeTest {
                 }
 
                 func f(): Boolean {
-                    val p = Point()
-                    val read = p.equals
+                    var p = Point()
+                    var read = p.equals
                     return true
                 }
                 """;
@@ -200,8 +200,8 @@ public final class SolvikEqualsOverrideNegativeTest {
                 }
 
                 func f(): Boolean {
-                    val p = Point()
-                    val read = p.equals
+                    var p = Point()
+                    var read = p.equals
                     return true
                 }
                 """;
@@ -216,7 +216,7 @@ public final class SolvikEqualsOverrideNegativeTest {
                 }
 
                 func f(named: Named): Boolean {
-                    val read = named.equals
+                    var read = named.equals
                     return true
                 }
                 """;
@@ -231,7 +231,7 @@ public final class SolvikEqualsOverrideNegativeTest {
                 }
 
                 class Service implements Greeter {
-                    delegate val equals: Greeter
+                    delegate var equals: Greeter
 
                     Service(greeter: Greeter) {
                         this.equals = greeter

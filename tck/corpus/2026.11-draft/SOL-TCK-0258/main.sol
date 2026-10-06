@@ -11,5 +11,5 @@ class Loud {
         return 4
     }
 }
-val p = Loud()
+var p = Loud()
 print("sc" .. (p == p) .. p.equals(p))

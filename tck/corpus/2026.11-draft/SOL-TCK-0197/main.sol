@@ -4,5 +4,5 @@ class Sq extends Shape {
 }
 class Ci extends Shape {
 }
-val s = Shape()
+var s = Shape()
 print("EXECUTED-INVALID")

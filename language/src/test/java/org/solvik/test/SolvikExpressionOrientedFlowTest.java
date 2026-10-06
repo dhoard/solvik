@@ -41,7 +41,7 @@ public final class SolvikExpressionOrientedFlowTest {
     public void valueBlockWithEveryStatementFormBeforeItsTail() {
         check("""
                 func run(flag: Boolean, n: Integer): Integer {
-                    val x = {
+                    var x = {
                         if (flag) {
                             print("a")
                         }
@@ -55,7 +55,7 @@ public final class SolvikExpressionOrientedFlowTest {
                             break
                         }
                         {
-                            mutable val i: Integer = 0
+                            var mutable i: Integer = 0
                             while (i < n) {
                                 i = i + 1
                                 continue
@@ -86,7 +86,7 @@ public final class SolvikExpressionOrientedFlowTest {
     public void statementIfWithElseIfChainBeforeItsTail() {
         check("""
                 func run(a: Boolean, b: Boolean): Integer {
-                    val x = {
+                    var x = {
                         if (a) {
                             print("a")
                         }
@@ -107,7 +107,7 @@ public final class SolvikExpressionOrientedFlowTest {
     public void statementSwitchWithoutDefaultBeforeItsTail() {
         check("""
                 func run(n: Integer): Integer {
-                    val x = {
+                    var x = {
                         switch (n) {
                             case 1 {
                                 print("one")
@@ -124,7 +124,7 @@ public final class SolvikExpressionOrientedFlowTest {
     public void aTailIfWithElseIfChainIsConvertedToAnExpression() {
         check("""
                 func run(a: Boolean, b: Boolean): Integer {
-                    val x = {
+                    var x = {
                         if (a) {
                             1
                         }
@@ -144,7 +144,7 @@ public final class SolvikExpressionOrientedFlowTest {
     public void aTailSwitchIsConvertedToAnExpression() {
         check("""
                 func run(n: Integer): String {
-                    val x = {
+                    var x = {
                         switch (n) {
                             case 1 {
                                 "one"
@@ -163,7 +163,7 @@ public final class SolvikExpressionOrientedFlowTest {
     public void anUnreachableTailAfterAnAlwaysAbruptStatementIsIgnored() {
         check("""
                 func run(flag: Boolean): Integer {
-                    val x = {
+                    var x = {
                         if (flag) {
                             return 1
                         }

@@ -1,2 +1,2 @@
-val a$b = 5
+var a$b = 5
 print("EXECUTED-INVALID")

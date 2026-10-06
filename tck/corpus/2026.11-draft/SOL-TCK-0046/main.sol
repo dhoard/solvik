@@ -6,9 +6,9 @@
 // (0+1+2) + (0+1+2) = 6. The oracle "2:6" is derived from the two bounds rules alone.
 // Discriminating value: re-evaluating the upper bound each iteration would give
 // `6:15` (passes 0..5), which no reading of the sentence permits.
-mutable val passes: Integer = 0
-mutable val sum: Integer = 0
-mutable val n: Integer = 2
+var mutable passes: Integer = 0
+var mutable sum: Integer = 0
+var mutable n: Integer = 2
 
 for (j in 0..<n) {
     passes = passes + 1

@@ -10,7 +10,7 @@
 //   - A static declaration initializer that is not assignable to the declared type is `SOLV-TYPE-001`.
 //
 mutable class Animal {
-    val name: String = "animal"
+    var name: String = "animal"
 }
 
 class Dog extends Animal {
@@ -32,13 +32,13 @@ func nameOf(value: Animal): String {
 // the more specific parameter and the nearest common result. A value of that joined type is a
 // callable function value, its result reaches an `Animal` parameter, and it is accepted by a
 // binding that writes the joined type out.
-val flag: Boolean = true
-val joined = if (flag) {
+var flag: Boolean = true
+var joined = if (flag) {
     dogToDog
 }
 else {
     animalToAnimal
 }
-val joinedWritten: func(Dog): Animal = joined
+var joinedWritten: func(Dog): Animal = joined
 
 print(nameOf(joined(Dog())) .. "-" .. nameOf(joinedWritten(Dog())))

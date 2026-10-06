@@ -62,7 +62,7 @@ public final class SolvikCharacterLiteralExecutionTest {
     @Test
     public void charactersConcatenateAndDisplay() {
         assertThat(run("""
-                    val letter = 'A'
+                    var letter = 'A'
                     println(letter)
                     println(letter .. "B" .. 'C')
                 """)).isEqualTo("A\nABC\n");
@@ -70,17 +70,17 @@ public final class SolvikCharacterLiteralExecutionTest {
 
     @Test
     public void invalidCharacterEscapeIsRejected() {
-        assertThat(firstCode("func f(): Unit {\n    val c = '\\q'\n}\n")).isEqualTo(DiagnosticCode.LEXER_INVALID_ESCAPE);
+        assertThat(firstCode("func f(): Unit {\n    var c = '\\q'\n}\n")).isEqualTo(DiagnosticCode.LEXER_INVALID_ESCAPE);
     }
 
     @Test
     public void emptyCharacterLiteralIsRejected() {
-        assertThat(hasError("func f(): Unit {\n    val c = ''\n}\n")).isTrue();
+        assertThat(hasError("func f(): Unit {\n    var c = ''\n}\n")).isTrue();
     }
 
     @Test
     public void multiCharacterCharacterLiteralIsRejected() {
-        assertThat(firstCode("func f(): Unit {\n    val c = 'ab'\n}\n")).isEqualTo(DiagnosticCode.LEXER_ERROR);
+        assertThat(firstCode("func f(): Unit {\n    var c = 'ab'\n}\n")).isEqualTo(DiagnosticCode.LEXER_ERROR);
     }
 
     /** Parses and analyzes {@code text}, returning the first diagnostic code from whichever stage fails. */

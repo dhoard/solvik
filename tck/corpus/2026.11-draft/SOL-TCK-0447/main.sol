@@ -8,11 +8,11 @@
 //   - Function bodies never acquire an implicit tail result, and the ordinary return diagnostics apply inside an anonymous function exactly as they do in a declaration.
 //   - A bare anonymous function or function reference used as an expression statement remains invalid, because creating and discarding a function value is not a call.
 //
-val formatter: func(Integer): String = func(value: Integer): String {
+var formatter: func(Integer): String = func(value: Integer): String {
     return "v" .. value.toString()
 }
 
-val consume: func(String) = func(value: String) {
+var consume: func(String) = func(value: String) {
     print(value)
 }
 

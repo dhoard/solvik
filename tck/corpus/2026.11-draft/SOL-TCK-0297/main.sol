@@ -1,4 +1,4 @@
-val c = false
+var c = false
 if (c) {
     print("y")
 }

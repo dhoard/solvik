@@ -7,7 +7,7 @@
 //   - Anonymous self-recursion through the binding being initialized is not supported: listing that binding in the capture list is an ordinary read-before-initialization error (`SOLV-TYPE-008`), because the value does not exist when its initializer is evaluated.
 //
 func run(): func(Integer): Integer {
-    val selfRef = func [selfRef](value: Integer): Integer {
+    var selfRef = func [selfRef](value: Integer): Integer {
         return value
     }
     return selfRef

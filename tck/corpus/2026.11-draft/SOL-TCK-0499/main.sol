@@ -6,8 +6,8 @@
 // names no diagnostic code for the rejection, so the expectation is asserted bare;
 // any compile-time error that leaves the sentinel unprinted satisfies the oracle.
 func counted(limit: Integer): Integer {
-    mutable val total: Integer = 0
-    for (mutable val i: Integer = 0; i < limit; i = i + 1) {
+    var mutable total: Integer = 0
+    for (var mutable i: Integer = 0; i < limit; i = i + 1) {
         total = total + i
     }
     return total

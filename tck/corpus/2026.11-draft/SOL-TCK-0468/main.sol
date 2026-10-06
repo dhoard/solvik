@@ -12,6 +12,6 @@ class Formatter {
     }
 }
 
-val formatter = Formatter()
-val operation: func(Integer): String = formatter.format
+var formatter = Formatter()
+var operation: func(Integer): String = formatter.format
 print(operation(42))

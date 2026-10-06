@@ -11,5 +11,5 @@ class Loud {
         return 4
     }
 }
-val p: Loud? = Loud()
+var p: Loud? = Loud()
 print("one" .. (p == null))

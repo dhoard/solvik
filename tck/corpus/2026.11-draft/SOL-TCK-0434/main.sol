@@ -22,9 +22,9 @@ func through(callback: func(Integer): String): String {
 // Function types are structural, and the declarations that produced values of those types
 // do not affect type identity: `format` and `render` are unrelated declarations, and a
 // value of one is assignable to a binding of the other's type.
-val substituted: func(Integer): String = render
+var substituted: func(Integer): String = render
 
 // Two values of one written function type compare by reference identity, not by which
 // declaration produced them, so a structural substitution does not change identity.
-val alsoSubstituted: func(Integer): String = render
+var alsoSubstituted: func(Integer): String = render
 print(through(format) .. "-" .. through(substituted) .. "-" .. through(alsoSubstituted) .. "-" .. (substituted === alsoSubstituted))

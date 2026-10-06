@@ -1,5 +1,5 @@
-val c = true
-val r = if (c) {
+var c = true
+var r = if (c) {
     1
 }
 else {

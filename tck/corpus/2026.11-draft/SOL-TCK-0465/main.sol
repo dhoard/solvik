@@ -7,13 +7,13 @@
 //   - Anonymous self-recursion through the binding being initialized is not supported: listing that binding in the capture list is an ordinary read-before-initialization error (`SOLV-TYPE-008`), because the value does not exist when its initializer is evaluated.
 //
 func run(): String {
-    val width = 100
-    val inner = func(width: Integer): String {
-        val doubled = width * 2
+    var width = 100
+    var inner = func(width: Integer): String {
+        var doubled = width * 2
         return doubled.toString()
     }
-    val shadowed = func(): Integer {
-        val width = 7
+    var shadowed = func(): Integer {
+        var width = 7
         return width
     }
     return inner(3) .. "|" .. shadowed().toString() .. "|" .. width.toString()

@@ -130,8 +130,8 @@ public final class SolvikPhysicalLineLayoutTest {
                     }
                 }
 
-                val blockResult = {
-                    val inner = 1
+                var blockResult = {
+                    var inner = 1
                     inner + 1
                 }
 
@@ -148,7 +148,7 @@ public final class SolvikPhysicalLineLayoutTest {
     public void aLineCommentMayFollowEitherBraceOnItsLine() {
         layoutOk("""
                 func f(): Integer { // implementation
-                    val x = if (true) { // the test
+                    var x = if (true) { // the test
                         1
                     } // the else
                     else { // the branch
@@ -161,7 +161,7 @@ public final class SolvikPhysicalLineLayoutTest {
 
     @Test
     public void aLineCarryingTwoStatementsNeedsItsSeparatorAndTwoStatementsNeedTwoLines() {
-        layoutOk("func f(): Unit {\n    val a = 1; val b = 2; print(a + b)\n}\n");
+        layoutOk("func f(): Unit {\n    var a = 1; var b = 2; print(a + b)\n}\n");
         layoutOk("func f(): Unit {\n    print(1); print(2); print(3)\n}\n");
     }
 
@@ -176,13 +176,13 @@ public final class SolvikPhysicalLineLayoutTest {
     public void expressionsContinueAcrossLinesWhereverTheGrammarDemandsMore() {
         layoutOk("""
                 func f(service: Service): Integer {
-                    val total = 1 +
+                    var total = 1 +
                         2 +
                         3
-                    val chain = service
+                    var chain = service
                         .load()
                         .transform()
-                    val called = compute(
+                    var called = compute(
                         1,
                         2,
                         3,
@@ -309,11 +309,11 @@ public final class SolvikPhysicalLineLayoutTest {
                 func describe(v: Integer): String {
                     switch (v) {
                         case 1 {
-                            val x = "one"
+                            var x = "one"
                             return x
                         }
                         case 2 {
-                            val x = "two"
+                            var x = "two"
                             return x
                         }
                         default {
@@ -347,11 +347,11 @@ public final class SolvikPhysicalLineLayoutTest {
     public void siblingLexicalScopesHoldSameNameBindings() {
         assertThat(run("""
                 {
-                    val x = 1
+                    var x = 1
                     print(x)
                 }
                 {
-                    val x = 2
+                    var x = 2
                     print(x)
                 }
                 """)).isEqualTo("12");
@@ -370,7 +370,7 @@ public final class SolvikPhysicalLineLayoutTest {
                 }
 
                 func counted(): Integer {
-                    mutable val seen: Integer = 0
+                    var mutable seen: Integer = 0
                     for (i in 0..<4) {
                         {
                             if (i == 1) {

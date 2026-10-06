@@ -18,7 +18,7 @@ class OnlyEq extends Both2 {
         return false
     }
 }
-val s = OnlyEq()
+var s = OnlyEq()
 print(s)
 
 print("EXECUTED-INVALID")

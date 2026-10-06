@@ -17,7 +17,7 @@ class English implements Greeter {
 }
 
 class Host implements Greeter {
-    delegate val impl: Greeter
+    delegate var impl: Greeter
 
     Host(impl: Greeter) {
         this.impl = impl

@@ -1,12 +1,12 @@
 class H1 {
-    val n: String?
+    var n: String?
     H1(n: String?) {
         this.n = n
     }
 }
 
 func show2(h: H1): String {
-    val n = h.n
+    var n = h.n
     if (n == null) {
         return "none"
     }
@@ -37,7 +37,7 @@ println(kind3(52))
 println(kind3(52) is String)
 
 class Box4<T> {
-    mutable val value: T
+    var mutable value: T
     Box4(value: T) {
         this.value = value
     }
@@ -46,7 +46,7 @@ class Box4<T> {
     }
 }
 
-val box5: Box4<String> = Box4("solvik3")
+var box5: Box4<String> = Box4("solvik3")
 
 println(box5.get())
 

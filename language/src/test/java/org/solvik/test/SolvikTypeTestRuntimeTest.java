@@ -64,12 +64,12 @@ public final class SolvikTypeTestRuntimeTest {
                     }
                     func noop() {
                     }
-                    val values: Any = List<Integer>(1, 2)
-                    val pattern: Any = Regex("a")
-                    val found: Any? = Regex("a").find("a")
-                    val color: Any = Color.Red
-                    val user: Any = User()
-                    val unit: Any = noop()
+                    var values: Any = List<Integer>(1, 2)
+                    var pattern: Any = Regex("a")
+                    var found: Any? = Regex("a").find("a")
+                    var color: Any = Color.Red
+                    var user: Any = User()
+                    var unit: Any = noop()
                     println(values is Any)
                     println(pattern is Any)
                     if (found != null) {
@@ -84,8 +84,8 @@ public final class SolvikTypeTestRuntimeTest {
     @Test
     public void castToAnyKeepsTheRuntimeValue() {
         assertThat(run("""
-                    val n: Any = 1 as Any
-                    val s: Any = "x" as Any
+                    var n: Any = 1 as Any
+                    var s: Any = "x" as Any
                     println(n is Integer)
                     println(n is Any)
                     println(s is String)
@@ -138,7 +138,7 @@ public final class SolvikTypeTestRuntimeTest {
                         return v is Float
                     }
 
-                    val g: Float = 1.5f
+                    var g: Float = 1.5f
                     println(f(1.5f))
                     println(g is Float)
                     println(g is Double)
@@ -181,12 +181,12 @@ public final class SolvikTypeTestRuntimeTest {
                     func noop() {
                     }
 
-                    val unit: Any = noop()
+                    var unit: Any = noop()
                     println(unit is Unit)
-                    val pattern: Any = Regex(r"a")
+                    var pattern: Any = Regex(r"a")
                     println(pattern is Regex)
                     println(pattern is String)
-                    val found = Regex(r"a").find("a")
+                    var found = Regex(r"a").find("a")
                     if (found != null) {
                         println(found is RegexMatch)
                     }
@@ -214,12 +214,12 @@ public final class SolvikTypeTestRuntimeTest {
                         Green
                     }
 
-                    val dog: Animal = Dog()
+                    var dog: Animal = Dog()
                     println(dog is Dog)
                     println(dog is Animal)
                     println(dog is Named)
                     println(dog is Any)
-                    val color: Any = Color.Red
+                    var color: Any = Color.Red
                     println(color is Color)
                     println(color is Animal)
                 """)).isEqualTo("true\ntrue\ntrue\ntrue\ntrue\nfalse\n");
@@ -237,7 +237,7 @@ public final class SolvikTypeTestRuntimeTest {
                     class C extends B {
                     }
 
-                    val value: A = C()
+                    var value: A = C()
                     println(value is A)
                     println(value is B)
                     println(value is C)
@@ -271,8 +271,8 @@ public final class SolvikTypeTestRuntimeTest {
                         }
                     }
 
-                    val obj: Any = User()
-                    val named = obj as Named
+                    var obj: Any = User()
+                    var named = obj as Named
                     println(named.name())
                 """)).isEqualTo("doug\n");
     }
@@ -282,7 +282,7 @@ public final class SolvikTypeTestRuntimeTest {
         // Confirms that `is` against a generic type with erased type arguments is rejected at
         // compile time (SOLV-TYPE-031): runtime type tests require reifiable types, so
         // `List<Integer>` cannot be inspected through `is` at runtime.
-        PolyglotException failure = failureOf("val list: List<Integer> = List(1, 2)\nprintln(list is List<Integer>)\n");
+        PolyglotException failure = failureOf("var list: List<Integer> = List(1, 2)\nprintln(list is List<Integer>)\n");
         assertThat(failure.isSyntaxError()).as(failure.getMessage()).isTrue();
         assertThat(failure.getMessage()).contains("SOLV-TYPE-031");
     }

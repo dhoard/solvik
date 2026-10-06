@@ -3,7 +3,7 @@
 // Obligation: `5...1` is a reversed ascending range, so the body runs zero times. The
 // observable is a counter that must remain at its initial value, proving the loop
 // neither iterated nor raised.
-mutable val n: Integer = 0
+var mutable n: Integer = 0
 
 for (i in 5...1) {
     n = n + 1

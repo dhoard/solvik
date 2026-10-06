@@ -1,5 +1,5 @@
 class Box1<T> {
-    mutable val value: T
+    var mutable value: T
     Box1(value: T) {
         this.value = value
     }
@@ -8,7 +8,7 @@ class Box1<T> {
     }
 }
 
-val box2: Box1<Boolean> = Box1(false)
+var box2: Box1<Boolean> = Box1(false)
 
 println(box2.get())
 

@@ -9,7 +9,7 @@
 //   - A static declaration initializer that is not assignable to the declared type is `SOLV-TYPE-001`.
 //
 mutable class Animal {
-    val name: String = "animal"
+    var name: String = "animal"
 }
 
 class Dog extends Animal {
@@ -31,10 +31,10 @@ func widenResult(value: Long): Long {
 // `func(Dog): Animal`. Parameters are contravariant, so the target's `Dog` must be
 // assignable to the source's `Animal`, and the result is covariant, so the source's `Dog`
 // result is assignable to the target's `Animal`.
-val accepted: func(Dog): Animal = toDog
+var accepted: func(Dog): Animal = toDog
 
 // Call-site widening is a separate rule from assignability and still applies through a
 // function value: this passes an `Integer` literal to a `Long` parameter.
-val takesLong: func(Long): Long = widenResult
+var takesLong: func(Long): Long = widenResult
 
 print(nameOf(accepted(Dog())) .. "-" .. takesLong(1))

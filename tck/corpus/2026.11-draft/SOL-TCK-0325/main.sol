@@ -4,8 +4,8 @@
 // Oracle quotations verified verbatim against docs/LANGUAGE_SPEC.md:
 //   - Names use lexical scope. Redeclaration in the same scope is an error. A nested block may shadow an outer declaration.
 //
-val x = 1
-val x = 2
+var x = 1
+var x = 2
 print(x)
 
 print("EXECUTED-INVALID")

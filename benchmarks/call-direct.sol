@@ -8,8 +8,8 @@ func step(value: Integer, delta: Integer): Integer {
     return value + delta
 }
 
-mutable val total = 0
-mutable val i = 0
+var mutable total = 0
+var mutable i = 0
 while (i < 20000000) {
     total = step(total, 1)
     i = i + 1

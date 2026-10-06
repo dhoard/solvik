@@ -7,10 +7,10 @@
 // `1L` is a section 1 Phase 7 `L`-suffixed Long literal; `1.5f` is an `F`/`f`-suffixed
 // Float literal per section 1 ("an `F` suffix selects `Float`").
 // Expected bytes: `true|true`.
-val one: Integer = 1
-val oneLong: Long = 1L
+var one: Integer = 1
+var oneLong: Long = 1L
 print(one == oneLong)
 print("|")
-val f: Float = 1.5f
-val d: Double = 1.5
+var f: Float = 1.5f
+var d: Double = 1.5
 print(f == d)

@@ -25,9 +25,9 @@ Per `AGENTS.md`: "Add positive and negative tests for every semantic feature."
 
 | Feature | Positive test | Negative test |
 |---|---|---|
-| `val` declares immutable binding | `SolvikSemanticTest.valDeclaration` | `SolvikClassSemanticNegativeTest.typeAssignToImmutable` |
-| `var` declares mutable binding | `SolvikSemanticTest.varDeclaration` | `SolvikPropertyAssignmentNegativeTest` |
-| Reassignment to `val` is error | (positive in `SolvikSemanticTest.localTypeInferenceAndMutabilityAreRecorded`) | **DONE** — `SolvikClassSemanticNegativeTest.typeAssignToImmutable` variants (D1); dedicated `val x = 1; x = 2` negative now present |
+| `var` declares an immutable binding | `SolvikSemanticTest.valDeclaration` | `SolvikClassSemanticNegativeTest.typeAssignToImmutable` |
+| `var mutable` declares a mutable binding | `SolvikSemanticTest.varDeclaration` | `SolvikPropertyAssignmentNegativeTest` |
+| Reassignment to an immutable `var` is an error | (positive in `SolvikSemanticTest.localTypeInferenceAndMutabilityAreRecorded`) | **DONE** — `SolvikClassSemanticNegativeTest.typeAssignToImmutable` variants (D1); dedicated `var x = 1; x = 2` negative now present |
 | `this.name` resolves to class property | `SolvikClassSemanticTest.thisPropertyAccess` | `SolvikClassSemanticNegativeTest.thisOutsideClass` |
 
 ### 2.2 §3 Static and Strong Typing
@@ -35,7 +35,7 @@ Per `AGENTS.md`: "Add positive and negative tests for every semantic feature."
 | Feature | Positive test | Negative test |
 |---|---|---|
 | Nominal subtyping (unrelated classes incompatible) | `SolvikSemanticTest.nominalSubtyping` | `SolvikSemanticNegativeTest.mismatch` |
-| `Any` does not disable typing | `SolvikAnyModelTest` | **DONE** — `SolvikSemanticNegativeTest.anyDoesNotDisableStaticTyping` (D3: `val x: Any = "x"; val n: Integer = x` → `TYPE_MISMATCH`) |
+| `Any` does not disable typing | `SolvikAnyModelTest` | **DONE** — `SolvikSemanticNegativeTest.anyDoesNotDisableStaticTyping` (D3: `var x: Any = "x"; var n: Integer = x` → `TYPE_MISMATCH`) |
 | Operator precedence | `SolvikSemanticTest.operatorPrecedence` | `SolvikConcatTest.invalidOperands` |
 | `==`/`!=` semantic equality comparability | `SolvikEqualityTest` (execution) / `SolvikIdentityNegativeTest` (static) | **DONE** — `SolvikIdentityNegativeTest.unrelatedNominalTypesAreNotEqualComparable` (D2: unrelated classes with `==`/`!=` → `TYPE_INVALID_OPERANDS`) |
 | `===`/`!==` reference identity | `SolvikIdentityTest` | `SolvikIdentityNegativeTest` |
@@ -59,7 +59,7 @@ Per `AGENTS.md`: "Add positive and negative tests for every semantic feature."
 | Feature | Positive test | Negative test |
 |---|---|---|
 | Non-null by default | `SolvikNullSafetySemanticTest` | `SolvikNullSafetyNegativeTest.nullableRequired` |
-| `T?` nullable type | `SolvikNullSafetySemanticTest` | **GAP** — no positive test for `val x: String? = null` |
+| `T?` nullable type | `SolvikNullSafetySemanticTest` | **GAP** — no positive test for `var x: String? = null` |
 | Safe member access `?.` | `SolvikNullSafetySemanticTest.safeAccess` | `SolvikNullSafetyNegativeTest.nullableDeref` |
 | Null coalescing `??` | `SolvikNullSafetySemanticTest.coalesce` | `SolvikNullSafetyNegativeTest.nullableRequired` |
 | Flow narrowing (`if (x != null)`) | `SolvikNullRefinementTest` | **GAP** — no negative test for narrowed `var` write invalidation |
@@ -200,7 +200,7 @@ a runtime sentence a static test could satisfy while the implementation is wrong
 | `this` where no receiver exists stays SOLV-RESOL-005 | — | `SolvikCaptureTest.aCaptureItemThisWithNoReceiverIsRejected` |
 | A `var` may not be captured; item and body use both report SOLV-SEM-057 | — | `SolvikCaptureTest.aCaptureItemNamingAVarIsRejected`, `.aBodyReadOfACapturedVarNameIsRejectedToo`, `.aBodyWriteToACapturedVarNameIsRejectedToo`, `.aTopLevelVarIsNotCapturable` |
 | An unlisted enclosing `var` stays SOLV-SEM-058, never a silent capture | — | `SolvikCaptureTest.anUnlistedEnclosingVarIsAnUnlistedCaptureNotAMutableCapture` |
-| Top-level `val`s are capturable; top-level functions need no entry | `SolvikCaptureTest.aTopLevelValIsCapturableAndNotVisibleUnlisted`, `.aTopLevelFunctionNeedsNoCaptureAndRecursesFromAClosureBody`, `.aFunctionValuedBindingRecursesThroughItsNamedDeclaration` | `SolvikCaptureTest.aTopLevelValIsCapturableAndNotVisibleUnlisted` (SOLV-SEM-058 for the unlisted form) |
+| Top-level `var`s are capturable; top-level functions need no entry | `SolvikCaptureTest.aTopLevelValIsCapturableAndNotVisibleUnlisted`, `.aTopLevelFunctionNeedsNoCaptureAndRecursesFromAClosureBody`, `.aFunctionValuedBindingRecursesThroughItsNamedDeclaration` | `SolvikCaptureTest.aTopLevelValIsCapturableAndNotVisibleUnlisted` (SOLV-SEM-058 for the unlisted form) |
 | An item naming a declaration or an unknown name is SOLV-RESOL-001 | — | `SolvikCaptureTest.aCaptureItemMayNotNameATopLevelClass`, `.aCaptureItemMayNotNameATopLevelFunction`, `.anUnknownCaptureItemIsAnOrdinaryUnknownName` |
 | A duplicate item, or one naming its own parameter, is SOLV-RESOL-002 | — | `SolvikCaptureTest.aCaptureItemMayNotRepeatAName`, `.aCaptureItemMayNotNameItsOwnParameter` |
 | Naming the binding being initialized is SOLV-TYPE-008 | — | `SolvikCaptureTest.aCaptureItemMayNotNameTheBindingBeingInitialized` |
@@ -388,7 +388,7 @@ unwinding signal into a failure happens after unwinding has discarded them; the 
 
 | Feature | Positive test | Negative test |
 |---|---|---|
-| `delegate val` syntax | `SolvikDelegateSemanticTest.delegateDecl` | `SolvikDelegateNegativeTest.invalidDelegateType` |
+| `delegate var` syntax | `SolvikDelegateSemanticTest.delegateDecl` | `SolvikDelegateNegativeTest.invalidDelegateType` |
 | Compiler synthesizes forwarding | `SolvikDelegateSemanticTest.forwarding` | **GAP** — only tested via execution, not semantic check |
 | Delegate must be interface type | `SolvikDelegateNegativeTest.invalidDelegateType` | **GAP** — no positive test for class-type delegate rejection |
 | Explicit method takes precedence | `SolvikDelegateSemanticTest.explicitPrecedence` | **GAP** — no negative test for ambiguous delegation |
@@ -593,7 +593,7 @@ their advice still describes what is missing.
 
 | # | Feature | Positive test to add | Negative test status |
 |---|---|---|---|
-| B1 | `val` reassignment | **DONE** — positive counterpart: `SolvikSemanticTest.localTypeInferenceAndMutabilityAreRecorded`; negative partner already present (`TYPE_ASSIGN_TO_IMMUTABLE`) |
+| B1 | `var` reassignment | **DONE** — positive counterpart: `SolvikSemanticTest.localTypeInferenceAndMutabilityAreRecorded`; negative partner already present (`TYPE_ASSIGN_TO_IMMUTABLE`) |
 | B2 | `if` expression with `else` | **DONE** — `SolvikExpressionOrientedSemanticTest.ifExpressionJoinsExactSubtypeAndNullable` (positive); `SEM_IF_EXPRESSION_MISSING_ELSE` present as negative |
 | B3 | `switch` expression with `default` | **DONE** — `SolvikExpressionOrientedSemanticTest.switchExpressionJoinsCaseResults` (positive); `SEM_SWITCH_EXPRESSION_MISSING_DEFAULT` present as negative |
 | B4 | `Unit` return type redundancy | **DONE** — `SolvikSemanticTest.omittedReturnTypeIsUnit` + `explicitUnitReturnTypeIsEquivalentToAnOmittedOne`; no error case for explicit `: Unit` exists by design |
@@ -620,9 +620,9 @@ their advice still describes what is missing.
 
 | D# | Feature | Negative test to add | Expected code |
 |---|---|---|---|
-| D1 | `val x = 1; x = 2` (reassignment) | **DONE** — `SolvikClassSemanticNegativeTest.typeAssignToImmutable` variants | `TYPE_ASSIGN_TO_IMMUTABLE` |
+| D1 | `var x = 1; x = 2` (reassignment) | **DONE** — `SolvikClassSemanticNegativeTest.typeAssignToImmutable` variants | `TYPE_ASSIGN_TO_IMMUTABLE` |
 | D2 | Unrelated classes compared with `==` | **DONE** — `SolvikIdentityNegativeTest.unrelatedNominalTypesAreNotEqualComparable` (corrected: code is `TYPE_INVALID_OPERANDS` via the comparability rule, not `TYPE_MISMATCH` as originally guessed) | `TYPE_INVALID_OPERANDS` |
-| D3 | `val x: Any = "x"; val n: Integer = x` (Any doesn't disable typing) | **DONE** — `SolvikSemanticNegativeTest.anyDoesNotDisableStaticTyping` (corrected placement: `SolvikSemanticNegativeTest`, not `SolvikAnyModelTest`; the latter is a pure object-model unit test with no source-parsing harness) | `TYPE_MISMATCH` |
+| D3 | `var x: Any = "x"; var n: Integer = x` (Any doesn't disable typing) | **DONE** — `SolvikSemanticNegativeTest.anyDoesNotDisableStaticTyping` (corrected placement: `SolvikSemanticNegativeTest`, not `SolvikAnyModelTest`; the latter is a pure object-model unit test with no source-parsing harness) | `TYPE_MISMATCH` |
 | D4 | Multiple delegates with ambiguous resolution (all combinations) | **DONE** — `SolvikDelegateNegativeTest.ambiguousDelegation` + two additional delegate-combination variants (3 scenarios total) | `SEM_AMBIGUOUS_DELEGATION` |
 | D5 | `switch` duplicate default placement not-last | **DONE** — `SolvikSwitchNegativeTest.aDefaultFollowedByACaseIsRejected` and `twoDefaultsAreRejected` | `SEM_SWITCH_DEFAULT_NOT_LAST` / `SEM_SWITCH_DUPLICATE_DEFAULT` |
 | D6 | `break` directly inside switch case (not in nested loop) | **DONE** — `SolvikSwitchNegativeTest.aBreakDirectlyInACaseWithoutALoopIsRejected` | `SEM_BREAK_IN_SWITCH_CASE` |

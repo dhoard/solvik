@@ -154,7 +154,7 @@ adapter config at your program. No Solvik Java or Truffle classes are required.
 
 `adapters/reference_subset_adapter.py` is a worked example: an independently written,
 stdlib-only front end that genuinely compiles and runs a **declared subset** (top-level
-`val` of a literal, `print`/`println` of a literal or bound name, and `include`
+`var` of a literal, `print`/`println` of a literal or bound name, and `include`
 resolution with the registry-named `SOLV-RESOL-008`/`-012`/`-011` conditions). It is
 deliberately incomplete and refuses everything outside its subset with
 `IMPLEMENTATION_FAILURE`, which the runner maps to a non-conformance exit rather than a

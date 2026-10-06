@@ -24,7 +24,7 @@ class R {
         return 2
     }
 }
-val l = L()
-val r = R()
-val q: Any = l
+var l = L()
+var r = R()
+var q: Any = l
 print(q == r)

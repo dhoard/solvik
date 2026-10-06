@@ -1,4 +1,4 @@
-mutable val total = 0
+var mutable total = 0
 for (i in 1...5) {
     if (i == 3) {
         continue
@@ -7,13 +7,13 @@ for (i in 1...5) {
 }
 println(total)
 
-mutable val n = 0
+var mutable n = 0
 while (n < 3) {
     n = n + 1
 }
 println(n)
 
-mutable val acc = ""
+var mutable acc = ""
 for (i in 5..>0) {
     acc = acc .. i
 }

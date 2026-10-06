@@ -6,8 +6,8 @@
 //   - Semantic equality for function values is reference identity, and `hashCode()` is the matching reference-identity hash.
 //
 class Wrapper {
-    val inner: Target
-    mutable val evaluations: Integer = 0
+    var inner: Target
+    var mutable evaluations: Integer = 0
     Wrapper(inner: Target) {
         this.inner = inner
     }
@@ -18,7 +18,7 @@ class Wrapper {
 }
 
 class Target {
-    val label: String
+    var label: String
     Target(label: String) {
         this.label = label
     }
@@ -27,10 +27,10 @@ class Target {
     }
 }
 
-val wrapper = Wrapper(Target("x"))
-val baseline = wrapper.evaluations
-val method: func(): String = wrapper.target().describe
-val copied = method
+var wrapper = Wrapper(Target("x"))
+var baseline = wrapper.evaluations
+var method: func(): String = wrapper.target().describe
+var copied = method
 print(wrapper.evaluations - baseline)
 print("|")
 print(method())
@@ -38,7 +38,7 @@ print("|")
 print(copied())
 print("|")
 print(copied === method)
-val again: func(): String = wrapper.target().describe
+var again: func(): String = wrapper.target().describe
 print("|")
 print(again === method)
 print("|")

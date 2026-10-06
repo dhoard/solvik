@@ -14,7 +14,7 @@
 // (protocol.md section 4.1) and the requirement is recorded
 // with `diagnosticNormative: false`. This is a genuine specification gap worth raising.
 // Sentinel per TCK.md section 10; the compile-only phase proves non-execution.
-val n: String? = "x"
-val m: String = n
+var n: String? = "x"
+var m: String = n
 print(m)
 println("EXECUTED-INVALID")

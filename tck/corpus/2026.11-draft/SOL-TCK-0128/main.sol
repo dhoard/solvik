@@ -5,10 +5,10 @@
 // arm fixes the whole output. Values are bracketed so the three arms are distinguishable
 // in a single stream regardless of print's separator behavior (section 5 defines print to
 // append nothing). Expected stdout is "[negative][zero][positive]".
-val low = -3
-val zero = 0
-val high = 9
-val a = if (low < 0) {
+var low = -3
+var zero = 0
+var high = 9
+var a = if (low < 0) {
     "negative"
 }
 else if (low == 0) {
@@ -17,7 +17,7 @@ else if (low == 0) {
 else {
     "positive"
 }
-val b = if (zero < 0) {
+var b = if (zero < 0) {
     "negative"
 }
 else if (zero == 0) {
@@ -26,7 +26,7 @@ else if (zero == 0) {
 else {
     "positive"
 }
-val c = if (high < 0) {
+var c = if (high < 0) {
     "negative"
 }
 else if (high == 0) {

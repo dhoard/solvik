@@ -4,8 +4,8 @@
 // lookup agree. A constant `switch` keeps matching by the same semantic equality.
 
 class Coordinate {
-    val x: Integer
-    val y: Integer
+    var x: Integer
+    var y: Integer
 
     Coordinate(x: Integer, y: Integer) {
         this.x = x

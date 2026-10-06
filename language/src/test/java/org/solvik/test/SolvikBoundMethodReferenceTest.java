@@ -128,8 +128,8 @@ public final class SolvikBoundMethodReferenceTest {
                     }
                 }
 
-                val formatter = Formatter()
-                val operation: func(Integer): String = formatter.format
+                var formatter = Formatter()
+                var operation: func(Integer): String = formatter.format
                 print(operation(42))
                 """)).isEqualTo("42");
     }
@@ -144,7 +144,7 @@ public final class SolvikBoundMethodReferenceTest {
     public void aBoundMethodReferenceIsPassedAndReturned() {
         assertThat(run("""
                 class Adder {
-                    val offset: Integer
+                    var offset: Integer
                     Adder(offset: Integer) {
                         this.offset = offset
                     }
@@ -201,10 +201,10 @@ public final class SolvikBoundMethodReferenceTest {
                     }
                 }
 
-                val base: Base = Base()
-                val leaf: Base = Leaf()
-                val fromBase: func(): String = base.greet
-                val fromLeaf: func(): String = leaf.greet
+                var base: Base = Base()
+                var leaf: Base = Leaf()
+                var fromBase: func(): String = base.greet
+                var fromLeaf: func(): String = leaf.greet
                 print(fromBase())
                 print("|")
                 print(fromLeaf())
@@ -236,8 +236,8 @@ public final class SolvikBoundMethodReferenceTest {
                     }
                 }
 
-                val animal: Animal = Animal()
-                val cat: Animal = Cat()
+                var animal: Animal = Animal()
+                var cat: Animal = Cat()
                 print(animal.sound())
                 print("|")
                 print(cat.sound())
@@ -274,15 +274,15 @@ public final class SolvikBoundMethodReferenceTest {
                     }
                 }
 
-                val dog: Speaker = Dog()
-                val loud: Speaker = Loud()
-                val dogSpeak: func(): String = dog.speak
-                val loudSpeak: func(): String = loud.speak
+                var dog: Speaker = Dog()
+                var loud: Speaker = Loud()
+                var dogSpeak: func(): String = dog.speak
+                var loudSpeak: func(): String = loud.speak
                 print(dogSpeak())
                 print("|")
                 print(loudSpeak())
                 print("|")
-                val dogShout: func(): String = dog.shout
+                var dogShout: func(): String = dog.shout
                 print(dogShout())
                 """)).isEqualTo("woof|BARK|woofwoof");
     }
@@ -308,15 +308,15 @@ public final class SolvikBoundMethodReferenceTest {
                 }
 
                 class Host implements Greeter {
-                    delegate val greeter: Greeter
+                    delegate var greeter: Greeter
 
                     Host(greeter: Greeter) {
                         this.greeter = greeter
                     }
                 }
 
-                val host = Host(FrenchGreeter())
-                val method: func(): String = host.greet
+                var host = Host(FrenchGreeter())
+                var method: func(): String = host.greet
                 print(method())
                 """)).isEqualTo("bonjour");
     }
@@ -442,7 +442,7 @@ public final class SolvikBoundMethodReferenceTest {
                     }
                 }
 
-                val method: func(): String = Mid().viaSuper()
+                var method: func(): String = Mid().viaSuper()
                 print(method())
                 print("|")
                 print(Leaf().viaSuper()())
@@ -531,7 +531,7 @@ public final class SolvikBoundMethodReferenceTest {
                 }
 
                 mutable class Holder implements Greeter {
-                    delegate val greeter: Greeter
+                    delegate var greeter: Greeter
 
                     Holder(greeter: Greeter) {
                         this.greeter = greeter
@@ -590,8 +590,8 @@ public final class SolvikBoundMethodReferenceTest {
     public void theReceiverExpressionIsEvaluatedExactlyOnceAtCreation() {
         assertThat(run("""
                 class Wrapper {
-                    val inner: Target
-                    mutable val evaluations: Integer = 0
+                    var inner: Target
+                    var mutable evaluations: Integer = 0
                     Wrapper(inner: Target) {
                         this.inner = inner
                     }
@@ -602,7 +602,7 @@ public final class SolvikBoundMethodReferenceTest {
                 }
 
                 class Target {
-                    val label: String
+                    var label: String
                     Target(label: String) {
                         this.label = label
                     }
@@ -611,9 +611,9 @@ public final class SolvikBoundMethodReferenceTest {
                     }
                 }
 
-                val wrapper = Wrapper(Target("x"))
-                val before = wrapper.evaluations
-                val method: func(): String = wrapper.target().describe
+                var wrapper = Wrapper(Target("x"))
+                var before = wrapper.evaluations
+                var method: func(): String = wrapper.target().describe
                 print(wrapper.evaluations - before)
                 print("|")
                 print(method())
@@ -648,7 +648,7 @@ public final class SolvikBoundMethodReferenceTest {
                         return super.label
                     }
                     func useTwice(): String {
-                        val method: func(): String = super.label
+                        var method: func(): String = super.label
                         return method() .. method()
                     }
                 }
@@ -680,10 +680,10 @@ public final class SolvikBoundMethodReferenceTest {
                     }
                 }
 
-                val formatter = Formatter()
-                val first: func(): String = formatter.format
-                val second: func(): String = formatter.format
-                val copy = first
+                var formatter = Formatter()
+                var first: func(): String = formatter.format
+                var second: func(): String = formatter.format
+                var copy = first
                 print(first === second)
                 print("|")
                 print(first === first)
@@ -711,10 +711,10 @@ public final class SolvikBoundMethodReferenceTest {
                     }
                 }
 
-                val a = Formatter()
-                val b = Formatter()
-                val fromA: func(): String = a.format
-                val fromB: func(): String = b.format
+                var a = Formatter()
+                var b = Formatter()
+                var fromA: func(): String = a.format
+                var fromB: func(): String = b.format
                 print(fromA === fromB)
                 print("|")
                 print(fromA !== fromB)
@@ -740,7 +740,7 @@ public final class SolvikBoundMethodReferenceTest {
                     }
                 }
 
-                val method: func(Integer): String = Formatter().format
+                var method: func(Integer): String = Formatter().format
                 print(method)
                 print("|")
                 print(method.toString())
@@ -766,8 +766,8 @@ public final class SolvikBoundMethodReferenceTest {
                     }
                 }
 
-                val method: func(): String = Formatter().format
-                val copy = method
+                var method: func(): String = Formatter().format
+                var copy = method
                 print(copy.hashCode() == method.hashCode())
                 print("|")
                 print(method.hashCode() == "func".hashCode())
@@ -796,12 +796,12 @@ public final class SolvikBoundMethodReferenceTest {
                     }
                 }
 
-                val nothing: Target? = null
-                val absent: (func(): String)? = nothing?.describe
+                var nothing: Target? = null
+                var absent: (func(): String)? = nothing?.describe
                 print(absent)
                 print("|")
-                val something: Target? = Target()
-                val present: (func(): String)? = something?.describe
+                var something: Target? = Target()
+                var present: (func(): String)? = something?.describe
                 if (present != null) {
                     print(present())
                 }
@@ -825,7 +825,7 @@ public final class SolvikBoundMethodReferenceTest {
                 }
 
                 func use(target: Target?) {
-                    val method: func(): String = target.describe
+                    var method: func(): String = target.describe
                 }
                 """)).isEqualTo(DiagnosticCode.TYPE_NULLABLE_DEREFERENCE);
     }
@@ -846,8 +846,8 @@ public final class SolvikBoundMethodReferenceTest {
                     }
                 }
 
-                val target = Target()
-                val method: func(): String = target?.describe
+                var target = Target()
+                var method: func(): String = target?.describe
                 print(method())
                 """)).isEqualTo("t");
     }
@@ -870,7 +870,7 @@ public final class SolvikBoundMethodReferenceTest {
     public void aFunctionTypedPropertyReadsItsStoredValue() {
         assertThat(run("""
                 class Holder {
-                    mutable val stored: func(): Integer
+                    var mutable stored: func(): Integer
                     func storedMethod(): Integer {
                         return 4
                     }
@@ -881,9 +881,9 @@ public final class SolvikBoundMethodReferenceTest {
                     }
                 }
 
-                val holder = Holder()
-                val fromProperty: func(): Integer = holder.stored
-                val fromMethod: func(): Integer = holder.storedMethod
+                var holder = Holder()
+                var fromProperty: func(): Integer = holder.stored
+                var fromMethod: func(): Integer = holder.storedMethod
                 print(fromProperty())
                 print("|")
                 print(fromMethod())
@@ -900,7 +900,7 @@ public final class SolvikBoundMethodReferenceTest {
      * A generic method reference is instantiated contextually to one monomorphic function type.
      *
      * <p>"A generic method reference is instantiated contextually under the same monomorphic rules as a
-     * generic top-level function reference, so {@code val operation: func(Integer): Integer =
+     * generic top-level function reference, so {@code var operation: func(Integer): Integer =
      * object.identity} is accepted" (section 6).
      */
     @Test
@@ -912,9 +912,9 @@ public final class SolvikBoundMethodReferenceTest {
                     }
                 }
 
-                val box = Box()
-                val fromInteger: func(Integer): Integer = box.pick
-                val fromString: func(String): String = box.pick
+                var box = Box()
+                var fromInteger: func(Integer): Integer = box.pick
+                var fromString: func(String): String = box.pick
                 print(fromInteger(42))
                 print("|")
                 print(fromString("s"))
@@ -934,7 +934,7 @@ public final class SolvikBoundMethodReferenceTest {
     public void aGenericMethodReferenceClosesTheReceiverTypeArgumentsFirst() {
         assertThat(run("""
                 mutable class Cell<T> {
-                    val stored: T
+                    var stored: T
                     Cell(stored: T) {
                         this.stored = stored
                     }
@@ -943,8 +943,8 @@ public final class SolvikBoundMethodReferenceTest {
                     }
                 }
 
-                val cell: Cell<Integer> = Cell(1)
-                val method: func(String): String = cell.replace
+                var cell: Cell<Integer> = Cell(1)
+                var method: func(String): String = cell.replace
                 print(method("swapped"))
                 print("|")
                 print(cell.stored)
@@ -968,7 +968,7 @@ public final class SolvikBoundMethodReferenceTest {
                 }
 
                 func use(box: Box) {
-                    val method: Any = box.pick
+                    var method: Any = box.pick
                 }
                 """)).isEqualTo(DiagnosticCode.TYPE_CANNOT_INFER);
     }
@@ -992,7 +992,7 @@ public final class SolvikBoundMethodReferenceTest {
                 }
 
                 func use(box: Box) {
-                    val method: func(Integer): Integer = box.wrap
+                    var method: func(Integer): Integer = box.wrap
                 }
                 """)).isEqualTo(DiagnosticCode.TYPE_CANNOT_INFER);
     }
@@ -1017,8 +1017,8 @@ public final class SolvikBoundMethodReferenceTest {
                 }
 
                 func use(box: Box) {
-                    val method: func(Integer): Integer = box.pick
-                    val wrong: String = method(1)
+                    var method: func(Integer): Integer = box.pick
+                    var wrong: String = method(1)
                 }
                 """)).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
@@ -1046,7 +1046,7 @@ public final class SolvikBoundMethodReferenceTest {
                 }
 
                 func use(point: Point) {
-                    val method: Any = point.toString
+                    var method: Any = point.toString
                 }
                 """)).isEqualTo(DiagnosticCode.TYPE_FUNCTION_AS_VALUE);
         assertThat(codeOf("""
@@ -1054,7 +1054,7 @@ public final class SolvikBoundMethodReferenceTest {
                 }
 
                 func use(point: Point) {
-                    val method: Any = point.equals
+                    var method: Any = point.equals
                 }
                 """)).isEqualTo(DiagnosticCode.TYPE_FUNCTION_AS_VALUE);
         assertThat(codeOf("""
@@ -1062,7 +1062,7 @@ public final class SolvikBoundMethodReferenceTest {
                 }
 
                 func use(point: Point) {
-                    val method: Any = point.hashCode
+                    var method: Any = point.hashCode
                 }
                 """)).isEqualTo(DiagnosticCode.TYPE_FUNCTION_AS_VALUE);
     }
@@ -1082,7 +1082,7 @@ public final class SolvikBoundMethodReferenceTest {
                 }
 
                 func use() {
-                    val method: Any = Holder.make
+                    var method: Any = Holder.make
                 }
                 """)).isEqualTo(DiagnosticCode.TYPE_FUNCTION_AS_VALUE);
     }
@@ -1107,8 +1107,8 @@ public final class SolvikBoundMethodReferenceTest {
                 }
 
                 func use() {
-                    val result = produce()
-                    val method: Any = result.isOk
+                    var result = produce()
+                    var method: Any = result.isOk
                 }
                 """)).isEqualTo(DiagnosticCode.TYPE_FUNCTION_AS_VALUE);
     }
@@ -1134,7 +1134,7 @@ public final class SolvikBoundMethodReferenceTest {
                 }
 
                 class Registry {
-                    static val transform: func(Integer): String = stringify
+                    static var transform: func(Integer): String = stringify
                 }
 
                 print(Registry.transform(7))
@@ -1152,7 +1152,7 @@ public final class SolvikBoundMethodReferenceTest {
     public void aNonFunctionTypedStaticPropertyIsNotInvokable() {
         assertThat(firstCode("""
                 class Registry {
-                    static val limit: Integer = 7
+                    static var limit: Integer = 7
                 }
 
                 func use() {
@@ -1180,7 +1180,7 @@ public final class SolvikBoundMethodReferenceTest {
                 }
 
                 class Registry {
-                    static val transform: func(Integer): String = stringify
+                    static var transform: func(Integer): String = stringify
                 }
                 """, """
                 module app
@@ -1210,7 +1210,7 @@ public final class SolvikBoundMethodReferenceTest {
                 }
 
                 class Registry {
-                    static mutable val transform: func(Integer): String = first
+                    static var mutable transform: func(Integer): String = first
                 }
 
                 print(Registry.transform(1))

@@ -30,7 +30,7 @@ import org.solvik.semantic.SolvikSemanticAnalyzer;
 /**
  * Negative tests for member-assignment targets and superclass member access
  * (docs/LANGUAGE_SPEC.md sections 3, 7, and 14). An assignment must name a mutable local or
- * {@code mutable val} property; a method, an immutable property, an unknown member, and a member reached
+ * {@code var mutable} property; a method, an immutable property, an unknown member, and a member reached
  * through a possibly-null receiver are each rejected with a distinct, source-located diagnostic.
  * {@code super.member} resolves only an inherited property, never a method used as a value.
  */
@@ -38,8 +38,8 @@ public final class SolvikPropertyAssignmentNegativeTest {
 
     private static final String REGEX_MATCH = """
             func use() {
-                val pattern = Regex(r"a")
-                val found = pattern.find("a")
+                var pattern = Regex(r"a")
+                var found = pattern.find("a")
                 if (found != null) {
             %s
                 }
@@ -86,12 +86,12 @@ public final class SolvikPropertyAssignmentNegativeTest {
 
     @Test
     public void assigningToARegexMethodIsRejected() {
-        assertThat(codeOf("func f() {\n    mutable val r = Regex(r\"a\")\n    r.matches = 5\n}\n")).isEqualTo(DiagnosticCode.TYPE_INVALID_ASSIGNMENT_TARGET);
+        assertThat(codeOf("func f() {\n    var mutable r = Regex(r\"a\")\n    r.matches = 5\n}\n")).isEqualTo(DiagnosticCode.TYPE_INVALID_ASSIGNMENT_TARGET);
     }
 
     @Test
     public void assigningToAnUnknownRegexMemberIsRejected() {
-        assertThat(codeOf("func f() {\n    mutable val r = Regex(r\"a\")\n    r.value = \"x\"\n}\n")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_MEMBER);
+        assertThat(codeOf("func f() {\n    var mutable r = Regex(r\"a\")\n    r.value = \"x\"\n}\n")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_MEMBER);
     }
 
     @Test
@@ -139,10 +139,10 @@ public final class SolvikPropertyAssignmentNegativeTest {
     public void assigningThroughANullableReceiverIsRejected() {
         assertThat(codeOf("""
                 class C {
-                    mutable val x: Integer = 0
+                    var mutable x: Integer = 0
 
                     func h() {
-                        mutable val c: C? = null
+                        var mutable c: C? = null
                         c.x = 5
                     }
                 }
@@ -153,7 +153,7 @@ public final class SolvikPropertyAssignmentNegativeTest {
     public void readingAnInheritedSuperPropertyResolves() {
         SemanticResult result = SolvikSemanticAnalyzer.analyze(parseOk("super.sol", """
                 mutable class B {
-                    mutable val p: Integer = 3
+                    var mutable p: Integer = 3
                 }
 
                 class C extends B {

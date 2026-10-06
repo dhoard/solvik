@@ -104,8 +104,8 @@ public final class SolvikEqualityTest {
                         return a == b
                     }
 
-                    val first = Box()
-                    val second = Box()
+                    var first = Box()
+                    var second = Box()
                     println(cmp(first, first))
                     println(cmp(first, second))
                     println(cmp(1, 1))
@@ -119,8 +119,8 @@ public final class SolvikEqualityTest {
                     class Box {
                     }
 
-                    val a = Box()
-                    val b = Box()
+                    var a = Box()
+                    var b = Box()
                     println(a == a)
                     println(a == b)
                     println(a != b)
@@ -135,9 +135,9 @@ public final class SolvikEqualityTest {
                         Green
                     }
 
-                    val red = Color.Red
-                    val otherRed = Color.Red
-                    val green = Color.Green
+                    var red = Color.Red
+                    var otherRed = Color.Red
+                    var green = Color.Green
                     println(red == otherRed)
                     println(red == green)
                     println(red != green)
@@ -152,9 +152,9 @@ public final class SolvikEqualityTest {
                         Error(String)
                     }
 
-                    val first = Result.Ok(1)
-                    val same = Result.Ok(1)
-                    val different = Result.Ok(2)
+                    var first = Result.Ok(1)
+                    var same = Result.Ok(1)
+                    var different = Result.Ok(2)
                     println(first == same)
                     println(first == different)
                 """)).isEqualTo("true\nfalse\n");
@@ -163,12 +163,12 @@ public final class SolvikEqualityTest {
     @Test
     public void setMembershipUsesScalarValueEquality() {
         assertThat(run("""
-                    mutable val longs: Set<Long> = Set(1L, 2L)
+                    var mutable longs: Set<Long> = Set(1L, 2L)
                     println(longs.contains(1L))
                     println(longs.contains(3L))
-                    mutable val doubles: Set<Double> = Set(1.5, 2.5)
+                    var mutable doubles: Set<Double> = Set(1.5, 2.5)
                     println(doubles.contains(2.5))
-                    mutable val chars: Set<Character> = Set('a', 'b')
+                    var mutable chars: Set<Character> = Set('a', 'b')
                     println(chars.contains('b'))
                 """)).isEqualTo("true\nfalse\ntrue\ntrue\n");
     }
@@ -176,10 +176,10 @@ public final class SolvikEqualityTest {
     @Test
     public void mapLookupUsesScalarValueEquality() {
         assertThat(run("""
-                    mutable val byLong: Map<Long, String> = Map(1L: "one")
+                    var mutable byLong: Map<Long, String> = Map(1L: "one")
                     println(byLong.containsKey(1L))
                     println(byLong.containsKey(2L))
-                    mutable val byDouble: Map<Double, Integer> = Map(1.5: 1)
+                    var mutable byDouble: Map<Double, Integer> = Map(1.5: 1)
                     println(byDouble.containsKey(1.5))
                 """)).isEqualTo("true\nfalse\ntrue\n");
     }
@@ -192,7 +192,7 @@ public final class SolvikEqualityTest {
                         Green
                     }
 
-                    mutable val colors: Set<Color> = Set(Color.Red)
+                    var mutable colors: Set<Color> = Set(Color.Red)
                     println(colors.contains(Color.Red))
                     println(colors.contains(Color.Green))
                 """)).isEqualTo("true\nfalse\n");
@@ -206,7 +206,7 @@ public final class SolvikEqualityTest {
                         Green
                     }
 
-                    mutable val names: Map<Color, String> = Map(Color.Red: "red")
+                    var mutable names: Map<Color, String> = Map(Color.Red: "red")
                     println(names.containsKey(Color.Red))
                     println(names.containsKey(Color.Green))
                 """)).isEqualTo("true\nfalse\n");
@@ -215,7 +215,7 @@ public final class SolvikEqualityTest {
     @Test
     public void setKeepsOnlyTheFirstOfTwoEqualValues() {
         assertThat(run("""
-                    mutable val values: Set<Long> = Set(1L, 1L, 2L)
+                    var mutable values: Set<Long> = Set(1L, 1L, 2L)
                     println(values.size)
                 """)).isEqualTo("2\n");
     }
@@ -224,7 +224,7 @@ public final class SolvikEqualityTest {
     public void userEqualsOverrideDispatchesFromOperatorAndExplicitCall() {
         assertThat(run("""
                     class Point {
-                        val x: Integer
+                        var x: Integer
 
                         Point(x: Integer) {
                             this.x = x
@@ -241,9 +241,9 @@ public final class SolvikEqualityTest {
                         }
                     }
 
-                    val a = Point(1)
-                    val b = Point(1)
-                    val c = Point(2)
+                    var a = Point(1)
+                    var b = Point(1)
+                    var c = Point(2)
                     println(a == b)
                     println(a.equals(b))
                     println(a != c)
@@ -267,8 +267,8 @@ public final class SolvikEqualityTest {
                     class Item extends Tagged {
                     }
 
-                    val a = Item()
-                    val b = Item()
+                    var a = Item()
+                    var b = Item()
                     println(a == b)
                     println(a.equals(b))
                 """)).isEqualTo("true\ntrue\n");
@@ -287,8 +287,8 @@ public final class SolvikEqualityTest {
                         }
                     }
 
-                    val p = Point()
-                    val maybe: Point? = p
+                    var p = Point()
+                    var maybe: Point? = p
                     println(maybe == null)
                     println(null == maybe)
                     println(maybe != null)
@@ -308,8 +308,8 @@ public final class SolvikEqualityTest {
                         }
                     }
 
-                    val missing: Point? = null
-                    val present: Point? = Point()
+                    var missing: Point? = null
+                    var present: Point? = Point()
                     println(missing?.equals(Point()))
                     println(present?.equals(Point()))
                 """)).isEqualTo("null\ntrue\n");
@@ -319,7 +319,7 @@ public final class SolvikEqualityTest {
     public void collectionMembershipUsesTheUserOverride() {
         assertThat(run("""
                     class Point {
-                        val x: Integer
+                        var x: Integer
 
                         Point(x: Integer) {
                             this.x = x
@@ -336,10 +336,10 @@ public final class SolvikEqualityTest {
                         }
                     }
 
-                    mutable val points: Set<Point> = Set(Point(1))
+                    var mutable points: Set<Point> = Set(Point(1))
                     println(points.contains(Point(1)))
                     println(points.contains(Point(2)))
-                    mutable val byPoint: Map<Point, String> = Map(Point(1): "one")
+                    var mutable byPoint: Map<Point, String> = Map(Point(1): "one")
                     println(byPoint.get(Point(1)))
                 """)).isEqualTo("true\nfalse\none\n");
     }
@@ -348,7 +348,7 @@ public final class SolvikEqualityTest {
     public void superEqualsReachesTheSuperclassOverride() {
         assertThat(run("""
                     mutable class Base {
-                        val id: Integer
+                        var id: Integer
 
                         Base(id: Integer) {
                             this.id = id
@@ -366,7 +366,7 @@ public final class SolvikEqualityTest {
                     }
 
                     class Derived extends Base {
-                        val extra: Integer
+                        var extra: Integer
 
                         Derived(id: Integer, extra: Integer) {
                             super(id)
@@ -405,8 +405,8 @@ public final class SolvikEqualityTest {
                         }
                     }
 
-                    val a = Derived()
-                    val b = Derived()
+                    var a = Derived()
+                    var b = Derived()
                     println(a == a)
                     println(a == b)
                 """)).isEqualTo("true\nfalse\n");
@@ -415,9 +415,9 @@ public final class SolvikEqualityTest {
     @Test
     public void regexValuesCompareBySourceTextNotCaching() {
         assertThat(run("""
-                    val constant = Regex("a+")
-                    val dynamic = Regex("a" .. "+")
-                    val other = Regex("b+")
+                    var constant = Regex("a+")
+                    var dynamic = Regex("a" .. "+")
+                    var other = Regex("b+")
                     println(constant == dynamic)
                     println(constant.equals(dynamic))
                     println(constant == other)
@@ -427,10 +427,10 @@ public final class SolvikEqualityTest {
     @Test
     public void regexMatchComparesItsImmutableSnapshot() {
         assertThat(run("""
-                    val pattern = Regex("(a)(b)?")
-                    val first = pattern.find("a")
-                    val second = pattern.find("a")
-                    val third = pattern.find("ab")
+                    var pattern = Regex("(a)(b)?")
+                    var first = pattern.find("a")
+                    var second = pattern.find("a")
+                    var third = pattern.find("ab")
                     println(first == second)
                     println(first == third)
                 """)).isEqualTo("true\nfalse\n");
@@ -440,7 +440,7 @@ public final class SolvikEqualityTest {
     public void enumPayloadRecursesThroughAUserOverride() {
         assertThat(run("""
                     class Point {
-                        val x: Integer
+                        var x: Integer
 
                         Point(x: Integer) {
                             this.x = x
@@ -503,7 +503,7 @@ public final class SolvikEqualityTest {
                         Wrap(Point)
                     }
 
-                    val p = Point()
+                    var p = Point()
                     println(Wrapper.Wrap(p) == Wrapper.Wrap(p))
                 """)).isEqualTo("equals called\ntrue\n");
     }
@@ -511,7 +511,7 @@ public final class SolvikEqualityTest {
     @Test
     public void floatingEqualityPreservesIeeeBehaviour() {
         assertThat(run("""
-                    val nan = 0.0 / 0.0
+                    var nan = 0.0 / 0.0
                     println(nan == nan)
                     println(nan != nan)
                     println(0.0 == -0.0)
@@ -583,7 +583,7 @@ public final class SolvikEqualityTest {
                         P(Integer, Noisy)
                     }
 
-                    val n = Noisy()
+                    var n = Noisy()
                     println(Pair.P(1, n) == Pair.P(2, n))
                 """)).isEqualTo("false\n");
     }
@@ -591,15 +591,15 @@ public final class SolvikEqualityTest {
     @Test
     public void regexMatchSnapshotsCompareByStartEndAndGroups() {
         assertThat(run("""
-                    val optional = Regex("(a)(b)?")
-                    val a0 = optional.find("a")
-                    val a1 = optional.find("a")
-                    val ab = optional.find("ab")
+                    var optional = Regex("(a)(b)?")
+                    var a0 = optional.find("a")
+                    var a1 = optional.find("a")
+                    var ab = optional.find("ab")
                     println(a0 == a1)
                     println(a0 == ab)
                     println(a0 != ab)
-                    val atStart = Regex("a").find("a")
-                    val later = Regex("a").find("ba")
+                    var atStart = Regex("a").find("a")
+                    var later = Regex("a").find("ba")
                     println(atStart == later)
                     println(Regex("a+").find("a") == Regex("a+").find("aa"))
                     println(Regex("a").find("a") == Regex("(a)").find("a"))
@@ -610,7 +610,7 @@ public final class SolvikEqualityTest {
     public void collectionsUseTheUserOverrideForAddRemoveAndPut() {
         assertThat(run("""
                     class Point {
-                        val x: Integer
+                        var x: Integer
 
                         Point(x: Integer) {
                             this.x = x
@@ -627,14 +627,14 @@ public final class SolvikEqualityTest {
                         }
                     }
 
-                    mutable val s: Set<Point> = Set()
+                    var mutable s: Set<Point> = Set()
                     println(s.add(Point(1)))
                     println(s.add(Point(1)))
                     println(s.size)
                     println(s.remove(Point(1)))
                     println(s.size)
 
-                    mutable val m: Map<Point, String> = Map()
+                    var mutable m: Map<Point, String> = Map()
                     m.put(Point(1), "one")
                     m.put(Point(1), "uno")
                     println(m.size)
@@ -647,7 +647,7 @@ public final class SolvikEqualityTest {
     @Test
     public void nanCollectionKeysFollowSemanticEquality() {
         assertThat(run("""
-                    mutable val m: Map<Double, Integer> = Map()
+                    var mutable m: Map<Double, Integer> = Map()
                     m.put(0.0 / 0.0, 1)
                     m.put(0.0 / 0.0, 2)
                     println(m.size)
@@ -663,7 +663,7 @@ public final class SolvikEqualityTest {
                     }
 
                     class Item implements Tag {
-                        val id: Integer
+                        var id: Integer
 
                         Item(id: Integer) {
                             this.id = id
@@ -684,8 +684,8 @@ public final class SolvikEqualityTest {
                         }
                     }
 
-                    val viaInterface: Tag = Item(1)
-                    val viaAny: Any = Item(1)
+                    var viaInterface: Tag = Item(1)
+                    var viaAny: Any = Item(1)
                     println(viaInterface == Item(1))
                     println(viaAny == Item(1))
                 """)).isEqualTo("true\ntrue\n");
@@ -695,7 +695,7 @@ public final class SolvikEqualityTest {
     public void notEqualsInvokesTheOverrideExactlyOnceAndNegates() {
         assertThat(run("""
                     class Counter {
-                        mutable val calls: Integer
+                        var mutable calls: Integer
 
                         Counter() {
                             this.calls = 0
@@ -703,7 +703,7 @@ public final class SolvikEqualityTest {
                     }
 
                     class Item {
-                        val counter: Counter
+                        var counter: Counter
 
                         Item(counter: Counter) {
                             this.counter = counter
@@ -718,9 +718,9 @@ public final class SolvikEqualityTest {
                         }
                     }
 
-                    val counter = Counter()
-                    val a = Item(counter)
-                    val b = Item(counter)
+                    var counter = Counter()
+                    var a = Item(counter)
+                    var b = Item(counter)
                     println(a != b)
                     println(counter.calls)
                 """)).isEqualTo("true\n1\n");
@@ -738,8 +738,8 @@ public final class SolvikEqualityTest {
                         }
                     }
 
-                    val a = Bad()
-                    val b = Bad()
+                    var a = Bad()
+                    var b = Bad()
                     println(a == b)
                 """));
         assertThat(thrown).isNotNull();
@@ -774,7 +774,7 @@ public final class SolvikEqualityTest {
     @Test
     public void regexMatchPropertiesExposeTheSnapshot() {
         assertThat(run("""
-                    val m = Regex("(a)(b)?").find("ab")
+                    var m = Regex("(a)(b)?").find("ab")
                     if (m != null) {
                         println(m.value)
                         println(m.start)
@@ -796,7 +796,7 @@ public final class SolvikEqualityTest {
                     func nothing(): Unit {
                     }
 
-                    val s = "sentinel"
+                    var s = "sentinel"
                     println(cmp(1, s))
                     println(cmp(1L, s))
                     println(cmp(Byte(1), s))
@@ -823,7 +823,7 @@ public final class SolvikEqualityTest {
                     println(cmp(Regex("a"), 1))
                     println(cmp(Regex("a"), List<Integer>(1)))
 
-                    val m = Regex("a").find("a")
+                    var m = Regex("a").find("a")
                     if (m != null) {
                         println(cmp(m, "x"))
                         println(cmp(m, Regex("a")))
@@ -834,10 +834,10 @@ public final class SolvikEqualityTest {
     @Test
     public void regexMatchIntegerPropertiesAreUsableAsIntegers() {
         assertThat(run("""
-                    val m = Regex("(a)(b)?").find("ab")
+                    var m = Regex("(a)(b)?").find("ab")
                     if (m != null) {
-                        val span: Integer = m.end - m.start
-                        val groups: Integer = m.groupCount + 1
+                        var span: Integer = m.end - m.start
+                        var groups: Integer = m.groupCount + 1
                         println(span)
                         println(groups)
                     }
@@ -881,7 +881,7 @@ public final class SolvikEqualityTest {
     public void enumKeysWithUserPayloadsUseTheOverride() {
         assertThat(run("""
                     class Point {
-                        val x: Integer
+                        var x: Integer
 
                         Point(x: Integer) {
                             this.x = x
@@ -902,7 +902,7 @@ public final class SolvikEqualityTest {
                         K(Point)
                     }
 
-                    mutable val m: Map<Key, String> = Map()
+                    var mutable m: Map<Key, String> = Map()
                     m.put(Key.K(Point(1)), "one")
                     println(m.get(Key.K(Point(1))))
                     println(m.containsKey(Key.K(Point(2))))
@@ -912,10 +912,10 @@ public final class SolvikEqualityTest {
     @Test
     public void repeatedRegexEvaluationDoesNotChangeEquality() {
         assertThat(run("""
-                    mutable val i = 0
+                    var mutable i = 0
                     while (i < 3) {
-                        val constant = Regex("a+")
-                        val dynamic = Regex("a" .. "+")
+                        var constant = Regex("a+")
+                        var dynamic = Regex("a" .. "+")
                         println(constant == dynamic)
                         i = i + 1
                     }

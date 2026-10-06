@@ -1,2 +1,2 @@
-val a = 2147483648
+var a = 2147483648
 print("EXECUTED-INVALID")

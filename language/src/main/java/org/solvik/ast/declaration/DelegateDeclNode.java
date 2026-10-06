@@ -25,7 +25,7 @@ import org.solvik.ast.expression.ExpressionNode;
 import org.solvik.source.SourceSpan;
 
 /**
- * A delegate property declaration {@code delegate val name: InterfaceType [= initializer]}
+ * A delegate property declaration {@code delegate var name: InterfaceType [= initializer]}
  * (docs/LANGUAGE_SPEC.md section 9). A delegate removes forwarding boilerplate: the compiler
  * synthesizes forwarding behavior for the interface members of its declared type that the class
  * does not implement itself.

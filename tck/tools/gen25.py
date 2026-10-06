@@ -51,7 +51,7 @@ REQS_SPEC = {
                 "an interface is a compile-time error",
         kind="compile-time",
         quotes=["Interfaces contain methods, not stored properties."],
-        note="A `val` property in an interface is the negated sentence. Section 8 names no code, so "
+        note="A `var` property in an interface is the negated sentence. Section 8 names no code, so "
              "the rejection is bare; the program prints a sentinel only if it executes."),
     "REQ-2301": dict(
         section="8. Interfaces",
@@ -199,9 +199,9 @@ def BAD(tid, cat, req, src, diag, note):
 
 # --- section 8.
 BAD("SOL-TCK-0341", "objects", "REQ-2300",
-    'interface Named {\n    val name: String\n}\nclass U implements Named {\n'
-    '    val name: String\n\n    U(name: String) {\n        this.name = name\n    }\n}\n'
-    'val u = U("x")\nprint(u.name)\n' + NEG, {},
+    'interface Named {\n    var name: String\n}\nclass U implements Named {\n'
+    '    var name: String\n\n    U(name: String) {\n        this.name = name\n    }\n}\n'
+    'var u = U("x")\nprint(u.name)\n' + NEG, {},
     "A stored property in an interface is the negated sentence.")
 BAD("SOL-TCK-0342", "objects", "REQ-2301",
     'interface Named {\n    func greet(who: String): String\n}\nclass U implements Named {\n'
@@ -212,7 +212,7 @@ OK("SOL-TCK-0343", "objects", "REQ-2302",
    'mutable class Animal {\n    Animal() {\n    }\n}\nclass Dog extends Animal {\n    Dog() {\n    }\n}\n'
    'interface Maker {\n    func make(): Animal\n}\nclass DogMaker implements Maker {\n'
    '    DogMaker() {\n    }\n\n    func make(): Dog {\n        return Dog()\n    }\n}\n'
-   'val m: Maker = DogMaker()\nprint("covok")\n',
+   'var m: Maker = DogMaker()\nprint("covok")\n',
    "covok",
    "Returning the subtype Dog for an interface method declared to return Animal is a covariant "
    "return and is accepted.")
@@ -220,33 +220,33 @@ BAD("SOL-TCK-0344", "objects", "REQ-2302",
     'mutable class Animal {\n    Animal() {\n    }\n}\nclass Rock {\n    Rock() {\n    }\n}\n'
     'interface Maker {\n    func make(): Animal\n}\nclass RockMaker implements Maker {\n'
     '    RockMaker() {\n    }\n\n    func make(): Rock {\n        return Rock()\n    }\n}\n'
-    'val m: Maker = RockMaker()\nprint("EXECUTED-INVALID")\n', {},
+    'var m: Maker = RockMaker()\nprint("EXECUTED-INVALID")\n', {},
     "Rock is unrelated to Animal, so the return type is not covariant.")
 BAD("SOL-TCK-0345", "objects", "REQ-2303",
     'interface A {\n    func speak(): String {\n        return "a"\n    }\n}\n'
     'interface B {\n    func speak(): String {\n        return "b"\n    }\n}\n'
     'class C implements A, B {\n    C() {\n    }\n}\n'
-    'val c = C()\nprint(c.speak())\n' + NEG, {},
+    'var c = C()\nprint(c.speak())\n' + NEG, {},
     "Two interfaces supply the same default and the class does not override it.")
 OK("SOL-TCK-0346", "objects", "REQ-2303",
    'interface A {\n    func speak(): String {\n        return "a"\n    }\n}\n'
    'interface B {\n    func speak(): String {\n        return "b"\n    }\n}\n'
    'class C implements A, B {\n    C() {\n    }\n\n    func speak(): String {\n        return "c"\n'
-   '    }\n}\nval c = C()\nprint("conf" .. c.speak())\n',
+   '    }\n}\nvar c = C()\nprint("conf" .. c.speak())\n',
    "confc",
    "The explicit override resolves the same default from both interfaces and its value is what "
    "runs.")
 
 # --- section 22.1: generic exceptions.
 BAD("SOL-TCK-0347", "exceptions", "REQ-2304",
-    'class MyErr<T> extends RuntimeException {\n    val payload: T\n\n    MyErr(payload: T) {\n'
+    'class MyErr<T> extends RuntimeException {\n    var payload: T\n\n    MyErr(payload: T) {\n'
     '        this.payload = payload\n    }\n}\nthrow MyErr<Integer>(1)\n'
     'print("EXECUTED-INVALID")\n',
     {"family": "SEM", "code": "SOLV-SEM-053"},
     "A parameterized generic exception is thrown, which the throw operand does not accept.")
 BAD("SOL-TCK-0348", "exceptions", "REQ-2305",
     'class Simple extends RuntimeException {\n    Simple() {\n    }\n}\n'
-    'class MyErr<T> extends RuntimeException {\n    val payload: T\n\n    MyErr(payload: T) {\n'
+    'class MyErr<T> extends RuntimeException {\n    var payload: T\n\n    MyErr(payload: T) {\n'
     '        this.payload = payload\n    }\n}\nfunc f() {\n    throw Simple()\n}\ntry {\n    f()\n'
     '}\ncatch (e: MyErr<Integer>) {\n    print("caught")\n}\nprint("EXECUTED-INVALID")\n',
     {"family": "SEM", "code": "SOLV-SEM-054"},
@@ -261,18 +261,18 @@ BAD("SOL-TCK-0349", "exceptions", "REQ-2306",
 
 # --- section 23.4: Result operation diagnostics.
 BAD("SOL-TCK-0350", "result", "REQ-2307",
-    RESULT + 'func use(): Result<Integer, String> {\n    val r = get()\n    val b = r.nope()\n'
+    RESULT + 'func use(): Result<Integer, String> {\n    var r = get()\n    var b = r.nope()\n'
     '    return Result.Ok(1)\n}\nprint("EXECUTED-INVALID")\n',
     {"family": "RESOL", "code": "SOLV-RESOL-004"},
     "An unknown member on a Result receiver pins the specification-named SOLV-RESOL-004.")
 BAD("SOL-TCK-0351", "result", "REQ-2308",
-    RESULT + 'func use(): Result<Integer, String> {\n    val r = get()\n    val b = r.isOk(1)\n'
+    RESULT + 'func use(): Result<Integer, String> {\n    var r = get()\n    var b = r.isOk(1)\n'
     '    return Result.Ok(1)\n}\nprint("EXECUTED-INVALID")\n',
     {"family": "TYPE", "code": "SOLV-TYPE-003"},
     "isOk takes no arguments, so the extra argument is the wrong argument count and pins "
     "SOLV-TYPE-003.")
 BAD("SOL-TCK-0352", "result", "REQ-2309",
-    RESULT + 'func use(): Result<Integer, String> {\n    val r = get()\n    val f = r.isOk\n'
+    RESULT + 'func use(): Result<Integer, String> {\n    var r = get()\n    var f = r.isOk\n'
     '    return Result.Ok(1)\n}\nprint("EXECUTED-INVALID")\n',
     {"family": "TYPE", "code": "SOLV-TYPE-014"},
     "A bare member read of a Result operation pins the specification-named SOLV-TYPE-014.")

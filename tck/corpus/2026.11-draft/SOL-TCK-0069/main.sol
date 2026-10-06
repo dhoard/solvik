@@ -5,7 +5,7 @@
 // `default`, while still requiring no `break` to stop. Both halves of the sentence are
 // observable from the single value "two": implicit fallthrough would yield "twoother"
 // and a mandated-break reading would make the program illegal rather than productive.
-mutable val v: Integer = 2
+var mutable v: Integer = 2
 
 switch (v) {
     case 1 {

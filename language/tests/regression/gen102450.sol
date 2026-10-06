@@ -11,7 +11,7 @@ class Imp2 implements I1 {
     }
 }
 
-val ifaceValue5: I1 = Imp2()
+var ifaceValue5: I1 = Imp2()
 
 println(ifaceValue5.twice4())
 

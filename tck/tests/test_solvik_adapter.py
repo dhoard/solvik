@@ -55,7 +55,7 @@ def test_offsets():
     # "🎈" is one UTF-16 code unit but four UTF-8 bytes; put three before a marker.
     path = os.path.join(ws, "main.sol")
     with open(path, "w", encoding="utf-8") as fh:
-        fh.write('val s = "🎈🎈🎈"\nMARKER\n')
+        fh.write('var s = "🎈🎈🎈"\nMARKER\n')
     with open(path, "rb") as fh:
         text = fh.read().decode("utf-8")
     table = AD.char_to_byte_offsets(path)
@@ -136,7 +136,7 @@ def test_handle_binding():
 def test_translate_diagnostics_full():
     """A realistic launcher COMPILE_ERROR translated with a non-ASCII source."""
     ws = tempfile.mkdtemp()
-    src = 'val s = "\U0001f388\U0001f388\U0001f388"\nclass P { override func equals(o: Any?): Boolean { return false } }\n'
+    src = 'var s = "\U0001f388\U0001f388\U0001f388"\nclass P { override func equals(o: Any?): Boolean { return false } }\n'
     with open(os.path.join(ws, "main.sol"), "w", encoding="utf-8") as fh:
         fh.write(src)
     with open(os.path.join(ws, "main.sol"), "rb") as fh:
@@ -297,7 +297,7 @@ def test_protocol_runtime():
 def test_protocol_reject_byte_offsets():
     # Source has a 4-byte emoji before the BAD token, so the fake launcher's char
     # offset must be converted up by 3 by the adapter.
-    src = 'val e = "\U0001f388"\nBAD\n'
+    src = 'var e = "\U0001f388"\nBAD\n'
     rc, resp, err, ws, rundir, handle = _session("reject", source=src, run_exec=False)
     by_op = {r["op"]: r for r in resp}
     diag = by_op["compile"]["diagnostics"][0]

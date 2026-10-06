@@ -210,8 +210,8 @@ public final class SolvikGenericFunctionValueTest {
                     return value
                 }
 
-                val integerIdentity: func(Integer): Integer = identity
-                val stringIdentity: func(String): String = identity
+                var integerIdentity: func(Integer): Integer = identity
+                var stringIdentity: func(String): String = identity
                 println(integerIdentity(41))
                 print(stringIdentity("ab"))
                 """)).isEqualTo("41\nab");
@@ -254,10 +254,10 @@ public final class SolvikGenericFunctionValueTest {
                 }
 
                 class Holder {
-                    val member: func(Integer): Integer = identity
+                    var member: func(Integer): Integer = identity
                 }
 
-                val holder = Holder()
+                var holder = Holder()
                 println(holder.member(3))
                 """)).isEqualTo("3\n");
     }
@@ -271,16 +271,16 @@ public final class SolvikGenericFunctionValueTest {
                 }
 
                 class Holder {
-                    static val member: func(String): String = identity
+                    static var member: func(String): String = identity
                 }
 
-                val taken: func(String): String = Holder.member
+                var taken: func(String): String = Holder.member
                 print(taken("yz"))
                 """)).isEqualTo("yz");
     }
 
     /**
-     * A {@code mutable val} assignment is a context: the variable's declared type is known before the value is
+     * A {@code var mutable} assignment is a context: the variable's declared type is known before the value is
      * examined, so it constrains a generic reference written on the right.
      *
      * "assignment targets" is listed among the positions expected function types flow into.
@@ -292,7 +292,7 @@ public final class SolvikGenericFunctionValueTest {
                     return value
                 }
 
-                mutable val slot: func(Integer): Integer = identity
+                var mutable slot: func(Integer): Integer = identity
                 slot = identity
                 println(slot(6))
                 """)).isEqualTo("6\n");
@@ -307,10 +307,10 @@ public final class SolvikGenericFunctionValueTest {
                 }
 
                 class Holder {
-                    mutable val slot: func(Integer): Integer = identity
+                    var mutable slot: func(Integer): Integer = identity
                 }
 
-                val holder = Holder()
+                var holder = Holder()
                 holder.slot = identity
                 println(holder.slot(7))
                 """)).isEqualTo("7\n");
@@ -325,11 +325,11 @@ public final class SolvikGenericFunctionValueTest {
                 }
 
                 class Holder {
-                    static mutable val slot: func(String): String = identity
+                    static var mutable slot: func(String): String = identity
                 }
 
                 Holder.slot = identity
-                val taken: func(String): String = Holder.slot
+                var taken: func(String): String = Holder.slot
                 print(taken("q"))
                 """)).isEqualTo("q");
     }
@@ -348,7 +348,7 @@ public final class SolvikGenericFunctionValueTest {
                     return value
                 }
 
-                val fns: List<func(Integer): Integer> = List<func(Integer): Integer>(identity)
+                var fns: List<func(Integer): Integer> = List<func(Integer): Integer>(identity)
                 println(fns.size)
                 println(fns.get(0)(9))
                 """)).isEqualTo("1\n9\n");
@@ -406,7 +406,7 @@ public final class SolvikGenericFunctionValueTest {
                     return f(identity, v)
                 }
 
-                val direct: func(func(Integer): Integer, Integer): Integer = apply
+                var direct: func(func(Integer): Integer, Integer): Integer = apply
                 println(applyThrough(direct, 12))
                 """)).isEqualTo("12\n");
     }
@@ -462,7 +462,7 @@ public final class SolvikGenericFunctionValueTest {
                     return value
                 }
 
-                val callbacks = List<func(Integer): Integer>()
+                var callbacks = List<func(Integer): Integer>()
                 callbacks.add(identity)
                 print(callbacks.get(0)(7).toString())
                 """)).isEqualTo("7");
@@ -476,7 +476,7 @@ public final class SolvikGenericFunctionValueTest {
      * argument receives is {@code Any?}, not {@code Any}. The reference is rejected with the reason naming
      * what it was actually given — which is the {@code found} field doing its job: it reports the type the
      * context supplied rather than a generic "no expected type", the only reading that tells a reader why
-     * moving the same reference to a {@code val} would compile.
+     * moving the same reference to a {@code var} would compile.
      */
     @Test
     public void anExpectedNullableAnyFromABuiltInParameterIsAlsoInsufficient() {
@@ -530,7 +530,7 @@ public final class SolvikGenericFunctionValueTest {
                 }
 
                 class Holder {
-                    mutable val slot: func(Integer): Integer = identity
+                    var mutable slot: func(Integer): Integer = identity
                 }
 
                 """;
@@ -551,7 +551,7 @@ public final class SolvikGenericFunctionValueTest {
                 """)).contains(DiagnosticCode.RESOL_UNKNOWN_MEMBER, DiagnosticCode.TYPE_CANNOT_INFER);
         assertThat(codes(prefix + """
                 func use(h: Holder?): Unit {
-                    val maybe = h
+                    var maybe = h
                     maybe.slot = identity
                 }
                 """)).contains(DiagnosticCode.TYPE_NULLABLE_DEREFERENCE, DiagnosticCode.TYPE_CANNOT_INFER);
@@ -578,8 +578,8 @@ public final class SolvikGenericFunctionValueTest {
                 }
 
                 class Store {
-                    static mutable val slot: func(Integer): Integer = identity
-                    static val frozen: func(Integer): Integer = identity
+                    static var mutable slot: func(Integer): Integer = identity
+                    static var frozen: func(Integer): Integer = identity
                     static func method(value: Integer): Integer {
                         return value
                     }
@@ -592,7 +592,7 @@ public final class SolvikGenericFunctionValueTest {
                     Store.slot = other
                 }
                 """)).containsExactly(DiagnosticCode.TYPE_MISMATCH);
-        // A `val` static property accepts no write at all.
+        // A `var` static property accepts no write at all.
         assertThat(codes(prefix + """
                 func use(): Unit {
                     Store.frozen = identity
@@ -624,13 +624,13 @@ public final class SolvikGenericFunctionValueTest {
                 }
 
                 class Store {
-                    static mutable val slot: func(String): String = identity
+                    static var mutable slot: func(String): String = identity
                 }
                 """, """
                 include "lib.sol" alias m
 
                 m::Store.slot = m::identity
-                val read: func(String): String = m::Store.slot
+                var read: func(String): String = m::Store.slot
                 print(read("written"))
                 """)).isEqualTo("written");
     }
@@ -675,7 +675,7 @@ public final class SolvikGenericFunctionValueTest {
                     return f
                 }
 
-                val made: func(String): String = compose(identity)
+                var made: func(String): String = compose(identity)
                 print(made("ab"))
                 """)).isEqualTo("ab");
     }
@@ -754,7 +754,7 @@ public final class SolvikGenericFunctionValueTest {
                     return f(v)
                 }
 
-                val composed: func(func(Integer): Integer, Integer): Integer = apply
+                var composed: func(func(Integer): Integer, Integer): Integer = apply
                 println(composed(identity, 3))
                 """)).isEqualTo("3\n");
     }
@@ -809,8 +809,8 @@ public final class SolvikGenericFunctionValueTest {
                     return value
                 }
 
-                val integerIdentity: func(Integer): Integer = identity
-                val stringIdentity: func(String): String = identity
+                var integerIdentity: func(Integer): Integer = identity
+                var stringIdentity: func(String): String = identity
                 println(integerIdentity.equals(stringIdentity))
                 println(integerIdentity === integerIdentity)
                 """)).isEqualTo("true\ntrue\n");
@@ -834,9 +834,9 @@ public final class SolvikGenericFunctionValueTest {
                     return value
                 }
 
-                val first: func(Integer): Integer = identity
-                val second: func(String): String = identity
-                val third: func(Integer): Integer = alsoIdentity
+                var first: func(Integer): Integer = identity
+                var second: func(String): String = identity
+                var third: func(Integer): Integer = alsoIdentity
                 println(first.equals(second))
                 println(first.equals(third))
                 println(first.hashCode() == second.hashCode())
@@ -859,8 +859,8 @@ public final class SolvikGenericFunctionValueTest {
                 }
                 """, """
                 include "lib.sol" alias m
-                val bare: func(Integer): Integer = m::identity
-                val again: func(String): String = m::identity
+                var bare: func(Integer): Integer = m::identity
+                var again: func(String): String = m::identity
                 println(bare.equals(again))
                 println(bare(5))
                 print(again("hi"))
@@ -883,7 +883,7 @@ public final class SolvikGenericFunctionValueTest {
                 }
 
                 func useInGeneric<U>(value: U): U {
-                    val local: func(U): U = identity
+                    var local: func(U): U = identity
                     return local(value)
                 }
 
@@ -915,7 +915,7 @@ public final class SolvikGenericFunctionValueTest {
                 }
 
                 func integerSite(): Unit {
-                    val local: func(Integer): Integer = identity
+                    var local: func(Integer): Integer = identity
                 }
                 """, "integerSite").name()).isEqualTo("func(Integer): Integer");
         assertThat(recordedInitializerType("""
@@ -924,7 +924,7 @@ public final class SolvikGenericFunctionValueTest {
                 }
 
                 func stringSite(): Unit {
-                    val local: func(String): String = identity
+                    var local: func(String): String = identity
                 }
                 """, "stringSite").name()).isEqualTo("func(String): String");
     }
@@ -944,13 +944,13 @@ public final class SolvikGenericFunctionValueTest {
                 }
 
                 func use(): Unit {
-                    val ambiguous = identity
+                    var ambiguous = identity
                 }
                 """;
         Diagnostic diagnostic = onlyDiagnostic(program, DiagnosticCode.TYPE_CANNOT_INFER);
         assertThat(diagnostic.message()).contains("identity");
         assertThat(diagnostic.found().orElse("")).isEqualTo("no expected type");
-        assertCovers(program, "val ambiguous = identity", "identity", diagnostic);
+        assertCovers(program, "var ambiguous = identity", "identity", diagnostic);
     }
 
     /**
@@ -967,7 +967,7 @@ public final class SolvikGenericFunctionValueTest {
                 }
 
                 func use(): Unit {
-                    val boxed: Any = identity
+                    var boxed: Any = identity
                 }
                 """, DiagnosticCode.TYPE_CANNOT_INFER);
         assertThat(diagnostic.found().orElse("")).isEqualTo("the expected type Any");
@@ -987,7 +987,7 @@ public final class SolvikGenericFunctionValueTest {
                 }
 
                 func passes<U>(value: U): U {
-                    val wrong: U = identity
+                    var wrong: U = identity
                     return value
                 }
                 """, DiagnosticCode.TYPE_CANNOT_INFER);
@@ -1011,7 +1011,7 @@ public final class SolvikGenericFunctionValueTest {
                 }
 
                 func use(): Unit {
-                    val partial: func(Integer): Integer = ignores
+                    var partial: func(Integer): Integer = ignores
                 }
                 """, DiagnosticCode.TYPE_CANNOT_INFER);
         assertThat(diagnostic.message()).contains("T");
@@ -1031,7 +1031,7 @@ public final class SolvikGenericFunctionValueTest {
                 }
 
                 func use(): Unit {
-                    val wrong: List<Integer> = identity
+                    var wrong: List<Integer> = identity
                 }
                 """, DiagnosticCode.TYPE_CANNOT_INFER);
     }
@@ -1052,7 +1052,7 @@ public final class SolvikGenericFunctionValueTest {
                 }
 
                 func use(): Unit {
-                    val wrong: func(Integer): Integer = pick
+                    var wrong: func(Integer): Integer = pick
                 }
                 """, DiagnosticCode.TYPE_MISMATCH);
         assertThat(diagnostic.message()).contains("func(Integer): Integer");
@@ -1075,7 +1075,7 @@ public final class SolvikGenericFunctionValueTest {
                 }
 
                 func use(): Unit {
-                    val wrong: func(Integer, String): Integer = pick
+                    var wrong: func(Integer, String): Integer = pick
                 }
                 """)).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
@@ -1099,7 +1099,7 @@ public final class SolvikGenericFunctionValueTest {
                     }
 
                     println("reached")
-                    val ambiguous = identity
+                    var ambiguous = identity
                     """, "reject.sol"));
         } catch (RuntimeException e) {
             failed = true;
@@ -1123,7 +1123,7 @@ public final class SolvikGenericFunctionValueTest {
                 }
 
                 func use(): Unit {
-                    val local: func(Integer): Integer = identity
+                    var local: func(Integer): Integer = identity
                     local<Integer>(1)
                 }
                 """, DiagnosticCode.TYPE_NOT_GENERIC);
@@ -1145,7 +1145,7 @@ public final class SolvikGenericFunctionValueTest {
                     return value
                 }
 
-                val made: func(Integer): Integer = identity
+                var made: func(Integer): Integer = identity
                 println(made(4))
                 print(made.toString())
                 """)).isEqualTo("4\nfunc");
@@ -1166,7 +1166,7 @@ public final class SolvikGenericFunctionValueTest {
                     return value
                 }
 
-                mutable val made: (func(Integer): Integer)? = identity
+                var mutable made: (func(Integer): Integer)? = identity
                 if (made != null) {
                     println(made(2))
                 }

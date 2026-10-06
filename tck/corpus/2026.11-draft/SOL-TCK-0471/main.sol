@@ -17,10 +17,10 @@ class Cat extends Animal {
     }
 }
 
-val animal: Animal = Animal()
-val cat: Animal = Cat()
-val animalMethod: func(): String = animal.sound
-val catMethod: func(): String = cat.sound
+var animal: Animal = Animal()
+var cat: Animal = Cat()
+var animalMethod: func(): String = animal.sound
+var catMethod: func(): String = cat.sound
 print(animalMethod())
 print("|")
 print(catMethod())

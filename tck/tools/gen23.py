@@ -16,7 +16,7 @@ exactly the codes the specification names.
 Semicolon caution. The postfix `?` is not listed among section 16's
 terminator-triggering tokens, so whether a synthetic SEMI is emitted after a `?`
 at a line boundary is not settled by the specification's condition-2 list
-(although section 23.3's own example, `val config = readConfig()?`, implies one
+(although section 23.3's own example, `var config = readConfig()?`, implies one
 is). Every program in this batch therefore writes something after the `?` on the
 same line -- a `;` or a continuing operator -- so the batch tests propagation
 semantics and not an unresolved insertion question.
@@ -240,10 +240,10 @@ OK("SOL-TCK-0309", "REQ-2000",
      '    return Result.Err("bad")\n'
      '}\n'
      'func use(ok: Boolean): Result<Integer, String> {\n'
-     '    val v = get(ok)? + 1\n'
+     '    var v = get(ok)? + 1\n'
      '    return Result.Ok(v)\n'
      '}\n'
-     'val r = use(true)\n'
+     'var r = use(true)\n'
      'print("ok=" .. r.isOk() .. " v=" .. r.unwrap())\n',
    "ok=true v=42",
    "The unary `?` yields the `Integer` payload 41, so `+ 1` produces 42; the payload is used as "
@@ -256,10 +256,10 @@ OK("SOL-TCK-0310", "REQ-2000",
      '    return Result.Ok(7)\n'
      '}\n'
      'func use(): Result<Integer, String> {\n'
-     '    val v = probe()?\n'
+     '    var v = probe()?\n'
      '    return Result.Ok(v)\n'
      '}\n'
-     'val r = use()\n'
+     'var r = use()\n'
      'print("v=" .. r.unwrap())\n',
    "pv=7",
    "`probe` prints `p` once, so the operand was evaluated exactly once on the success path.")
@@ -271,11 +271,11 @@ OK("SOL-TCK-0311", "REQ-2000",
      '    return Result.Err("e")\n'
      '}\n'
      'func use(): Result<Integer, String> {\n'
-     '    val v = probe()?\n'
+     '    var v = probe()?\n'
      '    print("AFTER")\n'
      '    return Result.Ok(v)\n'
      '}\n'
-     'val r = use()\n'
+     'var r = use()\n'
      'print("err=" .. r.isErr())\n',
    "perr=true",
    "The operand runs once and then returns from `use`, so `p` appears once and `AFTER` does not "
@@ -291,10 +291,10 @@ OK("SOL-TCK-0312", "REQ-2001",
      '    return Result.Err("bad")\n'
      '}\n'
      'func use(ok: Boolean): Result<Integer, String> {\n'
-     '    val v = get(ok)?\n'
+     '    var v = get(ok)?\n'
      '    return Result.Ok(v + 1)\n'
      '}\n'
-     'val r = use(false)\n'
+     'var r = use(false)\n'
      'print("err=" .. r.isErr() .. " e=" .. r.unwrapErr())\n',
    "err=true e=bad",
    "The `Err` is returned from `use` unchanged; the caller observes the same `bad` error and the "
@@ -306,11 +306,11 @@ OK("SOL-TCK-0313", "REQ-2001",
      '    return Result.Err("x")\n'
      '}\n'
      'func use(): Result<Integer, String> {\n'
-     '    val v = get()?\n'
+     '    var v = get()?\n'
      '    print("AFTER")\n'
      '    return Result.Ok(v)\n'
      '}\n'
-     'val r = use()\n'
+     'var r = use()\n'
      'print("err=" .. r.isErr())\n',
    "err=true",
    "The statement after the `?` is not evaluated once the `Err` returns; the output is exactly "
@@ -322,14 +322,14 @@ OK("SOL-TCK-0314", "REQ-2001",
      '    return Result.Err("deep")\n'
      '}\n'
      'func b(): Result<Integer, String> {\n'
-     '    val v = a()?\n'
+     '    var v = a()?\n'
      '    return Result.Ok(v + 1)\n'
      '}\n'
      'func c(): Result<Integer, String> {\n'
-     '    val v = b()?\n'
+     '    var v = b()?\n'
      '    return Result.Ok(v + 1)\n'
      '}\n'
-     'val r = c()\n'
+     'var r = c()\n'
      'print("err=" .. r.isErr() .. " e=" .. r.unwrapErr())\n',
    "err=true e=deep",
    "The `Err` returns through `b` and then `c` unchanged, so the return composes across two call "
@@ -338,7 +338,7 @@ OK("SOL-TCK-0314", "REQ-2001",
 # --- REQ-2002 .. REQ-2004: the specification-named diagnostics.
 BAD("SOL-TCK-0315", "REQ-2002",
     'func use(): Result<Integer, String> {\n'
-    '    val v = 1?\n'
+    '    var v = 1?\n'
     '    return Result.Ok(v)\n'
     '}\n'
     + NEG,
@@ -351,7 +351,7 @@ BAD("SOL-TCK-0316", "REQ-2003",
     + 'func get(): Result<Integer, String> {\n'
       '    return Result.Ok(1)\n'
       '}\n'
-      'val v = get()?\n'
+      'var v = get()?\n'
       + NEG,
     "SOLV-SEM-050",
     "The operand is a genuine `Result`, so only the missing boundary is wrong; the implicit "
@@ -363,7 +363,7 @@ BAD("SOL-TCK-0317", "REQ-2004",
       '    return Result.Ok("s")\n'
       '}\n'
       'func use(): Result<Integer, String> {\n'
-      '    val v = get()?\n'
+      '    var v = get()?\n'
       '    return Result.Ok(v)\n'
       '}\n'
       + NEG,
@@ -377,7 +377,7 @@ BAD("SOL-TCK-0318", "REQ-2004",
       '    return Result.Err("s")\n'
       '}\n'
       'func use(): Result<Integer, Integer> {\n'
-      '    val v = get()?\n'
+      '    var v = get()?\n'
       '    return Result.Ok(v)\n'
       '}\n'
       + NEG,
@@ -394,14 +394,14 @@ OK("SOL-TCK-0319", "REQ-2005",
      '}\n'
      'func use(): Result<Integer, String> {\n'
      '    try {\n'
-     '        val v = get()?\n'
+     '        var v = get()?\n'
      '        return Result.Ok(v)\n'
      '    }\n    catch (e: Exception) {\n'
      '        print("CAUGHT")\n'
      '        return Result.Ok(0)\n'
      '    }\n'
      '}\n'
-     'val r = use()\n'
+     'var r = use()\n'
      'print("err=" .. r.isErr() .. " e=" .. r.unwrapErr())\n',
    "err=true e=x",
    "A `catch (e: Exception)` around the propagation must not intercept a return; if `?` were a "
@@ -414,13 +414,13 @@ OK("SOL-TCK-0320", "REQ-2005",
      '}\n'
      'func use(): Result<Integer, String> {\n'
      '    try {\n'
-     '        val v = get()?\n'
+     '        var v = get()?\n'
      '        return Result.Ok(v)\n'
      '    }\n    finally {\n'
      '        print("fin")\n'
      '    }\n'
      '}\n'
-     'val r = use()\n'
+     'var r = use()\n'
      'print("err=" .. r.isErr() .. " e=" .. r.unwrapErr())\n',
    "finerr=true e=x",
    "The `finally` runs on the propagation exit path before the caller observes the `Err`, so "
@@ -437,12 +437,12 @@ OK("SOL-TCK-0321", "REQ-2006",
      '    return Result.Err("bad")\n'
      '}\n'
      'func use(ok: Boolean): Result<Integer, String> {\n'
-     '    val v = get(ok)? + 1\n'
+     '    var v = get(ok)? + 1\n'
      '    return Result.Ok(v)\n'
      '}\n'
-     'val a = use(true)\n'
+     'var a = use(true)\n'
      'print("a=" .. a.isOk() .. "," .. a.unwrap())\n'
-     'val b = use(false)\n'
+     'var b = use(false)\n'
      'print(" b=" .. b.isErr() .. "," .. b.unwrapErr())\n',
    "a=true,42 b=true,bad",
    "The `Ok` path propagates a value that `isOk`/`unwrap` then read, and the `Err` path propagates "

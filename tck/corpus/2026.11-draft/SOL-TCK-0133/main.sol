@@ -12,7 +12,7 @@ class Probe {
         return "one"
     }
 }
-val result = switch (Probe().tick()) {
+var result = switch (Probe().tick()) {
     case "one" {
         "one"
     }

@@ -10,7 +10,7 @@ class Simple extends RuntimeException {
     }
 }
 class MyErr<T> extends RuntimeException {
-    val payload: T
+    var payload: T
 
     MyErr(payload: T) {
         this.payload = payload

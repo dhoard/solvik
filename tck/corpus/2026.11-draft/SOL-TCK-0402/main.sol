@@ -12,5 +12,5 @@ func probe(): Result<Integer, String> {
     print("p")
     return Result.Ok(1)
 }
-val u: Unit = probe().ignore()
+var u: Unit = probe().ignore()
 print("done")

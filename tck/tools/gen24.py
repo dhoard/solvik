@@ -142,7 +142,7 @@ REQS_SPEC = {
                 "every successful constructor path before it is read",
         kind="compile-time",
         quotes=["Every property without a declaration initializer must be assigned exactly once on "
-                "every successful constructor path before it is read; a `val` property cannot be "
+                "every successful constructor path before it is read; a `var` property cannot be "
                 "assigned afterward."],
         note="The negative arm assigns the property only on the true branch, so a false-path "
              "instance is missing an assignment and the program is rejected bare; the positive arm "
@@ -258,7 +258,7 @@ BAD("SOL-TCK-0324", "names", "REQ-2202",
     'print(f(1))\n' + NEG, {},
     "Two same-named functions with different parameter types are an overload pair.")
 BAD("SOL-TCK-0325", "names", "REQ-2203",
-    'val x = 1\nval x = 2\nprint(x)\n' + NEG, {},
+    'var x = 1\nvar x = 2\nprint(x)\n' + NEG, {},
     "A second top-level binding of the same name is a same-scope redeclaration.")
 BAD("SOL-TCK-0326", "evaluation", "REQ-2204",
     '1 + 1\nprint("EXECUTED-INVALID")\n', {},
@@ -266,51 +266,51 @@ BAD("SOL-TCK-0326", "evaluation", "REQ-2204",
 
 # --- section 7.
 BAD("SOL-TCK-0327", "objects", "REQ-2205",
-    'class User {\n    val User: Integer = 1\n}\nval u = User()\nprint(u.User)\n' + NEG, {},
+    'class User {\n    var User: Integer = 1\n}\nvar u = User()\nprint(u.User)\n' + NEG, {},
     "The property name equals the class name.")
 BAD("SOL-TCK-0328", "objects", "REQ-2206",
     'class User {\n    User() {\n    }\n\n    User(x: Integer) {\n    }\n}\n'
-    'val u = User()\nprint("EXECUTED-INVALID")\n', {},
+    'var u = User()\nprint("EXECUTED-INVALID")\n', {},
     "A second constructor declaration is the negated at-most-one rule.")
 BAD("SOL-TCK-0329", "objects", "REQ-2207",
-    'class User {\n    User() {\n        this.User()\n    }\n}\nval u = User()\n'
+    'class User {\n    User() {\n        this.User()\n    }\n}\nvar u = User()\n'
     'print("EXECUTED-INVALID")\n', {},
     "The constructor invokes itself as `this.User()`.")
 BAD("SOL-TCK-0330", "objects", "REQ-2208",
-    'class User {\n    mutable val name: String\n}\nval u = User()\nprint("EXECUTED-INVALID")\n', {},
+    'class User {\n    var mutable name: String\n}\nvar u = User()\nprint("EXECUTED-INVALID")\n', {},
     "An uninitialized property without an explicit constructor removes the implicit zero-arg "
     "initializer.")
 BAD("SOL-TCK-0331", "objects", "REQ-2209",
     'mutable class A {\n    A(x: Integer) {\n    }\n}\nclass B extends A {\n    B() {\n    }\n}\n'
-    'val b = B()\nprint("EXECUTED-INVALID")\n', {},
+    'var b = B()\nprint("EXECUTED-INVALID")\n', {},
     "The subclass constructor omits the required `super(...)` call.")
 BAD("SOL-TCK-0332", "objects", "REQ-2210",
     'class A {\n    A() {\n    }\n\n    func toString(): String {\n        return "a"\n    }\n}\n'
-    'val a = A()\nprint(a.toString())\n' + NEG, {},
+    'var a = A()\nprint(a.toString())\n' + NEG, {},
     "`toString` is declared without `override`.")
 BAD("SOL-TCK-0333", "objects", "REQ-2211",
-    'class U {\n    val name: String\n\n    U(c: Boolean) {\n        if (c) {\n'
-    '            this.name = "a"\n        }\n    }\n}\nval u = U(true)\n'
+    'class U {\n    var name: String\n\n    U(c: Boolean) {\n        if (c) {\n'
+    '            this.name = "a"\n        }\n    }\n}\nvar u = U(true)\n'
     'print("EXECUTED-INVALID")\n', {},
     "The property is assigned only on the true branch, so a false-path instance is not definitely "
     "initialized.")
 OK("SOL-TCK-0334", "objects", "REQ-2211",
-   'class U {\n    val name: String\n\n    U(c: Boolean) {\n        if (c) {\n'
+   'class U {\n    var name: String\n\n    U(c: Boolean) {\n        if (c) {\n'
    '            this.name = "a"\n        }\n        else {\n            this.name = "b"\n'
-   '        }\n    }\n}\nval u = U(true)\nprint("def" .. u.name)\n',
+   '        }\n    }\n}\nvar u = U(true)\nprint("def" .. u.name)\n',
    "defa",
    "Assigning on both branches satisfies definite initialization and the read observes the taken "
    "branch; the arm differs from the rejection only by the else-assignment.")
 OK("SOL-TCK-0335", "objects", "REQ-2212",
-   'class C {\n    static mutable val i: Integer\n    static mutable val b: Boolean\n    static mutable val d: Double\n'
-   '    static mutable val s: String\n\n    C() {\n    }\n}\n'
+   'class C {\n    static var mutable i: Integer\n    static var mutable b: Boolean\n    static var mutable d: Double\n'
+   '    static var mutable s: String\n\n    C() {\n    }\n}\n'
    'print(C.i)\nprint(C.b)\nprint(C.d)\nprint(C.s)\n',
    "0false0.0null",
    "Each uninitialized static cell reads its declared type's zero value from the specification's "
    "list.")
 BAD("SOL-TCK-0336", "objects", "REQ-2213",
     'class C {\n    static {\n        print("a")\n    }\n\n    static {\n        print("b")\n'
-    '    }\n\n    C() {\n    }\n}\nval c = C()\nprint("EXECUTED-INVALID")\n',
+    '    }\n\n    C() {\n    }\n}\nvar c = C()\nprint("EXECUTED-INVALID")\n',
     {"family": "SEM", "code": "SOLV-SEM-046"},
     "A second class initializer block pins the specification-named SOLV-SEM-046.")
 BAD("SOL-TCK-0337", "objects", "REQ-2214",
@@ -319,11 +319,11 @@ BAD("SOL-TCK-0337", "objects", "REQ-2214",
     {"family": "SEM", "code": "SOLV-SEM-048"},
     "A static member mentioning the class type parameter pins the specification-named SOLV-SEM-048.")
 BAD("SOL-TCK-0338", "objects", "REQ-2215",
-    'mutable class A {\n    static mutable val n: Integer = 5\n}\nclass B extends A {\n    B() {\n    }\n}\n'
+    'mutable class A {\n    static var mutable n: Integer = 5\n}\nclass B extends A {\n    B() {\n    }\n}\n'
     'print(B.n)\n' + NEG, {},
     "The subclass name must not expose the superclass's static member.")
 OK("SOL-TCK-0339", "objects", "REQ-2216",
-   'class A {\n    static {\n        print("initA")\n    }\n\n    static mutable val n: Integer = 5\n\n'
+   'class A {\n    static {\n        print("initA")\n    }\n\n    static var mutable n: Integer = 5\n\n'
    '    A() {\n    }\n}\nclass B {\n    static {\n        print("initB")\n    }\n\n'
    '    B() {\n    }\n}\nprint("start")\nprint(A.n)\nprint("mid")\nprint("done")\n',
    "startinitA5middone",
@@ -332,7 +332,7 @@ OK("SOL-TCK-0339", "objects", "REQ-2216",
 OK("SOL-TCK-0340", "objects", "REQ-2217",
    'mutable class A {\n    static {\n        print("A")\n    }\n\n    A() {\n    }\n}\n'
    'class B extends A {\n    static {\n        print("B")\n    }\n\n    B() {\n    }\n}\n'
-   'print("start")\nval b = B()\nprint("end")\n',
+   'print("start")\nvar b = B()\nprint("end")\n',
    "startABend",
    "Constructing B triggers B's initialization, which initializes the direct superclass A first; "
    "the expected order is `A` then `B`, then the post-construction `end`.")

@@ -246,7 +246,7 @@ add("SOL-TCK-0148", PE + 'throw ParseError("a", "b")\n' + NEG,
 
 # --- REQ-1304: the message is independent of the declared constructor.
 add("SOL-TCK-0149", '''mutable class CodeError extends RuntimeException {
-    val code: Integer
+    var code: Integer
 
     CodeError(code: Integer) {
         this.code = code
@@ -277,20 +277,20 @@ guard()
 ''', "SUCCESS", stdout="[via base]")
 
 # --- REQ-1306: message/getMessage reserved on exception types, ordinary elsewhere.
-add("SOL-TCK-0151", 'class Bad extends RuntimeException {\n    val message: String = "mine"\n}\n' + NEG,
+add("SOL-TCK-0151", 'class Bad extends RuntimeException {\n    var message: String = "mine"\n}\n' + NEG,
     "COMPILE_ERROR", diag={"family": "SEM", "code": "SOLV-SEM-037"})
 
 add("SOL-TCK-0152", 'class Bad extends RuntimeException {\n    func getMessage(): String {\n        return "mine"\n    }\n}\n' + NEG,
     "COMPILE_ERROR", diag={"family": "SEM", "code": "SOLV-SEM-037"})
 
 add("SOL-TCK-0153", '''class Note {
-    val message: String = "fine"
+    var message: String = "fine"
 
     func getMessage(): String {
         return this.message
     }
 }
-val n = Note()
+var n = Note()
 print(n.message)
 print(n.getMessage())
 ''', "SUCCESS", stdout="finefine")

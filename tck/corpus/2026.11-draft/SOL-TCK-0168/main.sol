@@ -1,2 +1,2 @@
-val class = 5
+var class = 5
 print("EXECUTED-INVALID")

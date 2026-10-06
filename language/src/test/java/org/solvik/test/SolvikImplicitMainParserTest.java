@@ -47,10 +47,10 @@ public final class SolvikImplicitMainParserTest {
 
     @Test
     public void aTopLevelLocalIsAnOrdinaryLocalStatement() {
-        String src = "val x: Integer = 1\n";
+        String src = "var x: Integer = 1\n";
         CompilationUnitNode cu = parseOk("local.sol", src);
         assertThat(cu.statements().size()).isEqualTo(1);
-        assertNode(cu.statements().get(0), AstKind.LOCAL_DECL, src, "val x: Integer = 1");
+        assertNode(cu.statements().get(0), AstKind.LOCAL_DECL, src, "var x: Integer = 1");
     }
 
     @Test
@@ -89,7 +89,7 @@ public final class SolvikImplicitMainParserTest {
 
     @Test
     public void topLevelStatementsSeparatedBySemicolonsOnOneLineParse() {
-        String src = "val a = 1; val b = 2; println(a + b)\n";
+        String src = "var a = 1; var b = 2; println(a + b)\n";
         CompilationUnitNode cu = parseOk("explicit.sol", src);
         assertThat(cu.statements().size()).isEqualTo(3);
     }

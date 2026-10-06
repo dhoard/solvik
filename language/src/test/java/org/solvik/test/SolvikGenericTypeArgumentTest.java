@@ -44,7 +44,7 @@ public final class SolvikGenericTypeArgumentTest {
 
     private static final String PRELUDE = """
             class Box<T> {
-                mutable val value: T
+                var mutable value: T
 
                 Box(value: T) {
                     this.value = value
@@ -86,12 +86,12 @@ public final class SolvikGenericTypeArgumentTest {
 
     @Test
     public void explicitTypeArgumentOnAConstructionExecutes() {
-        assertThat(run(PRELUDE + "    val box = Box<Integer>(5)\n    println(box.value)\n")).isEqualTo("5\n");
+        assertThat(run(PRELUDE + "    var box = Box<Integer>(5)\n    println(box.value)\n")).isEqualTo("5\n");
     }
 
     @Test
     public void explicitTypeArgumentOnAMethodExecutes() {
-        assertThat(run(PRELUDE + "    val box = Box(5)\n    println(box.replaceWith<String>(\"x\"))\n")).isEqualTo("x\n");
+        assertThat(run(PRELUDE + "    var box = Box(5)\n    println(box.replaceWith<String>(\"x\"))\n")).isEqualTo("x\n");
     }
 
     @Test
@@ -128,7 +128,7 @@ public final class SolvikGenericTypeArgumentTest {
 
     @Test
     public void constructionExplicitTypeArgumentMismatchIsRejected() {
-        assertThat(first(checkFails(PRELUDE + "func use() {\n    val box = Box<Integer>(\"x\")\n}\n")).code())
+        assertThat(first(checkFails(PRELUDE + "func use() {\n    var box = Box<Integer>(\"x\")\n}\n")).code())
                 .isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
 

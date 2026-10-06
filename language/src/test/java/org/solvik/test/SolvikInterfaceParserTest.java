@@ -114,7 +114,7 @@ public final class SolvikInterfaceParserTest {
                     func name(): String
                 }
                 mutable class Base {
-                    val id: Integer
+                    var id: Integer
 
                     Base(id: Integer) {
                         this.id = id
@@ -153,7 +153,7 @@ public final class SolvikInterfaceParserTest {
 
     @Test
     public void propertyDeclarationInsideAnInterfaceIsRejected() {
-        parseFails("property.sol", "interface I {\n    val value: Integer\n}\n");
+        parseFails("property.sol", "interface I {\n    var value: Integer\n}\n");
     }
 
     @Test

@@ -19,7 +19,7 @@ What each requirement asserts, and why it needs the tests it has:
   * REQ-3312 -- contextual instantiation. The revision states the rule as a property of *positions* and
     lists the positions a function type may occupy, so the same reference has to work in each of them
     and fail where none supplies a signature. SOL-TCK-0436 enumerates the declared-type positions rather
-    than sampling one: a static property initializer, an instance property initializer, four `val`
+    than sampling one: a static property initializer, an instance property initializer, four `var`
     initializers of four different shapes, a static property assignment, and a generic type argument --
     one reference to one declaration simultaneously denoting `func(Integer): Integer`,
     `func(String): String`, `func(Integer, String): String` and `func(Integer): List<Integer>` in a
@@ -189,7 +189,7 @@ REQS_SPEC = {
                 BEFORE_LOWERING, WHERE_FUNCTION_TYPES_APPEAR],
         oracle=(
             "SOL-TCK-0436 puts one generic reference in every declared-type position the section "
-            "enumerates -- static property initializer, instance property initializer, `val` "
+            "enumerates -- static property initializer, instance property initializer, `var` "
             "initializers of four different shapes, a static property assignment, and a generic type "
             "argument -- and then calls the value at each, so a substitution is shown usable rather "
             "than merely typed. Those shapes are mutually incompatible monomorphic types over two "
@@ -296,19 +296,19 @@ func wrap<T>(value: T): List<T> {
 }
 
 class Holder {
-    val member: func(Integer): Integer = identity
-    static mutable val shared: func(String): String = identity
+    var member: func(Integer): Integer = identity
+    static var mutable shared: func(String): String = identity
 }
 
-val integerIdentity: func(Integer): Integer = identity
-val stringIdentity: func(String): String = identity
-val pick: func(Integer, String): String = second
-val boxed: func(Integer): List<Integer> = wrap
-val callbacks: List<func(Integer): Integer> = List<func(Integer): Integer>(identity)
+var integerIdentity: func(Integer): Integer = identity
+var stringIdentity: func(String): String = identity
+var pick: func(Integer, String): String = second
+var boxed: func(Integer): List<Integer> = wrap
+var callbacks: List<func(Integer): Integer> = List<func(Integer): Integer>(identity)
 
-val holder = Holder()
+var holder = Holder()
 Holder.shared = identity
-val taken: func(String): String = Holder.shared
+var taken: func(String): String = Holder.shared
 
 print(integerIdentity(41).toString() .. "\\n")
 print(stringIdentity("ab") .. "\\n")
@@ -334,7 +334,7 @@ func pair<A, B>(a: A, b: B): List<A> {
     return List<A>(a)
 }
 
-val made: func(String): String = identity
+var made: func(String): String = identity
 
 print(identity<Integer>(7).toString() .. "\\n")
 print(identity("text") .. "\\n")
@@ -357,10 +357,10 @@ func echo<T>(value: T): T {
     return value
 }
 
-val asInteger: func(Integer): Integer = identity
-val asString: func(String): String = identity
-val sameShape: func(Integer): Integer = identity
-val other: func(Integer): Integer = echo
+var asInteger: func(Integer): Integer = identity
+var asString: func(String): String = identity
+var sameShape: func(Integer): Integer = identity
+var other: func(Integer): Integer = echo
 
 print((asInteger === sameShape).toString() .. "\\n")
 print(asInteger.equals(asString).toString() .. "\\n")
@@ -380,7 +380,7 @@ print(asInteger(1).toString() .. asString("two") .. "\\n")
     return value
 }
 
-val ambiguous = identity
+var ambiguous = identity
 print(ambiguous)
 print("EXECUTED-INVALID")
 """,
@@ -394,7 +394,7 @@ print("EXECUTED-INVALID")
     return value
 }
 
-val boxed: Any = identity
+var boxed: Any = identity
 print(boxed)
 print("EXECUTED-INVALID")
 """,
@@ -409,7 +409,7 @@ print("EXECUTED-INVALID")
 }
 
 func use<R>() {
-    val slot: R = identity
+    var slot: R = identity
     print(slot)
 }
 
@@ -454,7 +454,7 @@ func outer<U>(f: func(U): U, v: U): U {
     return f(v)
 }
 
-val composed: func(func(Integer): Integer, Integer): Integer = apply
+var composed: func(func(Integer): Integer, Integer): Integer = apply
 
 print(apply(identity, 42).toString() .. "\\n")
 print(apply(identity, "xy") .. "\\n")
@@ -476,8 +476,8 @@ func duplicator<T>(f: func(T): T): func(T): T {
     return f
 }
 
-val viaString: func(String): String = duplicator(identity)
-val viaInteger: func(Integer): Integer = duplicator(identity)
+var viaString: func(String): String = duplicator(identity)
+var viaInteger: func(Integer): Integer = duplicator(identity)
 
 print(viaString("ab") .. "\\n")
 print(viaInteger(20).toString() .. "\\n")
@@ -493,7 +493,7 @@ print(viaInteger(20).toString() .. "\\n")
 }
 
 class Boundary {
-    static val mismatched: func(Integer): Integer = second
+    static var mismatched: func(Integer): Integer = second
 }
 
 print("EXECUTED-INVALID")

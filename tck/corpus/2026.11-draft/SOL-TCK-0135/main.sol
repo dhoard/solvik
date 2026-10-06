@@ -9,7 +9,7 @@
 // Asserted as a bare rejection: the specification names SOLV-TYPE-001 for a *static*
 // declaration initializer that is not assignable to its declared type, not for a local
 // initializer, so no code is mandated at this particular site.
-val joined: Long = if (true) {
+var joined: Long = if (true) {
     1
 }
 else {

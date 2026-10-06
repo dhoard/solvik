@@ -1,4 +1,4 @@
-val n: Integer = 1
+var n: Integer = 1
 print(n === n)
 
 print("EXECUTED-INVALID")

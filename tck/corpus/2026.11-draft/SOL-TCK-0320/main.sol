@@ -14,12 +14,12 @@ func get(): Result<Integer, String> {
 }
 func use(): Result<Integer, String> {
     try {
-        val v = get()?
+        var v = get()?
         return Result.Ok(v)
     }
     finally {
         print("fin")
     }
 }
-val r = use()
+var r = use()
 print("err=" .. r.isErr() .. " e=" .. r.unwrapErr())

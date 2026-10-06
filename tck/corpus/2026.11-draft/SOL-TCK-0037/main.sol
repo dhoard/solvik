@@ -10,7 +10,7 @@ func greet(s: String): String {
     return s
 }
 
-mutable val mv: String? = "a"
+var mutable mv: String? = "a"
 if (mv != null) {
     print(greet(mv))
 }

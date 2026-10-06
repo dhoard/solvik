@@ -113,29 +113,29 @@ def RTE(tid, cat, req, src, category, note):
 
 OK("SOL-TCK-0399", "result", "REQ-3000",
    RESULT + 'func get(): Result<Integer, String> {\n    return Result.Ok(5)\n}\n'
-   'val r = get()\nprint("exp" .. r.expect("msg"))\n',
+   'var r = get()\nprint("exp" .. r.expect("msg"))\n',
    "exp5",
    "expect on an Ok returns the success payload and ignores the message.")
 RTE("SOL-TCK-0400", "result", "REQ-3001",
     RESULT + 'func get(): Result<Integer, String> {\n    return Result.Err("boom")\n}\n'
-    'val r = get()\nprint(r.expect("custom"))\n',
+    'var r = get()\nprint(r.expect("custom"))\n',
     "RESULT_WRONG_VARIANT",
     "expect on an Err faults at run time with the wrong-variant category.")
 OK("SOL-TCK-0401", "result", "REQ-3002",
    RESULT + 'func msg(): String {\n    print("m")\n    return "x"\n}\n'
    'func get(): Result<Integer, String> {\n    return Result.Ok(1)\n}\n'
-   'val r = get()\nprint(r.expect(msg()))\n',
+   'var r = get()\nprint(r.expect(msg()))\n',
    "m1",
    "The message expression prints its marker once before the Ok payload, so it was evaluated "
    "exactly once.")
 OK("SOL-TCK-0402", "result", "REQ-3003",
    RESULT + 'func probe(): Result<Integer, String> {\n    print("p")\n    return Result.Ok(1)\n}\n'
-   'val u: Unit = probe().ignore()\nprint("done")\n',
+   'var u: Unit = probe().ignore()\nprint("done")\n',
    "pdone",
    "ignore evaluates the receiver once and yields Unit, which binds to the declared Unit local.")
 OK("SOL-TCK-0403", "result", "REQ-3004",
    RESULT + 'func get(): Result<Integer, String> {\n    return Result.Ok(1)\n}\n'
-   'val r = get()\nprint(r.isOk())\nprint(r.isErr())\n',
+   'var r = get()\nprint(r.isOk())\nprint(r.isErr())\n',
    "truefalse",
    "isOk and isErr report opposite verdicts on the same value without faulting.")
 OK("SOL-TCK-0404", "result", "REQ-3005",

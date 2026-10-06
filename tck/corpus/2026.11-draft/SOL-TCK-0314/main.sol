@@ -12,12 +12,12 @@ func a(): Result<Integer, String> {
     return Result.Err("deep")
 }
 func b(): Result<Integer, String> {
-    val v = a()?
+    var v = a()?
     return Result.Ok(v + 1)
 }
 func c(): Result<Integer, String> {
-    val v = b()?
+    var v = b()?
     return Result.Ok(v + 1)
 }
-val r = c()
+var r = c()
 print("err=" .. r.isErr() .. " e=" .. r.unwrapErr())

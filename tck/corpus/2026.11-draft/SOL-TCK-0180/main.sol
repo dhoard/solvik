@@ -1,2 +1,2 @@
-val a: Float = 1.5F
+var a: Float = 1.5F
 print(a)

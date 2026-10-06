@@ -9,8 +9,8 @@
 //   - Each cell begins at its declared type's zero value — `0` for every integer type, `0.0` for `Float`/`Double`, `false` for `Boolean`, the NUL character `'\0'` for `Character`, and `null` for every reference type — whether or not the declaration supplies an initializer, so a static property needs no initializer
 //
 class Holder {
-    static val operation: (func(Integer): String)? = null
-    static val sharedOperation: (func(Integer): String)?
-    static val nullableResult: func(Integer): String?
+    static var operation: (func(Integer): String)? = null
+    static var sharedOperation: (func(Integer): String)?
+    static var nullableResult: func(Integer): String?
 }
 print("0419")

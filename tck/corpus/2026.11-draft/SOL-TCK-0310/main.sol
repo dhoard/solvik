@@ -14,8 +14,8 @@ func probe(): Result<Integer, String> {
     return Result.Ok(7)
 }
 func use(): Result<Integer, String> {
-    val v = probe()?
+    var v = probe()?
     return Result.Ok(v)
 }
-val r = use()
+var r = use()
 print("v=" .. r.unwrap())

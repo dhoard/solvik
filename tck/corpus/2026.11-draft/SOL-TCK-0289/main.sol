@@ -1,7 +1,7 @@
 func add(x: Integer, y: Integer): Integer {
     return x + y
 }
-val v = add(
+var v = add(
     1,
     2,
 )

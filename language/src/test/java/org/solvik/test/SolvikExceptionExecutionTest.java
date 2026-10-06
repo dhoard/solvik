@@ -356,7 +356,7 @@ public final class SolvikExceptionExecutionTest {
         Result result = evaluate(
                 "class AppError extends RuntimeException {\n"
                         + "}\n"
-                        + "mutable val i: Integer = 0\n"
+                        + "var mutable i: Integer = 0\n"
                         + "while (true) {\n"
                         + "  i = i + 1\n"
                         + "  try {\n"
@@ -378,7 +378,7 @@ public final class SolvikExceptionExecutionTest {
         Result result = evaluate(
                 "class AppError extends RuntimeException {\n"
                         + "}\n"
-                        + "mutable val i: Integer = 0\n"
+                        + "var mutable i: Integer = 0\n"
                         + "while (i < 2) {\n"
                         + "  i = i + 1\n"
                         + "  try {\n"
@@ -427,7 +427,7 @@ public final class SolvikExceptionExecutionTest {
                         + "}\n"
                         + "func caller(): Result<Integer, String> {\n"
                         + "  try {\n"
-                        + "    val v = maybeFail()?\n"
+                        + "    var v = maybeFail()?\n"
                         + "    println(\"got-\" .. v)\n"
                         + "  }\n"
                         + "  finally {\n"
@@ -435,7 +435,7 @@ public final class SolvikExceptionExecutionTest {
                         + "  }\n"
                         + "  return Result.Ok(0)\n"
                         + "}\n"
-                        + "val r = caller()\n"
+                        + "var r = caller()\n"
                         + "println(\"isErr-\" .. r.isErr())\n");
         assertThat(result.failure).as(result.output).isNull();
         assertThat(result.output).isEqualTo("finally-on-prop\nisErr-true\n");
@@ -447,7 +447,7 @@ public final class SolvikExceptionExecutionTest {
         Result result = evaluate(
                 "class AppError extends RuntimeException {\n"
                         + "}\n"
-                        + "mutable val i: Integer = 0\n"
+                        + "var mutable i: Integer = 0\n"
                         + "try {\n"
                         + "  while (true) {\n"
                         + "    i = i + 1\n"
@@ -697,7 +697,7 @@ public final class SolvikExceptionExecutionTest {
                         + "    throw AppError()\n"
                         + "  }\n"
                         + "  catch (e: AppError) {\n"
-                        + "    val saved = e\n"
+                        + "    var saved = e\n"
                         + "    throw saved\n"
                         + "  }\n"
                         + "}\n"
@@ -752,7 +752,7 @@ public final class SolvikExceptionExecutionTest {
         // subclass keeps its own parameters and its super(...) forwarding unchanged.
         Result result = evaluate(
                 "mutable class BaseError extends RuntimeException {\n"
-                        + "  val code: Integer\n"
+                        + "  var code: Integer\n"
                         + "  BaseError(code: Integer) {\n"
                         + "    this.code = code\n"
                         + "  }\n"
@@ -797,7 +797,7 @@ public final class SolvikExceptionExecutionTest {
         Result result = evaluate(
                 "class AppError extends RuntimeException {\n"
                         + "}\n"
-                        + "val none: String? = null\n"
+                        + "var none: String? = null\n"
                         + "try {\n"
                         + "  throw AppError(none)\n"
                         + "}\n"
@@ -813,7 +813,7 @@ public final class SolvikExceptionExecutionTest {
         Result result = evaluate(
                 "class AppError extends RuntimeException {\n"
                         + "}\n"
-                        + "val none: AppError? = null\n"
+                        + "var none: AppError? = null\n"
                         + "println(\"onNull=\" .. none?.getMessage())\n"
                         + "try {\n"
                         + "  throw AppError(\"safe\")\n"
@@ -884,7 +884,7 @@ public final class SolvikExceptionExecutionTest {
     public void theSynthesizedMemberNamesAreReservedOnExceptionClasses() {
         Result field = evaluate(
                 "class AppError extends RuntimeException {\n"
-                        + "  val message: String = \"mine\"\n"
+                        + "  var message: String = \"mine\"\n"
                         + "}\n");
         assertThat(field.failure).as(field.output).isNotNull();
         assertThat(field.failure.getMessage().contains("SOLV-SEM-037")).as(field.failure.getMessage()).isTrue();
@@ -904,12 +904,12 @@ public final class SolvikExceptionExecutionTest {
         // The reservation applies only to guest exception types, so an ordinary class declares both names.
         Result result = evaluate(
                 "class Note {\n"
-                        + "  val message: String = \"fine\"\n"
+                        + "  var message: String = \"fine\"\n"
                         + "  func getMessage(): String {\n"
                         + "    return \"fine\"\n"
                         + "  }\n"
                         + "}\n"
-                        + "val note = Note()\n"
+                        + "var note = Note()\n"
                         + "println(note.message)\n"
                         + "println(note.getMessage())\n");
         assertThat(result.failure).as(result.output).isNull();

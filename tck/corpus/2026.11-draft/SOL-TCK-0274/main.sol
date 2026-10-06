@@ -14,5 +14,5 @@ class Plain extends Both {
     Plain() {
     }
 }
-val s = Plain()
+var s = Plain()
 print("inh" .. (s == s) .. s.hashCode())

@@ -5,7 +5,7 @@
 //    `func main()`"
 // Obligation: a top-level statement calls a function declared textually *after* it. The
 // expected bytes "got=42" are computed from the declaration (2 * 21), not observed.
-val n: Integer = later(2)
+var n: Integer = later(2)
 print("got=" .. n)
 
 func later(x: Integer): Integer {

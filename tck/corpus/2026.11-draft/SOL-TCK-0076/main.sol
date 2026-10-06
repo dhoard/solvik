@@ -1,6 +1,6 @@
 // Oracle derived from LANGUAGE_SPEC section 11's `List<T>` operation table, which gives
 // verbatim:
-//   "`List<T>`: `val isEmpty: Boolean`, `val size: Integer`, `func add(element: T)`,
+//   "`List<T>`: `var isEmpty: Boolean`, `var size: Integer`, `func add(element: T)`,
 //    `func get(index: Integer): T`, `func removeAt(index: Integer): T`,
 //    `func set(index: Integer, element: T)`, `func clear()`."
 // and: "A collection is constructed with a class-style call. The type arguments may be
@@ -21,7 +21,7 @@
 // That yields the exact stream `3 40 99 20 3 false true`.
 // Executed as top-level statements (section 20; an explicit `func main` is SOLV-SEM-001).
 // Uses print, so no platform line separator can enter the expected bytes.
-val nums = List<Integer>(10, 20, 30)
+var nums = List<Integer>(10, 20, 30)
 print(nums.size)
 print(" ")
 nums.add(40)

@@ -77,12 +77,12 @@ public final class SolvikNumericTest {
     public void numericAndCharacterLiteralsHaveTheirDeclaredTypes() {
         CheckedProgram program = check("""
                 func f(): Unit {
-                    val intValue = 1
-                    val longValue = 1L
-                    val floatValue = 1.5f
-                    val doubleValue = 1.5
-                    val exponentValue = 1e3
-                    val charValue = 'A'
+                    var intValue = 1
+                    var longValue = 1L
+                    var floatValue = 1.5f
+                    var doubleValue = 1.5
+                    var exponentValue = 1e3
+                    var charValue = 'A'
                 }
                 """);
         FunctionDeclNode fn = function(program);
@@ -98,12 +98,12 @@ public final class SolvikNumericTest {
     public void explicitConversionsProduceTheirTargetTypes() {
         CheckedProgram program = check("""
                 func f(): Unit {
-                    val b = Byte(1)
-                    val s = Short(1)
-                    val i = Integer(1L)
-                    val l = Long(1)
-                    val fl = Float(1)
-                    val d = Double(1)
+                    var b = Byte(1)
+                    var s = Short(1)
+                    var i = Integer(1L)
+                    var l = Long(1)
+                    var fl = Float(1)
+                    var d = Double(1)
                 }
                 """);
         FunctionDeclNode fn = function(program);
@@ -119,12 +119,12 @@ public final class SolvikNumericTest {
     public void sameTypeArithmeticProducesThatNumericType() {
         CheckedProgram program = check("""
                 func f(): Unit {
-                    val b = Byte(1) + Byte(2)
-                    val s = Short(1) * Short(2)
-                    val i = 1 + 2
-                    val l = 1L - 2L
-                    val fl = 1.5f / 2.5f
-                    val d = 1.5 + 2.5
+                    var b = Byte(1) + Byte(2)
+                    var s = Short(1) * Short(2)
+                    var i = 1 + 2
+                    var l = 1L - 2L
+                    var fl = 1.5f / 2.5f
+                    var d = 1.5 + 2.5
                 }
                 """);
         FunctionDeclNode fn = function(program);
@@ -140,12 +140,12 @@ public final class SolvikNumericTest {
     public void sameTypeOrderingProducesBoolean() {
         CheckedProgram program = check("""
                 func f(): Unit {
-                    val b = Byte(1) < Byte(2)
-                    val s = Short(1) >= Short(2)
-                    val i = 1 > 2
-                    val l = 1L <= 2L
-                    val fl = 1.5f < 2.5f
-                    val d = 1.5 > 2.5
+                    var b = Byte(1) < Byte(2)
+                    var s = Short(1) >= Short(2)
+                    var i = 1 > 2
+                    var l = 1L <= 2L
+                    var fl = 1.5f < 2.5f
+                    var d = 1.5 > 2.5
                 }
                 """);
         FunctionDeclNode fn = function(program);
@@ -158,9 +158,9 @@ public final class SolvikNumericTest {
     public void negationKeepsTheNumericType() {
         CheckedProgram program = check("""
                 func f(): Unit {
-                    val l = -1L
-                    val d = -1.5
-                    val fl = -1.5f
+                    var l = -1L
+                    var d = -1.5
+                    var fl = -1.5f
                 }
                 """);
         FunctionDeclNode fn = function(program);
@@ -173,11 +173,11 @@ public final class SolvikNumericTest {
     public void numberAcceptsEveryNumericSubtype() {
         check("""
                 func f(): Unit {
-                    val a: Number = 1
-                    val b: Number = 1L
-                    val c: Number = 1.5f
-                    val d: Number = 1.5
-                    val e: Any = 1
+                    var a: Number = 1
+                    var b: Number = 1L
+                    var c: Number = 1.5f
+                    var d: Number = 1.5
+                    var e: Any = 1
                 }
                 """);
     }
@@ -234,7 +234,7 @@ public final class SolvikNumericTest {
 
     @Test
     public void integralConversionOutOfRangeAtRuntimeRaisesAnArithmeticError() {
-        PolyglotException failure = evaluate("    val x = Integer(1000)\n    println(Byte(x))\n");
+        PolyglotException failure = evaluate("    var x = Integer(1000)\n    println(Byte(x))\n");
         assertThat(failure).isNotNull();
         assertThat(failure.isSyntaxError()).isFalse();
         assertThat(failure.getMessage().contains("out of range")).as(failure.getMessage()).isTrue();

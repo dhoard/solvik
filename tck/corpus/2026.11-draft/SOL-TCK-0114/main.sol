@@ -4,6 +4,6 @@
 // Oracle quotations verified verbatim against docs/LANGUAGE_SPEC.md:
 //   - `null` is assignable only to nullable types. If `S` is a subtype of `T`, then `S` is assignable to `T?` and `S?` is assignable to `T?`; `S?` is not assignable to non-null `T`.
 //
-val r = Regex(r#"\d+"#)
-val m = r.find("ab12y")
+var r = Regex(r#"\d+"#)
+var m = r.find("ab12y")
 print(m.value)

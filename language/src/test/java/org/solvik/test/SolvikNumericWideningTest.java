@@ -88,11 +88,11 @@ public final class SolvikNumericWideningTest {
     public void integralChainWidensLosslessly() {
         CheckedProgram program = check("""
                 func f(): Unit {
-                    val l: Long = 1
-                    val i: Integer = Short(1)
-                    val s: Short = Byte(1)
-                    val i2: Integer = Byte(2)
-                    val l2: Long = Byte(3)
+                    var l: Long = 1
+                    var i: Integer = Short(1)
+                    var s: Short = Byte(1)
+                    var i2: Integer = Byte(2)
+                    var l2: Long = Byte(3)
                 }
                 """);
         FunctionDeclNode fn = function(program);
@@ -109,9 +109,9 @@ public final class SolvikNumericWideningTest {
         // and is covered by SolvikNumericNegativeTest.longToDoubleIsRejectedAsPrecisionLoss.
         CheckedProgram program = check("""
                 func f(): Unit {
-                    val d1: Double = Byte(1)
-                    val d2: Double = Short(2)
-                    val d3: Double = 3
+                    var d1: Double = Byte(1)
+                    var d2: Double = Short(2)
+                    var d3: Double = 3
                 }
                 """);
         FunctionDeclNode fn = function(program);
@@ -125,8 +125,8 @@ public final class SolvikNumericWideningTest {
         // Byte and Short have at most 15 value bits, within the Float significand.
         CheckedProgram program = check("""
                 func f(): Unit {
-                    val f1: Float = Byte(1)
-                    val f2: Float = Short(2)
+                    var f1: Float = Byte(1)
+                    var f2: Float = Short(2)
                 }
                 """);
         FunctionDeclNode fn = function(program);
@@ -138,7 +138,7 @@ public final class SolvikNumericWideningTest {
     public void floatWidensToDouble() {
         CheckedProgram program = check("""
                 func f(): Unit {
-                    val d: Double = 1.5f
+                    var d: Double = 1.5f
                 }
                 """);
         FunctionDeclNode fn = function(program);
@@ -149,11 +149,11 @@ public final class SolvikNumericWideningTest {
     public void mixedArithmeticProducesTheLeastCommonWidenedType() {
         CheckedProgram program = check("""
                 func f(): Unit {
-                    val a = 1 + 1L
-                    val b = 1L + 1
-                    val c = 1 + 1.5
-                    val d = 1.5f + 2.0
-                    val e = Byte(1) + 2
+                    var a = 1 + 1L
+                    var b = 1L + 1
+                    var c = 1 + 1.5
+                    var d = 1.5f + 2.0
+                    var e = Byte(1) + 2
                 }
                 """);
         FunctionDeclNode fn = function(program);
@@ -170,7 +170,7 @@ public final class SolvikNumericWideningTest {
     public void mixedArithmeticWidensBothOperands() {
         CheckedProgram program = check("""
                 func f(): Unit {
-                    val a = 1 + 1L
+                    var a = 1 + 1L
                 }
                 """);
         FunctionDeclNode fn = function(program);
@@ -183,8 +183,8 @@ public final class SolvikNumericWideningTest {
     public void mixedOrderingProducesBoolean() {
         CheckedProgram program = check("""
                 func f(): Unit {
-                    val a = 1 < 2L
-                    val b = 1.5f > 2.0
+                    var a = 1 < 2L
+                    var b = 1.5f > 2.0
                 }
                 """);
         FunctionDeclNode fn = function(program);
@@ -196,8 +196,8 @@ public final class SolvikNumericWideningTest {
     public void mixedEqualityProducesBoolean() {
         CheckedProgram program = check("""
                 func f(): Unit {
-                    val a = 1 == 1L
-                    val b = 1.5f != 1.5
+                    var a = 1 == 1L
+                    var b = 1.5f != 1.5
                 }
                 """);
         FunctionDeclNode fn = function(program);
@@ -243,7 +243,7 @@ public final class SolvikNumericWideningTest {
         // the value round-trips as a Long. check() asserts the analysis succeeds (the widening).
         check("""
                 class Box<T> {
-                    val value: T
+                    var value: T
                     Box(value: T) {
                         this.value = value
                     }
@@ -251,12 +251,12 @@ public final class SolvikNumericWideningTest {
                 """);
         assertThat(run("""
                 class Box<T> {
-                    val value: T
+                    var value: T
                     Box(value: T) {
                         this.value = value
                     }
                 }
-                val b: Box<Long> = Box<Long>(1)
+                var b: Box<Long> = Box<Long>(1)
                 println(b.value)
                 """)).isEqualTo("1\n");
     }
@@ -265,7 +265,7 @@ public final class SolvikNumericWideningTest {
     public void collectionElementsWiden() {
         CheckedProgram program = check("""
                 func f(): Unit {
-                    val xs: List<Long> = List<Long>(1, 2)
+                    var xs: List<Long> = List<Long>(1, 2)
                 }
                 """);
         assertThat(function(program)).isNotNull();
@@ -288,7 +288,7 @@ public final class SolvikNumericWideningTest {
     public void wideningToFloatExecutes() {
         // A widening whose target is the Float typed slot drives the FLOAT convert branch at runtime.
         assertThat(run("""
-                    val f: Float = Byte(3)
+                    var f: Float = Byte(3)
                     println(f)
                 """)).isEqualTo("3.0\n");
     }
@@ -298,9 +298,9 @@ public final class SolvikNumericWideningTest {
         // Widened locals are stored in typed frame slots (Long, Double), exercising the boxed-value
         // write specialization rather than the generic object path.
         assertThat(run("""
-                    val l: Long = 1
-                    val d: Double = 1.5f
-                    val i: Integer = Byte(7)
+                    var l: Long = 1
+                    var d: Double = 1.5f
+                    var i: Integer = Byte(7)
                     println(l)
                     println(d)
                     println(i)

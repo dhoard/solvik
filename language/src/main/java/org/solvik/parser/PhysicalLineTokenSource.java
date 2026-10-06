@@ -94,7 +94,7 @@ public final class PhysicalLineTokenSource implements TokenSource {
      * statement: {@code return} alone on a line returns {@code Unit}. {@code this} is a
      * value-producing atom exactly like an identifier or a literal. {@code ?} completes a written
      * nullable type reference or a propagation suffix. Brackets and braces participate because a line
-     * may legitimately end on one. The keywords that open a construct - {@code val}, {@code mutable},
+     * may legitimately end on one. The keywords that open a construct - {@code var}, {@code mutable},
      * {@code func}, {@code class}, {@code if}, {@code while}, {@code for}, {@code switch}, {@code
      * case}, {@code try}, {@code else}, {@code and every other keyword that must be followed by what
      * it modifies} - are absent from this table, which is what makes a line break after one of them a

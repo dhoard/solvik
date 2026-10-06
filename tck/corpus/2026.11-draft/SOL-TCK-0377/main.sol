@@ -4,8 +4,8 @@
 // Oracle quotations verified verbatim against docs/LANGUAGE_SPEC.md:
 //   - `Any` is the sole top type for every non-null Solvik value, including every class, interface, and enum value.
 //
-val a: Any = 42
-val s: Any = "hi"
+var a: Any = 42
+var s: Any = "hi"
 print(a)
 print("|")
 print(s)

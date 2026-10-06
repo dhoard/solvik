@@ -1,12 +1,12 @@
 class H1 {
-    val n: String?
+    var n: String?
     H1(n: String?) {
         this.n = n
     }
 }
 
 func show2(h: H1): String {
-    val n = h.n
+    var n = h.n
     if (n == null) {
         return "none"
     }

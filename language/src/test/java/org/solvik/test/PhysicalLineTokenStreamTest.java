@@ -64,14 +64,14 @@ public final class PhysicalLineTokenStreamTest {
 
     @Test
     public void aLineEndingInAValueCarriesOneBoundary() {
-        assertThat(boundaries("val x = 1\n")).isEqualTo(1);
-        assertThat(boundaries("val x = 1\nval y = 2\n")).isEqualTo(2);
+        assertThat(boundaries("var x = 1\n")).isEqualTo(1);
+        assertThat(boundaries("var x = 1\nvar y = 2\n")).isEqualTo(2);
     }
 
     @Test
     public void endOfFileTerminatesTheLastLineOnce() {
-        assertThat(boundaries("val x = 1")).isEqualTo(1);
-        assertThat(delivered("val x = 1").get(delivered("val x = 1").size() - 1).getType()).isNotEqualTo(SolvikLexer.NEWLINE);
+        assertThat(boundaries("var x = 1")).isEqualTo(1);
+        assertThat(delivered("var x = 1").get(delivered("var x = 1").size() - 1).getType()).isNotEqualTo(SolvikLexer.NEWLINE);
     }
 
     @Test
@@ -93,8 +93,8 @@ public final class PhysicalLineTokenStreamTest {
 
     @Test
     public void blankAndCommentLinesNeverAddASecondBoundary() {
-        assertThat(boundaries("val a = 1\n\n\nval b = 2\n")).isEqualTo(2);
-        assertThat(boundaries("val a = 1\n// a comment\nval b = 2\n")).isEqualTo(2);
+        assertThat(boundaries("var a = 1\n\n\nvar b = 2\n")).isEqualTo(2);
+        assertThat(boundaries("var a = 1\n// a comment\nvar b = 2\n")).isEqualTo(2);
     }
 
     @Test
@@ -109,10 +109,10 @@ public final class PhysicalLineTokenStreamTest {
         // `(` and after `1,` carry none, because `(` and `,` cannot end a line; the line holding `2`
         // ends on its value and the line holding `)` ends on the closer, so the grammar absorbs the
         // break before the `)` from its own `NEWLINE*`.
-        assertThat(boundaries("val xs = foo(\n    1,\n    2\n)\n")).isEqualTo(2);
+        assertThat(boundaries("var xs = foo(\n    1,\n    2\n)\n")).isEqualTo(2);
         // The line broken after `=` carries no boundary - an assignment line cannot end there - and only
         // the line the value closes ends.
-        assertThat(boundaries("val x =\n    1\n")).isEqualTo(1);
+        assertThat(boundaries("var x =\n    1\n")).isEqualTo(1);
     }
 
     @Test
@@ -126,6 +126,7 @@ public final class PhysicalLineTokenStreamTest {
         assertThat(PhysicalLineTokenSource.endsLine(SolvikLexer.RPAREN)).isTrue();
         assertThat(PhysicalLineTokenSource.endsLine(SolvikLexer.RBRACE)).isTrue();
 
+        assertThat(PhysicalLineTokenSource.endsLine(SolvikLexer.VAR)).isFalse();
         assertThat(PhysicalLineTokenSource.endsLine(SolvikLexer.VAL)).isFalse();
         assertThat(PhysicalLineTokenSource.endsLine(SolvikLexer.MUTABLE)).isFalse();
         assertThat(PhysicalLineTokenSource.endsLine(SolvikLexer.IF)).isFalse();
@@ -141,25 +142,25 @@ public final class PhysicalLineTokenStreamTest {
 
     @Test
     public void anExplicitSeparatorClosingALineCarriesOneBoundary() {
-        assertThat(boundaries("val a = 1\n")).isEqualTo(1);
-        assertThat(boundaries("val a = 1\nval b = 2\n")).isEqualTo(2);
+        assertThat(boundaries("var a = 1\n")).isEqualTo(1);
+        assertThat(boundaries("var a = 1\nvar b = 2\n")).isEqualTo(2);
         // Two constructs on one line separated by `;` and one line break: one boundary, one `;`.
-        List<Token> tokens = delivered("val a = 1; val b = 2\n");
+        List<Token> tokens = delivered("var a = 1; var b = 2\n");
         assertThat(tokens.stream().filter(t -> t.getType() == SolvikLexer.SEMI).count()).isEqualTo(1);
-        assertThat(boundaries("val a = 1; val b = 2\n")).isEqualTo(1);
+        assertThat(boundaries("var a = 1; var b = 2\n")).isEqualTo(1);
     }
 
     @Test
     public void boundariesArePlacedInsideBracketsSoABodySeparatesItsStatements() {
         // Nesting depth is not consulted: the statements of a bracketed anonymous function terminate
         // exactly like statements anywhere else, which is what lets a body sit inside a call at all.
-        String source = "foo(\n    func(x: Integer): Integer {\n        val y = x\n        return y\n    }\n)\n";
+        String source = "foo(\n    func(x: Integer): Integer {\n        var y = x\n        return y\n    }\n)\n";
         assertThat(boundaries(source)).isEqualTo(4);
     }
 
     @Test
     public void aBoundaryIsIdentifiableAsPlacedByThisStage() {
-        List<Token> tokens = delivered("val x = 1\n");
+        List<Token> tokens = delivered("var x = 1\n");
         Token boundary = tokens.stream().filter(t -> t.getType() == SolvikLexer.NEWLINE).findFirst().orElseThrow();
         assertThat(PhysicalLineTokenSource.isLineBoundary(boundary)).isTrue();
         assertThat(boundary.getChannel()).isEqualTo(Token.DEFAULT_CHANNEL);

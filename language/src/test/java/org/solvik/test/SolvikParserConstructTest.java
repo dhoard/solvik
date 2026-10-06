@@ -90,7 +90,7 @@ public final class SolvikParserConstructTest {
 
     @Test
     public void typeTestIsDistinctFromBinaryEquality() {
-        String src = "func f(v: Any): Unit {\n    val r = v is String\n}\n";
+        String src = "func f(v: Any): Unit {\n    var r = v is String\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("istest.sol", src));
         TypeTestExprNode test = (TypeTestExprNode) local(fn, 0).initializer();
         assertThat(test.kind()).isEqualTo(AstKind.TYPE_TEST_EXPR);
@@ -100,7 +100,7 @@ public final class SolvikParserConstructTest {
 
     @Test
     public void castBuildsCastExprWithOperandAndTarget() {
-        String src = "func f(v: Any): Unit {\n    val r = v as Integer\n}\n";
+        String src = "func f(v: Any): Unit {\n    var r = v as Integer\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("ascast.sol", src));
         CastExprNode cast = (CastExprNode) local(fn, 0).initializer();
         assertThat(cast.kind()).isEqualTo(AstKind.CAST_EXPR);
@@ -187,7 +187,7 @@ public final class SolvikParserConstructTest {
     @Test
     public void ifExpressionMissingElseStillParsesButStatementConcatenationFails() {
         // Two statements jammed onto one line with no terminator are a parse error.
-        var bag = parseFails("jam.sol", "func f(): Unit {\n    val a = 1 val b = 2\n}\n");
+        var bag = parseFails("jam.sol", "func f(): Unit {\n    var a = 1 var b = 2\n}\n");
         assertThat(bag.all().get(0).code()).isEqualTo(DiagnosticCode.PARSER_UNEXPECTED_TOKEN);
     }
 
@@ -224,7 +224,7 @@ public final class SolvikParserConstructTest {
     @Test
     public void equalityChainFoldsLeftAssociatively() {
         // a == b == c groups as (a == b) == c: the top node's left child is itself an equality.
-        String src = "func f(a: Boolean, b: Boolean, c: Boolean): Unit {\n    val r = a == b == c\n}\n";
+        String src = "func f(a: Boolean, b: Boolean, c: Boolean): Unit {\n    var r = a == b == c\n}\n";
         BinaryExprNode top = binary(local(onlyFunction(parseOk("eqchain.sol", src)), 0).initializer());
         assertThat(top.operator()).isEqualTo(BinaryOperator.EQ);
         assertThat(binary(top.left()).operator()).isEqualTo(BinaryOperator.EQ);
@@ -232,7 +232,7 @@ public final class SolvikParserConstructTest {
 
     @Test
     public void additiveChainFoldsLeftAssociatively() {
-        String src = "func f(a: Integer, b: Integer, c: Integer): Unit {\n    val r = a - b - c\n}\n";
+        String src = "func f(a: Integer, b: Integer, c: Integer): Unit {\n    var r = a - b - c\n}\n";
         BinaryExprNode top = binary(local(onlyFunction(parseOk("addchain.sol", src)), 0).initializer());
         assertThat(top.operator()).isEqualTo(BinaryOperator.SUB);
         assertThat(binary(top.left()).operator()).isEqualTo(BinaryOperator.SUB);
@@ -241,7 +241,7 @@ public final class SolvikParserConstructTest {
     @Test
     public void coalesceIsTheLowestPrecedenceBinaryTier() {
         // a ?? b || c groups as a ?? (b || c): the top operator is COALESCE, the right child is OR.
-        String src = "func f(a: Integer, b: Boolean, c: Boolean): Unit {\n    val r = a ?? b || c\n}\n";
+        String src = "func f(a: Integer, b: Boolean, c: Boolean): Unit {\n    var r = a ?? b || c\n}\n";
         BinaryExprNode top = binary(local(onlyFunction(parseOk("coalesce.sol", src)), 0).initializer());
         assertThat(top.operator()).isEqualTo(BinaryOperator.COALESCE);
         assertThat(binary(top.right()).operator()).isEqualTo(BinaryOperator.OR);
@@ -251,7 +251,7 @@ public final class SolvikParserConstructTest {
     public void concatBindsLooserThanComparison() {
         // a .. b == c groups as (a .. b) == c: comparison sits above concat, so the top node is EQ
         // and its left child is the concat.
-        String src = "func f(a: Integer, b: Integer, c: Boolean): Unit {\n    val r = a .. b == c\n}\n";
+        String src = "func f(a: Integer, b: Integer, c: Boolean): Unit {\n    var r = a .. b == c\n}\n";
         BinaryExprNode top = binary(local(onlyFunction(parseOk("concatcmp.sol", src)), 0).initializer());
         assertThat(top.operator()).isEqualTo(BinaryOperator.EQ);
         assertThat(binary(top.left()).operator()).isEqualTo(BinaryOperator.CONCAT);
@@ -260,7 +260,7 @@ public final class SolvikParserConstructTest {
     @Test
     public void coalesceBindsLooserThanLogicalAnd() {
         // a ?? b && c groups as a ?? (b && c).
-        String src = "func f(a: Integer, b: Boolean, c: Boolean): Unit {\n    val r = a ?? b && c\n}\n";
+        String src = "func f(a: Integer, b: Boolean, c: Boolean): Unit {\n    var r = a ?? b && c\n}\n";
         BinaryExprNode top = binary(local(onlyFunction(parseOk("coalesceand.sol", src)), 0).initializer());
         assertThat(top.operator()).isEqualTo(BinaryOperator.COALESCE);
         assertThat(binary(top.right()).operator()).isEqualTo(BinaryOperator.AND);
@@ -269,7 +269,7 @@ public final class SolvikParserConstructTest {
     @Test
     public void unaryNegationBindsTighterThanMultiplicative() {
         // -a * b groups as (-a) * b: the multiplication's left operand is the unary node.
-        String src = "func f(a: Integer, b: Integer): Unit {\n    val r = -a * b\n}\n";
+        String src = "func f(a: Integer, b: Integer): Unit {\n    var r = -a * b\n}\n";
         BinaryExprNode top = binary(local(onlyFunction(parseOk("unarymul.sol", src)), 0).initializer());
         assertThat(top.operator()).isEqualTo(BinaryOperator.MUL);
         assertThat(top.left().kind()).isEqualTo(AstKind.UNARY_EXPR);
@@ -277,7 +277,7 @@ public final class SolvikParserConstructTest {
 
     @Test
     public void negationIsRecordedAsUnaryNegateAndBangAsNot() {
-        String src = "func f(a: Integer, b: Boolean): Unit {\n    val n = -a\n    val l = !b\n}\n";
+        String src = "func f(a: Integer, b: Boolean): Unit {\n    var n = -a\n    var l = !b\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("unaryops.sol", src));
         assertThat(((org.solvik.ast.expression.UnaryExprNode) local(fn, 0).initializer()).operator()).isEqualTo(org.solvik.ast.expression.UnaryOperator.NEGATE);
         assertThat(((org.solvik.ast.expression.UnaryExprNode) local(fn, 1).initializer()).operator()).isEqualTo(org.solvik.ast.expression.UnaryOperator.NOT);
@@ -287,7 +287,7 @@ public final class SolvikParserConstructTest {
     public void memberCallChainNestsReceiverInnermost() {
         // a.b().c() nests as ((a.b)()).c(): the outermost is the trailing call; its callee is the
         // '.c' member access; that member's receiver is the inner call; and so on to 'a'.
-        String src = "func f(a: Thing): Unit {\n    val r = a.b().c()\n}\n";
+        String src = "func f(a: Thing): Unit {\n    var r = a.b().c()\n}\n";
         org.solvik.ast.expression.CallExprNode outer = call(local(onlyFunction(parseOk("chain.sol", src)), 0).initializer());
         org.solvik.ast.expression.MemberAccessExprNode outerMember = member(outer.callee());
         assertThat(outerMember.memberName()).isEqualTo("c");
@@ -296,14 +296,14 @@ public final class SolvikParserConstructTest {
 
     @Test
     public void safeMemberAccessIsMarkedOnTheNode() {
-        String src = "func f(a: Thing?): Unit {\n    val r = a?.b\n}\n";
+        String src = "func f(a: Thing?): Unit {\n    var r = a?.b\n}\n";
         org.solvik.ast.expression.MemberAccessExprNode m = member(local(onlyFunction(parseOk("safemember.sol", src)), 0).initializer());
         assertThat(m.isSafe()).isTrue();
     }
 
     @Test
     public void genericCallRecordsTypeArgumentsAndValueArgumentsSeparately() {
-        String src = "func f(): Unit {\n    val r = build<Integer>(1)\n}\n";
+        String src = "func f(): Unit {\n    var r = build<Integer>(1)\n}\n";
         org.solvik.ast.expression.CallExprNode call = call(local(onlyFunction(parseOk("genericcall.sol", src)), 0).initializer());
         assertThat(call.typeArguments().size()).isEqualTo(1);
         assertThat(call.typeArguments().get(0).name()).isEqualTo("Integer");
@@ -312,7 +312,7 @@ public final class SolvikParserConstructTest {
 
     @Test
     public void namespaceQualifiedPathChainsToNamespaceAccessNodes() {
-        String src = "func f(): Unit {\n    val r = m::Thing\n}\n";
+        String src = "func f(): Unit {\n    var r = m::Thing\n}\n";
         org.solvik.ast.expression.NamespaceAccessExprNode ns = (org.solvik.ast.expression.NamespaceAccessExprNode) local(onlyFunction(parseOk("nspaceref.sol", src)), 0).initializer();
         assertThat(ns.memberName()).isEqualTo("Thing");
         assertThat(ns.receiver().kind()).isEqualTo(AstKind.NAME_REF_EXPR);
@@ -365,28 +365,28 @@ public final class SolvikParserConstructTest {
 
     @Test
     public void whileAndThreeClauseForParseToStatementNodes() {
-        String src = "func f(): Unit {\n    while (true) {\n        break\n    }\n    {\n        mutable val i = 0\n        while (i < 3) {\n            continue\n            i\n        }\n    }\n}\n";
+        String src = "func f(): Unit {\n    while (true) {\n        break\n    }\n    {\n        var mutable i = 0\n        while (i < 3) {\n            continue\n            i\n        }\n    }\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("loops.sol", src));
         assertThat(((org.solvik.ast.statement.WhileStmtNode) fn.body().statements().get(0)).kind()).isEqualTo(AstKind.WHILE_STMT);
     }
 
     @Test
     public void mapEntryArgumentParsesToMapEntryExpr() {
-        String src = "func f(): Unit {\n    val m = Map<String, Integer>(\"a\": 1)\n}\n";
+        String src = "func f(): Unit {\n    var m = Map<String, Integer>(\"a\": 1)\n}\n";
         org.solvik.ast.expression.CallExprNode call = call(local(onlyFunction(parseOk("mapentry.sol", src)), 0).initializer());
         assertThat(call.arguments().get(0).kind()).isEqualTo(AstKind.MAP_ENTRY_EXPR);
     }
 
     @Test
     public void trailingCommaInArgumentListContributesNoArgument() {
-        String src = "func f(a: Integer, b: Integer): Unit {\n    val r = g(1, 2,)\n}\n";
+        String src = "func f(a: Integer, b: Integer): Unit {\n    var r = g(1, 2,)\n}\n";
         org.solvik.ast.expression.CallExprNode call = call(local(onlyFunction(parseOk("trailcomma.sol", src)), 0).initializer());
         assertThat(call.arguments()).hasSize(2);
     }
 
     @Test
     public void classWithConstructorMethodsAndPropertiesExposesThem() {
-        String src = "class Point {\n    val x: Integer\n    Point(x: Integer) {\n        this.x = x\n    }\n    func getX(): Integer {\n        return this.x\n    }\n}\n";
+        String src = "class Point {\n    var x: Integer\n    Point(x: Integer) {\n        this.x = x\n    }\n    func getX(): Integer {\n        return this.x\n    }\n}\n";
         org.solvik.ast.declaration.ClassDeclNode cls = (org.solvik.ast.declaration.ClassDeclNode) parseOk("classfull.sol", src).declarations().get(0);
         assertThat(cls.name()).isEqualTo("Point");
         assertThat(cls.properties()).hasSize(1);
@@ -416,7 +416,7 @@ public final class SolvikParserConstructTest {
 
     @Test
     public void delegateMemberIsParsedUnderTheClass() {
-        String src = "class Wrapper {\n    delegate val inner: Speaker\n}\n";
+        String src = "class Wrapper {\n    delegate var inner: Speaker\n}\n";
         org.solvik.ast.declaration.ClassDeclNode cls = (org.solvik.ast.declaration.ClassDeclNode) parseOk("delegate.sol", src).declarations().get(0);
         assertThat(cls.delegates()).hasSize(1);
     }
@@ -448,7 +448,7 @@ public final class SolvikParserConstructTest {
 
     @Test
     public void topStatementsFormAnImplicitMain() {
-        String src = "val x = 1\nprintln(x)\n";
+        String src = "var x = 1\nprintln(x)\n";
         assertThat(parseOk("implicitmain.sol", src).hasImplicitMain()).isTrue();
     }
 
@@ -456,7 +456,7 @@ public final class SolvikParserConstructTest {
 
     @Test
     public void unclosedFunctionBraceIsRejected() {
-        parseFails("unclosedbrace.sol", "func f(): Unit {\n    val a = 1\n");
+        parseFails("unclosedbrace.sol", "func f(): Unit {\n    var a = 1\n");
     }
 
     @Test
@@ -466,7 +466,7 @@ public final class SolvikParserConstructTest {
 
     @Test
     public void unclosedClassBodyIsRejected() {
-        parseFails("unclosedclass.sol", "class A {\n    val x: Integer\n");
+        parseFails("unclosedclass.sol", "class A {\n    var x: Integer\n");
     }
 
     @Test
@@ -491,8 +491,8 @@ public final class SolvikParserConstructTest {
 
     @Test
     public void valWithoutInitializerIsRejected() {
-        // Section 2: a local 'val' must be initialized (no definite-assignment analysis).
-        parseFails("valnoinit.sol", "func f(): Unit {\n    val x: Integer\n}\n");
+        // Section 2: a local 'var' must be initialized (no definite-assignment analysis).
+        parseFails("valnoinit.sol", "func f(): Unit {\n    var x: Integer\n}\n");
     }
 
     @Test
@@ -532,7 +532,7 @@ public final class SolvikParserConstructTest {
     @Test
     public void assignmentAsAnExpressionIsRejected() {
         // Assignment is a statement, never an expression (section 2). '(y = 1)' is not a value.
-        parseFails("assignexpr.sol", "func f(y: Integer): Unit {\n    val x = (y = 1)\n}\n");
+        parseFails("assignexpr.sol", "func f(y: Integer): Unit {\n    var x = (y = 1)\n}\n");
     }
 
     @Test

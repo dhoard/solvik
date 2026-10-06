@@ -13,6 +13,6 @@
 // `diagnosticNormative: false`. This is a genuine specification gap to raise, not
 // something the TCK may paper over by adopting an implementation code.
 // Sentinel per TCK.md section 10; the compile-only phase proves non-execution.
-val s = "bad \q escape"
+var s = "bad \q escape"
 print(s)
 println("EXECUTED-INVALID")

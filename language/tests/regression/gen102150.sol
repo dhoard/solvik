@@ -20,14 +20,14 @@ println(num2(true) is Number)
 println(num2(true) is Any)
 
 class H3 {
-    val n: String?
+    var n: String?
     H3(n: String?) {
         this.n = n
     }
 }
 
 func show4(h: H3): String {
-    val n = h.n
+    var n = h.n
     if (n == null) {
         return "none"
     }

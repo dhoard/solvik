@@ -71,7 +71,7 @@ public final class SolvikToStringSemanticTest {
                     func name(): String
                 }
                 class User implements Named {
-                    val label: String
+                    var label: String
 
                     User(label: String) {
                         this.label = label
@@ -149,7 +149,7 @@ public final class SolvikToStringSemanticTest {
 
     @Test
     public void propertyNamedToStringIsRejected() {
-        assertThat(first(checkFails("class C {\n    val toString: String = \"c\"\n}\n")).code()).isEqualTo(DiagnosticCode.SEM_RESERVED_MEMBER);
+        assertThat(first(checkFails("class C {\n    var toString: String = \"c\"\n}\n")).code()).isEqualTo(DiagnosticCode.SEM_RESERVED_MEMBER);
     }
 
     @Test

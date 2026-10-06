@@ -351,7 +351,7 @@ public final class SolvikIncludeExecutionTest {
     public void runtimeErrorInIncludedFunctionPointsAtIncludedFile() throws IOException {
         Path dir = tempDir();
         try {
-            write(dir, "bad.sol", "func boom(): Integer {\n    val x: Integer = 1\n    return x / 0\n}\n");
+            write(dir, "bad.sol", "func boom(): Integer {\n    var x: Integer = 1\n    return x / 0\n}\n");
             Path root = write(dir, "root.sol", "include \"bad.sol\"\nprintln(boom())\n");
             Run run = eval(fileSource(root), null, null);
             assertThat(run.failure).isNotNull();

@@ -49,7 +49,7 @@ public final class SolvikStaticMemberParserTest {
     public void aStaticPropertyAndAStaticMethodAreRepresentedAsStaticMembers() {
         String src = """
                 class Counter {
-                    static val limit: Integer = 10
+                    static var limit: Integer = 10
                     static func reset() {
                         println("reset")
                     }
@@ -64,7 +64,7 @@ public final class SolvikStaticMemberParserTest {
         // The member span begins at `static`, so the keyword cannot vanish from a diagnostic that
         // points at the member. The inserted terminating SEMI is not part of the span, matching how
         // instance properties are spanned.
-        assertNode(limit, AstKind.PROPERTY_DECL, src, "static val limit: Integer = 10");
+        assertNode(limit, AstKind.PROPERTY_DECL, src, "static var limit: Integer = 10");
 
         assertThat(counter.staticMethods()).hasSize(1);
         FunctionDeclNode reset = counter.staticMethods().get(0);
@@ -79,8 +79,8 @@ public final class SolvikStaticMemberParserTest {
     public void staticMembersDoNotAppearInTheInstanceViews() {
         String src = """
                 class Counter {
-                    val instanceCount: Integer
-                    static val limit: Integer = 10
+                    var instanceCount: Integer
+                    static var limit: Integer = 10
                     func describe(): String {
                         return "counter"
                     }
@@ -108,7 +108,7 @@ public final class SolvikStaticMemberParserTest {
     public void aStaticBlockIsAPreservedStatementListInSourceOrder() {
         String src = """
                 class Counter {
-                    static val limit: Integer = 10
+                    static var limit: Integer = 10
                     static {
                         println("initializing")
                     }
@@ -136,7 +136,7 @@ public final class SolvikStaticMemberParserTest {
                     static {
                         println("initializing")
                     }
-                    val x: Integer
+                    var x: Integer
                 }
                 """;
         ClassDeclNode counter = onlyClass(parseOk("counter.sol", src));
@@ -167,7 +167,7 @@ public final class SolvikStaticMemberParserTest {
         // property (docs/LANGUAGE_SPEC.md sections 6 and 7).
         parseFails("counter.sol", """
                 class Counter {
-                    static val limit = 10
+                    static var limit = 10
                 }
                 """);
     }
@@ -203,7 +203,7 @@ public final class SolvikStaticMemberParserTest {
                 """);
         parseFails("property.sol", """
                 class C {
-                    val static: Integer
+                    var static: Integer
                 }
                 """);
     }

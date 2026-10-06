@@ -67,8 +67,8 @@ public final class SolvikClassSemanticTest {
     public void classSymbolDescribesPropertiesMethodsAndConstructor() {
         CheckedProgram program = check("""
                 class User {
-                    val id: Integer
-                    mutable val name: String
+                    var id: Integer
+                    var mutable name: String
 
                     User(id: Integer, name: String) {
                         this.id = id
@@ -108,7 +108,7 @@ public final class SolvikClassSemanticTest {
     public void constructionCallIsTypedAndResolved() {
         CheckedProgram program = check("""
                 class User {
-                    val id: Integer
+                    var id: Integer
                     User(id: Integer) {
                         this.id = id
                     }
@@ -129,13 +129,13 @@ public final class SolvikClassSemanticTest {
     public void memberReadsAndWritesResolveToProperties() {
         CheckedProgram program = check("""
                 class User {
-                    mutable val name: String
+                    var mutable name: String
                     User(name: String) {
                         this.name = name
                     }
                 }
                 func use(u: User): String {
-                    val current = u.name
+                    var current = u.name
                     u.name = "new"
                     return current
                 }
@@ -156,7 +156,7 @@ public final class SolvikClassSemanticTest {
     public void methodCallsAreResolvedWithAndWithoutThis() {
         CheckedProgram program = check("""
                 class Greeter {
-                    val name: String
+                    var name: String
                     Greeter(name: String) {
                         this.name = name
                     }
@@ -193,7 +193,7 @@ public final class SolvikClassSemanticTest {
     public void thisHasTheEnclosingClassType() {
         CheckedProgram program = check("""
                 class Holder {
-                    val value: Integer
+                    var value: Integer
                     Holder(value: Integer) {
                         this.value = value
                     }
@@ -214,8 +214,8 @@ public final class SolvikClassSemanticTest {
     public void propertyDeclarationInitializersAreTyped() {
         CheckedProgram program = check("""
                 class Counter {
-                    mutable val count: Integer = 0
-                    val label: String = "c"
+                    var mutable count: Integer = 0
+                    var label: String = "c"
                 }
                 """);
         ClassSymbol counter = program.classSymbol("Counter").orElseThrow();
@@ -229,10 +229,10 @@ public final class SolvikClassSemanticTest {
     public void methodBodiesMayUseLocalsLoopsAndConditions() {
         CheckedProgram program = check("""
                 class Accumulator {
-                    mutable val total: Integer = 0
+                    var mutable total: Integer = 0
                     func addUpTo(limit: Integer): Integer {
                         {
-                            mutable val i = 0
+                            var mutable i = 0
                             while (i < limit) {
                                 this.total = this.total + i
                                 i = i + 1
@@ -250,7 +250,7 @@ public final class SolvikClassSemanticTest {
     public void programWithoutMainStillChecksClasses() {
         CheckedProgram program = check("""
                 class Point {
-                    val x: Integer
+                    var x: Integer
                     Point(x: Integer) {
                         this.x = x
                     }
@@ -264,7 +264,7 @@ public final class SolvikClassSemanticTest {
     public void classTypedValuesAreAssignableToAny() {
         check("""
                 class Marker {
-                    val id: Integer = 1
+                    var id: Integer = 1
                 }
                 func asAny(m: Marker): Any {
                     return m
@@ -276,7 +276,7 @@ public final class SolvikClassSemanticTest {
     public void mutablePropertyAssignmentInsideMethodsIsTyped() {
         CheckedProgram program = check("""
                 class Cell {
-                    mutable val value: Integer
+                    var mutable value: Integer
                     Cell(value: Integer) {
                         this.value = value
                     }

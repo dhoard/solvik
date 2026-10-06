@@ -4,7 +4,7 @@
 // Oracle quotations verified verbatim against docs/LANGUAGE_SPEC.md:
 //   - Regex patterns may be used in `switch` cases
 //
-val a = "!!"
+var a = "!!"
 switch (a) {
   case regex r#"^\d+$"# {
     print("[number] ")
@@ -16,7 +16,7 @@ switch (a) {
     print("[other] ")
   }
 }
-val b = "42"
+var b = "42"
 switch (b) {
   case regex r#"^\d+$"# {
     print("[number] ")
@@ -28,7 +28,7 @@ switch (b) {
     print("[other] ")
   }
 }
-val c = "hi"
+var c = "hi"
 switch (c) {
   case regex r#"^\d+$"# {
     print("[number] ")

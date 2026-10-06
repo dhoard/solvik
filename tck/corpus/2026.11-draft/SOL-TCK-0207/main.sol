@@ -1,5 +1,5 @@
 class A {
-    val v: Integer
+    var v: Integer
 
     A(n: Integer) {
         this.v = n
@@ -11,7 +11,7 @@ class A {
 }
 
 class B {
-    val v: Integer
+    var v: Integer
 
     B(n: Integer) {
         this.v = n
@@ -21,8 +21,8 @@ class B {
         return this.v
     }
 }
-val b = B(8)
-val a: A = b
+var b = B(8)
+var a: A = b
 print(1)
 
 print("EXECUTED-INVALID")

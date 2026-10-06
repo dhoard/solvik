@@ -29,24 +29,24 @@ func identity(value: Any): Any {
 func noop() {
 }
 
-val dog: Any = Dog()
-val animal: Animal = Dog()
-val color: Any = Color.Red
-val joined: Any = if (true) {
+var dog: Any = Dog()
+var animal: Animal = Dog()
+var color: Any = Color.Red
+var joined: Any = if (true) {
     1
 }
 else {
     "text"
 }
-val numeric: Number = if (true) {
+var numeric: Number = if (true) {
     1
 }
 else {
     2L
 }
-val pattern: Any = Regex("a")
-val values: Any = List<Integer>(1, 2)
-val unit: Any = noop()
+var pattern: Any = Regex("a")
+var values: Any = List<Integer>(1, 2)
+var unit: Any = noop()
 
 println(dog is Any)
 println(dog is Animal)

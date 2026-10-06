@@ -1,5 +1,5 @@
-val s: String? = "ab"
-val r: Integer? = s?.hashCode()
-val n: String? = null
-val q: Integer? = n?.hashCode()
+var s: String? = "ab"
+var r: Integer? = s?.hashCode()
+var n: String? = null
+var q: Integer? = n?.hashCode()
 print("hc" .. (r != null) .. (q == null))

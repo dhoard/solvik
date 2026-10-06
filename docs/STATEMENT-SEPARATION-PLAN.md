@@ -16,7 +16,7 @@ below, and `REQ-0403`, `REQ-0501`, `REQ-1204`, and `REQ-1900`..`REQ-1907` quote 
    lookahead exceptions — the grammar writes `NEWLINE*` where a line may continue). The grammar
    *requires* a separator between statements, declarations, and members: `separator: NEWLINE | SEMI`.
 2. **`;` separates two constructs on one physical line and never terminates one.**
-   `val a = 1; val b = 2` is legal. A `;` followed by another physical line, end of file, or a
+   `var a = 1; var b = 2` is legal. A `;` followed by another physical line, end of file, or a
    stand-alone closing brace is rejected at the semicolon as `SOLV-PARS-012`, so `include "x";`,
    `foo();` at a line end, and `{ 42; }` are all errors; the grammar stays line-shape-free and the
    layout pass states the rule once.

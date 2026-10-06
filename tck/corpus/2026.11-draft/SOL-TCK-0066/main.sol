@@ -2,7 +2,7 @@
 //   "The compiler synthesizes forwarding behavior for interface members supplied by a
 //    delegate."
 //   "Delegation removes forwarding boilerplate."
-// Obligation: a class declares `delegate val` with an interface type and does NOT write a
+// Obligation: a class declares `delegate var` with an interface type and does NOT write a
 // forwarding method for the interface member it implements; calling that member on the
 // class must reach the delegate's implementation. `greet` is declared nowhere on `Host`,
 // so producing "hello" can only come through synthesized forwarding.
@@ -17,7 +17,7 @@ class English implements Greeter {
 }
 
 class Host implements Greeter {
-    delegate val impl: Greeter
+    delegate var impl: Greeter
 
     Host(impl: Greeter) {
         this.impl = impl

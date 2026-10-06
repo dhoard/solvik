@@ -11,13 +11,13 @@ func parse(raw: String): Result<Integer, String> {
     return Result.Ok(42)
 }
 func viaResult(): Result<Integer, String> {
-    val value = parse("ok")?
+    var value = parse("ok")?
     return Result.Ok(value + 1)
 }
-val good = parse("ok")
+var good = parse("ok")
 println(good.isOk())
 println(good.unwrap())
-val bad = parse("bad")
+var bad = parse("bad")
 println(bad.isErr())
 println(bad.unwrapErr())
 println(viaResult().unwrap())
@@ -88,7 +88,7 @@ func discard(): Integer {
 }
 println(discard())
 class Detailed extends RuntimeException {
-    val code: Integer
+    var code: Integer
     Detailed(code: Integer) {
         this.code = code
     }

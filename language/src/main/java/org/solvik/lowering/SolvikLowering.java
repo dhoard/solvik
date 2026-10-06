@@ -287,7 +287,7 @@ public final class SolvikLowering {
         for (FunctionSymbol function : program.functions().values()) {
             // A predeclared function gets a real call target here, before any body lowers, even though a
             // direct call to it keeps lowering to its specialized effect node. Naming one as a value
-            // (`val output: func(Any?): Unit = println`) requires the same canonical value any other
+            // (`var output: func(Any?): Unit = println`) requires the same canonical value any other
             // declared function has, and building that value reads the call target — so installing it
             // later would make a program that references `println` inside a function body read a target
             // that does not exist yet. A second representation for one callable would also put two

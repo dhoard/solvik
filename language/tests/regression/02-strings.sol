@@ -1,4 +1,4 @@
-val name = "Solvik"
+var name = "Solvik"
 println("Hello, " .. name .. "!")
 println("tab\tnewline\nquote\"end")
 println('A')

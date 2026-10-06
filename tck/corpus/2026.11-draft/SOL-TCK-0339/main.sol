@@ -10,7 +10,7 @@ class A {
         print("initA")
     }
 
-    static mutable val n: Integer = 5
+    static var mutable n: Integer = 5
 
     A() {
     }

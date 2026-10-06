@@ -264,7 +264,7 @@ public final class SolvikSwitchExecutionTest {
     public void scrutineeIsEvaluatedExactlyOnce() {
         assertThat(run("""
                 class Counter {
-                    mutable val count: Integer
+                    var mutable count: Integer
 
                     Counter() {
                         this.count = 0
@@ -276,7 +276,7 @@ public final class SolvikSwitchExecutionTest {
                     }
                 }
 
-                    val counter = Counter()
+                    var counter = Counter()
                     switch (counter.next()) {
                         case 1 {
                             println("one")
@@ -292,11 +292,11 @@ public final class SolvikSwitchExecutionTest {
     @Test
     public void breakInsideALoopNestedInACase() {
         assertThat(run("""
-                    mutable val total = 0
+                    var mutable total = 0
                     switch (1) {
                         case 1 {
                             {
-                                mutable val i = 0
+                                var mutable i = 0
                                 while (i < 5) {
                                     if (i == 2) {
                                         break
@@ -317,7 +317,7 @@ public final class SolvikSwitchExecutionTest {
     @Test
     public void continueInsideACaseTargetsTheEnclosingLoop() {
         assertThat(run("""
-                    mutable val v: Integer = 0
+                    var mutable v: Integer = 0
 
                     while (v < 3) {
                         v = v + 1

@@ -9,13 +9,13 @@
 // The NaN values are produced by 0.0/0.0 and the infinities by +/-1.0/0.0, which IEEE
 // defines; no floating literal is parsed, so no rendering format is relied upon.
 // Expected bytes: `false|true|true|true`.
-val nan: Double = 0.0 / 0.0
+var nan: Double = 0.0 / 0.0
 print(nan == nan)
 print("|")
 print(nan != nan)
 print("|")
-val zero: Double = 0.0
-val negZero: Double = -0.0
+var zero: Double = 0.0
+var negZero: Double = -0.0
 print(zero == negZero)
 print("|")
 print(-1.0 / 0.0 < 1.0 / 0.0)

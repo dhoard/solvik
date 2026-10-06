@@ -7,14 +7,14 @@
 // fresh `s` is 3, so total = 2+3 = 5. Printing after each block gives "2" then "5",
 // so the expected stdout is exactly "25". A shared or leaked scope could not produce 5
 // (it would produce 4 from `s + s`, or fail to compile).
-mutable val total = 0
-val a = {
-    val s = 2
+var mutable total = 0
+var a = {
+    var s = 2
     total = total + s
     total
 }
-val b = {
-    val s = 3
+var b = {
+    var s = 3
     total = total + s
     total
 }

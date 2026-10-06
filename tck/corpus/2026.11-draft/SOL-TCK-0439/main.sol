@@ -10,6 +10,6 @@ func identity<T>(value: T): T {
     return value
 }
 
-val ambiguous = identity
+var ambiguous = identity
 print(ambiguous)
 print("EXECUTED-INVALID")

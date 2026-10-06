@@ -16,13 +16,13 @@ class FrenchGreeter implements Greeter {
 }
 
 class Host implements Greeter {
-    delegate val greeter: Greeter
+    delegate var greeter: Greeter
 
     Host(greeter: Greeter) {
         this.greeter = greeter
     }
 }
 
-val host = Host(FrenchGreeter())
-val method: func(): String = host.greet
+var host = Host(FrenchGreeter())
+var method: func(): String = host.greet
 print(method())

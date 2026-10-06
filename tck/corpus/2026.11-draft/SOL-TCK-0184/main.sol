@@ -1,2 +1,2 @@
-val a = 'AB'
+var a = 'AB'
 print("EXECUTED-INVALID")

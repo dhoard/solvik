@@ -127,9 +127,9 @@ public final class SolvikConversionRuntimeTest {
 
     @ParameterizedTest(name = "{1} out of range")
     @CsvSource({
-            "mutable val x = 300, Byte(x)",
-            "mutable val x = 32768, Short(x)",
-            "mutable val x = 2147483648L, Integer(x)",
+            "var mutable x = 300, Byte(x)",
+            "var mutable x = 32768, Short(x)",
+            "var mutable x = 2147483648L, Integer(x)",
     })
     public void outOfRangeConversionOfAValueIsARuntimeError(String declaration, String expression) {
         PolyglotException failure = failureOf("    " + declaration + "\n    println(" + expression + ")\n");
@@ -139,9 +139,9 @@ public final class SolvikConversionRuntimeTest {
 
     @Test
     public void nanAndInfinityCannotConvertToAnIntegralType() {
-        assertThat(failureOf("    mutable val d = 0.0 / 0.0\n    println(Integer(d))\n").getMessage()).contains("out of range");
-        assertThat(failureOf("    mutable val d = 1.0 / 0.0\n    println(Long(d))\n").getMessage()).contains("out of range");
-        assertThat(failureOf("    mutable val f = 1.0f / 0.0f\n    println(Byte(f))\n").getMessage()).contains("out of range");
+        assertThat(failureOf("    var mutable d = 0.0 / 0.0\n    println(Integer(d))\n").getMessage()).contains("out of range");
+        assertThat(failureOf("    var mutable d = 1.0 / 0.0\n    println(Long(d))\n").getMessage()).contains("out of range");
+        assertThat(failureOf("    var mutable f = 1.0f / 0.0f\n    println(Byte(f))\n").getMessage()).contains("out of range");
     }
 
     @ParameterizedTest
@@ -151,7 +151,7 @@ public final class SolvikConversionRuntimeTest {
             "-9223372036854777856.0", "-9223373136366403584.0f",
     })
     public void floatingLongOutOfRangeValuesAreRejectedAtRuntime(String literal) {
-        PolyglotException failure = failureOf("mutable val value = " + literal + "\nprintln(Long(value))\n");
+        PolyglotException failure = failureOf("var mutable value = " + literal + "\nprintln(Long(value))\n");
         assertThat(failure.isSyntaxError()).as(failure.getMessage()).isFalse();
         assertThat(failure.isGuestException()).isTrue();
         assertThat(failure.getMessage()).contains("arithmetic error:", "out of range");
@@ -167,7 +167,7 @@ public final class SolvikConversionRuntimeTest {
             "-9223371487098961920.0f, -9223371487098961920",
     })
     public void floatingLongRepresentableBoundariesAreAccepted(String literal, String expected) {
-        assertThat(run("mutable val value = " + literal + "\nprintln(Long(value))\n")).isEqualTo(expected + "\n");
+        assertThat(run("var mutable value = " + literal + "\nprintln(Long(value))\n")).isEqualTo(expected + "\n");
     }
 
     @Test

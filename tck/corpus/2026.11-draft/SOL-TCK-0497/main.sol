@@ -1,4 +1,4 @@
-val v = {
+var v = {
     42;
 }
 print("v" .. v)

@@ -17,7 +17,7 @@
 // Generated sources are produced by generate_parser.sh; do not edit generated files by hand.
 //
 // Phase 1 supported constructs: top-level `func` declarations with typed parameters and explicit
-// return types; blocks; `val` and `mutable val` locals with initializers; call-expression
+// return types; blocks; `var` and `var mutable` locals with initializers; call-expression
 // statements; integer, Boolean, and normal-string literals; name references,
 // ordinary member access, calls, parentheses, and `+`, `-`, `*`, `/`; `if`/`else`; `return`.
 // SimpleLanguage `function` is intentionally not accepted.
@@ -104,9 +104,9 @@
 //     every implementor, and a class implementing method needs no modifier.
 //
 // Phase 9 adds composition through delegation (docs/LANGUAGE_SPEC.md section 9):
-//   * `delegateDecl` joins `classMember` as `delegate val name: InterfaceType;`. A delegate is a
+//   * `delegateDecl` joins `classMember` as `delegate var name: InterfaceType`. A delegate is a
 //     property declaration whose type annotation is required (there is no inference), and which may
-//     carry a declaration initializer like any other property: only a `val` may be a delegate and it
+//     carry a declaration initializer like any other property: a delegate binds immutably and it
 //     is initialized under the normal constructor rules.
 //   * a delegate's declared type must be an interface, because delegation forwards interface
 //     members; the semantic layer, not the grammar, decides which members a delegate supplies and
@@ -247,7 +247,7 @@ grammar Solvik;
 // with declarations. Those statements, in source order, form the body of an implicit
 // `func main()`; a file that also declares `main` is a duplicate-declaration error, and a file
 // with neither top-level statements nor an explicit `main` is still valid and does nothing. A
-// top-level `val`, mutable or not, is therefore a local of the implicit main, not a global.
+// top-level `var`, mutable or not, is therefore a local of the implicit main, not a global.
 // Phase 16 adds compile-time `include` (docs/LANGUAGE_SPEC.md section 20): a top-level-only
 // directive `include <string literal>` whose target file is parsed and spliced into the program
 // before semantic analysis. `include` is reserved so it can no longer be an identifier.
@@ -321,7 +321,7 @@ staticBlock: STATIC NEWLINE? block ;
 // compiler forwards unresolved interface members to. The type annotation is required and must name
 // an interface; the optional initializer is permitted because a delegate is initialized under the
 // normal constructor rules, exactly like any other property.
-delegateDecl: DELEGATE VAL Identifier COLON typeRef (ASSIGN expression)? ;
+delegateDecl: DELEGATE VAR Identifier COLON typeRef (ASSIGN expression)? ;
 
 methodDecl: methodModifier* FUNC Identifier typeParameterList? LPAREN parameterList? RPAREN (COLON typeRef)? NEWLINE? block ;
 
@@ -389,7 +389,9 @@ statementCore: localDecl | ifStmt | whileStmt | forInStmt | removedForStmt | swi
 
 localDecl: bindingKind Identifier (COLON typeRef)? ASSIGN expression ;
 
-bindingKind: MUTABLE? VAL ;
+// The one binding keyword is `var`; `mutable` follows it to permit reassignment
+// (docs/LANGUAGE_SPEC.md section 2). Keyword first, modifier second, so `mutable var` is rejected.
+bindingKind: VAR MUTABLE? ;
 
 ifStmt: IF LPAREN expression RPAREN NEWLINE? block (NEWLINE? elseBranch)? ;
 
@@ -623,9 +625,9 @@ ENUM: 'enum' ;
 // Error-handling phases: `error` introduces a closed nominal value-carrying error type. Like an
 // enum it opens a construct, so it ends no line; its variants already
 // end in an identifier or a closing paren, both of which terminate.
-// `mutable` is the language's single unlock marker (docs/LANGUAGE_SPEC.md section 1.1 of
-// KEYWORD_CHANGES.md): `mutable val` for a writable binding, `mutable class` for an extendable class,
-// and `mutable func` for an overridable method. It opens a construct and is never a newline terminator.
+// `mutable` is the language's single unlock marker: `var mutable` for a writable binding,
+// `mutable class` for an extendable class, and `mutable func` for an overridable method. It opens a
+// construct and is never a newline terminator.
 MUTABLE: 'mutable' ;
 ABSTRACT: 'abstract' ;
 // Reserved tokens with no parser production (docs/LANGUAGE_SPEC.md, "Lexical basics"). They are the
@@ -635,14 +637,16 @@ ABSTRACT: 'abstract' ;
 // not be deleted: removing a token here would make the spelling a legal identifier.
 SEALED: 'sealed' ;
 OPEN: 'open' ;
-VAR: 'var' ;
+VAL: 'val' ;
 DELEGATE: 'delegate' ;
 IMPLEMENTS: 'implements' ;
 EXTENDS: 'extends' ;
 OVERRIDE: 'override' ;
 THIS: 'this' ;
 SUPER: 'super' ;
-VAL: 'val' ;
+// The one binding keyword (docs/LANGUAGE_SPEC.md section 2). It opens a declaration and is never a
+// newline terminator.
+VAR: 'var' ;
 IF: 'if' ;
 ELSE: 'else' ;
 WHILE: 'while' ;

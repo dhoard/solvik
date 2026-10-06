@@ -168,8 +168,8 @@ def add(tid, req, category, src, outcome, **exp):
 
 
 PT = ('class Point {\n'
-      '    val x: Integer\n'
-      '    val y: Integer\n'
+      '    var x: Integer\n'
+      '    var y: Integer\n'
       '\n'
       '    Point(x: Integer, y: Integer) {\n'
       '        this.x = x\n'
@@ -183,47 +183,47 @@ LoudEQ = ('class Loud {\n    Loud() {\n    }\n\n'
 
 # --- REQ-1700 `===` semantics and negation.
 add("SOL-TCK-0237", "REQ-1700", "equality",
-    PT + 'val a = Point(1, 2)\nval b = Point(1, 2)\nval c = a\n'
+    PT + 'var a = Point(1, 2)\nvar b = Point(1, 2)\nvar c = a\n'
          'print("i" .. (a === b) .. (a === c) .. (a !== c))\n',
     "SUCCESS", stdout="ifalsetruefalse")
 add("SOL-TCK-0238", "REQ-1700", "equality",
-    PT + 'val a: Point? = Point(1, 2)\nval b: Point? = null\n'
+    PT + 'var a: Point? = Point(1, 2)\nvar b: Point? = null\n'
          'print("n" .. (a !== b) .. (a === b) .. (b !== b) .. (b === b))\n',
     "SUCCESS", stdout="ntruefalsefalsetrue")
 add("SOL-TCK-0239", "REQ-1700", "equality",
-    LoudEQ.replace("RET", "true") + 'val p = Loud()\nval q = Loud()\nprint("id" .. (p === q))\n',
+    LoudEQ.replace("RET", "true") + 'var p = Loud()\nvar q = Loud()\nprint("id" .. (p === q))\n',
     # equals returns true for every pair, yet identity is still false: `===` does not delegate.
     "SUCCESS", stdout="idfalse")
 
 # --- REQ-1701 identity-bearing type set.
 add("SOL-TCK-0240", "REQ-1701", "equality",
-    PT + 'val a = Point(1, 2)\nval b = Point(1, 2)\nprint("cls" .. (a === b))\n',
+    PT + 'var a = Point(1, 2)\nvar b = Point(1, 2)\nprint("cls" .. (a === b))\n',
     "SUCCESS", stdout="clsfalse")
 add("SOL-TCK-0241", "REQ-1701", "equality",
-    'val l = List<Integer>(1, 2)\nval m = List<Integer>(1, 2)\nval n = l\n'
+    'var l = List<Integer>(1, 2)\nvar m = List<Integer>(1, 2)\nvar n = l\n'
     'print("col" .. (l === m) .. (l === n))\n',
     "SUCCESS", stdout="colfalsetrue")
 add("SOL-TCK-0242", "REQ-1701", "equality",
     'interface Shape {\n    func sides(): Integer\n}\n'
     'class Sq implements Shape {\n    Sq() {\n    }\n\n    func sides(): Integer {\n        return 4\n    }\n}\n'
-    'val a: Shape = Sq()\nval b: Shape = Sq()\nval c: Shape = a\n'
+    'var a: Shape = Sq()\nvar b: Shape = Sq()\nvar c: Shape = a\n'
     'print("if" .. (a === b) .. (a === c))\n',
     "SUCCESS", stdout="iffalsetrue")
 add("SOL-TCK-0243", "REQ-1701", "equality",
-    'val n: Integer = 1\nprint(n === n)\n' + NEG, "COMPILE_ERROR",
+    'var n: Integer = 1\nprint(n === n)\n' + NEG, "COMPILE_ERROR",
     diag={"family": "TYPE", "code": "SOLV-TYPE-039"})
 add("SOL-TCK-0244", "REQ-1701", "equality",
-    'val s = "ab"\nprint(s === s)\n' + NEG, "COMPILE_ERROR",
+    'var s = "ab"\nprint(s === s)\n' + NEG, "COMPILE_ERROR",
     diag={"family": "TYPE", "code": "SOLV-TYPE-039"})
 add("SOL-TCK-0245", "REQ-1701", "equality",
-    'val b = true\nprint(b === b)\n' + NEG, "COMPILE_ERROR",
+    'var b = true\nprint(b === b)\n' + NEG, "COMPILE_ERROR",
     diag={"family": "TYPE", "code": "SOLV-TYPE-039"})
 add("SOL-TCK-0246", "REQ-1701", "equality",
-    'enum Opt {\n    Some(Integer)\n    None\n}\nval a: Opt = Opt.Some(1)\nval b: Opt = Opt.Some(1)\n'
+    'enum Opt {\n    Some(Integer)\n    None\n}\nvar a: Opt = Opt.Some(1)\nvar b: Opt = Opt.Some(1)\n'
     'print(a === b)\n' + NEG, "COMPILE_ERROR",
     diag={"family": "TYPE", "code": "SOLV-TYPE-039"})
 add("SOL-TCK-0247", "REQ-1701", "equality",
-    'val r = Regex("a")\nval s = Regex("a")\nprint(r === s)\n' + NEG, "COMPILE_ERROR",
+    'var r = Regex("a")\nvar s = Regex("a")\nprint(r === s)\n' + NEG, "COMPILE_ERROR",
     diag={"family": "TYPE", "code": "SOLV-TYPE-039"})
 
 # --- REQ-1702 comparability and the null literal.
@@ -231,42 +231,42 @@ add("SOL-TCK-0248", "REQ-1702", "equality",
     "print(null === null)\n" + NEG, "COMPILE_ERROR",
     diag={"family": "TYPE", "code": "SOLV-TYPE-039"})
 add("SOL-TCK-0249", "REQ-1702", "equality",
-    PT + 'val a = Point(1, 2)\nprint(a === null)\n' + NEG, "COMPILE_ERROR", diag={})
+    PT + 'var a = Point(1, 2)\nprint(a === null)\n' + NEG, "COMPILE_ERROR", diag={})
 add("SOL-TCK-0250", "REQ-1702", "equality",
-    PT + 'val a: Point? = Point(1, 2)\nprint("ok" .. (a === null))\n',
+    PT + 'var a: Point? = Point(1, 2)\nprint("ok" .. (a === null))\n',
     "SUCCESS", stdout="okfalse")
 
 # --- REQ-1703 identity tests narrow.
 add("SOL-TCK-0251", "REQ-1703", "equality",
-    PT + 'val a: Point? = Point(3, 4)\nif (a !== null) {\n    print("ne" .. a.x)\n}\n',
+    PT + 'var a: Point? = Point(3, 4)\nif (a !== null) {\n    print("ne" .. a.x)\n}\n',
     "SUCCESS", stdout="ne3")
 add("SOL-TCK-0252", "REQ-1703", "equality",
-    PT + 'val a: Point? = Point(3, 4)\nif (a === null) {\n    print("isnull")\n}\nelse {\n    print("el" .. a.y)\n}\n',
+    PT + 'var a: Point? = Point(3, 4)\nif (a === null) {\n    print("isnull")\n}\nelse {\n    print("el" .. a.y)\n}\n',
     "SUCCESS", stdout="el4")
 
 # --- REQ-1704 Any must be narrowed first.
 add("SOL-TCK-0253", "REQ-1704", "equality",
-    PT + 'val p = Point(1, 2)\nval q: Any = p\nval r: Any = p\nprint(q === r)\n' + NEG,
+    PT + 'var p = Point(1, 2)\nvar q: Any = p\nvar r: Any = p\nprint(q === r)\n' + NEG,
     "COMPILE_ERROR", diag={"family": "TYPE", "code": "SOLV-TYPE-039"})
 add("SOL-TCK-0254", "REQ-1704", "equality",
-    PT + 'val q: Any = Point(1, 2)\nval a: Point = q as Point\nval b: Point = a\nprint("nw" .. (a === b))\n',
+    PT + 'var q: Any = Point(1, 2)\nvar a: Point = q as Point\nvar b: Point = a\nprint("nw" .. (a === b))\n',
     "SUCCESS", stdout="nwtrue")
 
 # --- REQ-1705 the null steps of the equality algorithm.
 add("SOL-TCK-0255", "REQ-1705", "equality",
-    LoudEQ.replace("RET", "true") + 'val p: Loud? = Loud()\nprint("one" .. (p == null))\n',
+    LoudEQ.replace("RET", "true") + 'var p: Loud? = Loud()\nprint("one" .. (p == null))\n',
     # exactly one null: false, and the override must not run, so no "u" may appear.
     "SUCCESS", stdout="onefalse")
 add("SOL-TCK-0256", "REQ-1705", "equality",
-    LoudEQ.replace("RET", "true") + 'val p: Loud? = null\nprint("both" .. (p == null))\n',
+    LoudEQ.replace("RET", "true") + 'var p: Loud? = null\nprint("both" .. (p == null))\n',
     "SUCCESS", stdout="bothtrue")
 add("SOL-TCK-0257", "REQ-1705", "equality",
-    LoudEQ.replace("RET", "true") + 'val p: Loud? = Loud()\nval q: Loud? = null\nprint("rev" .. (q == p))\n',
+    LoudEQ.replace("RET", "true") + 'var p: Loud? = Loud()\nvar q: Loud? = null\nprint("rev" .. (q == p))\n',
     "SUCCESS", stdout="revfalse")
 
 # --- REQ-1706 no identity shortcut before user dispatch.
 add("SOL-TCK-0258", "REQ-1706", "equality",
-    LoudEQ.replace("RET", "false") + 'val p = Loud()\nprint("sc" .. (p == p) .. p.equals(p))\n',
+    LoudEQ.replace("RET", "false") + 'var p = Loud()\nprint("sc" .. (p == p) .. p.equals(p))\n',
     # The override prints "u" and returns false. Section 3 forbids an identity shortcut
     # before user dispatch, so `p == p` must dispatch (one "u") and yield false, and the
     # explicit call must dispatch too (second "u") and yield the same false. An
@@ -282,12 +282,12 @@ add("SOL-TCK-0259", "REQ-1707", "equality",
     'class R {\n    R() {\n    }\n\n'
     '    override func equals(other: Any?): Boolean {\n        print("R")\n        return false\n    }\n\n'
     '    override func hashCode(): Integer {\n        return 2\n    }\n}\n'
-    'val l = L()\nval r = R()\nval q: Any = l\nprint(q == r)\n',
+    'var l = L()\nvar r = R()\nvar q: Any = l\nprint(q == r)\n',
     "SUCCESS", stdout="Lfalse")
 
 # --- REQ-1708 default equality is reference identity.
 add("SOL-TCK-0260", "REQ-1708", "equality",
-    PT + 'val a = Point(1, 2)\nval b = Point(1, 2)\nval c = a\n'
+    PT + 'var a = Point(1, 2)\nvar b = Point(1, 2)\nvar c = a\n'
          'print("df" .. (a == b) .. (a == c) .. (a.equals(b)))\n',
     "SUCCESS", stdout="dffalsetruefalse")
 
@@ -296,20 +296,20 @@ add("SOL-TCK-0261", "REQ-1709", "hashing",
     'print("fz" .. (0.0 == -0.0) .. (0.0.hashCode() == (-0.0).hashCode()))\n',
     "SUCCESS", stdout="fztruetrue")
 add("SOL-TCK-0262", "REQ-1709", "hashing",
-    'val a = "ab"\nval b = "ab"\nprint("sh" .. (a == b) .. (a.hashCode() == b.hashCode()))\n',
+    'var a = "ab"\nvar b = "ab"\nprint("sh" .. (a == b) .. (a.hashCode() == b.hashCode()))\n',
     "SUCCESS", stdout="shtruetrue")
 
 # --- REQ-1710 collections compare by reference identity.
 add("SOL-TCK-0263", "REQ-1710", "hashing",
-    'val a = List<Integer>(1, 2)\nval b = List<Integer>(1, 2)\nval c = a\n'
+    'var a = List<Integer>(1, 2)\nvar b = List<Integer>(1, 2)\nvar c = a\n'
     'print("ce" .. (a == b) .. (a == c) .. (a.hashCode() == a.hashCode()))\n',
     "SUCCESS", stdout="cefalsetruetrue")
 
 # --- REQ-1711 enum equality over type, variant, and payloads.
 add("SOL-TCK-0264", "REQ-1711", "hashing",
     'enum Opt {\n    Some(Integer)\n    None\n}\n'
-    'val a: Opt = Opt.Some(3)\nval b: Opt = Opt.Some(3)\nval c: Opt = Opt.Some(4)\n'
-    'val d: Opt = Opt.None\n'
+    'var a: Opt = Opt.Some(3)\nvar b: Opt = Opt.Some(3)\nvar c: Opt = Opt.Some(4)\n'
+    'var d: Opt = Opt.None\n'
     'print("en" .. (a == b) .. (a == c) .. (a == d))\n',
     "SUCCESS", stdout="entruefalsefalse")
 

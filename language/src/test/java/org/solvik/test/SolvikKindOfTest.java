@@ -102,7 +102,7 @@ public final class SolvikKindOfTest {
         // receive a primitive slot kind, confirming the fall-through path for nominal types.
         CompilationUnitNode unit = parseOk("kindof.sol", """
                 mutable class Box {
-                    mutable val value: Integer = 0
+                    var mutable value: Integer = 0
                 }
                 """);
         SemanticResult result = SolvikSemanticAnalyzer.analyze(unit);

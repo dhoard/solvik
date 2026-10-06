@@ -144,18 +144,18 @@ S = {
 // verbatim: "A block expression introduces one lexical scope. Earlier statements execute
 // in source order, and a local declared inside the block is visible to later items in
 // that block and nowhere outside it." The section also gives both shapes used here:
-//   val answer = { val base = 20; base + 22 }   -- "has type Integer and value 42"
-//   val logged: Unit = { println("done") }      -- "the second has type Unit"
+//   var answer = { var base = 20; base + 22 }   -- "has type Integer and value 42"
+//   var logged: Unit = { println("done") }      -- "the second has type Unit"
 // `println` is replaced by `print` throughout this corpus so no platform line separator
 // can enter the expected bytes (section 6 defines println's separator as the platform's).
 // Ordering is fixed by source order: the Unit block runs at its declaration and emits
 // "d", then the final print emits the Integer block's 42. Expected stdout is "d42".
-val base = 20
-val answer = {
-    val inner = base
+var base = 20
+var answer = {
+    var inner = base
     inner + 22
 }
-val logged: Unit = {
+var logged: Unit = {
     print("d")
 }
 print(answer)
@@ -170,14 +170,14 @@ print(answer)
 // fresh `s` is 3, so total = 2+3 = 5. Printing after each block gives "2" then "5",
 // so the expected stdout is exactly "25". A shared or leaked scope could not produce 5
 // (it would produce 4 from `s + s`, or fail to compile).
-mutable val total = 0
-val a = {
-    val s = 2
+var mutable total = 0
+var a = {
+    var s = 2
     total = total + s
     total
 }
-val b = {
-    val s = 3
+var b = {
+    var s = 3
     total = total + s
     total
 }
@@ -191,10 +191,10 @@ print(b)
 // declaration, and the tail expression uses both; `outer` is visible going in.
 // first = 1, second = first + outer = 1 + 4 = 5, tail = second + 1 = 6, so the expected
 // stdout is exactly "6".
-val outer = 4
-val v = {
-    val first = 1
-    val second = first + outer
+var outer = 4
+var v = {
+    var first = 1
+    var second = first + outer
     second + 1
 }
 print(v)
@@ -203,12 +203,12 @@ print(v)
  "SOL-TCK-0122": """// Negative conformance test. Oracle derived by hand from LANGUAGE_SPEC section 21.2,
 // verbatim: "An empty block, a block ending in a local declaration, and a block ending in
 // an assignment are invalid in expression position and do not acquire an implicit `Unit`
-// result", illustrated by the spec's own `val invalid = { val local = 1 }`. Section 21.9
+// result", illustrated by the spec's own `var invalid = { var local = 1 }`. Section 21.9
 // names the stable code SEM_BLOCK_RESULT_REQUIRED = SOLV-SEM-041, whose primary span is
 // the "offending block or case body". The trailing print is a sentinel only: a compile
 // rejection prevents it from running.
-val invalid = {
-    val local = 1
+var invalid = {
+    var local = 1
 }
 print("EXECUTED-INVALID")
 """,
@@ -221,7 +221,7 @@ print("EXECUTED-INVALID")
 // (SOLV-SEM-041) is the required diagnostic. This test shares that expectation with its
 // siblings on purpose: the expectation is one specification rule exercised on three
 // distinct shapes, not three independently derived byte streams.
-val invalid = {
+var invalid = {
 }
 print("EXECUTED-INVALID")
 """,
@@ -231,8 +231,8 @@ print("EXECUTED-INVALID")
 // expression". The block's last item assigns to an outer variable, so the block never
 // reaches a tail expression and must be rejected with SEM_BLOCK_RESULT_REQUIRED
 // (SOLV-SEM-041) rather than acquiring a `Unit` result.
-mutable val target = 0
-val invalid = {
+var mutable target = 0
+var invalid = {
     target = 5
 }
 print("EXECUTED-INVALID")
@@ -248,7 +248,7 @@ print("EXECUTED-INVALID")
 // between `Nothing` and a fabricated `Unit`, zero, `null`, or empty string, all of which
 // section 21 forbids the implementation from inventing.
 func f(): Integer {
-    val v = {
+    var v = {
         return 7
     }
 }
@@ -266,9 +266,9 @@ print("EXECUTED-INVALID")
 // about ordering, so bracketing both marks this stream and keeps the two derivations
 // independently checkable. If the block were treated as an expression its value
 // would be required, and section 21.2 makes that a compile-time error instead.
-mutable val x = 10
+var mutable x = 10
 {
-    val d = 7
+    var d = 7
     x = x - d
 }
 print("[")
@@ -284,17 +284,17 @@ print("]")
 // separating two same-line statements.
 // Four spellings of the same value 42, so the expected stdout is "42424242". Any spelling
 // that lost the tail expression would instead be a compile-time error.
-val a = {
+var a = {
     42
 }
-val b = {
-    val unused: Integer = 0; 42
+var b = {
+    var unused: Integer = 0; 42
 }
-val c = {
+var c = {
     42
 
 }
-val d = {
+var d = {
     42
 
     // a comment and blank lines must not disturb tail selection
@@ -313,10 +313,10 @@ print(d)
 // arm fixes the whole output. Values are bracketed so the three arms are distinguishable
 // in a single stream regardless of print's separator behavior (section 5 defines print to
 // append nothing). Expected stdout is "[negative][zero][positive]".
-val low = -3
-val zero = 0
-val high = 9
-val a = if (low < 0) {
+var low = -3
+var zero = 0
+var high = 9
+var a = if (low < 0) {
     "negative"
 }
 else if (low == 0) {
@@ -325,7 +325,7 @@ else if (low == 0) {
 else {
     "positive"
 }
-val b = if (zero < 0) {
+var b = if (zero < 0) {
     "negative"
 }
 else if (zero == 0) {
@@ -334,7 +334,7 @@ else if (zero == 0) {
 else {
     "positive"
 }
-val c = if (high < 0) {
+var c = if (high < 0) {
     "negative"
 }
 else if (high == 0) {
@@ -362,7 +362,7 @@ print("]")
 // but names no diagnostic code for this site, and the implementation's own code for it does
 // not appear anywhere in LANGUAGE_SPEC.md, so pinning one here would assert a choice the
 // specification never made.
-val v = if (7) {
+var v = if (7) {
     "yes"
 }
 else {
@@ -408,8 +408,8 @@ print("]")
 // brackets are this test's own addition: a statement switch elsewhere in the corpus
 // already derives the bare bytes "two" from the statement-form rules, and sharing those
 // exact bytes would make the two expectations mutually uncheckable.
-val n = 2
-val word = switch (n) {
+var n = 2
+var word = switch (n) {
     case 1 {
         "one"
     }
@@ -437,10 +437,10 @@ print("]")
 // this normally completing path reaches no result.
 // Section 21.9 gives SEM_BLOCK_RESULT_REQUIRED = SOLV-SEM-041 with the primary span
 // "offending block or case body", which is exactly this position.
-val n = 1
-val m = switch (n) {
+var n = 1
+var m = switch (n) {
     case 1 {
-        val q = 1
+        var q = 1
     }
     default {
         "other"
@@ -463,7 +463,7 @@ class Probe {
         return "one"
     }
 }
-val result = switch (Probe().tick()) {
+var result = switch (Probe().tick()) {
     case "one" {
         "one"
     }
@@ -485,13 +485,13 @@ print(result)
 // is Number. Binding the construct to a `Number` local is therefore legal and the taken
 // branch's value is 1, so the expected stdout is exactly "1". The companion rejection test
 // SOL-TCK-0135 is what proves the join is not `Integer` or `Long`.
-val n = if (true) {
+var n = if (true) {
     1
 }
 else {
     1L
 }
-val joined: Number = n
+var joined: Number = n
 print(joined)
 """,
  # 0136 join is NOT Long / not Integer -> rejected
@@ -506,7 +506,7 @@ print(joined)
 // Asserted as a bare rejection: the specification names SOLV-TYPE-001 for a *static*
 // declaration initializer that is not assignable to its declared type, not for a local
 // initializer, so no code is mandated at this particular site.
-val joined: Long = if (true) {
+var joined: Long = if (true) {
     1
 }
 else {
@@ -544,7 +544,7 @@ print("]")
 // Four of those named contexts appear here, each producing a fixed value: assignment
 // right-hand side yields 10, call argument yields "n", explicit return yields "nonzero",
 // and a nested construct yields 2. Expected stdout is exactly "10nnonzero2".
-mutable val score: Integer = 0
+var mutable score: Integer = 0
 score = if (true) {
     10
 }
@@ -570,7 +570,7 @@ func classify(value: Integer): String {
     }
 }
 print(classify(5))
-val nested = if (true) {
+var nested = if (true) {
     if (false) {
         1
     }
@@ -639,8 +639,8 @@ print(extract(Shape.Err("bad")))
 // names the block-local `inner` outside the block, where nothing is visible. Section 4's
 // reference rule names the diagnostic: a bare name that resolves to no local, parameter,
 // function, or top-level declaration "is `SOLV-RESOL-001`".
-val v = {
-    val inner = 1
+var v = {
+    var inner = 1
     inner
 }
 print(inner)
@@ -655,7 +655,7 @@ print(inner)
 // `hashCode` override declared without `equals`". Override syntax mirrors the
 // spec-validated hashCode/equals example used by SOL-TCK-0003.
 class OnlyHash {
-    val n: Integer
+    var n: Integer
 
     OnlyHash(n: Integer) {
         this.n = n

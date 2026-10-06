@@ -16,13 +16,13 @@ Each gap was verified against the current codebase by cross-referencing the clai
 
 | # | Feature | Verified Status | Evidence / Test |
 |---|---|---|---|
-| A1 | `var` reassignment vs `val` immutability at runtime | ✅ DONE | `SolvikClassExecutionTest.varLocalWriteLoweringUpdatesTheFrameSlotAtRuntime()` — exercises `var counter = 5; counter = counter + 1; ...` at runtime (slot-reuse path) |
+| A1 | `var mutable` reassignment vs `var` immutability at runtime | ✅ DONE | `SolvikClassExecutionTest.varLocalWriteLoweringUpdatesTheFrameSlotAtRuntime()` — exercises `var mutable counter = 5; counter = counter + 1; ...` at runtime (slot-reuse path) |
 | A2 | `if` expression with `else if` chain at runtime | ✅ DONE | `SolvikExpressionOrientedExecutionTest` (line 82 `else if (value == 0)`); `SolvikExecutionTest` (lines 111/119 `else if (x < 10)`) |
 | A3 | `while` with complex `&&`/`||` condition at runtime | ⚠️ **GAP** | `SolvikSemanticTest` line 110 has `while (flag && remaining > 0)` — SEMANTIC level only. `SolvikExecutionTest.whileLoopWithBreakAndContinue` uses simple scalar `i < 6`. **No execution test exercises compound boolean while-condition branches.** |
 | A4 | ~~Three-clause `for` omitting condition → infinite iteration at runtime~~ | ✅ RESOLVED (construct removed) | The three-clause `for` was removed by the physical-line revision (LANGUAGE_SPEC sections 16/17, `SOLV-PARS-011`); `SolvikControlFlowParserTest` asserts the dedicated rejection instead. No runtime iteration behavior exists to test. |
 | A5 | `RegexMatch` member reads (value, start, end, groupCount) at runtime | ✅ DONE | `SolvikRegexExecutionTest.findReturnsTheFirstMatchWithOffsetsAndGroups()` executes all four members |
 | A6 | `is` on erased type argument at runtime | ✅ DONE (resolved as compile-time rejection) | `SolvikTypeTestRuntimeTest.typeTestOnAnErasedGenericArgumentIsRejectedAtCompileTime()` asserts `SOLV-TYPE-031`. Erased type arguments are rejected at compile time; only reifiable types reach runtime. |
-| A7 | `as` casting to interface type at runtime | ✅ DONE | `SolvikNullSafetyExecutionTest` (`val named = v as Named`); `SolvikTypeTestRuntimeTest` cast tests |
+| A7 | `as` casting to interface type at runtime | ✅ DONE | `SolvikNullSafetyExecutionTest` (`var named = v as Named`); `SolvikTypeTestRuntimeTest` cast tests |
 | A8 | All binary operator branches incl. `===`, `!==`, `&&`, `||` at runtime | ✅ DONE | `SolvikIdentityTest` (`===`/`!==` identity true-branches); `SolvikExecutionTest` (`&&`/`||` short-circuit); `SolvikEqualityTest` (value equality) |
 | A9 | Enum variant with payloads at runtime | ✅ DONE | `SolvikEnumExecutionTest.genericVariantConstructionExecutes()` + `enumVariantPayloadsAreProducedAtRuntimeByMatchLowering()` |
 | A10 | `if` expression tail result value production at runtime | ✅ DONE | `SolvikExpressionOrientedExecutionTest.ifExpressionJoinsBranches()` exercises if-expression with `else if` branches producing tail values |

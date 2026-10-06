@@ -80,7 +80,7 @@ public final class SolvikInheritanceParserTest {
     public void explicitSuperConstructorCallParsesAsASuperExprCall() {
         CompilationUnitNode unit = parseOk("super.sol", """
                 mutable class Animal {
-                    val legs: Integer
+                    var legs: Integer
                     Animal(legs: Integer) {
                         this.legs = legs
                     }

@@ -18,6 +18,6 @@ class Cat extends Animal {
 // the protocol's cast-failure classification (protocol.md section 4.1), with
 // empty stdout because the only print follows the cast. Deriving the category from the
 // protocol taxonomy is not reading a value from the implementation.
-mutable val v: Any = Cat()
-val d: Dog = v as Dog
+var mutable v: Any = Cat()
+var d: Dog = v as Dog
 print("unreachable")

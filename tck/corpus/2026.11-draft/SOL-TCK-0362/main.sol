@@ -4,13 +4,13 @@
 // Oracle quotations verified verbatim against docs/LANGUAGE_SPEC.md:
 //   - Built-in scalars provide fixed, non-overridable implementations: `Integer`, `Long`, `Byte`, and `Short` render in decimal, `Float` and `Double` use Java-style floating-point text, `Boolean` renders `true` or `false`, `Character` renders its character, `String` renders its contents, and `Unit` renders `Unit`.
 //
-val i: Integer = 42
-val l: Long = 42L
-val f: Float = 1.5F
-val d: Double = 1.5
-val c: Character = 'A'
-val s: String = "hi"
-val b: Boolean = true
+var i: Integer = 42
+var l: Long = 42L
+var f: Float = 1.5F
+var d: Double = 1.5
+var c: Character = 'A'
+var s: String = "hi"
+var b: Boolean = true
 print(i)
 print("|")
 print(l)

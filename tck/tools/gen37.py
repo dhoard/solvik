@@ -41,7 +41,7 @@ On diagnostic codes. Every rejection here is pinned to an exact code, and only b
 each one verbatim: `SOLV-TYPE-001` for a non-assignable *static declaration initializer*,
 `SOLV-TYPE-002` for "an invocation whose callee is not a function type", and `SOLV-TYPE-039` for "a
 compatible pair with no identity-bearing operand". That naming is also why four of the five rejection
-programs are written as static-property initializers rather than the `val` locals a hand-written test
+programs are written as static-property initializers rather than the `var` locals a hand-written test
 would use: the section pins the code for the static placement, and the project rule forbids adopting a
 code from the implementation for a placement the section leaves unnamed. The accepted halves of those
 same requirements are ordinary executable programs, so their oracles are real stdout.
@@ -250,9 +250,9 @@ func takeAny(value: Any): String {
     return value.toString()
 }
 
-val asAny: Any = format
-val branch: Any = makeFormatter()
-val optional: (func(Integer): String)? = format
+var asAny: Any = format
+var branch: Any = makeFormatter()
+var optional: (func(Integer): String)? = format
 print(take(makeFormatter()) .. take(describe) .. takeAny(asAny) .. takeAny(branch) .. "\\n")
 println(optional === format)
 println(optional === null)
@@ -271,8 +271,8 @@ println("" .. format .. "|" .. format.toString())
     return "v" .. value.toString()
 }
 
-val boxed: Any = format
-val other: Any = 1
+var boxed: Any = format
+var other: Any = 1
 print(boxed === other)
 print("EXECUTED-INVALID")
 """,
@@ -283,7 +283,7 @@ print("EXECUTED-INVALID")
         note="The section's accepted Animal/Dog direction is invoked, and a `func(Long): Long` value is "
              "called with an `Integer` literal, which is ordinary call-site widening.",
         src="""mutable class Animal {
-    val name: String = "animal"
+    var name: String = "animal"
 }
 
 class Dog extends Animal {
@@ -305,11 +305,11 @@ func widenResult(value: Long): Long {
 // `func(Dog): Animal`. Parameters are contravariant, so the target's `Dog` must be
 // assignable to the source's `Animal`, and the result is covariant, so the source's `Dog`
 // result is assignable to the target's `Animal`.
-val accepted: func(Dog): Animal = toDog
+var accepted: func(Dog): Animal = toDog
 
 // Call-site widening is a separate rule from assignability and still applies through a
 // function value: this passes an `Integer` literal to a `Long` parameter.
-val takesLong: func(Long): Long = widenResult
+var takesLong: func(Long): Long = widenResult
 
 print(nameOf(accepted(Dog())) .. "-" .. takesLong(1))
 """,
@@ -320,7 +320,7 @@ print(nameOf(accepted(Dog())) .. "-" .. takesLong(1))
         note="The rejected direction of the section's Animal/Dog pair, written as a static declaration "
              "initializer so the pinned code applies to the placement the section names.",
         src="""mutable class Animal {
-    val name: String = "animal"
+    var name: String = "animal"
 }
 
 class Dog extends Animal {
@@ -336,7 +336,7 @@ func toAnimal(dog: Dog): Animal {
 // assignable to `Dog`; neither holds. Written as a static initializer because that is
 // the placement whose diagnostic the section names verbatim.
 class Boundary {
-    static val reversed: func(Animal): Dog = toAnimal
+    static var reversed: func(Animal): Dog = toAnimal
 }
 
 print("EXECUTED-INVALID")
@@ -357,7 +357,7 @@ print("EXECUTED-INVALID")
 // as a static initializer because that is the placement whose diagnostic the section names
 // verbatim.
 class Boundary {
-    static val widened: func(Integer): Integer = widenResult
+    static var widened: func(Integer): Integer = widenResult
 }
 
 print("EXECUTED-INVALID")
@@ -382,13 +382,13 @@ func takeAny(value: Any): String {
 
 // Every non-null function type has `Any` as its top supertype, so a function value is
 // assignable to `Any` and may be passed where `Any` is expected.
-val asAny: Any = format
+var asAny: Any = format
 
 // The shared type join understands function types: these two branches have identical
 // parameter types and identical result types, so the join is that function type and the
 // joined value stays callable.
-val flag: Boolean = true
-val joined = if (flag) {
+var flag: Boolean = true
+var joined = if (flag) {
     format
 }
 else {
@@ -408,7 +408,7 @@ print(takeAny(asAny) .. "|" .. takeAny(joined) .. "|" .. joined(2))
 }
 
 class Unrelated {
-    val tag: String = "u"
+    var tag: String = "u"
 }
 
 func fromUnrelated(value: Unrelated): String {
@@ -420,8 +420,8 @@ func fromUnrelated(value: Unrelated): String {
 // `Nothing`, a union, or an intersection to manufacture a function supertype, so the joined
 // value is not of a function type and invoking it is an invocation whose callee is not a
 // function type -- the code the section names verbatim for that shape.
-val flag: Boolean = true
-val joined = if (flag) {
+var flag: Boolean = true
+var joined = if (flag) {
     format
 }
 else {
@@ -438,7 +438,7 @@ print("EXECUTED-INVALID")
              "refused, because generic type arguments stay invariant even where the element types are "
              "comparable. The sources carry explicit type arguments so inference cannot explain it.",
         src="""mutable class Animal {
-    val name: String = "animal"
+    var name: String = "animal"
 }
 
 class Dog extends Animal {
@@ -449,10 +449,10 @@ class Dog extends Animal {
 // static initializers, the placement whose non-assignable diagnostic the section names
 // verbatim, so each direction is pinned.
 class Invariant {
-    static val wide: List<func(Animal): Dog> = List<func(Animal): Dog>()
-    static val narrow: List<func(Dog): Animal> = List<func(Dog): Animal>()
-    static val intoNarrow: List<func(Dog): Animal> = Invariant.wide
-    static val intoWide: List<func(Animal): Dog> = Invariant.narrow
+    static var wide: List<func(Animal): Dog> = List<func(Animal): Dog>()
+    static var narrow: List<func(Dog): Animal> = List<func(Dog): Animal>()
+    static var intoNarrow: List<func(Dog): Animal> = Invariant.wide
+    static var intoWide: List<func(Animal): Dog> = Invariant.narrow
 }
 
 print("EXECUTED-INVALID")
@@ -477,7 +477,7 @@ print("EXECUTED-INVALID")
              "fell back to `Any` here would fail to compile: `Any` is not callable and does not flow "
              "into a function-typed binding.",
         src="""mutable class Animal {
-    val name: String = "animal"
+    var name: String = "animal"
 }
 
 class Dog extends Animal {
@@ -499,14 +499,14 @@ func nameOf(value: Animal): String {
 // the more specific parameter and the nearest common result. A value of that joined type is a
 // callable function value, its result reaches an `Animal` parameter, and it is accepted by a
 // binding that writes the joined type out.
-val flag: Boolean = true
-val joined = if (flag) {
+var flag: Boolean = true
+var joined = if (flag) {
     dogToDog
 }
 else {
     animalToAnimal
 }
-val joinedWritten: func(Dog): Animal = joined
+var joinedWritten: func(Dog): Animal = joined
 
 print(nameOf(joined(Dog())) .. "-" .. nameOf(joinedWritten(Dog())))
 """,
@@ -522,7 +522,7 @@ print(nameOf(joined(Dog())) .. "-" .. nameOf(joinedWritten(Dog())))
              "diagnostic the section names verbatim, so `SOLV-TYPE-001` is pinned; the sentinel proves "
              "non-execution.",
         src="""mutable class Animal {
-    val name: String = "animal"
+    var name: String = "animal"
 }
 
 class Dog extends Animal {
@@ -537,7 +537,7 @@ func animalToAnimal(animal: Animal): Animal {
 }
 
 class WiderParameter {
-    static val wide: func(Animal): Animal = if (true) {
+    static var wide: func(Animal): Animal = if (true) {
         dogToDog
     }
     else {
@@ -558,7 +558,7 @@ print("EXECUTED-INVALID")
              "initializer for the same reason as its sibling, so `SOLV-TYPE-001` is pinned; the "
              "sentinel proves non-execution.",
         src="""mutable class Animal {
-    val name: String = "animal"
+    var name: String = "animal"
 }
 
 class Dog extends Animal {
@@ -573,7 +573,7 @@ func animalToAnimal(animal: Animal): Animal {
 }
 
 class NarrowerResult {
-    static val narrow: func(Dog): Dog = if (true) {
+    static var narrow: func(Dog): Dog = if (true) {
         dogToDog
     }
     else {
@@ -605,11 +605,11 @@ func through(callback: func(Integer): String): String {
 // Function types are structural, and the declarations that produced values of those types
 // do not affect type identity: `format` and `render` are unrelated declarations, and a
 // value of one is assignable to a binding of the other's type.
-val substituted: func(Integer): String = render
+var substituted: func(Integer): String = render
 
 // Two values of one written function type compare by reference identity, not by which
 // declaration produced them, so a structural substitution does not change identity.
-val alsoSubstituted: func(Integer): String = render
+var alsoSubstituted: func(Integer): String = render
 print(through(format) .. "-" .. through(substituted) .. "-" .. through(alsoSubstituted) .. "-" .. (substituted === alsoSubstituted))
 """,
     ),
@@ -624,7 +624,7 @@ print(through(format) .. "-" .. through(substituted) .. "-" .. through(alsoSubst
 }
 
 class Left {
-    val name: String = "left"
+    var name: String = "left"
 
     func value(): Integer {
         return 1
@@ -632,7 +632,7 @@ class Left {
 }
 
 class Right {
-    val name: String = "left"
+    var name: String = "left"
 
     func value(): Integer {
         return 1
@@ -643,7 +643,7 @@ class Right {
 // property name and type and the same method, and remain assignment-incompatible; that
 // nominal half is the non-assignable static initializer, which the section pins.
 class Boundary {
-    static val copied: Right = Left()
+    static var copied: Right = Left()
 }
 
 print(format(1))

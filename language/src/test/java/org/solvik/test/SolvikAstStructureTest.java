@@ -156,8 +156,8 @@ public final class SolvikAstStructureTest {
         Deque<AstNode> stack = new ArrayDeque<>();
         stack.push(parse("""
                 func f(a: Integer): Integer {
-                    val v: Integer = (a + obj.g(1)) * 2
-                    mutable val w: Integer = h(v, obj.field)
+                    var v: Integer = (a + obj.g(1)) * 2
+                    var mutable w: Integer = h(v, obj.field)
                     if (true) {
                         obj.store(1)
                         return v
@@ -187,8 +187,8 @@ public final class SolvikAstStructureTest {
         Deque<AstNode> stack = new ArrayDeque<>();
         stack.push(parse("""
                 func f(a: Integer): Integer {
-                    val v: Integer = (a + obj.g(1)) * 2
-                    mutable val w: Integer = true
+                    var v: Integer = (a + obj.g(1)) * 2
+                    var mutable w: Integer = true
                     if (true) {
                         obj.store(1)
                         return v
@@ -234,9 +234,9 @@ public final class SolvikAstStructureTest {
         Deque<AstNode> stack = new ArrayDeque<>();
         stack.push(parse("""
                 func f(n: Integer): Integer {
-                    mutable val total = 0
+                    var mutable total = 0
                     {
-                        mutable val i = 0
+                        var mutable i = 0
                         while (i < n) {
                             i = i + 1
                             total = total + i
@@ -249,7 +249,7 @@ public final class SolvikAstStructureTest {
                     while (total > 0) {
                         total = total - 1
                     }
-                    val check = !false && (total == 0 || total <= n)
+                    var check = !false && (total == 0 || total <= n)
                     return total
                 }
                 """));
@@ -273,8 +273,8 @@ public final class SolvikAstStructureTest {
         Deque<AstNode> stack = new ArrayDeque<>();
         stack.push(parse("""
                 class User {
-                    val id: Integer
-                    mutable val name: String
+                    var id: Integer
+                    var mutable name: String
 
                     User(id: Integer, name: String) {
                         this.id = id
@@ -314,10 +314,10 @@ public final class SolvikAstStructureTest {
                     }
                 }
                 func literals(): Unit {
-                    val l = 1L
-                    val f = 1.5f
-                    val d = 1.5
-                    val c = 'A'
+                    var l = 1L
+                    var f = 1.5f
+                    var d = 1.5
+                    var c = 'A'
                 }
                 """));
         while (!stack.isEmpty()) {
@@ -346,7 +346,7 @@ public final class SolvikAstStructureTest {
                     }
                 }
                 class User implements Named {
-                    val label: String
+                    var label: String
 
                     User(label: String) {
                         this.label = label
@@ -379,7 +379,7 @@ public final class SolvikAstStructureTest {
                     func name(): String
                 }
                 class Service implements Named {
-                    delegate val named: Named
+                    delegate var named: Named
 
                     Service(named: Named) {
                         this.named = named
@@ -404,18 +404,18 @@ public final class SolvikAstStructureTest {
         Deque<AstNode> stack = new ArrayDeque<>();
         stack.push(parse("""
                 class Box {
-                    val value: Integer
+                    var value: Integer
 
                     Box(value: Integer) {
                         this.value = value
                     }
                 }
                 func f(box: Box?, v: Any): Integer? {
-                    val missing = null
-                    val safe = box?.value
-                    val fallback = safe ?? 0
-                    val tested = v is Box
-                    val cast = v as Box
+                    var missing = null
+                    var safe = box?.value
+                    var fallback = safe ?? 0
+                    var tested = v is Box
+                    var cast = v as Box
                     if (box != null) {
                         return box.value
                     }
@@ -442,7 +442,7 @@ public final class SolvikAstStructureTest {
         Deque<AstNode> stack = new ArrayDeque<>();
         stack.push(parse("""
                 class Box<T> {
-                    mutable val value: T
+                    var mutable value: T
                 }
                 interface Container<U> {
                     func get(): U

@@ -1,4 +1,4 @@
-val l = List<Integer>(1, 2)
-val m = List<Integer>(1, 2)
-val n = l
+var l = List<Integer>(1, 2)
+var m = List<Integer>(1, 2)
+var n = l
 print("col" .. (l === m) .. (l === n))

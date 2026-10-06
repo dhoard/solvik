@@ -3,8 +3,8 @@ class C {
         this.sum = x + y
     }
 
-    val sum: Integer
+    var sum: Integer
 }
-val c = C(1,
+var c = C(1,
     2)
 print("r" .. c.sum)

@@ -4,7 +4,7 @@
 // Oracle quotations verified verbatim against docs/LANGUAGE_SPEC.md:
 //   - A switch contains at most one `default`, and it must be last.
 //
-val x = 1
+var x = 1
 switch (x) {
     case 1 {
         print("one")

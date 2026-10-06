@@ -71,7 +71,7 @@ public final class SolvikSemanticNegativeTest {
 
     @Test
     public void useBeforeDeclarationIsAnUnknownName() {
-        Diagnostic diagnostic = first(checkFails("func f(): Integer {\n    val y = x\n    val x = 1\n    return y\n}\n"));
+        Diagnostic diagnostic = first(checkFails("func f(): Integer {\n    var y = x\n    var x = 1\n    return y\n}\n"));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_NAME);
     }
 
@@ -101,7 +101,7 @@ public final class SolvikSemanticNegativeTest {
 
     @Test
     public void retiredCharIsNotAvailableAsACollectionTypeArgument() {
-        Diagnostic diagnostic = first(checkFails("val chars: Set<Char> = Set('a')\n"));
+        Diagnostic diagnostic = first(checkFails("var chars: Set<Char> = Set('a')\n"));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_TYPE);
     }
 
@@ -140,13 +140,13 @@ public final class SolvikSemanticNegativeTest {
 
     @Test
     public void duplicateLocalNameIsRejected() {
-        Diagnostic diagnostic = first(checkFails("func f(): Unit {\n    val x = 1\n    val x = 2\n}\n"));
+        Diagnostic diagnostic = first(checkFails("func f(): Unit {\n    var x = 1\n    var x = 2\n}\n"));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_DUPLICATE_NAME);
     }
 
     @Test
     public void initializerMustBeAssignableToTheDeclaredType() {
-        Diagnostic diagnostic = first(checkFails("func f(): Unit {\n    val x: Integer = \"s\"\n}\n"));
+        Diagnostic diagnostic = first(checkFails("func f(): Unit {\n    var x: Integer = \"s\"\n}\n"));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
         assertThat(diagnostic.expected().orElseThrow()).isEqualTo("Integer");
         assertThat(diagnostic.found().orElseThrow()).isEqualTo("String");
@@ -157,12 +157,12 @@ public final class SolvikSemanticNegativeTest {
         // Declaring a source as `Any` does not suspend the static check: `Any` is the top type, so a
         // value whose static type is `Any` flows into a concrete target only by an explicit
         // conversion, never by an implicit assignment (docs/LANGUAGE_SPEC.md sections 3 and 4).
-        Diagnostic initializer = first(checkFails("func f(): Unit {\n    val x: Any = \"s\"\n    val n: Integer = x\n}\n"));
+        Diagnostic initializer = first(checkFails("func f(): Unit {\n    var x: Any = \"s\"\n    var n: Integer = x\n}\n"));
         assertThat(initializer.code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
         assertThat(initializer.expected().orElseThrow()).isEqualTo("Integer");
         assertThat(initializer.found().orElseThrow()).isEqualTo("Any");
 
-        Diagnostic assignment = first(checkFails("func f(source: Any): Unit {\n    mutable val n: Integer = 0\n    n = source\n}\n"));
+        Diagnostic assignment = first(checkFails("func f(source: Any): Unit {\n    var mutable n: Integer = 0\n    n = source\n}\n"));
         assertThat(assignment.code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
         assertThat(assignment.expected().orElseThrow()).isEqualTo("Integer");
         assertThat(assignment.found().orElseThrow()).isEqualTo("Any");
@@ -170,7 +170,7 @@ public final class SolvikSemanticNegativeTest {
 
     @Test
     public void assignmentToValIsRejected() {
-        Diagnostic diagnostic = first(checkFails("func f(): Unit {\n    val x = 1\n    x = 2\n}\n"));
+        Diagnostic diagnostic = first(checkFails("func f(): Unit {\n    var x = 1\n    x = 2\n}\n"));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_ASSIGN_TO_IMMUTABLE);
     }
 
@@ -188,7 +188,7 @@ public final class SolvikSemanticNegativeTest {
 
     @Test
     public void assignmentValueTypeIsChecked() {
-        Diagnostic diagnostic = first(checkFails("func f(): Unit {\n    mutable val x = 1\n    x = \"s\"\n}\n"));
+        Diagnostic diagnostic = first(checkFails("func f(): Unit {\n    var mutable x = 1\n    x = \"s\"\n}\n"));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
 
@@ -333,7 +333,7 @@ public final class SolvikSemanticNegativeTest {
 
     @Test
     public void callingANonFunctionIsRejected() {
-        Diagnostic diagnostic = first(checkFails("func f(): Unit {\n    val x = 1\n    x()\n}\n"));
+        Diagnostic diagnostic = first(checkFails("func f(): Unit {\n    var x = 1\n    x()\n}\n"));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_NOT_CALLABLE);
     }
 
@@ -354,7 +354,7 @@ public final class SolvikSemanticNegativeTest {
                     return value
                 }
                 func f(): Integer {
-                    val x = g
+                    var x = g
                     return x()
                 }
                 """));
@@ -388,13 +388,13 @@ public final class SolvikSemanticNegativeTest {
 
     @Test
     public void memberAccessOnNonClassIsRejected() {
-        Diagnostic diagnostic = first(checkFails("func f(s: String): Unit {\n    val x = s.length\n}\n"));
+        Diagnostic diagnostic = first(checkFails("func f(s: String): Unit {\n    var x = s.length\n}\n"));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_MEMBER);
     }
 
     @Test
     public void classNamesAreNotValues() {
-        Diagnostic diagnostic = first(checkFails("class User {\n    val name: String\n    User(name: String) {\n        this.name = name\n    }\n}\nfunc f(): User {\n    val x = User\n    return x\n}\n"));
+        Diagnostic diagnostic = first(checkFails("class User {\n    var name: String\n    User(name: String) {\n        this.name = name\n    }\n}\nfunc f(): User {\n    var x = User\n    return x\n}\n"));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_CLASS_AS_VALUE);
     }
 
@@ -406,7 +406,7 @@ public final class SolvikSemanticNegativeTest {
 
     @Test
     public void redeclarationInTheSameScopeBlockIsRejected() {
-        Diagnostic diagnostic = first(checkFails("func f(): Unit {\n    {\n        val x = 1\n        val x = 2\n    }\n}\n"));
+        Diagnostic diagnostic = first(checkFails("func f(): Unit {\n    {\n        var x = 1\n        var x = 2\n    }\n}\n"));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_DUPLICATE_NAME);
     }
 
@@ -418,7 +418,7 @@ public final class SolvikSemanticNegativeTest {
 
     @Test
     public void objectConversionIsRejected() {
-        Diagnostic diagnostic = first(checkFails("func f(): Unit {\n    val x = Object(1)\n}\n"));
+        Diagnostic diagnostic = first(checkFails("func f(): Unit {\n    var x = Object(1)\n}\n"));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_NAME);
     }
 

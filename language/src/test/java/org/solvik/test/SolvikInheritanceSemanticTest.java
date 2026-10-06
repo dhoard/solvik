@@ -61,7 +61,7 @@ public final class SolvikInheritanceSemanticTest {
     public void inheritedPropertiesAndMethodsAreVisible() {
         check("""
                 mutable class Animal {
-                    val name: String
+                    var name: String
 
                     Animal(name: String) {
                         this.name = name
@@ -77,7 +77,7 @@ public final class SolvikInheritanceSemanticTest {
                     }
                 }
                 func f(): String {
-                    val dog = Dog()
+                    var dog = Dog()
                     return dog.describe()
                 }
                 """);
@@ -111,7 +111,7 @@ public final class SolvikInheritanceSemanticTest {
     public void explicitSuperConstructorCallIsRecognized() {
         CheckedProgram program = check("""
                 mutable class Animal {
-                    val legs: Integer
+                    var legs: Integer
                     Animal(legs: Integer) {
                         this.legs = legs
                     }
@@ -132,10 +132,10 @@ public final class SolvikInheritanceSemanticTest {
     public void implicitSuperConstructorCallIsAcceptedForAZeroArgumentSuperclass() {
         check("""
                 mutable class Animal {
-                    val legs: Integer = 4
+                    var legs: Integer = 4
                 }
                 class Dog extends Animal {
-                    val name: String
+                    var name: String
                     Dog(name: String) {
                         this.name = name
                     }

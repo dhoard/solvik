@@ -10,14 +10,14 @@ class Point {
     override func toString(): String {
         return "p"
     }
-    val x: Integer
+    var x: Integer
     Point(x: Integer) {
         this.x = x
     }
 }
 
 func use(point: Point) {
-    val render: Any = point.toString
+    var render: Any = point.toString
     print("bound")
 }
 

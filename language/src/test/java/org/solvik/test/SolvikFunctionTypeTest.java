@@ -105,7 +105,7 @@ public final class SolvikFunctionTypeTest {
     public void functionTypeAsGenericArgumentResolves() {
         check("""
                 func use(): Unit {
-                    val callbacks: List<func(String): Unit> = List()
+                    var callbacks: List<func(String): Unit> = List()
                 }
                 """);
     }
@@ -122,7 +122,7 @@ public final class SolvikFunctionTypeTest {
                     return value.toString()
                 }
                 func use(): Unit {
-                    val f = format
+                    var f = format
                 }
                 """);
     }
@@ -140,7 +140,7 @@ public final class SolvikFunctionTypeTest {
                     return value
                 }
                 func use(): Unit {
-                    val f = identity
+                    var f = identity
                 }
                 """)).isEqualTo(DiagnosticCode.TYPE_CANNOT_INFER);
     }
@@ -166,7 +166,7 @@ public final class SolvikFunctionTypeTest {
     public void functionTypeIsRejectedAsCastTarget() {
         assertThat(firstCode("""
                 func use(x: Any): Unit {
-                    val y = x as func(): Unit
+                    var y = x as func(): Unit
                 }
                 """)).isEqualTo(DiagnosticCode.TYPE_INVALID_TYPE_OPERAND);
     }
@@ -180,9 +180,9 @@ public final class SolvikFunctionTypeTest {
     public void functionTypeAsStaticPropertyTypeResolves() {
         check("""
                 class Holder {
-                    static val operation: (func(Integer): Unit)? = null
-                    static val sharedOperation: (func(Integer): Unit)?
-                    static val nullableResult: func(Integer): Unit?
+                    static var operation: (func(Integer): Unit)? = null
+                    static var sharedOperation: (func(Integer): Unit)?
+                    static var nullableResult: func(Integer): Unit?
                 }
                 """);
     }
@@ -192,7 +192,7 @@ public final class SolvikFunctionTypeTest {
     public void nullIsNotAssignableToANonNullFunctionType() {
         assertThat(firstCode("""
                 class Holder {
-                    static val operation: func(Integer): Unit = null
+                    static var operation: func(Integer): Unit = null
                 }
                 """)).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }

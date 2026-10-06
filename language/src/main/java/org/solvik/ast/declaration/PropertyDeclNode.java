@@ -26,8 +26,8 @@ import org.solvik.ast.statement.BindingKind;
 import org.solvik.source.SourceSpan;
 
 /**
- * A class property declaration {@code val name: Type [= initializer]} or
- * {@code mutable val name: Type [= initializer]} (docs/LANGUAGE_SPEC.md section 7). Unlike a local
+ * A class property declaration {@code var name: Type [= initializer]} or
+ * {@code var mutable name: Type [= initializer]} (docs/LANGUAGE_SPEC.md section 7). Unlike a local
  * declaration the initializer is optional; a property without one must be assigned on every
  * successful constructor path.
  */

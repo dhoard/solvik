@@ -7,7 +7,7 @@
 // the result never depends on the order classes are declared (docs/LANGUAGE_SPEC.md section 7).
 
 mutable class Registry {
-    static mutable val entries: Integer = 0
+    static var mutable entries: Integer = 0
 
     static func add(): Integer {
         Registry.entries = Registry.entries + 1
@@ -20,8 +20,8 @@ mutable class Registry {
 }
 
 class Session extends Registry {
-    static mutable val id: Integer
-    static mutable val seen: Integer = 0
+    static var mutable id: Integer
+    static var mutable seen: Integer = 0
 
     static func label(): String {
         return "session"
@@ -34,10 +34,10 @@ class Session extends Registry {
 }
 
 class Defaults {
-    static mutable val count: Integer
-    static mutable val ratio: Double
-    static mutable val enabled: Boolean
-    static mutable val name: String?
+    static var mutable count: Integer
+    static var mutable ratio: Double
+    static var mutable enabled: Boolean
+    static var mutable name: String?
 }
 
 println(Registry.entries)
@@ -55,7 +55,7 @@ println(Registry.entries)
 // uses, is never initialized, so nothing is printed for it. First touching Unused below would run its
 // block; not touching it leaves it silent.
 class Unused {
-    static mutable val marker: Integer = 0
+    static var mutable marker: Integer = 0
     static {
         println("unused class initialized")
     }

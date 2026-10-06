@@ -10,6 +10,6 @@ func identity<T>(value: T): T {
     return value
 }
 
-val boxed: Any = identity
+var boxed: Any = identity
 print(boxed)
 print("EXECUTED-INVALID")

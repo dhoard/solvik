@@ -1,5 +1,5 @@
 mutable class CodeError extends RuntimeException {
-    val code: Integer
+    var code: Integer
 
     CodeError(code: Integer) {
         this.code = code

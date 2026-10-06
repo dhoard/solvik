@@ -1,4 +1,4 @@
-val a = 1;
+var a = 1;
 print("s" .. a)
 
 print("EXECUTED-INVALID")

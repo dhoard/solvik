@@ -13,6 +13,6 @@ class Target {
     }
 }
 
-val target = Target()
-val method: func(): String = target?.describe
+var target = Target()
+var method: func(): String = target?.describe
 print(method())

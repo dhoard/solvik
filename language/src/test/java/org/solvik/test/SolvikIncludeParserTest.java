@@ -106,7 +106,7 @@ public final class SolvikIncludeParserTest {
 
     @Test
     public void includeCanNoLongerBeAnIdentifier() {
-        parseFails("val include = 1\n");
+        parseFails("var include = 1\n");
     }
 
     @Test

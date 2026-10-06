@@ -1,5 +1,5 @@
 mutable class Animal {
-    val name: String
+    var name: String
     Animal(name: String) {
         this.name = name
     }

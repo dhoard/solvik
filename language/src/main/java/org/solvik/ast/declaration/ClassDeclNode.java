@@ -109,7 +109,7 @@ public final class ClassDeclNode extends DeclarationNode {
     }
 
     /**
-     * The instance {@code val} and {@code mutable val} property declarations, in source order. Static
+     * The instance {@code var} and {@code var mutable} property declarations, in source order. Static
      * properties are excluded (docs/LANGUAGE_SPEC.md section 7): they are class-level storage, so they
      * must not join the per-instance property list that drives object layout, constructor
      * initialization, and member access.
@@ -124,7 +124,7 @@ public final class ClassDeclNode extends DeclarationNode {
         return List.copyOf(found);
     }
 
-    /** The {@code static val} and {@code static mutable val} declarations, in source order. */
+    /** The {@code static var} and {@code static var mutable} declarations, in source order. */
     public List<PropertyDeclNode> staticProperties() {
         List<PropertyDeclNode> found = new ArrayList<>();
         for (PropertyDeclNode property : membersOfKind(PropertyDeclNode.class)) {
@@ -135,7 +135,7 @@ public final class ClassDeclNode extends DeclarationNode {
         return List.copyOf(found);
     }
 
-    /** The {@code delegate val} declarations, in source order (docs/LANGUAGE_SPEC.md section 9). */
+    /** The {@code delegate var} declarations, in source order (docs/LANGUAGE_SPEC.md section 9). */
     public List<DelegateDeclNode> delegates() {
         return membersOfKind(DelegateDeclNode.class);
     }

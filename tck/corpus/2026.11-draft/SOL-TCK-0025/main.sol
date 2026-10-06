@@ -12,6 +12,6 @@
 // message text or a code. Asserting either would let the TCK choose an observable the
 // specification leaves open (TCK.md section 6.1), so only the lexical family is asserted.
 // Sentinel per TCK.md section 10; the compile-only phase proves non-execution.
-val s = r#"unterminated
+var s = r#"unterminated
 print(s)
 println("EXECUTED-INVALID")

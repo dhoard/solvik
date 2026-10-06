@@ -3,7 +3,7 @@
 // type, and a checked cast to Any preserves the runtime value.
 
 class Box {
-    val value: Integer
+    var value: Integer
 
     Box(value: Integer) {
         this.value = value
@@ -17,20 +17,20 @@ func describe(value: Any?): String {
     return value.toString()
 }
 
-val boxed: Any = Box(7)
-val joined: Any = if (true) {
+var boxed: Any = Box(7)
+var joined: Any = if (true) {
     1
 }
 else {
     "text"
 }
-val numeric: Number = if (true) {
+var numeric: Number = if (true) {
     1
 }
 else {
     2L
 }
-val cast: Any = 42 as Any
+var cast: Any = 42 as Any
 
 println(describe(boxed))
 println(describe(null))

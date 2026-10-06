@@ -41,20 +41,20 @@ import org.solvik.source.SourceFile;
 /**
  * Corpus-wide gate for the removed keyword vocabulary.
  *
- * <p>{@code var}, {@code open}, and {@code sealed} are reserved words that no longer begin or
+ * <p>{@code val}, {@code open}, and {@code sealed} are reserved words that no longer begin or
  * introduce anything: the grammar declares no production that consumes them, and the parser reports
  * one diagnostic ({@code SOLV-PARS-006}) when a program uses one. The keyword overhaul migrated
  * every committed Solvik program to the replacement vocabulary, and this test is what keeps the
  * corpus migrated rather than merely intending to be.
  *
  * <p>The assertion is made through the lexer rather than through text search, and that choice is the
- * substance of the test. A word-boundary search cannot tell the removed keyword {@code var} from a
- * string that happens to print {@code "var"} or a comment that discusses the old spelling, so a text
+ * substance of the test. A word-boundary search cannot tell the removed keyword {@code val} from a
+ * string that happens to print {@code "val"} or a comment that discusses the old spelling, so a text
  * gate either fails on SOL-TCK-0390 -- which prints the word precisely to show it is ordinary data
  * now -- or grows an exception list that quietly admits anything else of the same shape. The lexer
  * already knows the difference: SOL-TCK-0390's occurrence arrives as a {@code STRING} token, while a
- * reintroduced declaration would arrive as {@code VAR}. Reserved words are allowed only as data, so
- * the rule is "no {@code VAR}, {@code OPEN}, or {@code SEALED} token in any committed program", with
+ * reintroduced declaration would arrive as {@code VAL}. Reserved words are allowed only as data, so
+ * the rule is "no {@code VAL}, {@code OPEN}, or {@code SEALED} token in any committed program", with
  * no exceptions to maintain.
  *
  * <p>Comments are checked as text on top of the token rule, because a comment is the one place a
@@ -66,14 +66,14 @@ import org.solvik.source.SourceFile;
 public final class SolvikRemovedKeywordCorpusTest {
 
     /** Token types that must never be delivered for a committed program. */
-    private static final Set<String> REMOVED_TOKENS = Set.of("VAR", "OPEN", "SEALED");
+    private static final Set<String> REMOVED_TOKENS = Set.of("VAL", "OPEN", "SEALED");
 
     /**
      * A comment that presents a removed word as syntax: the backticked form, or the word in a
      * position where only syntax belongs. English uses of the same words are not keyword mentions.
      */
     private static final java.util.regex.Pattern REMOVED_AS_SYNTAX =
-            java.util.regex.Pattern.compile("`(var|open|sealed)`|\\b(var|open|sealed)\\s+(val|class|func|static|override)\\b");
+            java.util.regex.Pattern.compile("`(val|open|sealed)`|\\b(val|open|sealed)\\s+(var|class|func|static|override)\\b");
 
     /** Every {@code .sol} program in the repository, from any working directory. */
     private static List<Path> programs() throws IOException {
@@ -172,7 +172,7 @@ public final class SolvikRemovedKeywordCorpusTest {
                 offenders.add(relative(program) + ": " + violation);
             }
         }
-        assertThat(offenders).as("committed programs using `var`, `open`, or `sealed` as syntax").isEmpty();
+        assertThat(offenders).as("committed programs using `val`, `open`, or `sealed` as syntax").isEmpty();
     }
 
     /** Token names, with line/column, for every removed-keyword token in one program. */
@@ -244,7 +244,7 @@ public final class SolvikRemovedKeywordCorpusTest {
                 }
             }
         }
-        assertThat(offenders).as("comments presenting `var`, `open`, or `sealed` as Solvik syntax").isEmpty();
+        assertThat(offenders).as("comments presenting `val`, `open`, or `sealed` as Solvik syntax").isEmpty();
     }
 
     /**

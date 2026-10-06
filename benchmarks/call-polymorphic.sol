@@ -18,7 +18,7 @@ func named(value: Integer): Integer {
 }
 
 class Stepper {
-    val delta: Integer = 4
+    var delta: Integer = 4
 
     func step(value: Integer): Integer {
         return value + this.delta
@@ -29,28 +29,28 @@ func apply(operation: func(Integer): Integer, value: Integer): Integer {
     return operation(value)
 }
 
-val delta = 3
+var delta = 3
 
-val operations: List<func(Integer): Integer> = List()
+var operations: List<func(Integer): Integer> = List()
 
-val anonymous = func(value: Integer): Integer {
+var anonymous = func(value: Integer): Integer {
     return value + 2
 }
 
-val closure = func [delta](value: Integer): Integer {
+var closure = func [delta](value: Integer): Integer {
     return value + delta
 }
 
-val stepper = Stepper()
+var stepper = Stepper()
 
 operations.add(named)
 operations.add(anonymous)
 operations.add(closure)
 operations.add(stepper.step)
 
-mutable val total = 0
-mutable val slot = 0
-mutable val i = 0
+var mutable total = 0
+var mutable slot = 0
+var mutable i = 0
 while (i < 20000000) {
     total = apply(operations.get(slot), total)
     slot = slot + 1

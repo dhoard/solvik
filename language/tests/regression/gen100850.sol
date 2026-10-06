@@ -1,4 +1,4 @@
-val xs1: List<Integer> = List(77, 87)
+var xs1: List<Integer> = List(77, 87)
 
 xs1.add(80)
 

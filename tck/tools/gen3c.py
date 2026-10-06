@@ -170,7 +170,7 @@ EQ_OK = ('class Q {\n'
          '\n')
 
 # --- REQ-1800 the equals declaration shape.
-add("SOL-TCK-0265", "REQ-1800", "types", EXACT + 'val p = Exact()\nprint("shape" .. (p == p))\n',
+add("SOL-TCK-0265", "REQ-1800", "types", EXACT + 'var p = Exact()\nprint("shape" .. (p == p))\n',
     "SUCCESS", stdout="shapetrue")
 add("SOL-TCK-0266", "REQ-1800", "types",
     'class Q {\n    Q() {\n    }\n\n    func equals(other: Any?): Boolean {\n        return true\n    }\n\n'
@@ -190,7 +190,7 @@ add("SOL-TCK-0269", "REQ-1800", "types",
     "COMPILE_ERROR", diag={})
 
 # --- REQ-1801 the hashCode declaration shape.
-add("SOL-TCK-0270", "REQ-1801", "types", EXACT + 'val p = Exact()\nprint("hash" .. p.hashCode())\n',
+add("SOL-TCK-0270", "REQ-1801", "types", EXACT + 'var p = Exact()\nprint("hash" .. p.hashCode())\n',
     "SUCCESS", stdout="hash7")
 add("SOL-TCK-0271", "REQ-1801", "types",
     EQ_OK + '    override func hashCode(x: Integer): Integer {\n        return 1\n    }\n}\nprint(1)\n' + NEG,
@@ -207,39 +207,39 @@ add("SOL-TCK-0274", "REQ-1802", "types",
     'mutable class Both {\n    Both() {\n    }\n\n    override func equals(other: Any?): Boolean {\n        return true\n    }\n\n'
     '    override func hashCode(): Integer {\n        return 5\n    }\n}\n'
     'class Plain extends Both {\n    Plain() {\n    }\n}\n'
-    'val s = Plain()\nprint("inh" .. (s == s) .. s.hashCode())\n',
+    'var s = Plain()\nprint("inh" .. (s == s) .. s.hashCode())\n',
     "SUCCESS", stdout="inhtrue5")
 add("SOL-TCK-0275", "REQ-1802", "types",
     'mutable class Both2 {\n    Both2() {\n    }\n\n    mutable override func equals(other: Any?): Boolean {\n        return true\n    }\n\n'
     '    mutable override func hashCode(): Integer {\n        return 5\n    }\n}\n'
     'class OnlyEq extends Both2 {\n    OnlyEq() {\n    }\n\n    override func equals(other: Any?): Boolean {\n        return false\n    }\n}\n'
-    'val s = OnlyEq()\nprint(s)\n' + NEG,
+    'var s = OnlyEq()\nprint(s)\n' + NEG,
     "COMPILE_ERROR",
     diag={"family": "SEM", "code": "SOLV-SEM-045"},
     locate="override func equals(other: Any?): Boolean {\n        return false\n    }")
 
 # --- REQ-1803 reserved member names.
 add("SOL-TCK-0276", "REQ-1803", "types",
-    'class C {\n    val equals: Integer\n\n    C(equals: Integer) {\n        this.equals = equals\n    }\n}\nprint(1)\n' + NEG,
+    'class C {\n    var equals: Integer\n\n    C(equals: Integer) {\n        this.equals = equals\n    }\n}\nprint(1)\n' + NEG,
     "COMPILE_ERROR", diag={})
 add("SOL-TCK-0277", "REQ-1803", "types",
-    'interface I {\n    func hashCode(): Integer\n}\nval x = 1\nprint(x)\n' + NEG,
+    'interface I {\n    func hashCode(): Integer\n}\nvar x = 1\nprint(x)\n' + NEG,
     "COMPILE_ERROR", diag={})
 add("SOL-TCK-0278", "REQ-1803", "types",
     'interface I {\n    func get(): Integer\n}\n'
     'class Impl implements I {\n    Impl() {\n    }\n\n    func get(): Integer {\n        return 1\n    }\n}\n'
-    'class Holder {\n    delegate val hashCode: I\n\n    Holder(i: I) {\n        this.hashCode = i\n    }\n}\n'
+    'class Holder {\n    delegate var hashCode: I\n\n    Holder(i: I) {\n        this.hashCode = i\n    }\n}\n'
     'print(1)\n' + NEG,
     "COMPILE_ERROR", diag={})
 
 # --- REQ-1804 nullable receiver calls.
 add("SOL-TCK-0279", "REQ-1804", "types",
-    'val s: String? = "ab"\nval t = "ab"\nval r: Boolean? = s?.equals(t)\nprint("eq" .. r)\n',
+    'var s: String? = "ab"\nvar t = "ab"\nvar r: Boolean? = s?.equals(t)\nprint("eq" .. r)\n',
     "SUCCESS", stdout="eqtrue")
 add("SOL-TCK-0280", "REQ-1804", "types",
     # The null-receiver arm is present so the safe-call operator is shown to skip the call
     # rather than merely to compile against a nullable result type.
-    'val s: String? = "ab"\nval r: Integer? = s?.hashCode()\nval n: String? = null\nval q: Integer? = n?.hashCode()\n'
+    'var s: String? = "ab"\nvar r: Integer? = s?.hashCode()\nvar n: String? = null\nvar q: Integer? = n?.hashCode()\n'
     'print("hc" .. (r != null) .. (q == null))\n',
     # Derived from the specification, not observed: `s` is non-null so the safe call runs
     # and yields an Integer (`r != null` is true); `n` is null so the safe call is skipped
@@ -249,17 +249,17 @@ add("SOL-TCK-0280", "REQ-1804", "types",
     # rather than dispatching and returning something non-null.
     "SUCCESS", stdout="hctruetrue")
 add("SOL-TCK-0281", "REQ-1804", "types",
-    'val s: String? = "ab"\nval t = "ab"\nprint(s.equals(t))\n' + NEG, "COMPILE_ERROR", diag={})
+    'var s: String? = "ab"\nvar t = "ab"\nprint(s.equals(t))\n' + NEG, "COMPILE_ERROR", diag={})
 add("SOL-TCK-0282", "REQ-1804", "types",
-    'val s: String? = "ab"\nprint(s.hashCode())\n' + NEG, "COMPILE_ERROR", diag={})
+    'var s: String? = "ab"\nprint(s.hashCode())\n' + NEG, "COMPILE_ERROR", diag={})
 
 # --- REQ-1805 bare member reads.
 add("SOL-TCK-0283", "REQ-1805", "types",
-    'val s = "ab"\nval f = s.equals\nprint(1)\n' + NEG, "COMPILE_ERROR", diag={})
+    'var s = "ab"\nvar f = s.equals\nprint(1)\n' + NEG, "COMPILE_ERROR", diag={})
 add("SOL-TCK-0284", "REQ-1805", "types",
-    'val s = "ab"\nval f = s.hashCode\nprint(1)\n' + NEG, "COMPILE_ERROR", diag={})
+    'var s = "ab"\nvar f = s.hashCode\nprint(1)\n' + NEG, "COMPILE_ERROR", diag={})
 add("SOL-TCK-0285", "REQ-1805", "types",
-    'val s = "ab"\nval f = s.toString\nprint(1)\n' + NEG, "COMPILE_ERROR", diag={})
+    'var s = "ab"\nvar f = s.toString\nprint(1)\n' + NEG, "COMPILE_ERROR", diag={})
 
 
 def verify():

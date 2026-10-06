@@ -5,7 +5,7 @@ else {
     "no"
 }
 )
-mutable val x = 1
+var mutable x = 1
 x = if (x == 1) {
     10
 }

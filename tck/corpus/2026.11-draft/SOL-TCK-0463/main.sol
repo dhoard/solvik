@@ -2,8 +2,8 @@
 // An unknown name written in a capture list earns the same code as a typo anywhere else, and the body is written to reference nothing from outside so the item is the only report
 //
 // Oracle quotations verified verbatim against docs/LANGUAGE_SPEC.md:
-//   - A closure must not list or otherwise capture a `mutable val` local. Naming a `mutable val` in a capture list is `SEM_MUTABLE_CAPTURE` (`SOLV-SEM-057`), reported on that capture item, and a read or write of that captured name in the body is reported with the same code.
-//   - Referencing the same outer `mutable val` without listing it remains `SEM_UNLISTED_CAPTURE` at the body reference; the compiler never silently converts it into a capture.
+//   - A closure must not list or otherwise capture a `var mutable` local. Naming a `var mutable` in a capture list is `SEM_MUTABLE_CAPTURE` (`SOLV-SEM-057`), reported on that capture item, and a read or write of that captured name in the body is reported with the same code.
+//   - Referencing the same outer `var mutable` without listing it remains `SEM_UNLISTED_CAPTURE` at the body reference; the compiler never silently converts it into a capture.
 //   - An outer local or parameter referenced by the body but omitted from the capture list is `SEM_UNLISTED_CAPTURE` (`SOLV-SEM-058`), reported on the body reference. This applies to `this` as well: a closure body may use `this` only when `[this]` is written.
 //   - The capture list uses source order as environment order.
 //   - A duplicate capture item, and a capture item with the same name as one of the anonymous function's parameters, is `SOLV-RESOL-002`.

@@ -247,7 +247,7 @@
       "id": "REQ-0300",
       "specVersion": "2026.11-draft",
       "section": "2. Variables and Mutability",
-      "summary": "A `val` binding cannot be reassigned; reassigning an immutable binding is a compile-time error, while mutating a `mutable val` property of an object held in a `val` remains legal.",
+      "summary": "A `var` binding cannot be reassigned; reassigning an immutable binding is a compile-time error, while mutating a `var mutable` property of an object held in a `var` remains legal.",
       "kind": "compile-time",
       "profile": "full-language",
       "portable": true,
@@ -257,17 +257,17 @@
       "status": "tested",
       "lifecycle": "active",
       "diagnosticNormative": false,
-      "oracleNotes": "LANGUAGE_SPEC section 2 states 'Reassignment is illegal' with the example `count = 2 // compile error`, and its `val freezes the binding, not the complete reachable object graph` example marks `user.name = \"Douglas\"` valid and `user = User(\"Other\")` a compile error. IMPORTANT: the specification names NO stable diagnostic code for this rule, so no code is asserted and `diagnosticNormative` is false -- TCK.md section 6 forbids promoting an implementation enum entry to normative status. The manifest therefore asserts only the diagnostic family, which is the protocol's own closed taxonomy (protocol.md section 4.1), and the compile-time category is a section 3 fact ('Assignments are statements, not value-producing expressions' plus the static-typing model).",
+      "oracleNotes": "LANGUAGE_SPEC section 2 states 'Reassignment is illegal' with the example `count = 2 // compile error`, and its `var freezes the binding, not the complete reachable object graph` example marks `user.name = \"Douglas\"` valid and `user = User(\"Other\")` a compile error. IMPORTANT: the specification names NO stable diagnostic code for this rule, so no code is asserted and `diagnosticNormative` is false -- TCK.md section 6 forbids promoting an implementation enum entry to normative status. The manifest therefore asserts only the diagnostic family, which is the protocol's own closed taxonomy (protocol.md section 4.1), and the compile-time category is a section 3 fact ('Assignments are statements, not value-producing expressions' plus the static-typing model).",
       "normativeQuotes": [
         "Reassignment is illegal",
-        "`val` freezes the binding, not the complete reachable object graph"
+        "`var` freezes the binding, not the complete reachable object graph"
       ]
     },
     {
       "id": "REQ-0301",
       "specVersion": "2026.11-draft",
       "section": "2. Variables and Mutability",
-      "summary": "`val` freezes the binding, not the complete reachable object graph: reassigning a `mutable val` property of an object held in a `val` is legal and the new value is observed by later reads.",
+      "summary": "`var` freezes the binding, not the complete reachable object graph: reassigning a `var mutable` property of an object held in a `var` is legal and the new value is observed by later reads.",
       "kind": "compile-time",
       "profile": "full-language",
       "portable": true,
@@ -276,9 +276,9 @@
       ],
       "status": "tested",
       "lifecycle": "active",
-      "oracleNotes": "LANGUAGE_SPEC section 2 states verbatim: '`val` freezes the binding, not the complete reachable object graph', demonstrated by the example where `user.name = \"Douglas\"` is annotated 'valid' and `user = User(\"Other\")` 'compile error'. This requirement covers the VALID half (property mutation through a `val`); REQ-0300 covers the rejected half (rebinding). Expected stdout is the reassigned name; section 5 states `print` appends no line separator, so the bytes are exactly `Douglas`. No code is involved: this is an acceptance, so the oracle is a plain observable.",
+      "oracleNotes": "LANGUAGE_SPEC section 2 states verbatim: '`var` freezes the binding, not the complete reachable object graph', demonstrated by the example where `user.name = \"Douglas\"` is annotated 'valid' and `user = User(\"Other\")` 'compile error'. This requirement covers the VALID half (property mutation through a `var`); REQ-0300 covers the rejected half (rebinding). Expected stdout is the reassigned name; section 5 states `print` appends no line separator, so the bytes are exactly `Douglas`. No code is involved: this is an acceptance, so the oracle is a plain observable.",
       "normativeQuotes": [
-        "`val` freezes the binding, not the complete reachable object graph",
+        "`var` freezes the binding, not the complete reachable object graph",
         "user.name = \"Douglas\" // valid",
         "user = User(\"Other\")  // compile error"
       ]
@@ -487,7 +487,7 @@
       ],
       "status": "tested",
       "lifecycle": "active",
-      "oracleNotes": "LANGUAGE_SPEC section 5 states 'Flow-sensitive narrowing is required' and annotates the narrowed use as '// name is String here'. The oracle makes narrowing load-bearing rather than cosmetic: `greet` is declared to take a NON-NULL `String`, so `greet(nn)` inside `if (nn != null)` is accepted only if narrowing actually changed the analyzed type from `String?` to `String`. SOL-TCK-0031 uses a `val` and SOL-TCK-0037 a `var` with no intervening write, together covering both binding kinds; SOL-TCK-0032 is the matched negative.",
+      "oracleNotes": "LANGUAGE_SPEC section 5 states 'Flow-sensitive narrowing is required' and annotates the narrowed use as '// name is String here'. The oracle makes narrowing load-bearing rather than cosmetic: `greet` is declared to take a NON-NULL `String`, so `greet(nn)` inside `if (nn != null)` is accepted only if narrowing actually changed the analyzed type from `String?` to `String`. SOL-TCK-0031 uses a `var` and SOL-TCK-0037 a `var` with no intervening write, together covering both binding kinds; SOL-TCK-0032 is the matched negative.",
       "normativeQuotes": [
         "Flow-sensitive narrowing is required:",
         "print(name) // name is String here"
@@ -497,7 +497,7 @@
       "id": "REQ-0455",
       "specVersion": "2026.11-draft",
       "section": "5. Nullability (narrowing invalidation)",
-      "summary": "Narrowing is permitted only while the value cannot be written or invalidated along the path; a write to a `mutable val` invalidates its prior narrowing.",
+      "summary": "Narrowing is permitted only while the value cannot be written or invalidated along the path; a write to a `var mutable` invalidates its prior narrowing.",
       "kind": "compile-time",
       "profile": "full-language",
       "portable": true,
@@ -507,10 +507,10 @@
       "status": "tested",
       "lifecycle": "active",
       "diagnosticNormative": false,
-      "oracleNotes": "LANGUAGE_SPEC section 5 states verbatim: 'Narrowing is permitted only when the analyzed value cannot be written or invalidated along that control-flow path. A write to a `mutable val` invalidates its prior narrowing.' The test writes `mv = null` between the `mv != null` test and a use that requires non-null, so the program must be rejected; SOL-TCK-0037 is the otherwise-identical control with the write removed, which must be accepted, isolating the rejection to the invalidating write alone. The specification names NO code for this rejection, and TCK.md section 6 forbids promoting an implementation enum entry to normative status, so only the protocol family is asserted.",
+      "oracleNotes": "LANGUAGE_SPEC section 5 states verbatim: 'Narrowing is permitted only when the analyzed value cannot be written or invalidated along that control-flow path. A write to a `var mutable` invalidates its prior narrowing.' The test writes `mv = null` between the `mv != null` test and a use that requires non-null, so the program must be rejected; SOL-TCK-0037 is the otherwise-identical control with the write removed, which must be accepted, isolating the rejection to the invalidating write alone. The specification names NO code for this rejection, and TCK.md section 6 forbids promoting an implementation enum entry to normative status, so only the protocol family is asserted.",
       "normativeQuotes": [
         "Narrowing is permitted only when the analyzed value cannot be written or invalidated along that control-flow path.",
-        "A write to a `mutable val` invalidates its prior narrowing."
+        "A write to a `var mutable` invalidates its prior narrowing."
       ]
     },
     {
@@ -527,10 +527,10 @@
       "status": "tested",
       "lifecycle": "active",
       "diagnosticNormative": false,
-      "oracleNotes": "LANGUAGE_SPEC section 5 states verbatim: 'Types are non-null by default', '`null` is assignable only to nullable types', and gives the annotated example `val bad: String = null // compile error`; the test program is that exact declaration. NO code is asserted: the spec names `SOLV-TYPE-001` for an assignability failure only in two other contexts (section 7 static declaration initializers, section 22.1 exception message arguments) and never binds a code to an ordinary local declaration, so generalizing would have the TCK invent a normative code, which TCK.md section 6 forbids. This is recorded as a specification gap to raise.",
+      "oracleNotes": "LANGUAGE_SPEC section 5 states verbatim: 'Types are non-null by default', '`null` is assignable only to nullable types', and gives the annotated example `var bad: String = null // compile error`; the test program is that exact declaration. NO code is asserted: the spec names `SOLV-TYPE-001` for an assignability failure only in two other contexts (section 7 static declaration initializers, section 22.1 exception message arguments) and never binds a code to an ordinary local declaration, so generalizing would have the TCK invent a normative code, which TCK.md section 6 forbids. This is recorded as a specification gap to raise.",
       "normativeQuotes": [
         "Types are non-null by default.",
-        "val bad: String = null // compile error",
+        "var bad: String = null // compile error",
         "null is assignable only to nullable types."
       ]
     },
@@ -548,7 +548,7 @@
       "status": "tested",
       "lifecycle": "active",
       "diagnosticNormative": false,
-      "oracleNotes": "LANGUAGE_SPEC section 5 states verbatim: 'If `S` is a subtype of `T`, then `S` is assignable to `T?` and `S?` is assignable to `T?`; `S?` is not assignable to non-null `T`.' With S = T = String, `val m: String = n` where `n: String?` must be rejected. Only the protocol family is asserted, for the same reason recorded on REQ-0456: the specification binds no code to an ordinary assignment/type mismatch and TCK.md section 6 forbids adopting an implementation code.",
+      "oracleNotes": "LANGUAGE_SPEC section 5 states verbatim: 'If `S` is a subtype of `T`, then `S` is assignable to `T?` and `S?` is assignable to `T?`; `S?` is not assignable to non-null `T`.' With S = T = String, `var m: String = n` where `n: String?` must be rejected. Only the protocol family is asserted, for the same reason recorded on REQ-0456: the specification binds no code to an ordinary assignment/type mismatch and TCK.md section 6 forbids adopting an implementation code.",
       "normativeQuotes": [
         "If S is a subtype of T, then S is assignable to T? and S? is assignable to T?; S? is not assignable to non-null T."
       ]
@@ -677,7 +677,7 @@
       "oracleNotes": "SOL-TCK-0052 calls a function declared textually after the calling statement, and the expected bytes are computed from the declaration body rather than observed.",
       "normativeQuotes": [
         "Declaration lookup remains order-independent within a module, so a declaration may be referenced from a physically earlier file or statement.",
-        "The top-level statements, in include-expansion order, form the body of an implicit `func main()`; a top-level `val`, whether or not it is `mutable`, is therefore a local of the implicit main, not a global."
+        "The top-level statements, in include-expansion order, form the body of an implicit `func main()`; a top-level `var`, whether or not it is `mutable`, is therefore a local of the implicit main, not a global."
       ]
     },
     {
@@ -914,7 +914,7 @@
       "id": "REQ-0701",
       "specVersion": "2026.11-draft",
       "section": "9. Composition and Delegation",
-      "summary": "A `delegate val` of interface type causes the compiler to synthesize forwarding for interface members, an explicit method on the class takes precedence over a delegated member, and ambiguous delegation is a compile-time error",
+      "summary": "A `delegate var` of interface type causes the compiler to synthesize forwarding for interface members, an explicit method on the class takes precedence over a delegated member, and ambiguous delegation is a compile-time error",
       "kind": "runtime",
       "profile": "full-language",
       "portable": true,
@@ -992,7 +992,7 @@
       "lifecycle": "active",
       "oracleNotes": "The table is the only normative source for `List` behavior, so it is quoted in full rather than paraphrased. Two of its entries -- `add` and `set` -- take `element: T` and declare no return type, so they are Unit-returning and SOL-TCK-0076 uses them only as statements: section 11 gives them no value that could be printed, and asserting a rendering for `Unit` would invent semantics. The printed stream is therefore restricted to the entries the table types as returning a value. Deliberate scope limit: section 11's table lists `isEmpty` for `List` but gives `List` no way to observe order, so no order-dependent assertion is made.",
       "normativeQuotes": [
-        "List<T>: val isEmpty: Boolean, val size: Integer, func add(element: T), func get(index: Integer): T, func removeAt(index: Integer): T, func set(index: Integer, element: T), func clear(). An invalid index raises a Solvik runtime bounds error.",
+        "List<T>: var isEmpty: Boolean, var size: Integer, func add(element: T), func get(index: Integer): T, func removeAt(index: Integer): T, func set(index: Integer, element: T), func clear(). An invalid index raises a Solvik runtime bounds error.",
         "A collection is constructed with a class-style call. The type arguments may be written explicitly (List<Integer>(1, 2, 3))"
       ]
     },
@@ -1011,7 +1011,7 @@
       "lifecycle": "active",
       "oracleNotes": "The sentence `Set` keeps only the first of equal elements` fixes the cardinality of a set built from a duplicated element, and the table fixes the return type of every operation as Boolean, so each printed value is forced. Section 11 gives `Set` no iteration order, so the oracle asserts only order-independent facts; asserting an element position would invent deferred semantics. `clear` and the `isEmpty` transition to true are not separately exercised because the table gives `clear` no return value and the empty rendering is covered by the Map and Stack tests.",
       "normativeQuotes": [
-        "Set<T>: val isEmpty: Boolean, val size: Integer, func add(element: T): Boolean, func contains(element: T): Boolean, func remove(element: T): Boolean, func clear().",
+        "Set<T>: var isEmpty: Boolean, var size: Integer, func add(element: T): Boolean, func contains(element: T): Boolean, func remove(element: T): Boolean, func clear().",
         "For List, Set, and Stack, the value arguments are the initial elements and each must be assignable to the element type; Set keeps only the first of equal elements. Map takes key: value entries, each key assignable to K and each value assignable to V; a repeated key keeps its position and takes the latest value. A key: value entry is meaningful only in a Map construction, and a positional value is not valid in a Map construction."
       ]
     },
@@ -1031,7 +1031,7 @@
       "lifecycle": "active",
       "oracleNotes": "SOL-TCK-0078 covers the `put`/`get`/`containsKey`/`remove` sequence on a map built by the empty-construction form; SOL-TCK-0088 covers a repeated key supplied as construction entries, the form the sentence about repeated keys actually describes. Splitting them keeps the two observable consequences of a repeated key -- the entry count does not grow and the value is the latest written -- attributable to construction rather than to `put`. \"keeps its position\" is deliberately not asserted: section 11 gives `Map` no iteration order in this revision, so no position-derived observable exists and asserting one would invent deferred semantics.",
       "normativeQuotes": [
-        "Map<K, V>: val isEmpty: Boolean, val size: Integer, func put(key: K, value: V), func get(key: K): V, func containsKey(key: K): Boolean, func remove(key: K): Boolean, func clear(). get for a missing key raises a Solvik collection error.",
+        "Map<K, V>: var isEmpty: Boolean, var size: Integer, func put(key: K, value: V), func get(key: K): V, func containsKey(key: K): Boolean, func remove(key: K): Boolean, func clear(). get for a missing key raises a Solvik collection error.",
         "For List, Set, and Stack, the value arguments are the initial elements and each must be assignable to the element type; Set keeps only the first of equal elements. Map takes key: value entries, each key assignable to K and each value assignable to V; a repeated key keeps its position and takes the latest value. A key: value entry is meaningful only in a Map construction, and a positional value is not valid in a Map construction.",
         "a construction that writes neither is a compile-time error. A call with no value arguments constructs an empty collection (List<Integer>())."
       ]
@@ -1051,7 +1051,7 @@
       "lifecycle": "active",
       "oracleNotes": "The table types `peek(): T` and `pop(): T`, so both are printable and the sequence forces `peek` to leave the stack unchanged while `pop` removes the element it reported; that size 2 -> 1 transition is what distinguishes last-in-first-out from a queue without the specification having to name either. The empty-stack failure half of the same sentence is REQ-0905.",
       "normativeQuotes": [
-        "Stack<T>: val isEmpty: Boolean, val size: Integer, func push(element: T), func peek(): T, func pop(): T, func clear(). peek and pop on an empty stack raise a Solvik collection error.",
+        "Stack<T>: var isEmpty: Boolean, var size: Integer, func push(element: T), func peek(): T, func pop(): T, func clear(). peek and pop on an empty stack raise a Solvik collection error.",
         "a construction that writes neither is a compile-time error. A call with no value arguments constructs an empty collection (List<Integer>())."
       ]
     },
@@ -1092,9 +1092,9 @@
       "lifecycle": "active",
       "oracleNotes": "Four tests because the specification states three distinct sentences and the `Stack` sentence names two operations: an implementation that rejects only `pop` while returning a value from `peek` would pass a single-test corpus, so each named operation is tested separately. Each program is static under section 11's own signatures, so the failure cannot be attributed to a different rule. The specification names no stable code for a Solvik runtime bounds error or a Solvik collection error, so the manifests assert the protocol runtime category (protocol.md section 4.1) rather than a SOLV-* code, and record no process exit status: the specification says only that a failure is raised.",
       "normativeQuotes": [
-        "List<T>: val isEmpty: Boolean, val size: Integer, func add(element: T), func get(index: Integer): T, func removeAt(index: Integer): T, func set(index: Integer, element: T), func clear(). An invalid index raises a Solvik runtime bounds error.",
-        "Map<K, V>: val isEmpty: Boolean, val size: Integer, func put(key: K, value: V), func get(key: K): V, func containsKey(key: K): Boolean, func remove(key: K): Boolean, func clear(). get for a missing key raises a Solvik collection error.",
-        "Stack<T>: val isEmpty: Boolean, val size: Integer, func push(element: T), func peek(): T, func pop(): T, func clear(). peek and pop on an empty stack raise a Solvik collection error."
+        "List<T>: var isEmpty: Boolean, var size: Integer, func add(element: T), func get(index: Integer): T, func removeAt(index: Integer): T, func set(index: Integer, element: T), func clear(). An invalid index raises a Solvik runtime bounds error.",
+        "Map<K, V>: var isEmpty: Boolean, var size: Integer, func put(key: K, value: V), func get(key: K): V, func containsKey(key: K): Boolean, func remove(key: K): Boolean, func clear(). get for a missing key raises a Solvik collection error.",
+        "Stack<T>: var isEmpty: Boolean, var size: Integer, func push(element: T), func peek(): T, func pop(): T, func clear(). peek and pop on an empty stack raise a Solvik collection error."
       ]
     },
     {
@@ -1150,7 +1150,7 @@
       ],
       "status": "tested",
       "lifecycle": "active",
-      "oracleNotes": "Section 11's own `class Box<T> { mutable val value: T }` example is the declaration under test; the program adds the constructor that section 7 requires because section 2 rejects a `mutable val` property with no initializer, which changes no generics semantics. Two different type arguments on the same declared class are the point: a runtime that shared one storage cell across instantiations could not print both the `String` and the incremented `Integer`. The type-test sentence is quoted because it is the only normative sentence in section 11 that speaks to user-declared generic types.",
+      "oracleNotes": "Section 11's own `class Box<T> { var mutable value: T }` example is the declaration under test; the program adds the constructor that section 7 requires because section 2 rejects a `var mutable` property with no initializer, which changes no generics semantics. Two different type arguments on the same declared class are the point: a runtime that shared one storage cell across instantiations could not print both the `String` and the incremented `Integer`. The type-test sentence is quoted because it is the only normative sentence in section 11 that speaks to user-declared generic types.",
       "normativeQuotes": [
         "Generic type arguments are invariant. The initial runtime uses erasure while preserving complete compile-time checking. A runtime type test against a non-reified type argument is a compile-time error."
       ]
@@ -1187,7 +1187,7 @@
       ],
       "status": "tested",
       "lifecycle": "active",
-      "oracleNotes": "The section's own examples show both a function call and a class construction through a prefix (`val point: math::Point = math::Point(1)`), so the test covers one of each. Constructor argument passes through unchanged, verified against section 7's constructor rule.",
+      "oracleNotes": "The section's own examples show both a function call and a class construction through a prefix (`var point: math::Point = math::Point(1)`), so the test covers one of each. Constructor argument passes through unchanged, verified against section 7's constructor rule.",
       "normativeQuotes": [
         "include P alias p binds the prefix p to the included file's module instead."
       ]
@@ -2660,7 +2660,7 @@
       "lifecycle": "active",
       "oracleNotes": "Four positions are refused -- nested inside another assignment, as an initializer, as a controlling condition, and as a call argument -- because 'not value-producing' is a statement about every expression position and one position alone cannot distinguish it from a local syntactic restriction. The accepted control assigns as a statement and prints the assigned value. Rejections are bare: the specification names no code for this, and these are parse-level refusals.",
       "normativeQuotes": [
-        "Assignments are statements, not value-producing expressions. The target must be a `mutable val` local or a `mutable val` property."
+        "Assignments are statements, not value-producing expressions. The target must be a `var mutable` local or a `var mutable` property."
       ]
     },
     {
@@ -3176,7 +3176,7 @@
       ],
       "status": "tested",
       "lifecycle": "active",
-      "oracleNotes": "The accepted arm breaks only at admitted positions -- after the opening paren, after each comma, and before the closing paren -- and remains a single call whose printed result is the oracle. The rejected arm `val v = 1\\n + 2` puts the newline BEFORE the operator: the first line ended of its own accord after the literal, so `+ 2` is orphaned, and it stays an error inside no parentheses at all because depth grants nothing. An implementation that joined a newline before an operator wherever brackets were open -- the removed depth-suppression design -- accepts the rejected arm and fails. Bare rejection.",
+      "oracleNotes": "The accepted arm breaks only at admitted positions -- after the opening paren, after each comma, and before the closing paren -- and remains a single call whose printed result is the oracle. The rejected arm `var v = 1\\n + 2` puts the newline BEFORE the operator: the first line ended of its own accord after the literal, so `+ 2` is orphaned, and it stays an error inside no parentheses at all because depth grants nothing. An implementation that joined a newline before an operator wherever brackets were open -- the removed depth-suppression design -- accepts the rejected arm and fails. Bare rejection.",
       "normativeQuotes": [
         "the grammar itself absorbs the boundary tokens at the positions where a construct may spread across lines - after a binary operator, after a comma, before a `.`, `?.`, or `::`, around argument, type-argument, and pattern lists, and before a closing delimiter.",
         "a line break the grammar does not admit is an error at the break."
@@ -3198,7 +3198,7 @@
       ],
       "status": "tested",
       "lifecycle": "active",
-      "oracleNotes": "`val b = a +\\n 1` (accepted) and `val b = a\\n + 1` (rejected) differ only in which side of the newline the `+` sits: on the accepted side the line cannot end after an operator, so the expression continues; on the rejected side the line ended after the identifier, so `+ 1` is orphaned. A second rejection uses `*` rather than `+` to show the rule is not about any one operator, and the multi-line call-argument arm shows the comma position. Together these are the direct evidence against JavaScript-style heuristics: an implementation that carried over JS operator-continuation would accept both leading-operator programs. Bare rejections.",
+      "oracleNotes": "`var b = a +\\n 1` (accepted) and `var b = a\\n + 1` (rejected) differ only in which side of the newline the `+` sits: on the accepted side the line cannot end after an operator, so the expression continues; on the rejected side the line ended after the identifier, so `+ 1` is orphaned. A second rejection uses `*` rather than `+` to show the rule is not about any one operator, and the multi-line call-argument arm shows the comma position. Together these are the direct evidence against JavaScript-style heuristics: an implementation that carried over JS operator-continuation would accept both leading-operator programs. Bare rejections.",
       "normativeQuotes": [
         "a line break the grammar does not admit is an error at the break.",
         "There is no lookahead exception table and no heuristic join: a line break the grammar does not admit is an error at the break."
@@ -3241,7 +3241,7 @@
       ],
       "status": "tested",
       "lifecycle": "active",
-      "oracleNotes": "`val a = 1 /* c\\n*/ print(...)` is accepted while the identical program with the comment-newline removed, `val a = 1 print(...)`, is rejected (that rejection is REQ-1900's arm and the contrast is documented in the plan). The accepted arm can only parse if the stage treats the newline contained in the block comment as the physical boundary that ended `val a = 1`; a stage that ignored comment interiors would see no boundary and reject it. A line-comment newline is accepted on the same principle. This is the only direct evidence for the clause, since a portable oracle cannot inspect the token stream.",
+      "oracleNotes": "`var a = 1 /* c\\n*/ print(...)` is accepted while the identical program with the comment-newline removed, `var a = 1 print(...)`, is rejected (that rejection is REQ-1900's arm and the contrast is documented in the plan). The accepted arm can only parse if the stage treats the newline contained in the block comment as the physical boundary that ended `var a = 1`; a stage that ignored comment interiors would see no boundary and reject it. A line-comment newline is accepted on the same principle. This is the only direct evidence for the clause, since a portable oracle cannot inspect the token stream.",
       "normativeQuotes": [
         "The lexer preserves every physical newline (including a newline inside a comment, because it is still a physical newline)"
       ]
@@ -3663,7 +3663,7 @@
       "lifecycle": "active",
       "oracleNotes": "The negative arm assigns the property only on the true branch, so a false-path instance is missing an assignment and the program is rejected bare; the positive arm assigns on both branches and reads the value, so acceptance is observed as stdout. The pair differs only in the missing else-assignment.",
       "normativeQuotes": [
-        "Every property without a declaration initializer must be assigned exactly once on every successful constructor path before it is read; a `val` property cannot be assigned afterward."
+        "Every property without a declaration initializer must be assigned exactly once on every successful constructor path before it is read; a `var` property cannot be assigned afterward."
       ]
     },
     {
@@ -3794,7 +3794,7 @@
       ],
       "status": "tested",
       "lifecycle": "active",
-      "oracleNotes": "A `val` property in an interface is the negated sentence. Section 8 names no code, so the rejection is bare; the program prints a sentinel only if it executes.",
+      "oracleNotes": "A `var` property in an interface is the negated sentence. Section 8 names no code, so the rejection is bare; the program prints a sentinel only if it executes.",
       "normativeQuotes": [
         "Interfaces contain methods, not stored properties."
       ]
@@ -4176,10 +4176,10 @@
       ],
       "status": "tested",
       "lifecycle": "active",
-      "oracleNotes": "The program binds the class name to a local, which is exactly the `val c = Counter` form the section rejects. The section names `SOLV-TYPE-016`, so the oracle pins it.",
+      "oracleNotes": "The program binds the class name to a local, which is exactly the `var c = Counter` form the section rejects. The section names `SOLV-TYPE-016`, so the oracle pins it.",
       "normativeQuotes": [
         "The class name in that position is a receiver, not a value: it is legal only as the root of a static member reference, and a class name used anywhere else remains `SOLV-TYPE-016`.",
-        "In particular `val c = Counter` and a read through an instance such as `instance.limit` are rejected."
+        "In particular `var c = Counter` and a read through an instance such as `instance.limit` are rejected."
       ],
       "diagnosticCode": "SOLV-TYPE-016",
       "diagnosticNormative": true
@@ -4200,7 +4200,7 @@
       "oracleNotes": "The program reads the static property through an instance, the second rejected form the section names. No code is named for the instance form, so the rejection is bare.",
       "normativeQuotes": [
         "The class name in that position is a receiver, not a value: it is legal only as the root of a static member reference, and a class name used anywhere else remains `SOLV-TYPE-016`.",
-        "In particular `val c = Counter` and a read through an instance such as `instance.limit` are rejected."
+        "In particular `var c = Counter` and a read through an instance such as `instance.limit` are rejected."
       ]
     },
     {
@@ -4275,7 +4275,7 @@
       ],
       "status": "tested",
       "lifecycle": "active",
-      "oracleNotes": "A class declares `static val toString` and reads it through the class name; the read observes the static cell, which the section says remains reachable alongside the inherited universal instance member. The expected bytes are the cell's value.",
+      "oracleNotes": "A class declares `static var toString` and reads it through the class name; the read observes the static cell, which the section says remains reachable alongside the inherited universal instance member. The expected bytes are the cell's value.",
       "normativeQuotes": [
         "The `toString`/`equals`/`hashCode` reserved-name rules apply to **instance** members only, so a static member may use those names."
       ]
@@ -4367,7 +4367,7 @@
       "id": "REQ-2604",
       "specVersion": "2026.11-draft",
       "section": "9. Composition and Delegation",
-      "summary": "A delegate is an explicitly typed property, so a `delegate val` declaration without a type is a compile-time error",
+      "summary": "A delegate is an explicitly typed property, so a `delegate var` declaration without a type is a compile-time error",
       "kind": "syntax",
       "profile": "full-language",
       "portable": true,
@@ -4560,7 +4560,7 @@
       "lifecycle": "active",
       "oracleNotes": "Variant `A` carries an `Integer` and is constructed with a `String`. A variant is a nominal constructor, so the general call-assignability rule applies; the section names no code for the payload mismatch, so the rejection is bare.",
       "normativeQuotes": [
-        "Assignments are statements, not value-producing expressions. The target must be a `mutable val` local or a `mutable val` property. Calls require exact arity, and each argument must be assignable to its declared parameter type."
+        "Assignments are statements, not value-producing expressions. The target must be a `var mutable` local or a `var mutable` property. Calls require exact arity, and each argument must be assignable to its declared parameter type."
       ]
     },
     {
@@ -4595,7 +4595,7 @@
       ],
       "status": "tested",
       "lifecycle": "active",
-      "oracleNotes": "After `x is String` narrows a `mutable val`, a write to `x` occurs and a later read requires the narrowed type. The refinement must not survive the write, so the read is a compile-time error; no code is named, so the rejection is bare.",
+      "oracleNotes": "After `x is String` narrows a `var mutable`, a write to `x` occurs and a later read requires the narrowed type. The refinement must not survive the write, so the read is a compile-time error; no code is named, so the rejection is bare.",
       "normativeQuotes": [
         "The compiler must narrow the type where the checked value is stable and no intervening write can invalidate the refinement."
       ]
@@ -4816,7 +4816,7 @@
       "id": "REQ-2900",
       "specVersion": "2026.11-draft",
       "section": "2. Variables and Mutability",
-      "summary": "`mutable val` declares a mutable binding or property, so a local declared `mutable val` may be reassigned and the new value is observed",
+      "summary": "`var mutable` declares a mutable binding or property, so a local declared `var mutable` may be reassigned and the new value is observed",
       "kind": "runtime",
       "profile": "full-language",
       "portable": true,
@@ -4825,16 +4825,16 @@
       ],
       "status": "tested",
       "lifecycle": "active",
-      "oracleNotes": "A `mutable val` local is reassigned and printed, so the observed bytes are the assigned value; this is the positive counterpart to the `val` immutability covered by REQ-0300/REQ-0301.",
+      "oracleNotes": "A `var mutable` local is reassigned and printed, so the observed bytes are the assigned value; this is the positive counterpart to the `var` immutability covered by REQ-0300/REQ-0301.",
       "normativeQuotes": [
-        "`mutable val` declares a mutable binding/property."
+        "`var mutable` declares a mutable binding/property."
       ]
     },
     {
       "id": "REQ-2901",
       "specVersion": "2026.11-draft",
       "section": "6. Functions",
-      "summary": "A top-level `val`, mutable or not, is a local of the implicit main, not a global, so it is not visible to a user-declared function",
+      "summary": "A top-level `var`, mutable or not, is a local of the implicit main, not a global, so it is not visible to a user-declared function",
       "kind": "compile-time",
       "profile": "full-language",
       "portable": true,
@@ -4845,7 +4845,7 @@
       "lifecycle": "active",
       "oracleNotes": "A top-level binding is referenced from a declared function, which is not the implicit main. The reference is resolved against function locals and parameters only, so it is an unresolvable-name error. The section names no code, so the rejection is bare.",
       "normativeQuotes": [
-        "a top-level `val`, whether or not it is `mutable`, is therefore a local of the implicit main, not a global."
+        "a top-level `var`, whether or not it is `mutable`, is therefore a local of the implicit main, not a global."
       ]
     },
     {
@@ -4976,6 +4976,132 @@
       "normativeQuotes": [
         "Two paths or symlinks that resolve to the same file are the same include.",
         "A canonical physical file is expanded at most once per evaluated root. A later include of the same canonical file is a no-op, so a diamond is deterministic and an included top-level statement never runs twice."
+      ]
+    },
+    {
+      "id": "REQ-2909",
+      "specVersion": "2026.11-draft",
+      "section": "2. Variables and Mutability",
+      "summary": "`var` declares an immutable binding, so a plain `var` local may be initialized and read",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0500"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "A plain `var` local is declared and printed with no reassignment, so the program exercises the immutable default rather than the writable form.",
+      "normativeQuotes": [
+        "`var` declares an immutable binding/property."
+      ]
+    },
+    {
+      "id": "REQ-2910",
+      "specVersion": "2026.11-draft",
+      "section": "2. Variables and Mutability",
+      "summary": "A `var` binding may carry an explicit type annotation, so `var name: Type = expression` declares an immutable typed binding",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0501"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The declared type is `Integer` and the initializer is an `Integer` literal, so the program only compiles if the annotation position is accepted and the value reads back.",
+      "normativeQuotes": [
+        "The canonical forms are `var name = expression`, `var name: Type = expression`, `var mutable name = expression`, and `var mutable name: Type = expression`"
+      ]
+    },
+    {
+      "id": "REQ-2911",
+      "specVersion": "2026.11-draft",
+      "section": "2. Variables and Mutability",
+      "summary": "`var mutable` declares a mutable binding, so a typed `var mutable` local may be reassigned and the new value is observed",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0502"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The typed mutable local is reassigned once and printed, so the observed bytes are the assigned value rather than the initializer.",
+      "normativeQuotes": [
+        "`var mutable` declares a mutable binding/property."
+      ]
+    },
+    {
+      "id": "REQ-2912",
+      "specVersion": "2026.11-draft",
+      "section": "2. Variables and Mutability",
+      "summary": "A mutable binding may be reassigned repeatedly, including from its own previous value",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0503"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The binding is assigned three times and the final assignment reads the binding's own previous value, so the printed result pins sequential reassignment.",
+      "normativeQuotes": [
+        "Reassignment uses ordinary `=` assignment on an existing binding and is legal only when the binding was declared `mutable`"
+      ]
+    },
+    {
+      "id": "REQ-2913",
+      "specVersion": "2026.11-draft",
+      "section": "6. Functions",
+      "summary": "A nested block may shadow an outer declaration, and the inner binding is a distinct binding, so mutating an inner `var mutable` leaves the outer immutable binding unchanged",
+      "kind": "runtime",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0504"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The outer immutable `var x` and the inner mutable `var mutable x` are different bindings: the inner reassignment prints 30 and the outer read after the block still prints 10, so a textual-identifier mutability model that conflated them would fail.",
+      "normativeQuotes": [
+        "A nested block may shadow an outer declaration."
+      ]
+    },
+    {
+      "id": "REQ-2914",
+      "specVersion": "2026.11-draft",
+      "section": "2. Variables and Mutability",
+      "summary": "A binding is immutable unless `mutable` follows it, so a write to an outer `var` from a nested block is rejected",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0505"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "The write is inside a nested block and targets the outer immutable binding, so the rejection must come from the binding's mutability rather than from the assignment's lexical position. The specification names no stable code, so only the TYPE family is asserted, and the sentinel proves the program never executed.",
+      "normativeQuotes": [
+        "a binding is immutable unless `mutable` follows it"
+      ]
+    },
+    {
+      "id": "REQ-2915",
+      "specVersion": "2026.11-draft",
+      "section": "2. Variables and Mutability",
+      "summary": "The declaration keyword comes first and `mutable` follows it, so a modifier-first declaration is rejected during parsing",
+      "kind": "compile-time",
+      "profile": "full-language",
+      "portable": true,
+      "tests": [
+        "SOL-TCK-0506"
+      ],
+      "status": "tested",
+      "lifecycle": "active",
+      "oracleNotes": "`mutable var x = 1` puts the modifier before the declaration keyword, which the grammar does not admit. The protocol family PARS is asserted rather than an implementation code.",
+      "normativeQuotes": [
+        "`mutable` is a modifier on the declaration, never a binding kind of its own, so `var mutable` is the complete form and a bare `mutable` is a compile-time error."
       ]
     },
     {
@@ -5252,7 +5378,7 @@
       "oracleNotes": "A class declares `static func toString` and an instance calls `toString()`. The instance reaches the inherited universal member and prints the class name, not the static method's text; an implementation that resolved the instance call to the static member would print `static`.",
       "normativeQuotes": [
         "Those names are reserved to protect the universal `Any` members, which are instance members reached through virtual dispatch; a static member never enters the dispatch table, so a `static func toString()` cannot replace `Any.toString()` any more than an instance method of another name can, and `instance.toString()` keeps reaching the universal member.",
-        "for a class declaring `static val toString: Integer` and inheriting the default `Any.toString()`, the expression `C.toString` reads the static cell and `instance` formatting still calls `Any.toString()`."
+        "for a class declaring `static var toString: Integer` and inheriting the default `Any.toString()`, the expression `C.toString` reads the static cell and `instance` formatting still calls `Any.toString()`."
       ]
     },
     {
@@ -5553,7 +5679,7 @@
       ],
       "status": "tested",
       "lifecycle": "active",
-      "oracleNotes": "SOL-TCK-0436 puts one generic reference in every declared-type position the section enumerates -- static property initializer, instance property initializer, `val` initializers of four different shapes, a static property assignment, and a generic type argument -- and then calls the value at each, so a substitution is shown usable rather than merely typed. Those shapes are mutually incompatible monomorphic types over two declarations in one program, which a host that computed one substitution per declaration, or that generalized a reference to `Any`, cannot produce. SOL-TCK-0437 is the half the section preserves: written type arguments on direct calls still resolve, at two different arities, with and without them written, beside a value reference whose types come only from its declared type -- both mechanisms in one file so neither can be quietly doing the other's work.",
+      "oracleNotes": "SOL-TCK-0436 puts one generic reference in every declared-type position the section enumerates -- static property initializer, instance property initializer, `var` initializers of four different shapes, a static property assignment, and a generic type argument -- and then calls the value at each, so a substitution is shown usable rather than merely typed. Those shapes are mutually incompatible monomorphic types over two declarations in one program, which a host that computed one substitution per declaration, or that generalized a reference to `Any`, cannot produce. SOL-TCK-0437 is the half the section preserves: written type arguments on direct calls still resolve, at two different arities, with and without them written, beside a value reference whose types come only from its declared type -- both mechanisms in one file so neither can be quietly doing the other's work.",
       "normativeQuotes": [
         "A generic function declaration does not itself produce a first-class polymorphic value.",
         "It must be instantiated to one monomorphic function type at each value-reference site, and that instantiation is contextual:",
@@ -5736,9 +5862,9 @@
       "lifecycle": "active",
       "oracleNotes": "SOL-TCK-0454 is the observation test: an object captured and then mutated *after* creation reads back its new state through the closure, which is what separates a copied reference from a copied object; a closure built over a closure returns the inner closure's captured value, which is what separates storing a function value from flattening its environment; and two creations from one parameterized factory each carry the value their parameter held at that moment, which a host that shared one binding per declaration could not produce. SOL-TCK-0455 carries a receiver through two intervening closures -- the path an implementation with implicit outer lookup would take without ever writing the forwarding the section requires. SOL-TCK-0456 is the global half: a body calls a named top-level function with no capture entry, and recurses through it, so the value that makes the answer right is one no capture list could have supplied.",
       "normativeQuotes": [
-        "A capture item is an identifier or `this`. It must resolve at the closure-creation site to one of: a `val` local declared in an enclosing function scope; an immutable parameter of an enclosing function; another function value held by an immutable binding; or `this` in an enclosing instance method or constructor.",
+        "A capture item is an identifier or `this`. It must resolve at the closure-creation site to one of: a `var` local declared in an enclosing function scope; an immutable parameter of an enclosing function; another function value held by an immutable binding; or `this` in an enclosing instance method or constructor.",
         "Each listed binding's value is captured when evaluation reaches the anonymous-function expression.",
-        "Capturing an object copies the reference, not the reachable object graph, so later mutation of that object's `mutable val` properties remains observable through the captured reference.",
+        "Capturing an object copies the reference, not the reachable object graph, so later mutation of that object's `var mutable` properties remains observable through the captured reference.",
         "Capture is transitive only through explicit values.",
         "A closure that captures another closure lists that function-valued binding and stores the function value; it does not duplicate or flatten the captured closure's environment.",
         "In nested closures, a name used in an inner capture list counts as a use by the enclosing closure, so every intervening closure must list and forward that value explicitly.",
@@ -5750,7 +5876,7 @@
       "id": "REQ-3321",
       "specVersion": "2026.11-draft",
       "section": "6. Functions (Explicit immutable closure capture; required diagnostics)",
-      "summary": "A `mutable val` named in a capture list is `SOLV-SEM-057`, an unlisted outer local or uncaptured `this` is `SOLV-SEM-058` at the body reference, an unknown item is `SOLV-RESOL-001`, `this` with no receiver is `SOLV-RESOL-005`, and a duplicate item or item colliding with a parameter is `SOLV-RESOL-002`",
+      "summary": "A `var mutable` named in a capture list is `SOLV-SEM-057`, an unlisted outer local or uncaptured `this` is `SOLV-SEM-058` at the body reference, an unknown item is `SOLV-RESOL-001`, `this` with no receiver is `SOLV-RESOL-005`, and a duplicate item or item colliding with a parameter is `SOLV-RESOL-002`",
       "kind": "compile-time",
       "profile": "full-language",
       "portable": true,
@@ -5766,10 +5892,10 @@
       ],
       "status": "tested",
       "lifecycle": "active",
-      "oracleNotes": "Each report is a program of its own with the body written not to introduce a second root cause. SOL-TCK-0457 and SOL-TCK-0458 are the two mutable-state halves the revision distinguishes by span -- `SOLV-SEM-057` at the item that names a `mutable val`, plain `SOLV-SEM-058` at a body reference to the *same kind* of outer `mutable val` that was never listed. That pair is the whole content of the sentence: a host that silently captured the unlisted variable fails 0458, and one that reported the item-side case with the unlisted code, or with none, fails 0457. SOL-TCK-0459 and SOL-TCK-0460 assert the body-reference code for an omitted `val` and for `this` used without `[this]`. SOL-TCK-0461 and SOL-TCK-0462 are the two halves of the duplicate-name rule -- `[base, base]`, whose body never mentions the duplicated name, and an item colliding with a parameter. SOL-TCK-0463 and SOL-TCK-0464 pin the remaining item codes, an unknown name and `this` in a top-level function where no instance receiver exists; each body is written to reference nothing from outside the closure at all, so the capture item is the only report the program can produce and a passing match cannot be about an unrelated diagnostic. Every program carries the sentinel.",
+      "oracleNotes": "Each report is a program of its own with the body written not to introduce a second root cause. SOL-TCK-0457 and SOL-TCK-0458 are the two mutable-state halves the revision distinguishes by span -- `SOLV-SEM-057` at the item that names a `var mutable`, plain `SOLV-SEM-058` at a body reference to the *same kind* of outer `var mutable` that was never listed. That pair is the whole content of the sentence: a host that silently captured the unlisted variable fails 0458, and one that reported the item-side case with the unlisted code, or with none, fails 0457. SOL-TCK-0459 and SOL-TCK-0460 assert the body-reference code for an omitted `var` and for `this` used without `[this]`. SOL-TCK-0461 and SOL-TCK-0462 are the two halves of the duplicate-name rule -- `[base, base]`, whose body never mentions the duplicated name, and an item colliding with a parameter. SOL-TCK-0463 and SOL-TCK-0464 pin the remaining item codes, an unknown name and `this` in a top-level function where no instance receiver exists; each body is written to reference nothing from outside the closure at all, so the capture item is the only report the program can produce and a passing match cannot be about an unrelated diagnostic. Every program carries the sentinel.",
       "normativeQuotes": [
-        "A closure must not list or otherwise capture a `mutable val` local. Naming a `mutable val` in a capture list is `SEM_MUTABLE_CAPTURE` (`SOLV-SEM-057`), reported on that capture item, and a read or write of that captured name in the body is reported with the same code.",
-        "Referencing the same outer `mutable val` without listing it remains `SEM_UNLISTED_CAPTURE` at the body reference; the compiler never silently converts it into a capture.",
+        "A closure must not list or otherwise capture a `var mutable` local. Naming a `var mutable` in a capture list is `SEM_MUTABLE_CAPTURE` (`SOLV-SEM-057`), reported on that capture item, and a read or write of that captured name in the body is reported with the same code.",
+        "Referencing the same outer `var mutable` without listing it remains `SEM_UNLISTED_CAPTURE` at the body reference; the compiler never silently converts it into a capture.",
         "An outer local or parameter referenced by the body but omitted from the capture list is `SEM_UNLISTED_CAPTURE` (`SOLV-SEM-058`), reported on the body reference. This applies to `this` as well: a closure body may use `this` only when `[this]` is written.",
         "The capture list uses source order as environment order.",
         "A duplicate capture item, and a capture item with the same name as one of the anonymous function's parameters, is `SOLV-RESOL-002`.",
@@ -5944,7 +6070,7 @@
       "oracleNotes": "SOL-TCK-0484 instantiates one declaration from one receiver at `func(Integer): Integer` and at `func(String): String`, which is what 'monomorphic' and 'contextual' jointly require: the value carries no type arguments, so the expected type must supply them, and two sites may differ. SOL-TCK-0485 puts the generic method on a generic class read through `Cell(Integer)`, so the class parameter is already fixed and only the method's own parameter is inferred; a host that treated the two as one inference problem would either fail to instantiate or substitute the wrong type, and the program prints the swapped value and the stored one to tell those apart. SOL-TCK-0486 is the named failure: the reference sits where no complete function signature is expected, and the section gives `SOLV-TYPE-030`. The positive programs assert no cross-instantiation identity, since instantiation is a static event and the distinct-identity sentence for bound values already covers what a host may observe.",
       "normativeQuotes": [
         "It must be instantiated to one monomorphic function type at each value-reference site, and that instantiation is contextual:",
-        "A generic method reference is instantiated contextually under the same monomorphic rules as a generic top-level function reference, so `val operation: func(Integer): Integer = object.identity` is accepted and an unconstrained reference is `SOLV-TYPE-030`."
+        "A generic method reference is instantiated contextually under the same monomorphic rules as a generic top-level function reference, so `var operation: func(Integer): Integer = object.identity` is accepted and an unconstrained reference is `SOLV-TYPE-030`."
       ]
     },
     {

@@ -35,7 +35,7 @@ public final class SolvikNullSafetyExecutionTest {
 
     private static final String BOX = """
             class Box {
-                val value: Integer
+                var value: Integer
 
                 Box(value: Integer) {
                     this.value = value
@@ -71,8 +71,8 @@ public final class SolvikNullSafetyExecutionTest {
     @Test
     public void safeAccessYieldsNullForANullReceiver() {
         assertThat(run(BOX + """
-                    val a: Box? = null
-                    val b: Box? = Box(7)
+                    var a: Box? = null
+                    var b: Box? = Box(7)
                     println(a == null)
                     println(b?.value ?? -1)
                 """)).isEqualTo("true\n7\n");
@@ -81,8 +81,8 @@ public final class SolvikNullSafetyExecutionTest {
     @Test
     public void coalescingUsesTheFallbackForNull() {
         assertThat(run("""
-                    val s: String? = null
-                    val t: String? = "value"
+                    var s: String? = null
+                    var t: String? = "value"
                     println(s ?? "fallback")
                     println(t ?? "fallback")
                 """)).isEqualTo("fallback\nvalue\n");
@@ -95,7 +95,7 @@ public final class SolvikNullSafetyExecutionTest {
                     println("side")
                     return "fallback"
                 }
-                    val s: String? = "value"
+                    var s: String? = "value"
                     println(s ?? side())
                 """)).isEqualTo("value\n");
     }
@@ -112,7 +112,7 @@ public final class SolvikNullSafetyExecutionTest {
                     println("side")
                     return 2
                 }
-                    val box: Box? = null
+                    var box: Box? = null
                     println(box?.plus(side()) ?? -1)
                 """)).isEqualTo("-1\n");
     }
@@ -122,7 +122,7 @@ public final class SolvikNullSafetyExecutionTest {
         assertThat(run("""
                 class Box {
                 }
-                    val v: Any = Box()
+                    var v: Any = Box()
                     println(v is Box)
                     println(v is String)
                 """)).isEqualTo("true\nfalse\n");
@@ -139,9 +139,9 @@ public final class SolvikNullSafetyExecutionTest {
                         return "Doug"
                     }
                 }
-                    val v: Any = User()
+                    var v: Any = User()
                     println(v is Named)
-                    val named = v as Named
+                    var named = v as Named
                     println(named.name())
                 """)).isEqualTo("true\nDoug\n");
     }
@@ -149,8 +149,8 @@ public final class SolvikNullSafetyExecutionTest {
     @Test
     public void checkedCastReturnsTheValueOnSuccess() {
         assertThat(run(BOX + """
-                    val v: Any = Box(3)
-                    val box = v as Box
+                    var v: Any = Box(3)
+                    var box = v as Box
                     println(box.value)
                 """)).isEqualTo("3\n");
     }
@@ -159,8 +159,8 @@ public final class SolvikNullSafetyExecutionTest {
     public void unsuccessfulCastRaisesARuntimeTypeError() {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         PolyglotException failure = runFailing(BOX + """
-                    val v: Any = "not a box"
-                    val box = v as Box
+                    var v: Any = "not a box"
+                    var box = v as Box
                     println(box.value)
                 """, out);
         assertThat(failure).as("the cast must fail").isNotNull();
@@ -172,7 +172,7 @@ public final class SolvikNullSafetyExecutionTest {
     @Test
     public void nullCheckNarrowingExecutesTheNonNullBranch() {
         assertThat(run(BOX + """
-                    val box: Box? = Box(5)
+                    var box: Box? = Box(5)
                     if (box != null) {
                         println(box.value)
                     }
@@ -182,7 +182,7 @@ public final class SolvikNullSafetyExecutionTest {
     @Test
     public void typeTestNarrowingExecutesTheNonNullBranch() {
         assertThat(run(BOX + """
-                    val v: Any = Box(9)
+                    var v: Any = Box(9)
                     if (v is Box) {
                         println(v.value)
                     }
@@ -192,10 +192,10 @@ public final class SolvikNullSafetyExecutionTest {
     @Test
     public void builtinTypeTestsAndCastsExecute() {
         assertThat(run("""
-                    val v: Any = 1
+                    var v: Any = 1
                     println(v is Integer)
                     println(v is String)
-                    val n = v as Integer
+                    var n = v as Integer
                     println(n + 1)
                 """)).isEqualTo("true\nfalse\n2\n");
     }
@@ -213,10 +213,10 @@ public final class SolvikNullSafetyExecutionTest {
                         return "woof"
                     }
                 }
-                    val v: Any = Dog()
+                    var v: Any = Dog()
                     println(v is Dog)
                     println(v is Animal)
-                    val animal = v as Animal
+                    var animal = v as Animal
                     println(animal.speak())
                 """)).isEqualTo("true\ntrue\nwoof\n");
     }

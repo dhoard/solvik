@@ -40,11 +40,11 @@ arm rather than agreeing by accident:
     own lines (`f(
  1,
  2,
-)`) and `val b = a +
+)`) and `var b = a +
  1` are accepted while
-    `val v = 1
- + 2`, `val b = a
- + 1` and `val b = a
+    `var v = 1
+ + 2`, `var b = a
+ + 1` and `var b = a
  * 3` are rejected. The
     accepted programs break only at positions the grammar admits (after `(`,
     after a comma, after a binary operator); the rejected programs break a line
@@ -66,9 +66,9 @@ arm rather than agreeing by accident:
     else {
         `.
 
-  * Comment newlines are physical. `val a = 1 /* c
+  * Comment newlines are physical. `var a = 1 /* c
 */ print(...)` is accepted
-    where the same program with the comment-newline removed, `val a = 1
+    where the same program with the comment-newline removed, `var a = 1
     print(...)`, is rejected by the no-separator rule; the accepted arm can only
     parse if the newline inside the block comment ended the first statement's
     line. A line-comment newline is accepted on the same principle.
@@ -122,14 +122,14 @@ REQS = {
   section="16. Statement Termination and Brace Placement",
   summary="A call may spread its arguments across physical lines because the grammar absorbs the boundary after `(`, after a comma, and before `)`, while a complete statement followed by an operator line cannot continue even inside parentheses, because nesting depth grants no continuation",
   kind="compile-time",
-  notes="The accepted arm breaks only at admitted positions -- after the opening paren, after each comma, and before the closing paren -- and remains a single call whose printed result is the oracle. The rejected arm `val v = 1\\n + 2` puts the newline BEFORE the operator: the first line ended of its own accord after the literal, so `+ 2` is orphaned, and it stays an error inside no parentheses at all because depth grants nothing. An implementation that joined a newline before an operator whenever brackets enclose the expression -- the removed depth-suppression design -- accepts the rejected arm and fails. Bare rejection.",
+  notes="The accepted arm breaks only at admitted positions -- after the opening paren, after each comma, and before the closing paren -- and remains a single call whose printed result is the oracle. The rejected arm `var v = 1\\n + 2` puts the newline BEFORE the operator: the first line ended of its own accord after the literal, so `+ 2` is orphaned, and it stays an error inside no parentheses at all because depth grants nothing. An implementation that joined a newline before an operator whenever brackets enclose the expression -- the removed depth-suppression design -- accepts the rejected arm and fails. Bare rejection.",
   quotes=["the grammar itself absorbs the boundary tokens at the positions where a construct may spread across lines - after a binary operator, after a comma, before a `.`, `?.`, or `::`, around argument, type-argument, and pattern lists, and before a closing delimiter.",
           "a line break the grammar does not admit is an error at the break."]),
  "REQ-1902": dict(
   section="16. Statement Termination and Brace Placement",
   summary="An expression continues across a line whose last token is a binary operator or a comma, while a newline placed before an operator - a complete line followed by an operator line - is a compile-time error, so continuation follows the grammar and not JavaScript's operator-continuation intuition",
   kind="compile-time",
-  notes="`val b = a +\\n 1` (accepted) and `val b = a\\n + 1` (rejected) differ only in which side of the newline the `+` sits: on the accepted side the line cannot end after an operator, so the expression continues; on the rejected side the line ended after the identifier, so `+ 1` is orphaned. A second rejection uses `*` rather than `+` to show the rule is not about any one operator, and the multi-line call-argument arm shows the comma position. Together these are the direct evidence against JavaScript-style heuristics: an implementation that carried over JS operator-continuation would accept both leading-operator programs. Bare rejections.",
+  notes="`var b = a +\\n 1` (accepted) and `var b = a\\n + 1` (rejected) differ only in which side of the newline the `+` sits: on the accepted side the line cannot end after an operator, so the expression continues; on the rejected side the line ended after the identifier, so `+ 1` is orphaned. A second rejection uses `*` rather than `+` to show the rule is not about any one operator, and the multi-line call-argument arm shows the comma position. Together these are the direct evidence against JavaScript-style heuristics: an implementation that carried over JS operator-continuation would accept both leading-operator programs. Bare rejections.",
   quotes=["a line break the grammar does not admit is an error at the break.",
           "There is no lookahead exception table and no heuristic join: a line break the grammar does not admit is an error at the break."]),
  "REQ-1903": dict(
@@ -144,7 +144,7 @@ REQS = {
   section="16. Statement Termination and Brace Placement",
   summary="A newline contained in a line comment or a block comment is still a physical newline, so a statement can be terminated by a newline that appears only inside a comment",
   kind="compile-time",
-  notes="`val a = 1 /* c\\n*/ print(...)` is accepted while the identical program with the comment-newline removed, `val a = 1 print(...)`, is rejected (that rejection is REQ-1900's arm and the contrast is documented in the plan). The accepted arm can only parse if the stage treats the newline contained in the block comment as the physical boundary that ended `val a = 1`; a stage that ignored comment interiors would see no boundary and reject it. A line-comment newline is accepted on the same principle. This is the only direct evidence for the clause, since a portable oracle cannot inspect the token stream.",
+  notes="`var a = 1 /* c\\n*/ print(...)` is accepted while the identical program with the comment-newline removed, `var a = 1 print(...)`, is rejected (that rejection is REQ-1900's arm and the contrast is documented in the plan). The accepted arm can only parse if the stage treats the newline contained in the block comment as the physical boundary that ended `var a = 1`; a stage that ignored comment interiors would see no boundary and reject it. A line-comment newline is accepted on the same principle. This is the only direct evidence for the clause, since a portable oracle cannot inspect the token stream.",
   quotes=["The lexer preserves every physical newline (including a newline inside a comment, because it is still a physical newline)"]),
  "REQ-1905": dict(
   section="16. Statement Termination and Brace Placement",
@@ -191,55 +191,55 @@ def rej(tid, req, src, libs=None, code=None):
 
 # --- REQ-1900: a newline ends a construct; `;` only separates one line.
 succ("SOL-TCK-0286", "REQ-1900",
-     'val a = 1\nval b = 2\nprint("n" .. a .. b)\n', "n12")
+     'var a = 1\nvar b = 2\nprint("n" .. a .. b)\n', "n12")
 succ("SOL-TCK-0287", "REQ-1900",
-     'val a = 1; val b = 2\nprint("x" .. a .. b)\n', "x12")
+     'var a = 1; var b = 2\nprint("x" .. a .. b)\n', "x12")
 rej("SOL-TCK-0288", "REQ-1900",
-    'val a = 1 print("a" .. a)\n' + NEG)
+    'var a = 1 print("a" .. a)\n' + NEG)
 # The three SOLV-PARS-012 arms: the `;` ends its line, ends the file, and
 # precedes the stand-alone closing brace of the block that encloses it.
 rej("SOL-TCK-0496", "REQ-1900",
-    'val a = 1;\nprint("s" .. a)\n' + NEG, code="SOLV-PARS-012")
+    'var a = 1;\nprint("s" .. a)\n' + NEG, code="SOLV-PARS-012")
 rej("SOL-TCK-0497", "REQ-1900",
-    'val v = {\n    42;\n}\nprint("v" .. v)\n' + NEG, code="SOLV-PARS-012")
+    'var v = {\n    42;\n}\nprint("v" .. v)\n' + NEG, code="SOLV-PARS-012")
 rej("SOL-TCK-0498", "REQ-1900",
-    'val a = 1\nprint("e" .. a);', code="SOLV-PARS-012")
+    'var a = 1\nprint("e" .. a);', code="SOLV-PARS-012")
 
 # --- REQ-1901: bracketed continuations are grammar, not lookahead.
 succ("SOL-TCK-0289", "REQ-1901",
-     'func add(x: Integer, y: Integer): Integer {\n    return x + y\n}\nval v = add(\n    1,\n    2,\n)\nprint("v" .. v)\n', "v3")
+     'func add(x: Integer, y: Integer): Integer {\n    return x + y\n}\nvar v = add(\n    1,\n    2,\n)\nprint("v" .. v)\n', "v3")
 rej("SOL-TCK-0290", "REQ-1901",
-    'val v = 1\n    + 2\nprint("v" .. v)\n' + NEG)
+    'var v = 1\n    + 2\nprint("v" .. v)\n' + NEG)
 
 # --- REQ-1902: operators and commas continue; operator lines do not join.
 succ("SOL-TCK-0291", "REQ-1902",
-     'val a = 1\nval b = a +\n    1\nprint("b" .. b)\n', "b2")
+     'var a = 1\nvar b = a +\n    1\nprint("b" .. b)\n', "b2")
 succ("SOL-TCK-0292", "REQ-1902",
-     'class C {\n    C(x: Integer, y: Integer) {\n        this.sum = x + y\n    }\n\n    val sum: Integer\n}\n'
-     'val c = C(1,\n    2)\nprint("r" .. c.sum)\n', "r3")
+     'class C {\n    C(x: Integer, y: Integer) {\n        this.sum = x + y\n    }\n\n    var sum: Integer\n}\n'
+     'var c = C(1,\n    2)\nprint("r" .. c.sum)\n', "r3")
 rej("SOL-TCK-0293", "REQ-1902",
-    'val a = 1\nval b = a\n    + 1\nprint("b" .. b)\n' + NEG)
+    'var a = 1\nvar b = a\n    + 1\nprint("b" .. b)\n' + NEG)
 rej("SOL-TCK-0294", "REQ-1902",
-    'val a = 2\nval b = a\n    * 3\nprint("b" .. b)\n' + NEG)
+    'var a = 2\nvar b = a\n    * 3\nprint("b" .. b)\n' + NEG)
 
 # --- REQ-1903: member-suffix continuation and the canonical standalone `else`.
 succ("SOL-TCK-0295", "REQ-1903",
      'class S {\n    S() {\n    }\n\n    func load(): S {\n        return this\n    }\n\n'
      '    func value(): Integer {\n        return 42\n    }\n}\n'
-     'val s = S()\nval r = s\n    .load()\n    .value()\nprint("r" .. r)\n', "r42")
+     'var s = S()\nvar r = s\n    .load()\n    .value()\nprint("r" .. r)\n', "r42")
 succ("SOL-TCK-0296", "REQ-1903",
      'class W {\n    W() {\n    }\n\n    func opt(): String? {\n        return "z"\n    }\n}\n'
-     'val w = W()\nval v = w.opt()\n    ?.hashCode()\nprint("v" .. (v != null))\n', "vtrue")
+     'var w = W()\nvar v = w.opt()\n    ?.hashCode()\nprint("v" .. (v != null))\n', "vtrue")
 succ("SOL-TCK-0297", "REQ-1903",
-     'val c = false\nif (c) {\n    print("y")\n}\nelse {\n    print("n")\n}\n', "n")
+     'var c = false\nif (c) {\n    print("y")\n}\nelse {\n    print("n")\n}\n', "n")
 succ("SOL-TCK-0298", "REQ-1903",
-     'val c = true\nval r = if (c) {\n    1\n}\nelse {\n    2\n}\nprint("r" .. r)\n', "r1")
+     'var c = true\nvar r = if (c) {\n    1\n}\nelse {\n    2\n}\nprint("r" .. r)\n', "r1")
 
 # --- REQ-1904: a newline inside a comment is a physical newline.
 succ("SOL-TCK-0299", "REQ-1904",
-     'val a = 1 /* c\n*/ print("bc" .. a)\n', "bc1")
+     'var a = 1 /* c\n*/ print("bc" .. a)\n', "bc1")
 succ("SOL-TCK-0300", "REQ-1904",
-     'val a = 1 // note\nprint("lc" .. a)\n', "lc1")
+     'var a = 1 // note\nprint("lc" .. a)\n', "lc1")
 
 # --- REQ-1905: `return` followed by a newline is a complete bare return.
 rej("SOL-TCK-0301", "REQ-1905",
@@ -254,9 +254,9 @@ succ("SOL-TCK-0303", "REQ-1905",
 
 # --- REQ-1906: blank lines add no second boundary; EOF closes the final line.
 succ("SOL-TCK-0304", "REQ-1906",
-     'val a = 1\n\n\nval b = 2\n\nprint("z" .. a .. b)\n', "z12")
+     'var a = 1\n\n\nvar b = 2\n\nprint("z" .. a .. b)\n', "z12")
 add("SOL-TCK-0305", "REQ-1906", "syntax",
-    'val a = 1\nval b = 2\nprint("e" .. a .. b)', "SUCCESS", stdout="e12")
+    'var a = 1\nvar b = 2\nprint("e" .. a .. b)', "SUCCESS", stdout="e12")
 
 # --- REQ-1907: an include ends where its physical line ends.
 LIBDIR = {"lib/m.sol": LIB}

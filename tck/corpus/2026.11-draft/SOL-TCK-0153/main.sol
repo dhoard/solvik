@@ -1,10 +1,10 @@
 class Note {
-    val message: String = "fine"
+    var message: String = "fine"
 
     func getMessage(): String {
         return this.message
     }
 }
-val n = Note()
+var n = Note()
 print(n.message)
 print(n.getMessage())

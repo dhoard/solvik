@@ -330,12 +330,12 @@ public enum DiagnosticCode {
     SEM_UNLISTED_CAPTURE("SOLV-SEM-058"),
 
     /**
-     * Function values: a capture item names a mutable ({@code mutable val}) binding, or an anonymous function
+     * Function values: a capture item names a mutable ({@code var mutable}) binding, or an anonymous function
      * body reads or writes a name that its own capture list named as such a binding
      * (docs/LANGUAGE_SPEC.md section 6, "Explicit immutable closure capture"). The item reports this on
      * the capture item and the body use reports it on the body reference; both placements are specified
      * and both report this one code. Only a name the list itself named reaches the body placement — a
-     * body use of a {@code mutable val} the list never named is the unlisted-capture diagnostic instead, since
+     * body use of a {@code var mutable} the list never named is the unlisted-capture diagnostic instead, since
      * no capture of it was ever written. Capture is immutable by rule, so mutable state is shared
      * through a captured immutable object reference instead.
      */

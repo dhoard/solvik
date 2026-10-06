@@ -20,7 +20,7 @@ func outer<U>(f: func(U): U, v: U): U {
     return f(v)
 }
 
-val composed: func(func(Integer): Integer, Integer): Integer = apply
+var composed: func(func(Integer): Integer, Integer): Integer = apply
 
 print(apply(identity, 42).toString() .. "\n")
 print(apply(identity, "xy") .. "\n")

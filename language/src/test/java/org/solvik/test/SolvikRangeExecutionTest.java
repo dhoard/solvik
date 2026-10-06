@@ -51,7 +51,7 @@ public final class SolvikRangeExecutionTest {
     @Test
     public void inclusiveRangeIteratesBothEnds() {
         assertThat(run("""
-                mutable val text = ""
+                var mutable text = ""
                 for (i in 1...5) {
                     text = text .. i
                 }
@@ -62,7 +62,7 @@ public final class SolvikRangeExecutionTest {
     @Test
     public void ascendingExclusiveRangeExcludesTheEnd() {
         assertThat(run("""
-                mutable val text = ""
+                var mutable text = ""
                 for (i in 0..<4) {
                     text = text .. i
                 }
@@ -73,7 +73,7 @@ public final class SolvikRangeExecutionTest {
     @Test
     public void descendingExclusiveRangeExcludesTheEnd() {
         assertThat(run("""
-                mutable val text = ""
+                var mutable text = ""
                 for (i in 5..>0) {
                     text = text .. i
                 }
@@ -84,7 +84,7 @@ public final class SolvikRangeExecutionTest {
     @Test
     public void emptyAndReversedRangesRunZeroTimes() {
         assertThat(run("""
-                mutable val count = 0
+                var mutable count = 0
                 for (i in 0..<0) {
                     count = count + 1
                 }
@@ -101,7 +101,7 @@ public final class SolvikRangeExecutionTest {
     @Test
     public void singleElementRangesRunOnce() {
         assertThat(run("""
-                mutable val text = ""
+                var mutable text = ""
                 for (i in 3...3) {
                     text = text .. i
                 }
@@ -120,7 +120,7 @@ public final class SolvikRangeExecutionTest {
     @Test
     public void inclusiveRangeAtIntegerMaxDoesNotOverflow() {
         assertThat(run("""
-                mutable val last = 0
+                var mutable last = 0
                 for (i in 2147483647...2147483647) {
                     last = i
                 }
@@ -131,7 +131,7 @@ public final class SolvikRangeExecutionTest {
     @Test
     public void breakAndContinueControlTheLoop() {
         assertThat(run("""
-                mutable val total = 0
+                var mutable total = 0
                 for (i in 1...10) {
                     if (i == 3) {
                         continue
@@ -148,7 +148,7 @@ public final class SolvikRangeExecutionTest {
     @Test
     public void nestedRangeLoopsCountEveryPair() {
         assertThat(run("""
-                mutable val pairs = 0
+                var mutable pairs = 0
                 for (i in 1...2) {
                     for (j in 1...2) {
                         pairs = pairs + 1
@@ -166,7 +166,7 @@ public final class SolvikRangeExecutionTest {
                     return 3
                 }
 
-                mutable val text = ""
+                var mutable text = ""
                 for (i in 1...bound()) {
                     text = text .. i
                 }
@@ -177,7 +177,7 @@ public final class SolvikRangeExecutionTest {
     @Test
     public void negativeBoundsAreSupported() {
         assertThat(run("""
-                mutable val text = ""
+                var mutable text = ""
                 for (i in -2...0) {
                     text = text .. i
                 }
@@ -188,7 +188,7 @@ public final class SolvikRangeExecutionTest {
     @Test
     public void loopVariableDoesNotEscapeItsScope() {
         assertThat(run("""
-                mutable val i = 99
+                var mutable i = 99
                 for (i in 1...1) {
                 }
                 println(i)

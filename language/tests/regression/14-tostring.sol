@@ -1,5 +1,5 @@
 class Money {
-    val amount: Integer
+    var amount: Integer
     Money(amount: Integer) {
         this.amount = amount
     }
@@ -7,7 +7,7 @@ class Money {
         return "$" .. this.amount
     }
 }
-val m: Any = Money(5)
+var m: Any = Money(5)
 println(m.toString())
 println(Money(9))
 println(1.toString())

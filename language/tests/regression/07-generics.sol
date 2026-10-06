@@ -1,5 +1,5 @@
 class Box<T> {
-    mutable val value: T
+    var mutable value: T
     Box(value: T) {
         this.value = value
     }
@@ -10,8 +10,8 @@ class Box<T> {
 func first<T>(a: T, b: T): T {
     return a
 }
-val ints: Box<Integer> = Box(7)
-val texts: Box<String> = Box("hi")
+var ints: Box<Integer> = Box(7)
+var texts: Box<String> = Box("hi")
 println(ints.get())
 println(texts.get())
 println(first(1, 2))

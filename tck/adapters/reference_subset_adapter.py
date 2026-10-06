@@ -41,7 +41,7 @@ Declared subset (everything else is refused)
 compile : whole-program include resolution and module-name shape checking, using
           only diagnostics the specification's own required-diagnostics registry
           names (`SOLV-RESOL-008`, `SOLV-RESOL-012`).
-execute : top-level `val NAME = <literal>`, `print(<literal|NAME>)` and
+execute : top-level `var NAME = <literal>`, `print(<literal|NAME>)` and
           `println(<literal|NAME>)` over `String` and `Integer` literals only.
 
 Refusals that come from specification gaps
@@ -215,7 +215,7 @@ def _in_int32_range(token):
 # Names this front end will not bind. Section 1 says "keywords are reserved" and, as the
 # module-name limitation recorded in the module docstring explains, the specification supplies no
 # keyword list -- so legality of a binding name cannot be decided. Rather than accept every
-# identifier the character class allows (which silently accepts `val class = 5`, a program section
+# identifier the character class allows (which silently accepts `var class = 5`, a program section
 # 1 forbids), a name is refused whenever it appears anywhere in the specification as a backticked
 # bare lowercase word, which is the only signal the document gives about which words are language
 # keywords rather than prose. The list is mechanically extracted from the specification -- it is
@@ -449,7 +449,7 @@ def expand(root_dir, entry_rel):
 
 # ----------------------------------------------------------------- value model
 # Top-level items the execute subset understands. Each is (kind, payload).
-_VAL_RE = re.compile(r"\Aval\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+?)\s*;?\s*\Z")
+_VAL_RE = re.compile(r"\Avar\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+?)\s*;?\s*\Z")
 _PRINT_RE = re.compile(r"\A(print|println)\s*\(\s*(.+?)\s*\)\s*;?\s*\Z")
 # Literals whose display section 6 states outright: "Boolean values as `true` or
 # `false`" and "`null` displays as `null`". Spelled as tokens rather than values so
@@ -458,7 +458,7 @@ _KEYWORD_LITERAL = {"true": "true", "false": "false", "null": "null"}
 
 
 def _literal_or_ref(token, env):
-    """Evaluate one `print`/`println` argument: a literal or a prior `val` name."""
+    """Evaluate one `print`/`println` argument: a literal or a prior `var` name."""
     if _IDENT_RE.match(token) and token in env:
         return env[token]
     if _IDENT_RE.match(token) and token in _KEYWORD_LITERAL:
@@ -519,10 +519,10 @@ def analyze(items):
                 if not _in_int32_range(rhs):
                     raise Refusal("integer literal %r is outside the signed 32-bit range; "
                                   "section 1 forbids it but names no diagnostic" % rhs)
-                ops.append(("val", rel, name, int(rhs)))
+                ops.append(("var", rel, name, int(rhs)))
                 continue
             if _starts_literal(rhs):
-                ops.append(("val", rel, name, decode_string_literal(rhs)))
+                ops.append(("var", rel, name, decode_string_literal(rhs)))
                 continue
             raise Refusal("initializer outside the subset: %r" % rhs[:80])
         m = _PRINT_RE.match(code)
@@ -598,7 +598,7 @@ def execute(req):
     env = {}
     try:
         for op in analyze(items):
-            if op[0] == "val":
+            if op[0] == "var":
                 env[op[2]] = op[3]
             else:
                 _, _, func, arg = op

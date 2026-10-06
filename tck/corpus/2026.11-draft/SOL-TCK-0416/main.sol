@@ -8,7 +8,7 @@ class A {
     A() {
     }
 }
-val a: A = A()
-val b = a as? A
+var a: A = A()
+var b = a as? A
 
 print("EXECUTED-INVALID")

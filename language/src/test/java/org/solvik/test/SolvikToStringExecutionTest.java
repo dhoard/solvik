@@ -83,7 +83,7 @@ public final class SolvikToStringExecutionTest {
     public void userOverrideIsUsedByPrintlnAndConcat() {
         assertThat(run("""
                 class Money {
-                    val cents: Integer
+                    var cents: Integer
 
                     Money(cents: Integer) {
                         this.cents = cents
@@ -94,7 +94,7 @@ public final class SolvikToStringExecutionTest {
                     }
                 }
 
-                val price = Money(1250)
+                var price = Money(1250)
                 println(price)
                 println(price.toString())
                 println("price=" .. price)
@@ -116,8 +116,8 @@ public final class SolvikToStringExecutionTest {
                     }
                 }
 
-                val b: Any = Base()
-                val c: Any = Child()
+                var b: Any = Base()
+                var c: Any = Child()
                 println(b)
                 println(c)
                 println(Child())
@@ -136,7 +136,7 @@ public final class SolvikToStringExecutionTest {
     @Test
     public void nullRendersAsNull() {
         assertThat(run("""
-                val missing: String? = null
+                var missing: String? = null
                 println(missing)
                 println(null)
                 """)).isEqualTo("null\nnull\n");

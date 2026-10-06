@@ -11,10 +11,10 @@ class Formatter {
     }
 }
 
-val formatter = Formatter()
-val first: func(): String = formatter.format
-val second: func(): String = formatter.format
-val copied = first
+var formatter = Formatter()
+var first: func(): String = formatter.format
+var second: func(): String = formatter.format
+var copied = first
 print(first === second)
 print("|")
 print(copied === first)

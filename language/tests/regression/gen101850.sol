@@ -15,10 +15,10 @@ println(kind1('b'))
 
 println(kind1('b') is String)
 
-val s2: Set<String> = Set("a", "b", "a")
+var s2: Set<String> = Set("a", "b", "a")
 
 println(s2.size)
 
-val st3: Stack<Integer> = Stack(1, 2, 3)
+var st3: Stack<Integer> = Stack(1, 2, 3)
 
 println(st3.size)

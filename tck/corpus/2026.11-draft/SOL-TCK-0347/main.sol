@@ -6,7 +6,7 @@
 //   - | `SEM_THROW_NON_EXCEPTION` | `SOLV-SEM-053` | the `throw` operand expression |
 //
 class MyErr<T> extends RuntimeException {
-    val payload: T
+    var payload: T
 
     MyErr(payload: T) {
         this.payload = payload

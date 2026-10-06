@@ -120,7 +120,7 @@ public final class SolvikMatchExecutionTest {
                 }
 
                 class Circle extends Shape {
-                    val radius: Integer
+                    var radius: Integer
 
                     Circle(radius: Integer) {
                         this.radius = radius
@@ -128,7 +128,7 @@ public final class SolvikMatchExecutionTest {
                 }
 
                 class Square extends Shape {
-                    val side: Integer
+                    var side: Integer
 
                     Square(side: Integer) {
                         this.side = side
@@ -200,8 +200,8 @@ public final class SolvikMatchExecutionTest {
                     Blue
                 }
 
-                    val color: Color = Color.Blue
-                    val label = match color {
+                    var color: Color = Color.Blue
+                    var label = match color {
                         Red => "primary"
                         Blue => "other"
                     }

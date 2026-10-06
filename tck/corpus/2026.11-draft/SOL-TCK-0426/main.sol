@@ -31,9 +31,9 @@ func takeAny(value: Any): String {
     return value.toString()
 }
 
-val asAny: Any = format
-val branch: Any = makeFormatter()
-val optional: (func(Integer): String)? = format
+var asAny: Any = format
+var branch: Any = makeFormatter()
+var optional: (func(Integer): String)? = format
 print(take(makeFormatter()) .. take(describe) .. takeAny(asAny) .. takeAny(branch) .. "\n")
 println(optional === format)
 println(optional === null)

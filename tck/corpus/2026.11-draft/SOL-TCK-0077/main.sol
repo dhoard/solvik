@@ -3,7 +3,7 @@
 //    each must be assignable to the element type; `Set` keeps only the first of equal
 //    elements."
 // and gives the operation table:
-//   "`Set<T>`: `val isEmpty: Boolean`, `val size: Integer`, `func add(element: T): Boolean`,
+//   "`Set<T>`: `var isEmpty: Boolean`, `var size: Integer`, `func add(element: T): Boolean`,
 //    `func contains(element: T): Boolean`, `func remove(element: T): Boolean`,
 //    `func clear()`."
 //
@@ -21,7 +21,7 @@
 // Note the element order is unspecified, which is exactly why every value asserted here
 // is order-independent. Executed as top-level statements (section 20). Uses print, so no
 // platform line separator can enter the expected bytes.
-val ids = Set<Integer>(1, 2, 2, 3)
+var ids = Set<Integer>(1, 2, 2, 3)
 print(ids.size)
 print(" ")
 print(ids.add(1))

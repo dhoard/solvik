@@ -12,7 +12,7 @@ class A {
         return "a"
     }
 }
-val a = A()
+var a = A()
 print(a.toString())
 
 print("EXECUTED-INVALID")

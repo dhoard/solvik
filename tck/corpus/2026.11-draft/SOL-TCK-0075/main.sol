@@ -9,7 +9,7 @@
 // function boundary (section 6 states the same principle for scope blocks). The loop runs
 // v = 1,2,3; the v == 1 iteration continues past the print, so the exact stream is "d2d3".
 // A reading in which `continue` terminated the switch would print "d1d2d3" or stop early.
-mutable val v: Integer = 0
+var mutable v: Integer = 0
 
 while (v < 3) {
     v = v + 1

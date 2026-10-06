@@ -1,5 +1,5 @@
 class Bad extends RuntimeException {
-    val message: String = "mine"
+    var message: String = "mine"
 }
 
 print("EXECUTED-INVALID")

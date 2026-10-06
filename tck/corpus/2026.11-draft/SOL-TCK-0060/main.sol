@@ -7,7 +7,7 @@
 // passed to the constructor, so a rejection of the syntax or a miscompiled initializer
 // both fail.
 class Point extends Any {
-    val x: Integer
+    var x: Integer
 
     Point(x: Integer) {
         this.x = x

@@ -107,7 +107,7 @@ public final class SolvikParserRobustnessTest {
 
     @Test
     public void unclosedParenthesisNestingIsDiagnosedInsteadOfOverflowingTheStack() {
-        String src = "func f(): Unit {\n    val x = " + repeat("(", FORMERLY_FATAL_DEPTH) + "1\n}\n";
+        String src = "func f(): Unit {\n    var x = " + repeat("(", FORMERLY_FATAL_DEPTH) + "1\n}\n";
         SolvikParseResult result = checkContract("deep-open.sol", src);
         assertThat(result.isSuccess()).isFalse();
     }
@@ -120,13 +120,13 @@ public final class SolvikParserRobustnessTest {
 
     @Test
     public void unclosedVariantPatternNestingIsDiagnosedInsteadOfOverflowingTheStack() {
-        String src = "func f(v: Any): Unit {\n    val y = match v { " + repeat("A(", FORMERLY_FATAL_DEPTH) + " }\n}\n";
+        String src = "func f(v: Any): Unit {\n    var y = match v { " + repeat("A(", FORMERLY_FATAL_DEPTH) + " }\n}\n";
         assertThat(checkContract("deep-pattern.sol", src).isSuccess()).isFalse();
     }
 
     @Test
     public void unclosedTypeArgumentNestingIsDiagnosedInsteadOfOverflowingTheStack() {
-        String src = "func f(): Unit {\n    val x: " + repeat("List<", FORMERLY_FATAL_DEPTH) + "Integer\n}\n";
+        String src = "func f(): Unit {\n    var x: " + repeat("List<", FORMERLY_FATAL_DEPTH) + "Integer\n}\n";
         assertThat(checkContract("deep-typeargs.sol", src).isSuccess()).isFalse();
     }
 
@@ -150,7 +150,7 @@ public final class SolvikParserRobustnessTest {
     /** An anonymous function nests a whole callable body, which no other expression form does. */
     @Test
     public void unclosedAnonymousFunctionNestingIsDiagnosedInsteadOfOverflowingTheStack() {
-        String src = "func f(): Integer {\n" + repeat("    val v = func(p: Integer): Integer {\n", FORMERLY_FATAL_DEPTH);
+        String src = "func f(): Integer {\n" + repeat("    var v = func(p: Integer): Integer {\n", FORMERLY_FATAL_DEPTH);
         assertThat(checkContract("deep-anonymous.sol", src).isSuccess()).isFalse();
     }
 
@@ -166,7 +166,7 @@ public final class SolvikParserRobustnessTest {
 
     @Test
     public void balancedNestingFarBeyondTheFormerStackLimitParses() {
-        String src = "func f(): Integer {\n    val x = " + repeat("(", FORMERLY_FATAL_BALANCED_DEPTH) + "1" + repeat(")", FORMERLY_FATAL_BALANCED_DEPTH) + "\n    return x\n}\n";
+        String src = "func f(): Integer {\n    var x = " + repeat("(", FORMERLY_FATAL_BALANCED_DEPTH) + "1" + repeat(")", FORMERLY_FATAL_BALANCED_DEPTH) + "\n    return x\n}\n";
         SolvikParseResult result = checkContract("balanced-parens.sol", src);
         assertThat(result.isSuccess()).as("a valid program must parse at this depth").isTrue();
     }
@@ -210,7 +210,7 @@ public final class SolvikParserRobustnessTest {
     public void nestingBeyondCompilerCapacityIsReportedAsADiagnosticNotAResourceFailure() {
         // Past the reserved front-end stack the compiler cannot read the file at all. The outcome
         // must be a normal parse failure naming the problem, never an escaping StackOverflowError.
-        String src = "func f(): Unit {\n    val x = " + repeat("(", 400_000) + "1" + repeat(")", 400_000) + "\n}\n";
+        String src = "func f(): Unit {\n    var x = " + repeat("(", 400_000) + "1" + repeat(")", 400_000) + "\n}\n";
         SolvikParseResult result = checkContract("too-deep.sol", src);
         assertThat(result.isSuccess()).isFalse();
         List<String> codes = new ArrayList<>();
@@ -269,7 +269,7 @@ public final class SolvikParserRobustnessTest {
     @Test
     public void deeplyNestedAnonymousFunctionBodiesParseWithoutUnboundedCost() {
         for (int depth : new int[] {20, 100, FORMERLY_FATAL_BALANCED_DEPTH}) {
-            String src = "func f(): Integer {\n" + repeat("    val v = func(p: Integer): Integer {\n", depth)
+            String src = "func f(): Integer {\n" + repeat("    var v = func(p: Integer): Integer {\n", depth)
                     + "        return 0\n" + repeat("    }\n", depth) + "    return 0\n}\n";
             long started = System.nanoTime();
             assertThat(checkContract("nested-anonymous-" + depth + ".sol", src).isSuccess())
@@ -289,7 +289,7 @@ public final class SolvikParserRobustnessTest {
     public void randomTokenSoupNeverThrowsAndNeverProducesAnOutOfBoundSpan() {
         // The soup intentionally includes the keywords removed in 2026.11-draft: feeding them to the
         // parser must produce a diagnostic rather than throw.
-        String[] atoms = {"func", "class", "val", "var", "sealed", "open", "mutable", "abstract", "if", "else", "while", "for", "in", "return", "match", "switch", "case", "regex", "null", "is", "as", "true", "include", "module", "alias", "(", ")", "{", "}", "[", "]", ";", ",", ":", "::", "=", ".", "..", "...", "..<", "..>", "?.", "??", "?", "+", "-", "*", "/", "!", "===", "!==", "==", "!=", "<", "<=", ">", ">=", "&&", "||", "=>", "@", "#", "$", "\\", "1", "2", "123L", "1.5", "1e3", "\"s\"", "'c'", "r\"r\"", "x", "y", "_", "function", "\n", "\t", " ", "//c\n", "/*c*/", "/*\nc*/"}; // solvik-keyword: soup feeds removed keywords
+        String[] atoms = {"func", "class", "var", "var", "sealed", "open", "mutable", "abstract", "if", "else", "while", "for", "in", "return", "match", "switch", "case", "regex", "null", "is", "as", "true", "include", "module", "alias", "(", ")", "{", "}", "[", "]", ";", ",", ":", "::", "=", ".", "..", "...", "..<", "..>", "?.", "??", "?", "+", "-", "*", "/", "!", "===", "!==", "==", "!=", "<", "<=", ">", ">=", "&&", "||", "=>", "@", "#", "$", "\\", "1", "2", "123L", "1.5", "1e3", "\"s\"", "'c'", "r\"r\"", "x", "y", "_", "function", "\n", "\t", " ", "//c\n", "/*c*/", "/*\nc*/"}; // solvik-keyword: soup feeds removed keywords
         Random random = new Random(20_260_923L);
         for (int iteration = 0; iteration < 3_000; iteration++) {
             StringBuilder src = new StringBuilder();
@@ -309,17 +309,17 @@ public final class SolvikParserRobustnessTest {
     public void singleCharacterMutationsOfWellFormedProgramsNeverThrow() {
         String[] seeds = { //
                 "func add(a: Integer, b: Integer): Integer {\n    return a + b\n}\nprintln(add(1, 2))\n", //
-                "class Point {\n    val x: Integer = 0\n    Point(theX: Integer) {\n        x = theX\n    }\n    func getX(): Integer {\n        return x\n    }\n}\n", //
+                "class Point {\n    var x: Integer = 0\n    Point(theX: Integer) {\n        x = theX\n    }\n    func getX(): Integer {\n        return x\n    }\n}\n", //
                 "interface Shape {\n    func area(): Integer\n    func name(): String {\n        return \"shape\"\n    }\n}\n", //
                 "enum Color {\n    Red\n    Green(Integer)\n}\nfunc f(c: Color): Integer {\n    return match c {\n        Red => 1,\n        Green(v) => v\n    }\n}\n", //
                 "func f(): Unit {\n    switch (1) {\n    case 1, 2:\n        println(1)\n        break\n    default:\n        println(0)\n    }\n}\n", //
                 "func f(v: Any): Unit {\n    if (v is String) {\n        println(v)\n    } else {\n        println(v as Integer)\n    }\n}\n", //
-                "func f(): Unit {\n    val s = r#\"raw \"value\"\"# .. \"tail\"\n    println(s)\n}\n", //
+                "func f(): Unit {\n    var s = r#\"raw \"value\"\"# .. \"tail\"\n    println(s)\n}\n", //
                 "func id<T>(v: T): T {\n    return v\n}\nfunc f(): Unit {\n    println(id<Integer>(3))\n}\n", //
-                "func f(v: Integer?): Unit {\n    val x = v ?? 0\n    println(x)\n}\n", //
+                "func f(v: Integer?): Unit {\n    var x = v ?? 0\n    println(x)\n}\n", //
                 "func f(): Unit {\n    for (i in 0...10) {\n        if (i == 5) {\n            continue\n        }\n        println(i)\n    }\n}\n", //
-                "module app\nfunc f(): Unit {\n    val x = if (true) { 1 } else { 2 }\n}\n", //
-                "interface I {\n    func ping(): Integer\n}\nclass C {\n    delegate val d: I\n}\n"};
+                "module app\nfunc f(): Unit {\n    var x = if (true) { 1 } else { 2 }\n}\n", //
+                "interface I {\n    func ping(): Integer\n}\nclass C {\n    delegate var d: I\n}\n"};
         char[] mutations = {'(', ')', '{', '}', ';', ',', ':', '.', '<', '>', '=', '?', '!', '*', '+', '-', '/', '&', '|', '@', '#', '\\', '\'', '"', '\n', ' ', '\t', 'r', '1', 'x', 'e', 'a', 'v', 'f', 'i', '\r'};
         Random random = new Random(9_999L);
         for (String seed : seeds) {
@@ -343,7 +343,7 @@ public final class SolvikParserRobustnessTest {
     /** The parser is a function of its input: the same source must give the same outcome. */
     @Test
     public void parsingIsRepeatableForAcceptedAndRejectedInput() {
-        String accepted = "func f(): Integer {\n    val x = 1 + 2\n    return x\n}\n";
+        String accepted = "func f(): Integer {\n    var x = 1 + 2\n    return x\n}\n";
         String rejected = "func f(): Unit {\n    g(1) h(2)\n}\n";
         for (int run = 0; run < 3; run++) {
             assertThat(render(parse("a.sol", accepted))).isEqualTo(render(parse("a.sol", accepted)));
@@ -375,7 +375,7 @@ public final class SolvikParserRobustnessTest {
     /** An accepted parse carries no diagnostics; a rejected parse carries no AST. */
     @Test
     public void acceptedAndRejectedResultsAreMutuallyExclusive() {
-        List<String> sources = List.of("", "\n", "func f(): Unit {\n}\n", "func f(): Unit {\n    @\n}\n", "func f(): Unit {\n    val x = (1\n}\n");
+        List<String> sources = List.of("", "\n", "func f(): Unit {\n}\n", "func f(): Unit {\n    @\n}\n", "func f(): Unit {\n    var x = (1\n}\n");
         for (String src : sources) {
             SolvikParseResult result = checkContract("exclusive.sol", src);
             assertThat(result.isSuccess() ^ result.diagnostics().hasErrors()).as("exactly one outcome for " + preview(src)).isTrue();

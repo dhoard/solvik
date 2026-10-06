@@ -20,9 +20,9 @@ include "ModulesLib.sol" alias math
 // -- Values and the shared equality/hash pairing (sections 2, 3, 7) ----------
 
 class Point {
-    val x: Integer
-    val y: Integer
-    mutable val label: String
+    var x: Integer
+    var y: Integer
+    var mutable label: String
 
     Point(x: Integer, y: Integer, label: String) {
         this.x = x
@@ -49,7 +49,7 @@ class Point {
 // -- Inheritance: `mutable` classes, `mutable`/`override` chains, `abstract` bases (sections 7, 12)
 
 mutable class Gear {
-    val ratio: Integer
+    var ratio: Integer
 
     Gear(ratio: Integer) {
         this.ratio = ratio
@@ -82,7 +82,7 @@ class Chip extends Boosted {
 }
 
 abstract class Vehicle {
-    val wheels: Integer
+    var wheels: Integer
 
     Vehicle(wheels: Integer) {
         this.wheels = wheels
@@ -122,8 +122,8 @@ interface Aged {
 }
 
 class Person implements Named, Aged {
-    val fullName: String
-    val years: Integer
+    var fullName: String
+    var years: Integer
 
     Person(fullName: String, years: Integer) {
         this.fullName = fullName
@@ -153,7 +153,7 @@ class Echo implements Loud {
 }
 
 class Announcer implements Loud {
-    delegate val speaker: Loud
+    delegate var speaker: Loud
 
     Announcer(speaker: Loud) {
         this.speaker = speaker
@@ -163,7 +163,7 @@ class Announcer implements Loud {
 // -- Generics (section 11): generic classes, generic methods, generic functions
 
 class Slot<T> {
-    mutable val value: T
+    var mutable value: T
 
     Slot(value: T) {
         this.value = value
@@ -221,7 +221,7 @@ func parse(raw: String): Result<Integer, String> {
 
 func parseDoubled(raw: String): Result<Integer, String> {
     // The postfix `?` propagates an Err as an immediate return and unwraps an Ok.
-    val value = parse(raw)?
+    var value = parse(raw)?
     return Result.Ok(value + value)
 }
 
@@ -231,7 +231,7 @@ class ValidationError extends RuntimeException {
 }
 
 mutable class ScaledError extends ApplicationException {
-    val level: Integer
+    var level: Integer
 
     ScaledError(level: Integer) {
         this.level = level
@@ -278,7 +278,7 @@ func scaleBy(factor: Integer): func(Integer): Integer {
 }
 
 class Tagger {
-    val tag: String = "tag"
+    var tag: String = "tag"
 
     func attach(value: Integer): String {
         return this.tag .. value.toString()
@@ -291,7 +291,7 @@ class Tagger {
         }
     }
 
-    val transform: func(Integer): Integer = func(value: Integer): Integer {
+    var transform: func(Integer): Integer = func(value: Integer): Integer {
         return value - 1
     }
 }
@@ -349,15 +349,15 @@ func lateBound(n: Integer): String {
 
 // -- 1. Bindings and mutability (section 2) -----------------------------------
 
-val name: String = "Solvik"
-val inferred = 42
-mutable val counter: Integer = 0
+var name: String = "Solvik"
+var inferred = 42
+var mutable counter: Integer = 0
 counter = counter + 7
 // A semicolon separates two constructs sharing one physical line and never terminates one.
-val one = 1; val two = 2; println(one + two)
+var one = 1; var two = 2; println(one + two)
 // A call argument list may end with a trailing comma and spread across lines.
 println(add(1, 2,))
-val spread = add(1,
+var spread = add(1,
     41)
 println(name .. " " .. inferred .. " " .. counter)
 println(spread .. " " .. factorial(5))
@@ -365,10 +365,10 @@ println(spread .. " " .. factorial(5))
 // -- 2. Literals and numeric types (sections 1, 4) -----------------------------
 
 println(2147483647)
-val maxInt: Integer = 2147483647
+var maxInt: Integer = 2147483647
 // Integral arithmetic is checked and overflows raise a Solvik arithmetic error; an implicit
 // widening to `Long` carries the value past the `Integer` range without loss (section 4).
-val maxAsLong: Long = maxInt
+var maxAsLong: Long = maxInt
 println(maxAsLong + 1)
 println(1L * 1000L)
 println(1.5)
@@ -387,7 +387,7 @@ println(-5)
 println(2 * 3 + 4)
 println(1 < 2 && !(3 >= 4) || false)
 // Expression continuation after a binary operator (section 16).
-val total = 1 +
+var total = 1 +
     2 +
     3
 println(total)
@@ -395,25 +395,25 @@ println(total)
 // -- 3. Strings, raw strings, concatenation (sections 3, 15) -------------------
 
 println("tab[\t]nl[\n]quote[\"]backslash[\\]native-escape[\N]")
-val raw = r#"\d+ "quoted" C:\temp"#
+var raw = r#"\d+ "quoted" C:\temp"#
 println(raw)
-val hashy = r##"contains "# text"##
+var hashy = r##"contains "# text"##
 println(hashy)
-val sql = r#"SELECT 1"#
+var sql = r#"SELECT 1"#
 println(sql)
 // `..` renders both operands through `toString`; it is not `+`, which stays numeric.
 println("sum=" .. total .. ", flag=" .. (total > 3))
 // A member chain continues across lines through a leading `.` (section 16).
-val chained = "solvik"
+var chained = "solvik"
     .toString()
     .toString()
 println(chained)
 
 // -- 4. Equality, identity, hashing (section 3) --------------------------------
 
-val p1 = Point(1, 2, "first")
-val p2 = Point(1, 2, "first")
-val sameRef = p1
+var p1 = Point(1, 2, "first")
+var p2 = Point(1, 2, "first")
+var sameRef = p1
 println(p1 == p2)
 println(p1 != p2)
 println(p1 === sameRef)
@@ -423,13 +423,13 @@ println(p1.hashCode() == p2.hashCode())
 println(p1)
 println("held: " .. p1)
 // `Any` never disables checking: read it back through a checked cast or a type test (section 18).
-val erased: Any = p1
+var erased: Any = p1
 if (erased is Point) {
     println(erased.label)
 }
-val recast = erased as Point
+var recast = erased as Point
 println(recast.label)
-// `val` freezes the binding, not the object: a `mutable val` property stays writable.
+// `var` freezes the binding, not the object: a `var mutable` property stays writable.
 p1.label = "second"
 println(p1 == p2)
 p1.label = "first"
@@ -439,23 +439,23 @@ p1.label = "first"
 println(Gear(4).drive())
 println(Boosted().drive())
 println(Chip().drive())
-val vehicle: Vehicle = Trike()
+var vehicle: Vehicle = Trike()
 println(vehicle.summary())
 
 // -- 6. Interfaces and delegation (sections 8, 9) ------------------------------
 
-val person = Person("Dana", 30)
+var person = Person("Dana", 30)
 println(person.greeting())
 println(person.shout())
-val loud: Loud = Announcer(Echo())
+var loud: Loud = Announcer(Echo())
 println(loud.shout("hey"))
 
 // -- 7. Generics (section 11) ---------------------------------------------------
 
-val slot = Slot(7)
+var slot = Slot(7)
 println(slot.get())
 println(slot.mapWith(scaleBy(3)))
-val texts: Slot<String> = Slot("abc")
+var texts: Slot<String> = Slot("abc")
 println(texts.get())
 // Explicit type arguments are permitted on direct calls.
 println(pick<Integer>(1, 2))
@@ -489,14 +489,14 @@ class VehicleHolder {
 
 // -- 9. Result values: operations, propagation, must-consume (section 23) -------
 
-val good = parse("ok")
+var good = parse("ok")
 println(good.isOk())
 println(good.unwrap())
-val bad = parse("bad")
+var bad = parse("bad")
 println(bad.isErr())
 println(bad.unwrapErr())
 println(good.expect("should be ok"))
-val propagated = parseDoubled("ok")
+var propagated = parseDoubled("ok")
 println(propagated.unwrap())
 println(parseDoubled("bad").unwrapErr())
 // A Result must be consumed; `ignore()` is the deliberate discard.
@@ -505,14 +505,14 @@ bad.ignore()
 
 // -- 10. Nullability (section 5) -------------------------------------------------
 
-val missing: String? = null
-val present: String? = "here"
+var missing: String? = null
+var present: String? = "here"
 println(missing ?? "fallback")
 println(present ?? "fallback")
 println(missing?.toString())
 // Reference-identity null tests narrow the same way as `== null`/`!= null` for
 // identity-bearing types (section 3), and writes invalidate a prior narrowing (section 5).
-mutable val holder: Point? = p1
+var mutable holder: Point? = p1
 if (holder !== null) {
     println(holder.label)
 }
@@ -523,7 +523,7 @@ println(describe(7))
 
 // -- 11. Control flow (section 17) ------------------------------------------------
 
-mutable val walked = ""
+var mutable walked = ""
 for (i in 1...3) {
     walked = walked .. i
 }
@@ -535,8 +535,8 @@ for (i in 3..>0) {
 }
 println(walked)
 
-mutable val loopTotal = 0
-mutable val spins = 0
+var mutable loopTotal = 0
+var mutable spins = 0
 while (true) {
     spins = spins + 1
     if (spins == 2) {
@@ -550,7 +550,7 @@ while (true) {
 println(loopTotal)
 
 // An `if`/`else if`/`else` chain as an expression, with statements before the tail (section 21.4).
-val band = if (counter > 100) {
+var band = if (counter > 100) {
     "high"
 }
 else if (counter > 5) {
@@ -562,19 +562,19 @@ else {
 println(band)
 
 // A block expression: statements then a tail expression (section 21.2).
-val computed = {
-    val base = 20
+var computed = {
+    var base = 20
     base + 22
 }
 println(computed)
 
 // A stand-alone scope block introduces an independent scope and may shadow (section 6).
 {
-    val name = "inner"
+    var name = "inner"
     println(name)
 }
 {
-    val name = "also inner"
+    var name = "also inner"
     println(name)
 }
 
@@ -591,7 +591,7 @@ switch (99) {
     }
 }
 // `switch` expressions and regex dispatch:
-val kind = switch (counter) {
+var kind = switch (counter) {
     case 0 {
         "none"
     }
@@ -603,7 +603,7 @@ val kind = switch (counter) {
     }
 }
 println(kind)
-val viaRegex = switch (name) {
+var viaRegex = switch (name) {
     case regex r#"^[a-z]+$"# {
         "lower"
     }
@@ -621,9 +621,9 @@ println(lateBound(7))
 
 // Named functions are values; module-qualified functions too. Every reference to one
 // declaration is the same canonical value, and every function value renders as `func`.
-val formatter: func(Integer): String = render
-val doubled: func(Integer): Integer = scaleBy(2)
-val doubler: func(Integer): Integer = math::double
+var formatter: func(Integer): String = render
+var doubled: func(Integer): Integer = scaleBy(2)
+var doubler: func(Integer): Integer = math::double
 println(formatter(3))
 println(doubled(21))
 println(doubler(21))
@@ -631,31 +631,31 @@ println(math::double(10))
 println(scaleBy(3)(3))
 
 // Anonymous functions and explicit capture.
-val plusOne: func(Integer): Integer = func(value: Integer): Integer {
+var plusOne: func(Integer): Integer = func(value: Integer): Integer {
     return value + 1
 }
 println(plusOne(41))
-val offset: func(Integer): Integer = scaleBy(10)
+var offset: func(Integer): Integer = scaleBy(10)
 println(offset(4))
-val tagger = Tagger()
-val attach: func(Integer): String = tagger.attach
+var tagger = Tagger()
+var attach: func(Integer): String = tagger.attach
 println(attach(7))
-val withBonus: func(Integer): Integer = tagger.bonusBy(100)
+var withBonus: func(Integer): Integer = tagger.bonusBy(100)
 println(withBonus(1) == withBonus(1))
 println(withBonus(1))
 // A property may itself hold a function value.
 println(tagger.transform(9))
 // Bound references are fresh identities; named references are canonical.
 println(attach === tagger.attach)
-val aliased: func(Integer): String = tagger.attach
+var aliased: func(Integer): String = tagger.attach
 println(attach.equals(aliased))
 // The predeclared `println` is itself a function value.
-val output: func(Any?): Unit = println
+var output: func(Any?): Unit = println
 output("via-value")
 println(plusOne.toString())
 println(formatter === formatter)
 // Nullable function values refine like any other nullable value.
-mutable val optional: (func(Integer): Integer)? = null
+var mutable optional: (func(Integer): Integer)? = null
 if (optional != null) {
     println("no")
 }
@@ -667,7 +667,7 @@ if (optional != null) {
     println(optional(9))
 }
 // A generic function used as a value is instantiated to the type its position expects.
-val integerRender: func(Integer): String = render
+var integerRender: func(Integer): String = render
 println(integerRender(8))
 // Function values flow through parameters and results.
 func applyTwice(operation: func(Integer): Integer, value: Integer): Integer {
@@ -675,44 +675,44 @@ func applyTwice(operation: func(Integer): Integer, value: Integer): Integer {
 }
 println(applyTwice(plusOne, 40))
 // A generic function used as a value can also produce closures through a factory type.
-val factory: func(Integer): func(Integer): Integer = scaleBy
+var factory: func(Integer): func(Integer): Integer = scaleBy
 println(factory(2)(40))
 
 // -- 14. Collections (section 11) ---------------------------------------------------
 
-val items: List<Integer> = List(1, 2, 3)
+var items: List<Integer> = List(1, 2, 3)
 items.add(4)
 items.set(0, 9)
 println(items.size)
 println(items.get(0))
 println(items.removeAt(1))
 println(items.isEmpty)
-val unique: Set<Integer> = Set(1, 2, 2)
+var unique: Set<Integer> = Set(1, 2, 2)
 println(unique.size)
 println(unique.add(3))
 println(unique.contains(2))
 println(unique.remove(1))
-val scores: Map<String, Integer> = Map("a": 1, "b": 2)
+var scores: Map<String, Integer> = Map("a": 1, "b": 2)
 scores.put("a", 10)
 println(scores.size)
 println(scores.get("a"))
 println(scores.containsKey("c"))
 println(scores.remove("b"))
-val stack: Stack<String> = Stack()
+var stack: Stack<String> = Stack()
 stack.push("one")
 stack.push("two")
 println(stack.peek())
 println(stack.pop())
 println(stack.size)
 // Explicit type arguments on construction; inferred otherwise.
-val explicit: List<Integer> = List<Integer>(7)
+var explicit: List<Integer> = List<Integer>(7)
 println(explicit.get(0))
 
 // -- 15. Regex (section 14) -----------------------------------------------------------
 
-val email = Regex(r#"(\w+)@(\w+)"#)
+var email = Regex(r#"(\w+)@(\w+)"#)
 println(email.matches("a@b"))
-val firstMatch = email.find("mail x@y and p@q")
+var firstMatch = email.find("mail x@y and p@q")
 if (firstMatch != null) {
     println(firstMatch.value .. "@" .. firstMatch.start .. "-" .. firstMatch.end .. "#" .. firstMatch.groupCount)
     println(firstMatch.group(1) ?? "?")
@@ -740,7 +740,7 @@ try {
 }
 catch (e: ApplicationException) {
     println("is scaled: " .. (e is ScaledError))
-    val scaled = e as ScaledError
+    var scaled = e as ScaledError
     println("base caught level " .. scaled.level)
     println("msg: " .. (e.getMessage() ?? "none"))
 }
@@ -788,7 +788,7 @@ catch (e: RuntimeException) {
 
 // -- 17. Unit and the last words ---------------------------------------------------------
 
-val unitValue: Unit = {
+var unitValue: Unit = {
     print("block-tail|")
 }
 println(unitValue)

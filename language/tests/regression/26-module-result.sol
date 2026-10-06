@@ -18,14 +18,14 @@ func parse(raw: String): Result<Integer, String> {
 }
 
 func parseDoubled(raw: String): Result<Integer, String> {
-    val value = parse(raw)?
+    var value = parse(raw)?
     return Result.Ok(value + value)
 }
 
-val good = parse("ok")
+var good = parse("ok")
 println(good.isOk())
 println(good.unwrap())
-val bad = parse("bad")
+var bad = parse("bad")
 println(bad.isErr())
 println(bad.unwrapErr())
 good.ignore()

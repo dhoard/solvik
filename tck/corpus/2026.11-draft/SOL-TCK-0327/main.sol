@@ -5,9 +5,9 @@
 //   - A class member declaration other than the constructor cannot have the same name as its class.
 //
 class User {
-    val User: Integer = 1
+    var User: Integer = 1
 }
-val u = User()
+var u = User()
 print(u.User)
 
 print("EXECUTED-INVALID")

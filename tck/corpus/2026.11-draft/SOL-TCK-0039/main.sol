@@ -7,7 +7,7 @@
 // into a `String` with `..` (section 3: result is always `String`) makes the sequence
 // visible as one byte-exact stdout value. `print` appends no separator, so the expected
 // bytes are the concatenation alone.
-mutable val s: String = ""
+var mutable s: String = ""
 
 for (i in 1...5) {
     s = s .. i

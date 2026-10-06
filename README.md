@@ -31,7 +31,7 @@ Solvik is a strongly and statically typed, nominally typed, object-oriented lang
 Its design combines a familiar Java/TypeScript/Kotlin-style surface with stricter and more explicit
 semantics:
 
-- immutable-by-default bindings with `val` and explicit mutation with `mutable val`;
+- immutable-by-default bindings with `var` and explicit mutation with `var mutable`;
 - non-null types by default, nullable `T?`, safe access, coalescing, and flow narrowing;
 - classes that are final by default, controlled single inheritance, and explicit `override`;
 - multiple interfaces with default methods;
@@ -64,7 +64,7 @@ interface Greeter {
 }
 
 class Named implements Greeter {
-    val name: String
+    var name: String
 
     Named(name: String) {
         this.name = name
@@ -76,7 +76,7 @@ class Named implements Greeter {
 }
 
 class Service implements Greeter {
-    delegate val greeter: Greeter
+    delegate var greeter: Greeter
 
     Service(greeter: Greeter) {
         this.greeter = greeter
@@ -128,8 +128,8 @@ Solvik avoids behavior that is convenient locally but difficult to reason about 
 For example:
 
 ```solvik
-val x: Integer = 1
-val y: Long = Long(x)
+var x: Integer = 1
+var y: Long = Long(x)
 ```
 
 Numeric conversion is explicit. There is no implicit widening or narrowing.
@@ -137,8 +137,8 @@ Numeric conversion is explicit. There is no implicit widening or narrowing.
 Likewise, `Any` is a real top type, not an escape hatch from static checking:
 
 ```solvik
-val value: Any = "hello"
-val count: Integer = value // compile error
+var value: Any = "hello"
+var count: Integer = value // compile error
 ```
 
 ### Composition first, inheritance controlled
@@ -148,7 +148,7 @@ delegation provide reusable behavior without encouraging deep inheritance hierar
 
 ```solvik
 class Service implements Logger {
-    delegate val logger: Logger
+    delegate var logger: Logger
 }
 ```
 
@@ -194,23 +194,23 @@ The comparison is about design direction, not source compatibility or feature eq
 ### Explicit mutability
 
 ```solvik
-val name = "Solvik"
-mutable val count = 0
+var name = "Solvik"
+var mutable count = 0
 
 count = count + 1
 name = "Other" // compile error
 ```
 
-`val` freezes the binding, not the entire reachable object graph. `mutable val` is the only
-writable binding form, and `val` is the only binding keyword.
+`var` freezes the binding, not the entire reachable object graph. `var mutable` is the only
+writable binding form, and `var` is the only binding keyword.
 
 ### Null safety
 
 Types are non-null by default.
 
 ```solvik
-val name: String = "Solvik"
-val optional: String? = null
+var name: String = "Solvik"
+var optional: String? = null
 ```
 
 Flow analysis can narrow nullable values:
@@ -256,7 +256,7 @@ interface Logger {
 }
 
 class Service implements Logger {
-    delegate val logger: Logger
+    delegate var logger: Logger
 
     Service(logger: Logger) {
         this.logger = logger
@@ -293,7 +293,7 @@ func twice(value: Integer): Integer {
     return value * 2
 }
 
-val operation: func(Integer): Integer = twice
+var operation: func(Integer): Integer = twice
 println(operation(21))
 ```
 
@@ -310,14 +310,14 @@ func makeOffset(base: Integer): func(Integer): Integer {
     }
 }
 
-val offsetByTen: func(Integer): Integer = makeOffset(10)
+var offsetByTen: func(Integer): Integer = makeOffset(10)
 println(offsetByTen(5))
 ```
 
 Reading a declared instance method without calling it binds that receiver:
 
 ```solvik
-val attach: func(Integer): String = Tagger().attach
+var attach: func(Integer): String = Tagger().attach
 println(attach(7))
 ```
 
@@ -337,8 +337,8 @@ Constant regex patterns can be compiled once and reused by the runtime.
 Rust-style raw-string delimiters avoid escaping-heavy source:
 
 ```solvik
-val text = r#"He said "hello"."#
-val more = r##"A value containing "# inside"##
+var text = r#"He said "hello"."#
+var more = r##"A value containing "# inside"##
 ```
 
 The opening delimiter determines the exact closing delimiter.
@@ -348,7 +348,7 @@ The opening delimiter determines the exact closing delimiter.
 Solvik uses `..` rather than overloading `+` for both arithmetic and strings:
 
 ```solvik
-val total = 10
+var total = 10
 println("total = " .. total)
 ```
 

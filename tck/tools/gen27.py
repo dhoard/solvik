@@ -62,9 +62,9 @@ REQS_SPEC = {
         quotes=["The class name in that position is a receiver, not a value: it is legal only as the "
                 "root of a static member reference, and a class name used anywhere else remains "
                 "`SOLV-TYPE-016`.",
-                "In particular `val c = Counter` and a read through an instance such as "
+                "In particular `var c = Counter` and a read through an instance such as "
                 "`instance.limit` are rejected."],
-        note="The program binds the class name to a local, which is exactly the `val c = Counter` "
+        note="The program binds the class name to a local, which is exactly the `var c = Counter` "
              "form the section rejects. The section names `SOLV-TYPE-016`, so the oracle pins it.",
         diagnosticCode="SOLV-TYPE-016",
         diagnosticNormative=True,
@@ -77,7 +77,7 @@ REQS_SPEC = {
         quotes=["The class name in that position is a receiver, not a value: it is legal only as the "
                 "root of a static member reference, and a class name used anywhere else remains "
                 "`SOLV-TYPE-016`.",
-                "In particular `val c = Counter` and a read through an instance such as "
+                "In particular `var c = Counter` and a read through an instance such as "
                 "`instance.limit` are rejected."],
         note="The program reads the static property through an instance, the second rejected form "
              "the section names. No code is named for the instance form, so the rejection is bare."),
@@ -127,7 +127,7 @@ REQS_SPEC = {
         kind="runtime",
         quotes=["The `toString`/`equals`/`hashCode` reserved-name rules apply to **instance** "
                 "members only, so a static member may use those names."],
-        note="A class declares `static val toString` and reads it through the class name; the read "
+        note="A class declares `static var toString` and reads it through the class name; the read "
              "observes the static cell, which the section says remains reachable alongside the "
              "inherited universal instance member. The expected bytes are the cell's value.",
     ),
@@ -155,8 +155,8 @@ def BAD(tid, cat, req, src, diag, note):
 
 
 OK("SOL-TCK-0362", "types", "REQ-2500",
-   'val i: Integer = 42\nval l: Long = 42L\nval f: Float = 1.5F\nval d: Double = 1.5\n'
-   'val c: Character = \'A\'\nval s: String = "hi"\nval b: Boolean = true\n'
+   'var i: Integer = 42\nvar l: Long = 42L\nvar f: Float = 1.5F\nvar d: Double = 1.5\n'
+   'var c: Character = \'A\'\nvar s: String = "hi"\nvar b: Boolean = true\n'
    'print(i)\nprint("|")\nprint(l)\nprint("|")\nprint(f)\nprint("|")\nprint(d)\nprint("|")\n'
    'print(c)\nprint("|")\nprint(s)\nprint("|")\nprint(b)\n',
    "42|42|1.5|1.5|A|hi|true",
@@ -166,20 +166,20 @@ BAD("SOL-TCK-0363", "objects", "REQ-2501",
     'class MyInt extends Integer {\n    MyInt() {\n    }\n}\nprint("EXECUTED-INVALID")\n', {},
     "A class extending the built-in Integer is the forbidden extension.")
 BAD("SOL-TCK-0364", "objects", "REQ-2502",
-    'class Counter {\n    static mutable val n: Integer = 0\n\n    Counter() {\n    }\n}\n'
-    'val c = Counter\nprint("EXECUTED-INVALID")\n',
+    'class Counter {\n    static var mutable n: Integer = 0\n\n    Counter() {\n    }\n}\n'
+    'var c = Counter\nprint("EXECUTED-INVALID")\n',
     {"family": "TYPE", "code": "SOLV-TYPE-016"},
     "Binding the class name to a local uses it as a value, which pins SOLV-TYPE-016.")
 BAD("SOL-TCK-0365", "objects", "REQ-2503",
-    'class Counter {\n    static mutable val n: Integer = 0\n\n    Counter() {\n    }\n}\n'
-    'val c = Counter()\nprint(c.n)\n' + NEG, {},
+    'class Counter {\n    static var mutable n: Integer = 0\n\n    Counter() {\n    }\n}\n'
+    'var c = Counter()\nprint(c.n)\n' + NEG, {},
     "Reading a static member through an instance is the second rejected form.")
 BAD("SOL-TCK-0366", "objects", "REQ-2504",
-    'class C {\n    static mutable val x: Integer = 1\n    val x: Integer\n\n    C() {\n'
-    '        this.x = 2\n    }\n}\nval c = C()\nprint("EXECUTED-INVALID")\n', {},
+    'class C {\n    static var mutable x: Integer = 1\n    var x: Integer\n\n    C() {\n'
+    '        this.x = 2\n    }\n}\nvar c = C()\nprint("EXECUTED-INVALID")\n', {},
     "A static and an instance member share the name x, which the shared namespace forbids.")
 BAD("SOL-TCK-0367", "objects", "REQ-2505",
-    'class C {\n    static mutable val n: Integer = 1\n\n    static func f(): Integer {\n'
+    'class C {\n    static var mutable n: Integer = 1\n\n    static func f(): Integer {\n'
     '        return this.n\n    }\n\n    C() {\n    }\n}\nprint(C.f())\n' + NEG,
     {"family": "RESOL", "code": "SOLV-RESOL-005"},
     "`this` inside a static method pins the specification-named SOLV-RESOL-005.")
@@ -190,7 +190,7 @@ BAD("SOL-TCK-0368", "objects", "REQ-2506",
     {"family": "RESOL", "code": "SOLV-RESOL-006"},
     "`super` inside a static method pins the specification-named SOLV-RESOL-006.")
 OK("SOL-TCK-0369", "objects", "REQ-2507",
-   'class C {\n    static val toString: Integer = 7\n\n    C() {\n    }\n}\nprint(C.toString)\n',
+   'class C {\n    static var toString: Integer = 7\n\n    C() {\n    }\n}\nprint(C.toString)\n',
    "7",
    "The static member may use the reserved instance name and the class-name read observes its "
    "value.")

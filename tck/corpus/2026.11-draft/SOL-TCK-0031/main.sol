@@ -11,7 +11,7 @@ func greet(s: String): String {
     return s
 }
 
-val nn: String? = "Doug"
+var nn: String? = "Doug"
 if (nn != null) {
     print(greet(nn))
 }

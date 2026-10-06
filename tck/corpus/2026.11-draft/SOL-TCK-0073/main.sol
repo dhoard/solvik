@@ -4,7 +4,7 @@
 // LEGAL (it exits that loop) and must not be mistaken for the illegal bare `break`. The
 // program prints once and terminates: a loop that ignored the break would not terminate,
 // and a switch that rejected the legal form would not compile.
-mutable val v: Integer = 2
+var mutable v: Integer = 2
 
 switch (v) {
     case 1 {

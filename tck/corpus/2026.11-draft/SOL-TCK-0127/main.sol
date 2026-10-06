@@ -6,17 +6,17 @@
 // separating two same-line statements.
 // Four spellings of the same value 42, so the expected stdout is "42424242". Any spelling
 // that lost the tail expression would instead be a compile-time error.
-val a = {
+var a = {
     42
 }
-val b = {
-    val unused: Integer = 0; 42
+var b = {
+    var unused: Integer = 0; 42
 }
-val c = {
+var c = {
     42
 
 }
-val d = {
+var d = {
     42
 
     // a comment and blank lines must not disturb tail selection

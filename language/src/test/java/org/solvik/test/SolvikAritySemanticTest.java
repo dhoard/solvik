@@ -152,13 +152,13 @@ public final class SolvikAritySemanticTest {
     public void instanceMethodCorrectArityExecutes() {
         assertThat(runMain("""
                 class Counter {
-                    mutable val value: Integer = 0
+                    var mutable value: Integer = 0
 
                     func bump(by: Integer): Unit {
                         this.value = this.value + by
                     }
                 }
-                val counter = Counter()
+                var counter = Counter()
                 counter.bump(2)
                 println(counter.value)
                 """)).isEqualTo("2\n");
@@ -168,7 +168,7 @@ public final class SolvikAritySemanticTest {
     public void instanceMethodWithTooFewArgumentsIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 class Counter {
-                    mutable val value: Integer = 0
+                    var mutable value: Integer = 0
 
                     func bump(by: Integer): Unit {
                         this.value = this.value + by
@@ -186,7 +186,7 @@ public final class SolvikAritySemanticTest {
     public void instanceMethodWithTooManyArgumentsIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 class Counter {
-                    mutable val value: Integer = 0
+                    var mutable value: Integer = 0
 
                     func bump(by: Integer): Unit {
                         this.value = this.value + by
@@ -204,7 +204,7 @@ public final class SolvikAritySemanticTest {
     public void implicitThisMethodCallWithWrongArityIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 class Counter {
-                    mutable val value: Integer = 0
+                    var mutable value: Integer = 0
 
                     func bump(by: Integer): Unit {
                         this.value = this.value + by
@@ -243,13 +243,13 @@ public final class SolvikAritySemanticTest {
     public void constructorCorrectArityExecutes() {
         assertThat(runMain("""
                 class User {
-                    val name: String
+                    var name: String
 
                     User(name: String) {
                         this.name = name
                     }
                 }
-                val user = User("Doug")
+                var user = User("Doug")
                 println(user.name)
                 """)).isEqualTo("Doug\n");
     }
@@ -258,7 +258,7 @@ public final class SolvikAritySemanticTest {
     public void constructorWithTooFewArgumentsIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 class User {
-                    val name: String
+                    var name: String
 
                     User(name: String) {
                         this.name = name
@@ -276,7 +276,7 @@ public final class SolvikAritySemanticTest {
     public void constructorWithTooManyArgumentsIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 class User {
-                    val name: String
+                    var name: String
 
                     User(name: String) {
                         this.name = name
@@ -413,7 +413,7 @@ public final class SolvikAritySemanticTest {
     public void genericConstructorWithWrongArityIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 class Box<T> {
-                    mutable val value: T
+                    var mutable value: T
 
                     Box(value: T) {
                         this.value = value

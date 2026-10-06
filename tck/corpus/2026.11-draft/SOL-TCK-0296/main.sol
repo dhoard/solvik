@@ -6,7 +6,7 @@ class W {
         return "z"
     }
 }
-val w = W()
-val v = w.opt()
+var w = W()
+var v = w.opt()
     ?.hashCode()
 print("v" .. (v != null))

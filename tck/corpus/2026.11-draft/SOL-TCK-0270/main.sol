@@ -10,5 +10,5 @@ class Exact {
         return 7
     }
 }
-val p = Exact()
+var p = Exact()
 print("hash" .. p.hashCode())

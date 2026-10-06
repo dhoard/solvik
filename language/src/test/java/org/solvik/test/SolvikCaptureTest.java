@@ -128,8 +128,8 @@ public final class SolvikCaptureTest {
     public void anImmutableLocalIsReadableThroughTheCaptureList() {
         assertThat(run("""
             func demo(): Integer {
-                val scale: Integer = 6
-                val apply: func(Integer): Integer = func [scale](value: Integer): Integer {
+                var scale: Integer = 6
+                var apply: func(Integer): Integer = func [scale](value: Integer): Integer {
                     return value * scale
                 }
                 return apply(7)
@@ -147,7 +147,7 @@ public final class SolvikCaptureTest {
     public void anEnclosingParameterIsCapturable() {
         assertThat(run("""
             func demo(base: Integer): Integer {
-                val add: func(Integer): Integer = func [base](value: Integer): Integer {
+                var add: func(Integer): Integer = func [base](value: Integer): Integer {
                     return base + value
                 }
                 return add(2)
@@ -168,11 +168,11 @@ public final class SolvikCaptureTest {
     public void severalCapturesAreReadableIncludingAFunctionValueThatTheBodyCalls() {
         assertThat(run("""
             func demo(): Integer {
-                val twice: func(Integer): Integer = func(value: Integer): Integer {
+                var twice: func(Integer): Integer = func(value: Integer): Integer {
                     return value * 2
                 }
-                val offset: Integer = 7
-                val caller: func(Integer): Integer = func [twice, offset](value: Integer): Integer {
+                var offset: Integer = 7
+                var caller: func(Integer): Integer = func [twice, offset](value: Integer): Integer {
                     return twice(value) + offset
                 }
                 return caller(5)
@@ -195,8 +195,8 @@ public final class SolvikCaptureTest {
     public void aClosureParameterShadowsAnEnclosingLocalOfTheSameSpelling() {
         assertThat(run("""
             func demo(): Integer {
-                val value: Integer = 10
-                val viaParameter: func(Integer): Integer = func(value: Integer): Integer {
+                var value: Integer = 10
+                var viaParameter: func(Integer): Integer = func(value: Integer): Integer {
                     return value
                 }
                 return viaParameter(99)
@@ -214,20 +214,20 @@ public final class SolvikCaptureTest {
      * the closure was created.
      *
      * <p>"Captures bind values, not storage locations. For a reference, copying the reference still
-     * observes mutation of the referent: {@code val counter = Counter()} then {@code func [counter]()
+     * observes mutation of the referent: {@code var counter = Counter()} then {@code func [counter]()
      * { counter.increment() }} observes later mutation of the same object" (section 6). A
      * deep-copying capture would print the pre-mutation value, and a capture of storage would be
-     * impossible for a {@code val} at all, so only copying the reference produces 7.
+     * impossible for a {@code var} at all, so only copying the reference produces 7.
      */
     @Test
     public void aCapturedObjectReferenceObservesLaterMutation() {
         assertThat(run("""
             class Cell {
-                mutable val n: Integer = 0
+                var mutable n: Integer = 0
             }
             func demo(): Integer {
-                val cell = Cell()
-                val read: func(): Integer = func [cell](): Integer {
+                var cell = Cell()
+                var read: func(): Integer = func [cell](): Integer {
                     return cell.n
                 }
                 cell.n = 7
@@ -248,11 +248,11 @@ public final class SolvikCaptureTest {
     public void aCapturedObjectIsTheSameObjectTheBodyReceives() {
         assertThat(run("""
             class Box {
-                mutable val n: Integer = 1
+                var mutable n: Integer = 1
             }
             func demo(): Boolean {
-                val box = Box()
-                val read: func(): Box = func [box](): Box {
+                var box = Box()
+                var read: func(): Box = func [box](): Box {
                     return box
                 }
                 return read() === box
@@ -273,12 +273,12 @@ public final class SolvikCaptureTest {
     public void eachCreationBindsTheValuesThatExistedAtThatMoment() {
         assertThat(run("""
             func demo(): Integer {
-                val seed: Integer = 1
-                val before: func(): Integer = func [seed](): Integer {
+                var seed: Integer = 1
+                var before: func(): Integer = func [seed](): Integer {
                     return seed
                 }
-                val seed2: Integer = 2
-                val after: func(): Integer = func [seed, seed2](): Integer {
+                var seed2: Integer = 2
+                var after: func(): Integer = func [seed, seed2](): Integer {
                     return seed + seed2
                 }
                 return before() * 10 + after()
@@ -302,12 +302,12 @@ public final class SolvikCaptureTest {
     public void aClosureRemainsValidAfterItsCreatorReturns() {
         assertThat(run("""
             func make(seed: Integer): func(): Integer {
-                val local: Integer = seed + 1
+                var local: Integer = seed + 1
                 return func [local](): Integer {
                     return local
                 }
             }
-            val made = make(40)
+            var made = make(40)
             print(made())
             """)).isEqualTo("41");
     }
@@ -328,8 +328,8 @@ public final class SolvikCaptureTest {
                     return seed
                 }
             }
-            val first = make(1)
-            val second = make(2)
+            var first = make(1)
+            var second = make(2)
             print(first() + second())
             """)).isEqualTo("3");
     }
@@ -352,14 +352,14 @@ public final class SolvikCaptureTest {
     public void aClosureCapturingAClosureRetainsTheCapturedClosuresOwnEnvironment() {
         assertThat(run("""
             func demo(): Integer {
-                val seed: Integer = 3
-                val inner: func(): Integer = func [seed](): Integer {
+                var seed: Integer = 3
+                var inner: func(): Integer = func [seed](): Integer {
                     return seed * 2
                 }
-                val middle: func(): Integer = func [inner](): Integer {
+                var middle: func(): Integer = func [inner](): Integer {
                     return inner() + 1
                 }
-                val outer: func(): Integer = func [middle](): Integer {
+                var outer: func(): Integer = func [middle](): Integer {
                     return middle() + 100
                 }
                 return outer()
@@ -379,10 +379,10 @@ public final class SolvikCaptureTest {
     public void aCapturedClosureIsStoredAsTheSameValue() {
         assertThat(run("""
             func demo(): Boolean {
-                val inner: func(): Integer = func(): Integer {
+                var inner: func(): Integer = func(): Integer {
                     return 1
                 }
-                val forward: func(): func(): Integer = func [inner](): func(): Integer {
+                var forward: func(): func(): Integer = func [inner](): func(): Integer {
                     return inner
                 }
                 return forward() === inner
@@ -459,7 +459,7 @@ public final class SolvikCaptureTest {
     public void aClosureCapturesTheReceiverToUseIt() {
         assertThat(run("""
             class Adder {
-                mutable val base: Integer = 0
+                var mutable base: Integer = 0
 
                 func set(value: Integer) {
                     this.base = value
@@ -471,7 +471,7 @@ public final class SolvikCaptureTest {
                     }
                 }
             }
-            val adder = Adder()
+            var adder = Adder()
             adder.set(10)
             print(adder.adder()(5))
             """)).isEqualTo("15");
@@ -489,7 +489,7 @@ public final class SolvikCaptureTest {
     public void aCapturedReceiverObeysReferenceSemantics() {
         assertThat(run("""
             class Adder {
-                mutable val base: Integer = 0
+                var mutable base: Integer = 0
 
                 func set(value: Integer) {
                     this.base = value
@@ -501,9 +501,9 @@ public final class SolvikCaptureTest {
                     }
                 }
             }
-            val adder = Adder()
+            var adder = Adder()
             adder.set(10)
-            val add = adder.adder()
+            var add = adder.adder()
             adder.set(100)
             print(add(5))
             """)).isEqualTo("105");
@@ -521,7 +521,7 @@ public final class SolvikCaptureTest {
     public void aReceiverIsForwardedThroughNestedClosures() {
         assertThat(run("""
             class Holder {
-                mutable val n: Integer = 0
+                var mutable n: Integer = 0
 
                 func set(value: Integer) {
                     this.n = value
@@ -535,7 +535,7 @@ public final class SolvikCaptureTest {
                     }
                 }
             }
-            val holder = Holder()
+            var holder = Holder()
             holder.set(100)
             print(holder.nested()()())
             """)).isEqualTo("100");
@@ -553,7 +553,7 @@ public final class SolvikCaptureTest {
     public void aClosureBodyMayNotUseThisWithoutCapturingIt() {
         String source = """
             class Holder {
-                mutable val n: Integer = 0
+                var mutable n: Integer = 0
 
                 func leaks(): func(): Integer {
                     return func(): Integer {
@@ -601,7 +601,7 @@ public final class SolvikCaptureTest {
     public void aCaptureListMayNotWriteThisTwice() {
         String source = """
             class Holder {
-                mutable val n: Integer = 0
+                var mutable n: Integer = 0
 
                 func leaks(): func(): Integer {
                     return func [this, this](): Integer {
@@ -619,19 +619,19 @@ public final class SolvikCaptureTest {
     // ---------------------------------------------------------------------------------------------
 
     /**
-     * A capture item naming a {@code mutable val} is rejected at the item.
+     * A capture item naming a {@code var mutable} is rejected at the item.
      *
-     * <p>"Naming a {@code mutable val} in a capture list is {@code SEM_MUTABLE_CAPTURE}
+     * <p>"Naming a {@code var mutable} in a capture list is {@code SEM_MUTABLE_CAPTURE}
      * ({@code SOLV-SEM-057}), reported on that capture item" (section 6). The specification's own
      * example is {@code func [total](value: Integer) { total = total + value }} over
-     * {@code mutable val total = 0}.
+     * {@code var mutable total = 0}.
      */
     @Test
     public void aCaptureItemNamingAVarIsRejected() {
         String source = """
             func demo(): func(Integer): Unit {
-                mutable val total: Integer = 0
-                val add: func(Integer): Unit = func [total](value: Integer): Unit {
+                var mutable total: Integer = 0
+                var add: func(Integer): Unit = func [total](value: Integer): Unit {
                     total = value
                 }
                 return add
@@ -643,7 +643,7 @@ public final class SolvikCaptureTest {
     }
 
     /**
-     * A body read of a {@code mutable val} that its own capture list named is rejected with the same code.
+     * A body read of a {@code var mutable} that its own capture list named is rejected with the same code.
      *
      * <p>"and a read or write of that captured name in the body is reported with the same code"
      * (section 6). Two diagnostics therefore appear for one closure: one on the item and one on the
@@ -654,7 +654,7 @@ public final class SolvikCaptureTest {
     public void aBodyReadOfACapturedVarNameIsRejectedToo() {
         String source = """
             func demo(): func(): Integer {
-                mutable val total: Integer = 0
+                var mutable total: Integer = 0
                 return func [total](): Integer {
                     return total
                 }
@@ -666,7 +666,7 @@ public final class SolvikCaptureTest {
     }
 
     /**
-     * A body write of a {@code mutable val} that its own capture list named is rejected as well.
+     * A body write of a {@code var mutable} that its own capture list named is rejected as well.
      *
      * <p>"a read or write of that captured name in the body is reported with the same code"
      * (section 6) — a write is no different, since the binding it would assign lives in a frame the
@@ -676,7 +676,7 @@ public final class SolvikCaptureTest {
     public void aBodyWriteToACapturedVarNameIsRejectedToo() {
         String source = """
             func demo(): func(Integer): Unit {
-                mutable val total: Integer = 0
+                var mutable total: Integer = 0
                 return func [total](value: Integer): Unit {
                     total = value
                 }
@@ -723,7 +723,7 @@ public final class SolvikCaptureTest {
     public void aBodyUseOfASelfReferentialCaptureItemDoesNotCascade() {
         String source = """
             func demo(): func(Integer): Integer {
-                val selfRef: func(Integer): Integer = func [selfRef](value: Integer): Integer {
+                var selfRef: func(Integer): Integer = func [selfRef](value: Integer): Integer {
                     return selfRef(value)
                 }
                 return selfRef
@@ -747,7 +747,7 @@ public final class SolvikCaptureTest {
     public void callingAnOmittedFunctionValuedBindingIsAnUnlistedCapture() {
         String source = """
             func demo(): func(): Integer {
-                val inner: func(): Integer = func(): Integer {
+                var inner: func(): Integer = func(): Integer {
                     return 1
                 }
                 return func(): Integer {
@@ -762,7 +762,7 @@ public final class SolvikCaptureTest {
     }
 
     /**
-     * The {@code mutable val} case is deliberately <em>not</em> suppressed, and a separate omission in the same
+     * The {@code var mutable} case is deliberately <em>not</em> suppressed, and a separate omission in the same
      * body is still reported.
      *
      * <p>The specification assigns the mutable-capture code to both placements -- the item and each body
@@ -774,7 +774,7 @@ public final class SolvikCaptureTest {
     public void aCapturedVarUseStillReportsAndAnUnrelatedOmissionSurvives() {
         String source = """
             func demo(base: Integer): func(Integer): Integer {
-                mutable val total: Integer = 0
+                var mutable total: Integer = 0
                 return func [total](value: Integer): Integer {
                     return total + base
                 }
@@ -786,10 +786,10 @@ public final class SolvikCaptureTest {
     }
 
     /**
-     * Referencing an enclosing {@code mutable val} without listing it stays an unlisted capture rather than
+     * Referencing an enclosing {@code var mutable} without listing it stays an unlisted capture rather than
      * becoming a mutable-capture error.
      *
-     * <p>"Referencing the same outer {@code mutable val} without listing it remains
+     * <p>"Referencing the same outer {@code var mutable} without listing it remains
      * {@code SEM_UNLISTED_CAPTURE} at the body reference; the compiler never silently converts it into
      * a capture" (section 6). The name never reaches a capture list, so no capture-item diagnostic can
      * apply, and reporting the mutable code instead would tell the reader to remove a capture that was
@@ -799,7 +799,7 @@ public final class SolvikCaptureTest {
     public void anUnlistedEnclosingVarIsAnUnlistedCaptureNotAMutableCapture() {
         String source = """
             func demo(): func(): Integer {
-                mutable val total: Integer = 0
+                var mutable total: Integer = 0
                 return func(): Integer {
                     return total
                 }
@@ -811,19 +811,19 @@ public final class SolvikCaptureTest {
     }
 
     /**
-     * A {@code mutable val} declared at top level is a local of the implicit entry point, so capturing it is
+     * A {@code var mutable} declared at top level is a local of the implicit entry point, so capturing it is
      * rejected like capturing any other local.
      *
      * <p>Section 5 gives top-level statements the scope of an implicit entry point, so a top-level
-     * {@code mutable val} is a mutable local of that callable and the capture rule about {@code mutable val}s applies
+     * {@code var mutable} is a mutable local of that callable and the capture rule about {@code var mutable}s applies
      * to it. This is the case where "capture top-level state" would be the natural wrong reading of
      * the exemption for top-level functions.
      */
     @Test
     public void aTopLevelVarIsNotCapturable() {
         String source = """
-            mutable val count: Integer = 0
-            val read: func(): Integer = func [count](): Integer {
+            var mutable count: Integer = 0
+            var read: func(): Integer = func [count](): Integer {
                 return count
             }
             print(read)
@@ -832,9 +832,9 @@ public final class SolvikCaptureTest {
     }
 
     /**
-     * A {@code val} declared at top level is capturable, and a body may not reach it unlisted.
+     * A {@code var} declared at top level is capturable, and a body may not reach it unlisted.
      *
-     * <p>The same implicit-entry-point scoping: a top-level {@code val} is an immutable local, so it
+     * <p>The same implicit-entry-point scoping: a top-level {@code var} is an immutable local, so it
      * is a legal capture and an unlisted body use of it is still rejected. The exemption that exists is
      * for declarations, not for state: "Top-level and module-qualified function declarations are
      * globally resolved declarations rather than local state and need no capture entry; there are no
@@ -843,16 +843,16 @@ public final class SolvikCaptureTest {
     @Test
     public void aTopLevelValIsCapturableAndNotVisibleUnlisted() {
         assertThat(run("""
-            val greeting: String = "hello"
-            val suffix: String = "!"
-            val shout: func(): String = func [greeting, suffix](): String {
+            var greeting: String = "hello"
+            var suffix: String = "!"
+            var shout: func(): String = func [greeting, suffix](): String {
                 return greeting .. suffix
             }
             print(shout())
             """)).isEqualTo("hello!");
         String source = """
-            val greeting: String = "hello"
-            val shout: func(): String = func(): String {
+            var greeting: String = "hello"
+            var shout: func(): String = func(): String {
                 return greeting
             }
             print(shout())
@@ -881,7 +881,7 @@ public final class SolvikCaptureTest {
                 }
                 return n * fact(n - 1)
             }
-            val viaClosure: func(Integer): Integer = func(n: Integer): Integer {
+            var viaClosure: func(Integer): Integer = func(n: Integer): Integer {
                 return fact(n)
             }
             print(viaClosure(5))
@@ -901,7 +901,7 @@ public final class SolvikCaptureTest {
     public void aCaptureItemMayNotNameATopLevelClass() {
         String source = """
             class Helper {
-                mutable val n: Integer = 0
+                var mutable n: Integer = 0
             }
             func demo(): func(): Integer {
                 return func [Helper](): Integer {
@@ -967,7 +967,7 @@ public final class SolvikCaptureTest {
     public void aCaptureItemMayNotRepeatAName() {
         String source = """
             func demo(): func(): Integer {
-                val a: Integer = 1
+                var a: Integer = 1
                 return func [a, a](): Integer {
                     return a
                 }
@@ -988,7 +988,7 @@ public final class SolvikCaptureTest {
     public void aCaptureItemMayNotNameItsOwnParameter() {
         String source = """
             func demo(): func(Integer): Integer {
-                val value: Integer = 1
+                var value: Integer = 1
                 return func [value](value: Integer): Integer {
                     return value
                 }
@@ -1017,7 +1017,7 @@ public final class SolvikCaptureTest {
     public void aCaptureItemMayNotNameTheBindingBeingInitialized() {
         String source = """
             func demo(): func(): Integer {
-                val recurse: func(): Integer = func [recurse](): Integer {
+                var recurse: func(): Integer = func [recurse](): Integer {
                     return recurse()
                 }
                 return recurse
@@ -1043,7 +1043,7 @@ public final class SolvikCaptureTest {
                 }
                 return fib(n - 1) + fib(n - 2)
             }
-            val fibValue: func(Integer): Integer = func(n: Integer): Integer {
+            var fibValue: func(Integer): Integer = func(n: Integer): Integer {
                 return fib(n)
             }
             print(fibValue(10))
@@ -1066,11 +1066,11 @@ public final class SolvikCaptureTest {
     public void eachEvaluationOfACapturingClosureProducesADistinctValue() {
         assertThat(run("""
             func demo(): Boolean {
-                val seed: Integer = 1
-                val first: func(): Integer = func [seed](): Integer {
+                var seed: Integer = 1
+                var first: func(): Integer = func [seed](): Integer {
                     return seed
                 }
-                val second: func(): Integer = func [seed](): Integer {
+                var second: func(): Integer = func [seed](): Integer {
                     return seed
                 }
                 return first !== second
@@ -1090,7 +1090,7 @@ public final class SolvikCaptureTest {
     public void aClosureWithNoCaptureListStillCannotReachEnclosingLocals() {
         String source = """
             func demo(base: Integer): Integer {
-                val compute: func(Integer): Integer = func(value: Integer): Integer {
+                var compute: func(Integer): Integer = func(value: Integer): Integer {
                     return value + base
                 }
                 return compute(1)
@@ -1112,9 +1112,9 @@ public final class SolvikCaptureTest {
     public void bodyLocalsAndParametersAreNotCaptures() {
         assertThat(run("""
             func demo(): Integer {
-                val seed: Integer = 10
-                val apply: func(Integer): Integer = func [seed](value: Integer): Integer {
-                    val doubled: Integer = value * 2
+                var seed: Integer = 10
+                var apply: func(Integer): Integer = func [seed](value: Integer): Integer {
+                    var doubled: Integer = value * 2
                     return seed + doubled
                 }
                 return apply(16)

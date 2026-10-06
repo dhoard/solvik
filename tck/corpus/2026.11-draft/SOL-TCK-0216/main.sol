@@ -1,4 +1,4 @@
-mutable val a = 1
+var mutable a = 1
 if (a = 2) {
     print(1)
 }

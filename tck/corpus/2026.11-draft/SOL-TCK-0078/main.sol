@@ -3,7 +3,7 @@
 //    assignable to `V`; a repeated key keeps its position and takes the latest value."
 //   "A call with no value arguments constructs an empty collection (`List<Integer>()`)."
 // and gives the operation table:
-//   "`Map<K, V>`: `val isEmpty: Boolean`, `val size: Integer`, `func put(key: K, value: V)`,
+//   "`Map<K, V>`: `var isEmpty: Boolean`, `var size: Integer`, `func put(key: K, value: V)`,
 //    `func get(key: K): V`, `func containsKey(key: K): Boolean`,
 //    `func remove(key: K): Boolean`, `func clear()`."
 //
@@ -21,7 +21,7 @@
 // remove("b"), containsKey("b"), size -> `true 2 2 7 2 false true false 1`.
 // Executed as top-level statements (section 20). Uses print, so no platform line
 // separator can enter the expected bytes.
-val scores = Map<String, Integer>()
+var scores = Map<String, Integer>()
 print(scores.isEmpty)
 print(" ")
 scores.put("a", 1)

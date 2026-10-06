@@ -5,7 +5,7 @@
 // immutable closure capture"). The reference is written on the body's own read of `base`, which is where
 // the specification locates the diagnostic.
 func demo(base: Integer): Integer {
-    val compute: func(Integer): Integer = func(value: Integer): Integer {
+    var compute: func(Integer): Integer = func(value: Integer): Integer {
         return value + base
     }
     return compute(1)

@@ -213,11 +213,11 @@ public final class SolvikParserTest {
 
     @Test
     public void literalsNamesAndStrings() {
-        String src = "func f(): Unit {\n  val a: Integer = 42\n  mutable val b: Boolean = true\n  val c = \"esc\\t\"\n}\n";
+        String src = "func f(): Unit {\n  var a: Integer = 42\n  var mutable b: Boolean = true\n  var c = \"esc\\t\"\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("literals.sol", src));
 
         LocalDeclNode a = local(fn, 0);
-        assertNode(a, AstKind.LOCAL_DECL, src, "val a: Integer = 42");
+        assertNode(a, AstKind.LOCAL_DECL, src, "var a: Integer = 42");
         assertThat(a.bindingKind()).isEqualTo(BindingKind.IMMUTABLE);
         assertThat(a.name()).isEqualTo("a");
         assertThat(a.declaredType().orElseThrow().name()).isEqualTo("Integer");
@@ -226,14 +226,14 @@ public final class SolvikParserTest {
         assertThat(lit.lexeme()).isEqualTo("42");
 
         LocalDeclNode b = local(fn, 1);
-        assertNode(b, AstKind.LOCAL_DECL, src, "mutable val b: Boolean = true");
+        assertNode(b, AstKind.LOCAL_DECL, src, "var mutable b: Boolean = true");
         assertThat(b.bindingKind()).isEqualTo(BindingKind.MUTABLE);
         BoolLiteralNode bool = (BoolLiteralNode) b.initializer();
         assertNode(bool, AstKind.BOOL_LITERAL, src, "true");
         assertThat(bool.value()).isTrue();
 
         LocalDeclNode c = local(fn, 2);
-        assertNode(c, AstKind.LOCAL_DECL, src, "val c = \"esc\\t\"");
+        assertNode(c, AstKind.LOCAL_DECL, src, "var c = \"esc\\t\"");
         assertThat(c.declaredType().isEmpty()).isTrue();
         StringLiteralNode str = (StringLiteralNode) c.initializer();
         assertNode(str, AstKind.STRING_LITERAL, src, "\"esc\\t\"");
@@ -251,7 +251,7 @@ public final class SolvikParserTest {
 
     @Test
     public void binaryPrecedenceAssociativityAndParentheses() {
-        String src = "func f(): Integer {\n    val x = 1 - 2 - 3 * 4\n    val y = (1 + 2) / 3\n    return x\n}\n";
+        String src = "func f(): Integer {\n    var x = 1 - 2 - 3 * 4\n    var y = (1 + 2) / 3\n    return x\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("prec.sol", src));
 
         BinaryExprNode top = binary(local(fn, 0).initializer());
@@ -415,7 +415,7 @@ public final class SolvikParserTest {
     @Test
     public void spansAreNestedWithinParents() {
         String src = "func f(x: Integer): Integer {\n" + //
-                "    val y: Integer = (x + g(x, obj.f(1))) * 2\n" + //
+                "    var y: Integer = (x + g(x, obj.f(1))) * 2\n" + //
                 "    obj.a.b(1).c\n" + //
                 "    if (true) {\n        return y\n    }\n    else {\n        return x\n    }\n" + //
                 "}\n";
@@ -433,7 +433,7 @@ public final class SolvikParserTest {
     /** Structural invariant: children follow source order without overlap. */
     @Test
     public void siblingsFollowSourceOrder() {
-        String src = "func f(): Unit {\n    val v = h(1, 2, obj.x)\n    return v\n}\n";
+        String src = "func f(): Unit {\n    var v = h(1, 2, obj.x)\n    return v\n}\n";
         Deque<AstNode> stack = new ArrayDeque<>();
         stack.push(parseOk("order.sol", src));
         while (!stack.isEmpty()) {

@@ -22,5 +22,5 @@ class C implements A, B {
         return "c"
     }
 }
-val c = C()
+var c = C()
 print("conf" .. c.speak())

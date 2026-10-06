@@ -9,14 +9,14 @@
 // of the SOLV-RESOL-001 case: together they pin that the bare/qualified distinction is
 // real rather than an implementation accident.
 class Box {
-    val size: Integer
+    var size: Integer
 
     Box(size: Integer) {
         this.size = size
     }
 
     func report(): String {
-        val size: Integer = 99
+        var size: Integer = 99
         return "shadow=" .. this.size .. "/" .. size
     }
 }
