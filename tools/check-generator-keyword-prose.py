@@ -7,13 +7,13 @@ and `failureModes` strings. Requirement records that a generator owns are
 reproduced byte-for-byte by `tck/tools/verify_regen.py`, so stale prose there
 cannot be patched in the inventory -- it has to be fixed at the generator. This
 script is the search path for that fix, and a gate: it exits non-zero while any
-literal still names `var`, `sealed`, or `open` as a language keyword.
+literal still names `val`, `sealed`, or `open` as a language keyword.
 
 Literals are examined both as written and with `\\n` unescaped, because many
 generator sources are single-line strings whose line structure exists only as an
 escape. Ordinary English uses of the words ("the class is open to extension",
 "half-open") are not keyword uses and are not reported: the pattern requires the
-word to stand alone as an identifier, which is what makes `mutable val` and
+word to stand alone as an identifier, which is what makes `val x = 1` and
 `open func` detectable without parsing Solvik.
 
 Usage: python3 tools/check-generator-keyword-prose.py
@@ -28,21 +28,18 @@ import tokenize
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 GENS = sorted((ROOT / "tck" / "tools").glob("gen*.py"))
 
-# A removed keyword standing alone as a word: `var`, `sealed`, `open`. The
+# A removed keyword standing alone as a word: `val`, `sealed`, `open`. The
 # lookarounds reject hyphenated and attached uses ("half-open", "openFoo",
-# "variables"), which are prose, not syntax.
-KEYWORD = re.compile(r"(?<![\w-])(var|sealed|open)(?![\w-])")
+# "variables", "interval"), which are prose, not syntax.
+KEYWORD = re.compile(r"(?<![\w-])(val|sealed|open)(?![\w-])")
 
 # Occasions that name a removed keyword *on purpose*, keyed (generator, exact
-# line within a literal). `SOL-TCK-0390` prints the text `var` to demonstrate that
-# the word is ordinary data now that it is no longer a keyword, so the line must
-# keep saying `var` for the test to test anything. An exception is verified rather
-# than trusted: if the line stops appearing the check fails, which stops an
-# exception outliving the case it was written for.
-EXCEPTIONS = {
-    ("gen31.py", 'print("var" .. x)'):
-        "SOL-TCK-0390 prints the word `var` to show it is data, not a keyword",
-}
+# line within a literal). A program that prints the text of a removed word as
+# string data is legitimate, but none is needed: `var` is the active keyword now,
+# so no generator prints `val` as data. An exception is verified rather than
+# trusted: if the line stops appearing the check fails, which stops an exception
+# outliving the case it was written for.
+EXCEPTIONS = {}
 
 
 def literals(path):
@@ -98,7 +95,7 @@ def main():
               % len(problems), file=sys.stderr)
         return 1
     print("generator-keyword-prose: OK -- no string literal in the %d TCK "
-          "generators still names `var`, `sealed`, or `open`" % len(GENS))
+          "generators still names `val`, `sealed`, or `open`" % len(GENS))
     return 0
 
 

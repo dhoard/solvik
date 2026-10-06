@@ -10,7 +10,7 @@ class Impl implements I {
     }
 }
 class Holder {
-    delegate val hashCode: I
+    delegate var hashCode: I
 
     Holder(i: I) {
         this.hashCode = i

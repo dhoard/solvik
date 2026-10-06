@@ -5,7 +5,7 @@
 // and, from the type hierarchy in section 4, `class Derived extends Base` makes `Derived`
 // a nominal subtype of `Base`.
 //
-// `val box: List<Base> = items` assigns a value of type `List<Derived>` where
+// `var box: List<Base> = items` assigns a value of type `List<Derived>` where
 // `List<Base>` is declared. Because the type arguments are invariant, `List<Derived>` is
 // not assignable to `List<Base>` even though `Derived` is a subtype of `Base`, so the
 // assignment is a compile-time error.
@@ -28,6 +28,6 @@ mutable class Base {
 class Derived extends Base {
 }
 
-val items = List<Derived>(Derived())
-val box: List<Base> = items
+var items = List<Derived>(Derived())
+var box: List<Base> = items
 print(box.size)

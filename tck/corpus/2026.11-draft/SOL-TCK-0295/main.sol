@@ -1,4 +1,5 @@
-class S { S() {
+class S {
+    S() {
     }
 
     func load(): S {
@@ -9,8 +10,8 @@ class S { S() {
         return 42
     }
 }
-val s = S()
-val r = s
+var s = S()
+var r = s
     .load()
     .value()
 print("r" .. r)

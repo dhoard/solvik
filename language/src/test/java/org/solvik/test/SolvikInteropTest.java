@@ -75,7 +75,7 @@ public final class SolvikInteropTest {
 
     @Test
     public void parseExceptionExposesParseErrorTypeAndSourceLocation() throws Exception {
-        String text = "    val x: Integer = \"nope\"\n";
+        String text = "    var x: Integer = \"nope\"\n";
         com.oracle.truffle.api.source.Source source = com.oracle.truffle.api.source.Source.newBuilder("solvik", text, "bad.sol").build();
         SourceFile file = new SourceFile("bad.sol", text);
         SolvikParseException failure = SolvikParseException.create(source, file, org.solvik.parser.SolvikParser.parse(file).diagnostics());
@@ -96,7 +96,7 @@ public final class SolvikInteropTest {
     public void polyglotExposesSolvikCompileErrorsAsLocatedSyntaxErrors() {
         try (Context context = Context.newBuilder("solvik").allowAllAccess(true).build()) {
             try {
-                context.eval(source("    val x: Integer = \"nope\"\n", "bad.sol"));
+                context.eval(source("    var x: Integer = \"nope\"\n", "bad.sol"));
                 throw new AssertionError("ill-typed source must be rejected");
             } catch (PolyglotException e) {
                 assertThat(e.isSyntaxError()).isTrue();
@@ -110,7 +110,7 @@ public final class SolvikInteropTest {
     public void parseExceptionExposesStructuredDiagnosticsThroughInterop() throws Exception {
         // A parser-level error so the parse stage alone produces a diagnostic (type errors require the
         // semantic analyzer and are not present on SolvikParser.parse alone).
-        String text = "val x: Integer = = 5\n";
+        String text = "var x: Integer = = 5\n";
         com.oracle.truffle.api.source.Source source = com.oracle.truffle.api.source.Source.newBuilder("solvik", text, "bad.sol").build();
         SourceFile file = new SourceFile("bad.sol", text);
         SolvikParseException failure = SolvikParseException.create(source, file, org.solvik.parser.SolvikParser.parse(file).diagnostics());
@@ -136,7 +136,7 @@ public final class SolvikInteropTest {
 
     @Test
     public void diagnosticInteropRejectsUnknownMemberAndIndex() throws Exception {
-        String text = "val x: Integer = = 5\n";
+        String text = "var x: Integer = = 5\n";
         com.oracle.truffle.api.source.Source source = com.oracle.truffle.api.source.Source.newBuilder("solvik", text, "bad.sol").build();
         SourceFile file = new SourceFile("bad.sol", text);
         SolvikParseException failure = SolvikParseException.create(source, file, org.solvik.parser.SolvikParser.parse(file).diagnostics());
@@ -159,9 +159,9 @@ public final class SolvikInteropTest {
         record Expectation(String source, String family, String code) {
         }
         List<Expectation> cases = new ArrayList<>();
-        cases.add(new Expectation("val s = \"unterminated\n", "LEX", "SOLV-LEX-001"));
-        cases.add(new Expectation("val x: Integer = = 5\n", "PARS", "SOLV-PARS-001"));
-        cases.add(new Expectation("val x: Integer = \"s\"\n", "TYPE", "SOLV-TYPE-001"));
+        cases.add(new Expectation("var s = \"unterminated\n", "LEX", "SOLV-LEX-001"));
+        cases.add(new Expectation("var x: Integer = = 5\n", "PARS", "SOLV-PARS-001"));
+        cases.add(new Expectation("var x: Integer = \"s\"\n", "TYPE", "SOLV-TYPE-001"));
         cases.add(new Expectation("undefinedName()\n", "RESOL", "SOLV-RESOL-001"));
 
         try (Context context = Context.newBuilder("solvik").allowAllAccess(true).build()) {
@@ -294,7 +294,7 @@ public final class SolvikInteropTest {
             }
 
             func quiet() {
-                val unused: Integer = 1
+                var unused: Integer = 1
             }
 
             func nothing(): (func(Integer): Integer)? {
@@ -311,13 +311,14 @@ public final class SolvikInteropTest {
             func guarded(): String {
                 try {
                     return "returned " .. failing().toString()
-                } catch (error: Boom) {
+                }
+                catch (error: Boom) {
                     return "caught " .. error.getMessage()
                 }
             }
 
             class Box {
-                val tag: String = "box"
+                var tag: String = "box"
 
                 func describe(value: Integer): String {
                     return this.tag .. value.toString()
@@ -423,7 +424,7 @@ public final class SolvikInteropTest {
     public void aPolyglotHostSeesAFunctionValueAsAnExecutableWithNoMembers() throws Exception {
         LoweredProgram program = lowerFunctionValues();
         try (Context context = Context.newBuilder("solvik").allowAllAccess(true).build()) {
-            context.eval(source("val warm: Integer = 1\n", "warm.sol"));
+            context.eval(source("var warm: Integer = 1\n", "warm.sol"));
             Value host = context.asValue(function(program, "triple").functionValue());
 
             // "...a non-null function value reports itself as executable" — asked the way an embedding
@@ -532,7 +533,7 @@ public final class SolvikInteropTest {
         assertThat(empty).as("a Solvik null is no object, so no library is dispatched for it").isNull();
 
         try (Context context = Context.newBuilder("solvik").allowAllAccess(true).build()) {
-            context.eval(source("val warm: Integer = 1\n", "warm.sol"));
+            context.eval(source("var warm: Integer = 1\n", "warm.sol"));
             Value hostNull = context.asValue(empty);
             assertThat(hostNull.isNull()).isTrue();
             assertThat(hostNull.canExecute()).as("section 6 makes executability conditional on non-null").isFalse();

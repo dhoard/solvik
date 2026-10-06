@@ -1,4 +1,4 @@
 // expected: SOLV-RESOL-003
 func f(): Unit {
-    val x: NotAType = 1
+    var x: NotAType = 1
 }

@@ -15,7 +15,7 @@ func format(value: Integer): String {
     return "v" .. value.toString()
 }
 
-val boxed: Any = format
-val other: Any = 1
+var boxed: Any = format
+var other: Any = 1
 print(boxed === other)
 print("EXECUTED-INVALID")

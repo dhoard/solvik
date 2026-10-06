@@ -64,7 +64,7 @@ public final class SolvikCollectionMemberDispatchTest {
     @Test
     public void listReachesToStringFromAStaticallyTypedReceiver() {
         assertThat(run("""
-                mutable val nums: List<Integer> = List(1, 2, 3)
+                var mutable nums: List<Integer> = List(1, 2, 3)
                 println(nums.toString())
                 """)).isEqualTo("List\n");
     }
@@ -72,10 +72,10 @@ public final class SolvikCollectionMemberDispatchTest {
     @Test
     public void everyCollectionKindReachesToString() {
         assertThat(run("""
-                mutable val nums: List<Integer> = List(1)
-                mutable val unique: Set<Integer> = Set(1)
-                mutable val map: Map<Integer, Integer> = Map(1: 1)
-                mutable val stack: Stack<Integer> = Stack(1)
+                var mutable nums: List<Integer> = List(1)
+                var mutable unique: Set<Integer> = Set(1)
+                var mutable map: Map<Integer, Integer> = Map(1: 1)
+                var mutable stack: Stack<Integer> = Stack(1)
                 println(nums.toString())
                 println(unique.toString())
                 println(map.toString())
@@ -86,8 +86,8 @@ public final class SolvikCollectionMemberDispatchTest {
     @Test
     public void toStringAgreesThroughAnAnyReceiver() {
         assertThat(run("""
-                mutable val nums: List<Integer> = List(1)
-                mutable val boxed: Any = nums
+                var mutable nums: List<Integer> = List(1)
+                var mutable boxed: Any = nums
                 println(nums.toString())
                 println(boxed.toString())
                 """)).isEqualTo("List\nList\n");
@@ -96,7 +96,7 @@ public final class SolvikCollectionMemberDispatchTest {
     @Test
     public void equalsHoldsForTheSameCollectionReference() {
         assertThat(run("""
-                mutable val nums: List<Integer> = List(1, 2, 3)
+                var mutable nums: List<Integer> = List(1, 2, 3)
                 println(nums.equals(nums))
                 """)).isEqualTo("true\n");
     }
@@ -105,8 +105,8 @@ public final class SolvikCollectionMemberDispatchTest {
     public void equalsIsFalseForDistinctCollectionsWithEqualContent() {
         // Collections are reference-identical (docs/LANGUAGE_SPEC.md section 3), never structural.
         assertThat(run("""
-                mutable val left: List<Integer> = List(1, 2, 3)
-                mutable val right: List<Integer> = List(1, 2, 3)
+                var mutable left: List<Integer> = List(1, 2, 3)
+                var mutable right: List<Integer> = List(1, 2, 3)
                 println(left.equals(right))
                 println(left == right)
                 """)).isEqualTo("false\nfalse\n");
@@ -117,8 +117,8 @@ public final class SolvikCollectionMemberDispatchTest {
         // equals takes Any?, so a cross-kind comparison is legal and always false: distinct
         // references, and collections compare by reference identity.
         assertThat(run("""
-                mutable val nums: List<Integer> = List(1)
-                mutable val unique: Set<Integer> = Set(1)
+                var mutable nums: List<Integer> = List(1)
+                var mutable unique: Set<Integer> = Set(1)
                 println(nums.equals(unique))
                 println(unique.equals(nums))
                 """)).isEqualTo("false\nfalse\n");
@@ -128,7 +128,7 @@ public final class SolvikCollectionMemberDispatchTest {
     public void universalMembersReflectPostMutationState() {
         // toString and equals read through the same erased receiver the declared members mutate.
         assertThat(run("""
-                mutable val nums: List<Integer> = List<Integer>()
+                var mutable nums: List<Integer> = List<Integer>()
                 println(nums.toString())
                 nums.add(1)
                 nums.add(2)
@@ -140,7 +140,7 @@ public final class SolvikCollectionMemberDispatchTest {
     @Test
     public void safeUniversalMemberOnANullCollectionYieldsNull() {
         assertThat(run("""
-                mutable val nums: List<Integer>? = null
+                var mutable nums: List<Integer>? = null
                 println(nums?.toString())
                 println(nums?.equals(nums))
                 """)).isEqualTo("null\nnull\n");
@@ -151,7 +151,7 @@ public final class SolvikCollectionMemberDispatchTest {
     @Test
     public void declaredMembersStillDispatchAfterTheUniversalMembers() {
         assertThat(run("""
-                mutable val nums: List<Integer> = List(1, 2, 3)
+                var mutable nums: List<Integer> = List(1, 2, 3)
                 nums.add(4)
                 println(nums.get(3))
                 println(nums.size)
@@ -166,7 +166,7 @@ public final class SolvikCollectionMemberDispatchTest {
         // The universal members are reachable; a name in neither table is still a compile-time error.
         String text = """
                 func f(): Unit {
-                    mutable val nums: List<Integer> = List(1)
+                    var mutable nums: List<Integer> = List(1)
                     println(nums.bogus())
                 }
                 """;
@@ -183,7 +183,7 @@ public final class SolvikCollectionMemberDispatchTest {
     @Test
     public void safeComputedSizeOnANullListYieldsNull() {
         assertThat(run("""
-                mutable val nums: List<Integer>? = null
+                var mutable nums: List<Integer>? = null
                 println(nums?.size)
                 """)).isEqualTo("null\n");
     }
@@ -191,10 +191,10 @@ public final class SolvikCollectionMemberDispatchTest {
     @Test
     public void safeComputedMembersResolveOnEveryNullableCollectionKind() {
         assertThat(run("""
-                mutable val nums: List<Integer>? = null
-                mutable val unique: Set<Integer>? = null
-                mutable val map: Map<Integer, Integer>? = null
-                mutable val stack: Stack<Integer>? = null
+                var mutable nums: List<Integer>? = null
+                var mutable unique: Set<Integer>? = null
+                var mutable map: Map<Integer, Integer>? = null
+                var mutable stack: Stack<Integer>? = null
                 println(nums?.isEmpty)
                 println(unique?.isEmpty)
                 println(map?.isEmpty)
@@ -205,7 +205,7 @@ public final class SolvikCollectionMemberDispatchTest {
     @Test
     public void safeDeclaredMethodOnANullListYieldsNull() {
         assertThat(run("""
-                mutable val nums: List<Integer>? = null
+                var mutable nums: List<Integer>? = null
                 println(nums?.get(0))
                 """)).isEqualTo("null\n");
     }
@@ -213,7 +213,7 @@ public final class SolvikCollectionMemberDispatchTest {
     @Test
     public void nullableCollectionMembersResolveOnceTheReceiverIsPresent() {
         assertThat(run("""
-                mutable val nums: List<Integer>? = null
+                var mutable nums: List<Integer>? = null
                 println(nums?.size)
                 nums = List<Integer>(7, 8)
                 println(nums?.size)

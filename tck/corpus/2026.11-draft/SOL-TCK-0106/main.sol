@@ -4,8 +4,8 @@
 // Oracle quotations verified verbatim against docs/LANGUAGE_SPEC.md:
 //   - Regex construction accepts raw strings
 //
-val raw = Regex(r#"\d+"#)
+var raw = Regex(r#"\d+"#)
 print(raw.matches("77"))
 print(" ")
-val escaped = Regex("^\\d+$")
+var escaped = Regex("^\\d+$")
 print(escaped.matches("77"))

@@ -6,7 +6,7 @@
 //   - | `SEM_RESULT_PROPAGATION_INVALID_OPERAND` | `SOLV-SEM-049` | the `?` operand is not a `Result<T, E>` |
 //
 func use(): Result<Integer, String> {
-    val v = 1?;
+    var v = 1?
     return Result.Ok(v)
 }
 

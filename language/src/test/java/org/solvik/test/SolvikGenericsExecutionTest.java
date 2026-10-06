@@ -54,7 +54,7 @@ public final class SolvikGenericsExecutionTest {
     public void genericConstructionAndMembersExecute() {
         assertThat(run("""
                 class Box<T> {
-                    mutable val value: T
+                    var mutable value: T
 
                     Box(value: T) {
                         this.value = value
@@ -65,10 +65,10 @@ public final class SolvikGenericsExecutionTest {
                     }
                 }
 
-                    val intBox = Box(5)
+                    var intBox = Box(5)
                     println(intBox.value)
                     println(intBox.get())
-                    val stringBox = Box("hi")
+                    var stringBox = Box("hi")
                     println(stringBox.get())
                 """)).isEqualTo("5\n5\nhi\n");
     }
@@ -89,7 +89,7 @@ public final class SolvikGenericsExecutionTest {
     public void genericMethodExecutes() {
         assertThat(run("""
                 class Box<T> {
-                    mutable val value: T
+                    var mutable value: T
 
                     Box(value: T) {
                         this.value = value
@@ -100,7 +100,7 @@ public final class SolvikGenericsExecutionTest {
                     }
                 }
 
-                    val box = Box(1)
+                    var box = Box(1)
                     println(box.replaceWith("hello"))
                     println(box.value)
                 """)).isEqualTo("hello\n1\n");
@@ -135,7 +135,7 @@ public final class SolvikGenericsExecutionTest {
                 }
 
                 class Holder<T> implements Container<T> {
-                    mutable val value: T
+                    var mutable value: T
 
                     Holder(value: T) {
                         this.value = value
@@ -146,8 +146,8 @@ public final class SolvikGenericsExecutionTest {
                     }
                 }
 
-                    val holder = Holder("value")
-                    val container: Container<String> = holder
+                    var holder = Holder("value")
+                    var container: Container<String> = holder
                     println(container.get())
                 """)).isEqualTo("value\n");
     }
@@ -156,7 +156,7 @@ public final class SolvikGenericsExecutionTest {
     public void inheritedGenericMembersExecuteThroughASubclass() {
         assertThat(run("""
                 mutable class Box<T> {
-                    mutable val value: T
+                    var mutable value: T
 
                     Box(value: T) {
                         this.value = value
@@ -173,7 +173,7 @@ public final class SolvikGenericsExecutionTest {
                     }
                 }
 
-                    val box = IntBox(9)
+                    var box = IntBox(9)
                     println(box.value)
                     println(box.get())
                 """)).isEqualTo("9\n9\n");
@@ -183,7 +183,7 @@ public final class SolvikGenericsExecutionTest {
     public void genericClassDisplaysAsItsClassName() {
         assertThat(run("""
                 class Box<T> {
-                    mutable val value: T
+                    var mutable value: T
 
                     Box(value: T) {
                         this.value = value
@@ -198,7 +198,7 @@ public final class SolvikGenericsExecutionTest {
     public void parameterizedArgumentInfersTheTypeArgument() {
         assertThat(run("""
                 class Box<T> {
-                    mutable val value: T
+                    var mutable value: T
 
                     Box(value: T) {
                         this.value = value
@@ -209,8 +209,8 @@ public final class SolvikGenericsExecutionTest {
                     return box.value
                 }
 
-                    val ints: Box<Integer> = Box(7)
-                    val texts: Box<String> = Box("hi")
+                    var ints: Box<Integer> = Box(7)
+                    var texts: Box<String> = Box("hi")
                     println(unwrap(ints))
                     println(unwrap(texts))
                     println(unwrap(Box(3)))
@@ -236,7 +236,7 @@ public final class SolvikGenericsExecutionTest {
     public void enclosingTypeParameterInAParameterDoesNotConstrainInference() {
         assertThat(run("""
                 class Box<T> {
-                    mutable val value: T
+                    var mutable value: T
 
                     Box(value: T) {
                         this.value = value
@@ -248,8 +248,8 @@ public final class SolvikGenericsExecutionTest {
                     }
                 }
 
-                    val box: Box<Integer> = Box(1)
-                    val other: Box<Integer> = Box(2)
+                    var box: Box<Integer> = Box(1)
+                    var other: Box<Integer> = Box(2)
                     println(box.firstOf(other, "done"))
                 """)).isEqualTo("1\ndone\n");
     }
@@ -260,7 +260,7 @@ public final class SolvikGenericsExecutionTest {
         try (Context context = Context.newBuilder("solvik").out(out).err(out).allowAllAccess(true).build()) {
             PolyglotException failure = expectThrows(PolyglotException.class, () -> context.eval(build("""
                     class Box<T> {
-                        mutable val value: T
+                        var mutable value: T
 
                         Box(value: T) {
                             this.value = value
@@ -268,7 +268,7 @@ public final class SolvikGenericsExecutionTest {
                     }
 
                         println("before")
-                        val box: Box<Integer> = Box("x")
+                        var box: Box<Integer> = Box("x")
                         println("after")
                     """, "test.sol")));
             assertThat(out.size()).isEqualTo(0);

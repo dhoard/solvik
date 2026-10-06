@@ -10,14 +10,14 @@
 //   * "Flow-sensitive narrowing is required: if (name != null) { print(name) // name is
 //     String here }" -- narrowing makes the non-null use legal, so `Doug` is printed.
 // Expected bytes: `Unknown|true|Doug`.
-val name: String? = null
-val display = name ?? "Unknown"
+var name: String? = null
+var display = name ?? "Unknown"
 print(display)
 print("|")
-val rendered: String? = name?.toString()
+var rendered: String? = name?.toString()
 print(rendered == null)
 print("|")
-val nn: String? = "Doug"
+var nn: String? = "Doug"
 if (nn != null) {
     print(nn)
 }

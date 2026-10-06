@@ -7,7 +7,7 @@
 // code SOLV-RESOL-001. Because section 7 names that code for exactly this rule, the
 // manifest pins the full code rather than only the diagnostic family.
 class Box {
-    val size: Integer
+    var size: Integer
 
     Box(size: Integer) {
         this.size = size

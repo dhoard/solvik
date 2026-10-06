@@ -1,4 +1,4 @@
-val a = 1
-val b = a +
+var a = 1
+var b = a +
     1
 print("b" .. b)

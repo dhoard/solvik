@@ -66,10 +66,12 @@ public final class SolvikSwitchNegativeTest {
         assertThat(first(checkFails("""
                 func run(value: Integer, other: Integer): Unit {
                     switch (value) {
-                        case other:
+                        case other {
                             print("same")
-                        default:
+                        }
+                        default {
                             print("other")
+                        }
                     }
                 }
                 """)).code()).isEqualTo(DiagnosticCode.SEM_SWITCH_CASE_NOT_CONSTANT);
@@ -80,10 +82,12 @@ public final class SolvikSwitchNegativeTest {
         assertThat(first(checkFails("""
                 func run(value: Integer): Unit {
                     switch (value) {
-                        case 1 + 2:
+                        case 1 + 2 {
                             print("three")
-                        default:
+                        }
+                        default {
                             print("other")
+                        }
                     }
                 }
                 """)).code()).isEqualTo(DiagnosticCode.SEM_SWITCH_CASE_NOT_CONSTANT);
@@ -94,10 +98,12 @@ public final class SolvikSwitchNegativeTest {
         assertThat(first(checkFails("""
                 func run(value: Integer): Unit {
                     switch (value) {
-                        case "a":
+                        case "a" {
                             print("a")
-                        default:
+                        }
+                        default {
                             print("other")
+                        }
                     }
                 }
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_CASE_LABEL_MISMATCH);
@@ -110,10 +116,12 @@ public final class SolvikSwitchNegativeTest {
         assertThat(first(checkFails("""
                 func run(value: Integer): Unit {
                     switch (value) {
-                        case 1, "a", 3:
+                        case 1, "a", 3 {
                             print("hit")
-                        default:
+                        }
+                        default {
                             print("other")
+                        }
                     }
                 }
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_CASE_LABEL_MISMATCH);
@@ -125,10 +133,12 @@ public final class SolvikSwitchNegativeTest {
         assertThat(first(checkFails("""
                 func run(value: Integer, other: Integer): Unit {
                     switch (value) {
-                        case 1, other:
+                        case 1, other {
                             print("hit")
-                        default:
+                        }
+                        default {
                             print("other")
+                        }
                     }
                 }
                 """)).code()).isEqualTo(DiagnosticCode.SEM_SWITCH_CASE_NOT_CONSTANT);
@@ -139,10 +149,12 @@ public final class SolvikSwitchNegativeTest {
         assertThat(first(checkFails("""
                 func run(value: Integer): Unit {
                     switch (value) {
-                        case regex r#"\\d+"#:
+                        case regex r#"\\d+"# {
                             print("number")
-                        default:
+                        }
+                        default {
                             print("other")
+                        }
                     }
                 }
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_REGEX_CASE_REQUIRES_STRING);
@@ -158,10 +170,12 @@ public final class SolvikSwitchNegativeTest {
         assertThat(first(checkFails("""
                 func run(input: String?): Unit {
                     switch (input) {
-                        case regex r#"^\\d+$"#:
+                        case regex r#"^\\d+$"# {
                             print("number")
-                        default:
+                        }
+                        default {
                             print("other")
+                        }
                     }
                 }
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_REGEX_CASE_REQUIRES_STRING);
@@ -173,10 +187,12 @@ public final class SolvikSwitchNegativeTest {
         assertThat(first(checkFails("""
                 func run(input: String?): String {
                     return switch (input) {
-                        case regex r#"^\\d+$"#:
+                        case regex r#"^\\d+$"# {
                             "number"
-                        default:
+                        }
+                        default {
                             "other"
+                        }
                     }
                 }
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_REGEX_CASE_REQUIRES_STRING);
@@ -187,10 +203,12 @@ public final class SolvikSwitchNegativeTest {
         assertThat(first(checkFails("""
                 func run(input: String): Unit {
                     switch (input) {
-                        case regex r#"("#:
+                        case regex r#"("# {
                             print("bad")
-                        default:
+                        }
+                        default {
                             print("other")
+                        }
                     }
                 }
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_REGEX_PATTERN);
@@ -201,10 +219,12 @@ public final class SolvikSwitchNegativeTest {
         assertThat(first(checkFails("""
                 func run(value: Integer): Unit {
                     switch (value) {
-                        default:
+                        default {
                             print("other")
-                        case 1:
+                        }
+                        case 1 {
                             print("one")
+                        }
                     }
                 }
                 """)).code()).isEqualTo(DiagnosticCode.SEM_SWITCH_DEFAULT_NOT_LAST);
@@ -215,12 +235,15 @@ public final class SolvikSwitchNegativeTest {
         DiagnosticBag bag = checkFails("""
                 func run(value: Integer): Unit {
                     switch (value) {
-                        case 1:
+                        case 1 {
                             print("one")
-                        default:
+                        }
+                        default {
                             print("first")
-                        default:
+                        }
+                        default {
                             print("second")
+                        }
                     }
                 }
                 """);
@@ -233,10 +256,12 @@ public final class SolvikSwitchNegativeTest {
                 func run(value: Integer): Unit {
                     while (true) {
                         switch (value) {
-                            case 1:
+                            case 1 {
                                 break
-                            default:
+                            }
+                            default {
                                 print("other")
+                            }
                         }
                     }
                 }
@@ -248,10 +273,12 @@ public final class SolvikSwitchNegativeTest {
         assertThat(first(checkFails("""
                 func run(value: Integer): Unit {
                     switch (value) {
-                        case 1:
+                        case 1 {
                             break
-                        default:
+                        }
+                        default {
                             print("other")
+                        }
                     }
                 }
                 """)).code()).isEqualTo(DiagnosticCode.SEM_LOOP_CONTROL_OUTSIDE_LOOP);
@@ -262,10 +289,12 @@ public final class SolvikSwitchNegativeTest {
         assertThat(first(checkFails("""
                 func run(value: Integer): Unit {
                     switch (value) {
-                        case 1:
+                        case 1 {
                             continue
-                        default:
+                        }
+                        default {
                             print("other")
+                        }
                     }
                 }
                 """)).code()).isEqualTo(DiagnosticCode.SEM_LOOP_CONTROL_OUTSIDE_LOOP);
@@ -279,10 +308,12 @@ public final class SolvikSwitchNegativeTest {
                 }
                 func run(value: Integer): Unit {
                     switch (value) {
-                        case compute():
+                        case compute() {
                             print("one")
-                        default:
+                        }
+                        default {
                             print("other")
+                        }
                     }
                 }
                 """)).code()).isEqualTo(DiagnosticCode.SEM_SWITCH_CASE_NOT_CONSTANT);
@@ -293,10 +324,12 @@ public final class SolvikSwitchNegativeTest {
         assertThat(first(checkFails("""
                 func run(value: Integer): Unit {
                     switch (value) {
-                        case null:
+                        case null {
                             print("none")
-                        default:
+                        }
+                        default {
                             print("other")
+                        }
                     }
                 }
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_CASE_LABEL_MISMATCH);
@@ -307,12 +340,15 @@ public final class SolvikSwitchNegativeTest {
         DiagnosticBag bag = checkFails("""
                 func run(value: Integer): Unit {
                     switch (value) {
-                        default:
+                        default {
                             print("other")
-                        case 1:
+                        }
+                        case 1 {
                             print("one")
-                        case 2:
+                        }
+                        case 2 {
                             print("two")
+                        }
                     }
                 }
                 """);

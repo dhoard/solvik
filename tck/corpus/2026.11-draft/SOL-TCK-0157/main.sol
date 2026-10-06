@@ -1,9 +1,11 @@
 func guard() {
     try {
         print("trying")
-    } catch (e: Exception) {
+    }
+    catch (e: Exception) {
         print("root")
-    } catch (e: RuntimeException) {
+    }
+    catch (e: RuntimeException) {
         print("runtime")
     }
 }

@@ -38,16 +38,16 @@ public final class SolvikIdentityTest {
     public void identityAnswersAliasesAndDistinctObjects() {
         assertThat(run("""
                     class Point {
-                        val x: Integer
+                        var x: Integer
 
                         Point(x: Integer) {
                             this.x = x
                         }
                     }
 
-                    val first = Point(1)
-                    val second = Point(1)
-                    val aliasPoint = first
+                    var first = Point(1)
+                    var second = Point(1)
+                    var aliasPoint = first
                     println(first === second)
                     println(first === aliasPoint)
                     println(first !== second)
@@ -60,7 +60,7 @@ public final class SolvikIdentityTest {
         // `==` consults the override; `===` must not, even though it has an observable side effect.
         assertThat(run("""
                     class Point {
-                        val x: Integer
+                        var x: Integer
 
                         Point(x: Integer) {
                             this.x = x
@@ -76,8 +76,8 @@ public final class SolvikIdentityTest {
                         }
                     }
 
-                    val a = Point(1)
-                    val b = Point(2)
+                    var a = Point(1)
+                    var b = Point(2)
                     println(a === b)
                     println(a !== b)
                 """)).isEqualTo("false\ntrue\n");
@@ -91,7 +91,7 @@ public final class SolvikIdentityTest {
                     }
 
                     class Item implements Identified {
-                        val n: Integer
+                        var n: Integer
 
                         Item(n: Integer) {
                             this.n = n
@@ -102,8 +102,8 @@ public final class SolvikIdentityTest {
                         }
                     }
 
-                    val a: Identified = Item(1)
-                    val b: Identified = a
+                    var a: Identified = Item(1)
+                    var b: Identified = a
                     println(a === b)
                     println(a === Item(1))
                     println(a !== Item(1))
@@ -119,8 +119,8 @@ public final class SolvikIdentityTest {
                     class Derived extends Base {
                     }
 
-                    val base: Base = Derived()
-                    val derived: Derived = Derived()
+                    var base: Base = Derived()
+                    var derived: Derived = Derived()
                     println(base === base)
                     println(base === derived)
                 """)).isEqualTo("true\nfalse\n");
@@ -129,9 +129,9 @@ public final class SolvikIdentityTest {
     @Test
     public void identityOfParameterizedCollections() {
         assertThat(run("""
-                    val a: List<Integer> = List(1, 2)
-                    val b: List<Integer> = a
-                    val c: List<Integer> = List(1, 2)
+                    var a: List<Integer> = List(1, 2)
+                    var b: List<Integer> = a
+                    var c: List<Integer> = List(1, 2)
                     println(a === b)
                     println(a === c)
                     println(a !== c)
@@ -142,16 +142,16 @@ public final class SolvikIdentityTest {
     public void identityOfParameterizedUserClasses() {
         assertThat(run("""
                     class Box<T> {
-                        val value: T
+                        var value: T
 
                         Box(value: T) {
                             this.value = value
                         }
                     }
 
-                    val a: Box<Integer> = Box(1)
-                    val b: Box<Integer> = a
-                    val c: Box<Integer> = Box(1)
+                    var a: Box<Integer> = Box(1)
+                    var b: Box<Integer> = a
+                    var c: Box<Integer> = Box(1)
                     println(a === b)
                     println(a === c)
                 """)).isEqualTo("true\nfalse\n");
@@ -163,8 +163,8 @@ public final class SolvikIdentityTest {
                     class Point {
                     }
 
-                    val missing: Point? = null
-                    val present: Point? = Point()
+                    var missing: Point? = null
+                    var present: Point? = Point()
                     println(missing === null)
                     println(present === null)
                     println(missing !== null)
@@ -180,7 +180,7 @@ public final class SolvikIdentityTest {
                     }
 
                     class Counter {
-                        mutable val calls: Integer
+                        var mutable calls: Integer
 
                         Counter() {
                             this.calls = 0
@@ -192,7 +192,7 @@ public final class SolvikIdentityTest {
                         return Item()
                     }
 
-                    val counter = Counter()
+                    var counter = Counter()
                     println(make(counter) === make(counter))
                     println(counter.calls)
                 """)).isEqualTo("false\n2\n");
@@ -205,7 +205,7 @@ public final class SolvikIdentityTest {
                     }
 
                     class Counter {
-                        mutable val calls: Integer
+                        var mutable calls: Integer
 
                         Counter() {
                             this.calls = 0
@@ -217,7 +217,7 @@ public final class SolvikIdentityTest {
                         return Item()
                     }
 
-                    val counter = Counter()
+                    var counter = Counter()
                     println(make(counter) !== make(counter))
                     println(counter.calls)
                 """)).isEqualTo("true\n2\n");
@@ -226,21 +226,21 @@ public final class SolvikIdentityTest {
     @Test
     public void identityOfEachMutableCollectionType() {
         assertThat(run("""
-                    val s1: Set<Integer> = Set(1)
-                    val s2: Set<Integer> = s1
-                    val s3: Set<Integer> = Set(1)
+                    var s1: Set<Integer> = Set(1)
+                    var s2: Set<Integer> = s1
+                    var s3: Set<Integer> = Set(1)
                     println(s1 === s2)
                     println(s1 === s3)
 
-                    val m1: Map<Integer, Integer> = Map(1: 1)
-                    val m2: Map<Integer, Integer> = m1
-                    val m3: Map<Integer, Integer> = Map(1: 1)
+                    var m1: Map<Integer, Integer> = Map(1: 1)
+                    var m2: Map<Integer, Integer> = m1
+                    var m3: Map<Integer, Integer> = Map(1: 1)
                     println(m1 === m2)
                     println(m1 === m3)
 
-                    val st1: Stack<Integer> = Stack(1)
-                    val st2: Stack<Integer> = st1
-                    val st3: Stack<Integer> = Stack(1)
+                    var st1: Stack<Integer> = Stack(1)
+                    var st2: Stack<Integer> = st1
+                    var st3: Stack<Integer> = Stack(1)
                     println(st1 === st2)
                     println(st1 === st3)
                 """)).isEqualTo("true\nfalse\ntrue\nfalse\ntrue\nfalse\n");
@@ -252,8 +252,8 @@ public final class SolvikIdentityTest {
                     class Point {
                     }
 
-                    val missing: Point? = null
-                    val present: Point? = Point()
+                    var missing: Point? = null
+                    var present: Point? = Point()
                     println(null !== missing)
                     println(null === missing)
                     println(null === present)
@@ -267,13 +267,13 @@ public final class SolvikIdentityTest {
                     class Box {
                     }
 
-                    val first = Box()
-                    val second = Box()
-                    val dup = first
+                    var first = Box()
+                    var second = Box()
+                    var dup = first
 
-                    val a: List<Integer> = List(1, 2)
-                    val b: List<Integer> = a
-                    val c: List<Integer> = List(1, 2)
+                    var a: List<Integer> = List(1, 2)
+                    var b: List<Integer> = a
+                    var c: List<Integer> = List(1, 2)
 
                     println(first !== second)
                     println(first !== dup)

@@ -84,7 +84,7 @@ public final class SolvikRegexSemanticTest {
     @Test
     public void regexConstructionHasTheRegexType() {
         CheckedProgram program = check("""
-                    val re = Regex("a")
+                    var re = Regex("a")
                 """);
         assertThat(typeOfLocal(program, "main", 0)).isSameAs(RegexType.INSTANCE);
         assertThat(RegexType.INSTANCE.isSubtypeOf(AnyType.INSTANCE)).isTrue();
@@ -179,8 +179,8 @@ public final class SolvikRegexSemanticTest {
     @Test
     public void constantPatternsAreCompiledOnceDuringAnalysis() {
         CheckedProgram program = check("""
-                    val re = Regex(r#"^\\d+$"#)
-                    val other = Regex("a\\\\d")
+                    var re = Regex(r#"^\\d+$"#)
+                    var other = Regex("a\\\\d")
                 """);
         ExpressionNode raw = localInitializer(program, "main", 0);
         RegexPattern rawPattern = program.regexConstantOf(raw).orElseThrow();
@@ -199,7 +199,7 @@ public final class SolvikRegexSemanticTest {
                     return "a"
                 }
 
-                    val re = Regex(make())
+                    var re = Regex(make())
                 """);
         assertThat(program.regexConstantOf(localInitializer(program, "main", 0)).isEmpty()).isTrue();
     }
@@ -207,8 +207,8 @@ public final class SolvikRegexSemanticTest {
     @Test
     public void constantPatternsAreCompiledForEveryConstantPosition() {
         CheckedProgram program = check("""
-                    val a = Regex("(a)")
-                    val b = Regex((r#"\\d"#))
+                    var a = Regex("(a)")
+                    var b = Regex((r#"\\d"#))
                 """);
         assertThat(program.regexConstantOf(localInitializer(program, "main", 0)).isPresent()).isTrue();
         assertThat(program.regexConstantOf(localInitializer(program, "main", 1)).isPresent()).isTrue();
@@ -270,8 +270,8 @@ public final class SolvikRegexSemanticTest {
                     return re.matches("word")
                 }
 
-                    val re: Regex = build()
-                    val ok: Boolean = accept(re)
+                    var re: Regex = build()
+                    var ok: Boolean = accept(re)
                 """);
         assertThat(typeOfReturn(program, "build", 0)).isSameAs(RegexType.INSTANCE);
         assertThat(typeOfReturn(program, "accept", 0)).isSameAs(BooleanType.INSTANCE);

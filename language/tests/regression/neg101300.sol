@@ -6,6 +6,6 @@ func pick<T>(first: T, second: T): T {
 }
 
 func use(): Unit {
-    val wrong: func(Integer): Integer = pick
+    var wrong: func(Integer): Integer = pick
 }
 use()

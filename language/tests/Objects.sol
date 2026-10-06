@@ -8,7 +8,7 @@ interface Greeter {
 }
 
 class Named implements Greeter {
-    val name: String
+    var name: String
 
     Named(name: String) {
         this.name = name
@@ -20,7 +20,7 @@ class Named implements Greeter {
 }
 
 class Service implements Greeter {
-    delegate val greeter: Greeter
+    delegate var greeter: Greeter
 
     Service(greeter: Greeter) {
         this.greeter = greeter

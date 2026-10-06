@@ -14,7 +14,7 @@ func format(value: Integer): String {
 }
 
 class Unrelated {
-    val tag: String = "u"
+    var tag: String = "u"
 }
 
 func fromUnrelated(value: Unrelated): String {
@@ -26,7 +26,12 @@ func fromUnrelated(value: Unrelated): String {
 // `Nothing`, a union, or an intersection to manufacture a function supertype, so the joined
 // value is not of a function type and invoking it is an invocation whose callee is not a
 // function type -- the code the section names verbatim for that shape.
-val flag: Boolean = true
-val joined = if (flag) { format } else { fromUnrelated }
+var flag: Boolean = true
+var joined = if (flag) {
+    format
+}
+else {
+    fromUnrelated
+}
 print(joined(1))
 print("EXECUTED-INVALID")

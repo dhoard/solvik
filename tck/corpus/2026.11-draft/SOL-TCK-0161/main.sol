@@ -3,7 +3,8 @@ class Plain {
 func guard() {
     try {
         print("trying")
-    } catch (e: Plain) {
+    }
+    catch (e: Plain) {
         print("caught")
     }
 }

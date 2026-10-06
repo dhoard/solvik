@@ -5,11 +5,11 @@
 //   - `find` returns the first non-overlapping match and `findAll` returns all non-overlapping matches from left to right
 //   - Offsets are zero-based character offsets and `end` is exclusive.
 //
-val r = Regex(r#"\d+"#)
-val all = r.findAll("a1b22c333")
+var r = Regex(r#"\d+"#)
+var all = r.findAll("a1b22c333")
 print(all.size)
 for (i in 0..<all.size) {
-  val m = all.get(i)
+  var m = all.get(i)
   print(" ")
   print(m.value)
   print(":")

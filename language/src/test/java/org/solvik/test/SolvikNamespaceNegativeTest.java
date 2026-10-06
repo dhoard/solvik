@@ -40,8 +40,8 @@ public final class SolvikNamespaceNegativeTest {
             class Thing {
             }
             class Holder {
-                static mutable val count: Integer = 0
-                static val limit: Integer = 1
+                static var mutable count: Integer = 0
+                static var limit: Integer = 1
                 static func bump(): Integer {
                     Holder.count = Holder.count + 1
                     return Holder.count
@@ -82,17 +82,17 @@ public final class SolvikNamespaceNegativeTest {
 
     @Test
     public void qualifiedClassReadIsRejected() {
-        assertThat(firstError("val x = m::Thing")).isEqualTo(DiagnosticCode.TYPE_CLASS_AS_VALUE);
+        assertThat(firstError("var x = m::Thing")).isEqualTo(DiagnosticCode.TYPE_CLASS_AS_VALUE);
     }
 
     @Test
     public void qualifiedInterfaceReadIsRejected() {
-        assertThat(firstError("val x = m::Contract")).isEqualTo(DiagnosticCode.TYPE_INTERFACE_AS_VALUE);
+        assertThat(firstError("var x = m::Contract")).isEqualTo(DiagnosticCode.TYPE_INTERFACE_AS_VALUE);
     }
 
     @Test
     public void qualifiedEnumReadIsRejected() {
-        assertThat(firstError("val x = m::Color")).isEqualTo(DiagnosticCode.TYPE_ENUM_AS_VALUE);
+        assertThat(firstError("var x = m::Color")).isEqualTo(DiagnosticCode.TYPE_ENUM_AS_VALUE);
     }
 
     /**
@@ -102,7 +102,7 @@ public final class SolvikNamespaceNegativeTest {
      */
     @Test
     public void qualifiedFunctionReadResolvesAsAFunctionValue() {
-        SemanticResult result = analyze("val x = m::hello\n");
+        SemanticResult result = analyze("var x = m::hello\n");
         assertThat(result.isSuccess()).as("qualified function reference must analyze: " + result.diagnostics().all()).isTrue();
     }
 
@@ -113,17 +113,17 @@ public final class SolvikNamespaceNegativeTest {
      */
     @Test
     public void qualifiedUnknownFunctionReadIsRejected() {
-        assertThat(firstError("val x = m::nothing")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_NAME);
+        assertThat(firstError("var x = m::nothing")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_NAME);
     }
 
     @Test
     public void qualifiedUnknownReadIsRejected() {
-        assertThat(firstError("val x = m::Nope")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_NAME);
+        assertThat(firstError("var x = m::Nope")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_NAME);
     }
 
     @Test
     public void qualifiedReadOfANonEnumMemberIsRejected() {
-        assertThat(firstError("val x = m::Nope.Bar")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_NAME);
+        assertThat(firstError("var x = m::Nope.Bar")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_NAME);
     }
 
     @Test
@@ -171,12 +171,12 @@ public final class SolvikNamespaceNegativeTest {
 
     @Test
     public void unknownModulePrefixReadIsRejected() {
-        assertThat(firstError("val x = nope::Thing")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_MODULE);
+        assertThat(firstError("var x = nope::Thing")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_MODULE);
     }
 
     @Test
     public void qualifiedVariantReadResolves() {
-        SemanticResult result = analyze("val color: m::Color = m::Color.Red");
+        SemanticResult result = analyze("var color: m::Color = m::Color.Red");
         assertThat(result.isSuccess()).as("expected success but got " + result.diagnostics().all()).isTrue();
     }
 
@@ -186,7 +186,7 @@ public final class SolvikNamespaceNegativeTest {
 
     @Test
     public void qualifiedStaticMemberReadResolves() {
-        SemanticResult result = analyze("val n: Integer = m::Holder.count\nval limit: Integer = m::Holder.limit\nval bumped: Integer = m::Holder.bump()");
+        SemanticResult result = analyze("var n: Integer = m::Holder.count\nvar limit: Integer = m::Holder.limit\nvar bumped: Integer = m::Holder.bump()");
         assertThat(result.isSuccess()).as("expected success but got " + result.diagnostics().all()).isTrue();
     }
 
@@ -201,7 +201,7 @@ public final class SolvikNamespaceNegativeTest {
         // Only `prefix::Class.member` names a static member. `prefix::Class::member` is not a qualified
         // name the language defines, and lowering has no node for a bare namespace chain used as a
         // value, so it must be refused by analysis rather than escaping as a host failure.
-        assertThat(firstError("val n: Integer = m::Holder::count")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_NAME);
+        assertThat(firstError("var n: Integer = m::Holder::count")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_NAME);
     }
 
     @Test
@@ -212,7 +212,7 @@ public final class SolvikNamespaceNegativeTest {
     @Test
     public void anAllNamespaceQualifiedVariantReadIsRejected() {
         // The same rule guards the enum variant path, which shares the qualified read.
-        assertThat(firstError("val color: m::Color = m::Color::Red")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_NAME);
+        assertThat(firstError("var color: m::Color = m::Color::Red")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_NAME);
     }
 
     @Test
@@ -222,6 +222,6 @@ public final class SolvikNamespaceNegativeTest {
 
     @Test
     public void aQualifiedStaticMemberDoesNotReachAnInstanceMember() {
-        assertThat(firstError("val n: Integer = m::Thing.nope")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_MEMBER);
+        assertThat(firstError("var n: Integer = m::Thing.nope")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_MEMBER);
     }
 }

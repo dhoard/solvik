@@ -42,7 +42,7 @@ public final class DelegateBinding {
         this.contract = Objects.requireNonNull(contract);
     }
 
-    /** The immutable {@code delegate val} property that holds the delegate value. */
+    /** The immutable {@code delegate var} property that holds the delegate value. */
     public PropertySymbol property() {
         return property;
     }

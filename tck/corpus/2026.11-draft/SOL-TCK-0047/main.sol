@@ -10,7 +10,7 @@
 //     refinement. `Animal` declares no `fetch` member, therefore the member read inside
 //     `if (v is Dog)` compiles only if the compiler narrowed `v` to `Dog`, which section
 //     18 requires for a stable checked value. The guarded block emits what Dog.fetch()
-//     returns, `fetched`. (`v` is a `val`, so no intervening write can invalidate the
+//     returns, `fetched`. (`v` is a `var`, so no intervening write can invalidate the
 //     refinement, satisfying the same sentence's condition.)
 //   * `v as Dog` on a Dog value is a successful cast; section 18 raises a Solvik runtime
 //     type error only for an unsuccessful `as`, so execution continues and the last
@@ -29,9 +29,9 @@ class Dog extends Animal {
     }
 }
 
-val v: Animal = Dog()
+var v: Animal = Dog()
 if (v is Dog) {
     print(v.fetch())
 }
-val cast = v as Dog
+var cast = v as Dog
 print("|cast-ok")

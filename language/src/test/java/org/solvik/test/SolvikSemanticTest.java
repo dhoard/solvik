@@ -104,9 +104,9 @@ public final class SolvikSemanticTest {
                 "    return a\n" + //
                 "}\n" + //
                 "func f(n: Integer): Integer {\n" + //
-                "    mutable val total = 0\n" + //
-                "    mutable val remaining = n\n" + //
-                "    val flag = n > 0 && !(n == 0)\n" + //
+                "    var mutable total = 0\n" + //
+                "    var mutable remaining = n\n" + //
+                "    var flag = n > 0 && !(n == 0)\n" + //
                 "    while (flag && remaining > 0) {\n" + //
                 "        total = total + remaining\n" + //
                 "        remaining = remaining - 1\n" + //
@@ -115,8 +115,12 @@ public final class SolvikSemanticTest {
                 "        }\n" + //
                 "        continue\n" + //
                 "    }\n" + //
-                "    for (mutable val i = 0; i < 3; i = i + 1) {\n" + //
-                "        total = total + g(i)\n" + //
+                "    {\n" + //
+                "        var mutable i = 0\n" + //
+                "        while (i < 3) {\n" + //
+                "            total = total + g(i)\n" + //
+                "            i = i + 1\n" + //
+                "        }\n" + //
                 "    }\n" + //
                 "    return total\n" + //
                 "}\n";
@@ -158,7 +162,7 @@ public final class SolvikSemanticTest {
 
     @Test
     public void localTypeInferenceAndMutabilityAreRecorded() {
-        String src = "func f(): Integer {\n    val inferred = 1\n    mutable val annotated: Integer = inferred\n    val text = \"hi\"\n    annotated = 2\n    return annotated\n}\n";
+        String src = "func f(): Integer {\n    var inferred = 1\n    var mutable annotated: Integer = inferred\n    var text = \"hi\"\n    annotated = 2\n    return annotated\n}\n";
         CheckedProgram program = check(src);
         FunctionDeclNode fn = function(program, 0);
         VariableSymbol inferred = program.symbolOf(local(fn, 0)).orElseThrow();
@@ -175,18 +179,18 @@ public final class SolvikSemanticTest {
 
     @Test
     public void nestedBlocksMayShadowOuterDeclarations() {
-        String src = "func f(): Integer {\n    val x = 1\n    if (true) {\n        val x = 2\n        return x\n    }\n    return x\n}\n";
+        String src = "func f(): Integer {\n    var x = 1\n    if (true) {\n        var x = 2\n        return x\n    }\n    return x\n}\n";
         check(src);
     }
 
     @Test
     public void forInitializerVariableIsScopedToTheLoop() {
-        check("func f(): Integer {\n    for (mutable val i = 0; i < 3; i = i + 1) {\n        return i\n    }\n    val i = 9\n    return i\n}\n");
+        check("func f(): Integer {\n    {\n        var mutable i = 0\n        while (i < 3) {\n            return i\n            i = i + 1\n        }\n    }\n    var i = 9\n    return i\n}\n");
     }
 
     @Test
     public void anyAcceptsEveryValueTypeWithoutDisablingChecking() {
-        CheckedProgram program = check("func f(): Any {\n    val text: Any = \"hello\"\n    val number: Any = 1\n    val flag: Any = true\n    return text\n}\n");
+        CheckedProgram program = check("func f(): Any {\n    var text: Any = \"hello\"\n    var number: Any = 1\n    var flag: Any = true\n    return text\n}\n");
         FunctionDeclNode fn = function(program, 0);
         assertThat(program.symbolOf(local(fn, 0)).orElseThrow().type()).isEqualTo(org.solvik.type.AnyType.INSTANCE);
     }
@@ -194,20 +198,20 @@ public final class SolvikSemanticTest {
     @Test
     public void operatorsTypeToTheirDeclaredResultTypes() {
         String src = "func ops(a: Integer, b: Integer, c: Boolean): Boolean {\n" + //
-                "    val sum = a + b\n" + //
-                "    val diff = a - b\n" + //
-                "    val product = a * b\n" + //
-                "    val quotient = a / b\n" + //
-                "    val negated = -a\n" + //
-                "    val less = a < b\n" + //
-                "    val lessEq = a <= b\n" + //
-                "    val greater = a > b\n" + //
-                "    val greaterEq = a >= b\n" + //
-                "    val equal = a == b\n" + //
-                "    val notEqual = a != b\n" + //
-                "    val and = c && c\n" + //
-                "    val or = c || c\n" + //
-                "    val not = !c\n" + //
+                "    var sum = a + b\n" + //
+                "    var diff = a - b\n" + //
+                "    var product = a * b\n" + //
+                "    var quotient = a / b\n" + //
+                "    var negated = -a\n" + //
+                "    var less = a < b\n" + //
+                "    var lessEq = a <= b\n" + //
+                "    var greater = a > b\n" + //
+                "    var greaterEq = a >= b\n" + //
+                "    var equal = a == b\n" + //
+                "    var notEqual = a != b\n" + //
+                "    var and = c && c\n" + //
+                "    var or = c || c\n" + //
+                "    var not = !c\n" + //
                 "    return and && or && not && less && lessEq && greater && greaterEq && equal && notEqual\n" + //
                 "}\n";
         CheckedProgram program = check(src);
@@ -224,14 +228,14 @@ public final class SolvikSemanticTest {
 
     @Test
     public void concatenationYieldsAString() {
-        CheckedProgram program = check("func f(s: String, t: String): String {\n    val joined = s .. t\n    return joined\n}\n");
+        CheckedProgram program = check("func f(s: String, t: String): String {\n    var joined = s .. t\n    return joined\n}\n");
         FunctionDeclNode fn = function(program, 0);
         assertThat(program.typeOf(local(fn, 0).initializer()).orElseThrow()).isEqualTo(StringType.INSTANCE);
     }
 
     @Test
     public void rawStringLiteralHasStringType() {
-        CheckedProgram program = check("func f(): String {\n    val pattern = r#\"\\d+\"#\n    return pattern\n}\n");
+        CheckedProgram program = check("func f(): String {\n    var pattern = r#\"\\d+\"#\n    return pattern\n}\n");
         FunctionDeclNode fn = function(program, 0);
         assertThat(program.typeOf(local(fn, 0).initializer()).orElseThrow()).isEqualTo(StringType.INSTANCE);
     }
@@ -265,20 +269,25 @@ public final class SolvikSemanticTest {
     @Test
     public void loopsAndLoopControlCheckInsideLoops() {
         String src = "func f(n: Integer): Integer {\n" + //
-                "    mutable val total = 0\n" + //
-                "    mutable val remaining = n\n" + //
+                "    var mutable total = 0\n" + //
+                "    var mutable remaining = n\n" + //
                 "    while (remaining > 0) {\n" + //
                 "        total = total + remaining\n" + //
                 "        remaining = remaining - 1\n" + //
                 "    }\n" + //
-                "    for (mutable val i = 0; i < 3; i = i + 1) {\n" + //
-                "        if (i == 1) {\n" + //
-                "            continue\n" + //
+                "    {\n" + //
+                "        var mutable i = 0\n" + //
+                "        while (i < 3) {\n" + //
+                "            if (i == 1) {\n" + //
+                "                i = i + 1\n" + //
+                "                continue\n" + //
+                "            }\n" + //
+                "            if (i == 2) {\n" + //
+                "                break\n" + //
+                "            }\n" + //
+                "            total = total + i\n" + //
+                "            i = i + 1\n" + //
                 "        }\n" + //
-                "        if (i == 2) {\n" + //
-                "            break\n" + //
-                "        }\n" + //
-                "        total = total + i\n" + //
                 "    }\n" + //
                 "    return total\n" + //
                 "}\n";
@@ -291,13 +300,13 @@ public final class SolvikSemanticTest {
     @Test
     public void siblingScopeBlocksMayReuseALocalName() {
         String src = "func f(): Integer {\n" + //
-                "    mutable val total = 0\n" + //
+                "    var mutable total = 0\n" + //
                 "    {\n" + //
-                "        val result = 1\n" + //
+                "        var result = 1\n" + //
                 "        total = total + result\n" + //
                 "    }\n" + //
                 "    {\n" + //
-                "        val result = 2\n" + //
+                "        var result = 2\n" + //
                 "        total = total + result\n" + //
                 "    }\n" + //
                 "    return total\n" + //

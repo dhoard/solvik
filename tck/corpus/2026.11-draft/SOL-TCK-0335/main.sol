@@ -5,10 +5,10 @@
 //   - Each cell begins at its declared type's zero value -- `0` for every integer type, `0.0` for `Float`/`Double`, `false` for `Boolean`, the NUL character `'\0'` for `Character`, and `null` for every reference type -- whether or not the declaration supplies an initializer,
 //
 class C {
-    static mutable val i: Integer
-    static mutable val b: Boolean
-    static mutable val d: Double
-    static mutable val s: String
+    static var mutable i: Integer
+    static var mutable b: Boolean
+    static var mutable d: Double
+    static var mutable s: String
 
     C() {
     }

@@ -77,7 +77,6 @@ import org.solvik.ast.statement.ContinueStmtNode;
 import org.solvik.ast.statement.ElseBranchNode;
 import org.solvik.ast.statement.ExprStmtNode;
 import org.solvik.ast.statement.ForInStmtNode;
-import org.solvik.ast.statement.ForStmtNode;
 import org.solvik.ast.statement.IfStmtNode;
 import org.solvik.ast.statement.LocalDeclNode;
 import org.solvik.ast.statement.RegexCaseLabelNode;
@@ -137,7 +136,6 @@ import org.solvik.truffle.nodes.SolvikFunctionValueNode;
 import org.solvik.truffle.nodes.SolvikFunctionDispatchNode;
 import org.solvik.truffle.nodes.SolvikFunctionDispatchNodeGen;
 import org.solvik.truffle.nodes.SolvikIndirectCallNode;
-import org.solvik.truffle.nodes.SolvikForNode;
 import org.solvik.truffle.nodes.SolvikForRangeNode;
 import org.solvik.truffle.nodes.SolvikGreaterOrEqualNodeGen;
 import org.solvik.truffle.nodes.SolvikGreaterThanNodeGen;
@@ -289,7 +287,7 @@ public final class SolvikLowering {
         for (FunctionSymbol function : program.functions().values()) {
             // A predeclared function gets a real call target here, before any body lowers, even though a
             // direct call to it keeps lowering to its specialized effect node. Naming one as a value
-            // (`val output: func(Any?): Unit = println`) requires the same canonical value any other
+            // (`var output: func(Any?): Unit = println`) requires the same canonical value any other
             // declared function has, and building that value reads the call target — so installing it
             // later would make a program that references `println` inside a function body read a target
             // that does not exist yet. A second representation for one callable would also put two
@@ -850,7 +848,6 @@ public final class SolvikLowering {
             case LOCAL_DECL -> lowerLocalDecl((LocalDeclNode) statement);
             case IF_STMT -> lowerIf((IfStmtNode) statement);
             case WHILE_STMT -> lowerWhile((WhileStmtNode) statement);
-            case FOR_STMT -> lowerFor((ForStmtNode) statement);
             case FOR_IN_STMT -> lowerForIn((ForInStmtNode) statement);
             case SWITCH_STMT -> lowerSwitch((SwitchStmtNode) statement);
             case BLOCK -> lowerBlock((BlockNode) statement);
@@ -962,15 +959,6 @@ public final class SolvikLowering {
         SolvikExpressionNode condition = lowerExpression(statement.condition());
         SolvikStatementNode body = lowerBlock(statement.body());
         SolvikWhileNode node = new SolvikWhileNode(condition, body);
-        return setSource(node, statement);
-    }
-
-    private SolvikStatementNode lowerFor(ForStmtNode statement) {
-        SolvikStatementNode[] initializer = statement.initializer().map(init -> new SolvikStatementNode[]{lowerStatement(init)}).orElse(new SolvikStatementNode[0]);
-        SolvikExpressionNode condition = statement.condition().map(this::lowerExpression).orElse(null);
-        SolvikStatementNode update = statement.update().map(this::lowerStatement).orElse(null);
-        SolvikStatementNode body = lowerBlock(statement.body());
-        SolvikForNode node = new SolvikForNode(initializer, condition, update, body);
         return setSource(node, statement);
     }
 
@@ -1586,7 +1574,7 @@ public final class SolvikLowering {
      */
     private SolvikExpressionNode lowerPropagation(PropagationExprNode expression) {
         SolvikExpressionNode operand = lowerExpression(expression.operand());
-        EnumVariantSymbol success = program.enumSymbol("Result")
+        EnumVariantSymbol success = resultEnum(program.typeOf(expression.operand()).orElse(null))
                 .orElseThrow(() -> new IllegalStateException("propagation of a non-Result value reached lowering"))
                 .variants().get(0);
         SolvikEnumVariant runtimeVariant = runtimeEnumVariants.get(success);
@@ -1621,6 +1609,24 @@ public final class SolvikLowering {
     }
 
     /**
+     * The {@code Result} enum symbol behind a {@code Result<T, E>} receiver or operand type. The symbol
+     * is resolved through the type's nominal base rather than by the plain registry name, because a
+     * declaration in a named module is registered under a module-qualified key (LANGUAGE_SPEC.md
+     * section 20) while the analyzer's {@code Result} shape check matches the simple name.
+     */
+    private Optional<EnumSymbol> resultEnum(Type type) {
+        Type base = baseTypeOf(type);
+        if (base instanceof ParameterizedType parameterized) {
+            for (EnumSymbol symbol : program.enums().values()) {
+                if (symbol.type() == parameterized.base()) {
+                    return Optional.of(symbol);
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
+    /**
      * Lowers a {@code Result} operation call (docs/LANGUAGE_SPEC.md error-handling operations). The
      * receiver is lowered and evaluated exactly once; {@code expect} also lowers its single message
      * argument. The {@code Ok} and {@code Err} runtime variants are fixed from the compiler's closed
@@ -1629,7 +1635,7 @@ public final class SolvikLowering {
     private SolvikExpressionNode lowerResultOperation(CallExprNode expression, MemberAccessExprNode member) {
         SolvikExpressionNode receiver = lowerExpression(member.receiver());
         SolvikExpressionNode message = member.memberName().equals("expect") ? lowerExpression(expression.arguments().get(0)) : null;
-        List<EnumVariantSymbol> variants = program.enumSymbol("Result")
+        List<EnumVariantSymbol> variants = resultEnum(program.typeOf(member.receiver()).orElse(null))
                 .orElseThrow(() -> new IllegalStateException("a Result operation reached lowering without a Result enum")).variants();
         SolvikEnumVariant okVariant = runtimeEnumVariants.get(variants.get(0));
         SolvikEnumVariant errVariant = runtimeEnumVariants.get(variants.size() > 1 ? variants.get(1) : variants.get(0));

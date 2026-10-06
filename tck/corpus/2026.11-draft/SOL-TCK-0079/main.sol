@@ -1,5 +1,5 @@
 // Oracle derived from LANGUAGE_SPEC section 11's operation table, which gives verbatim:
-//   "`Stack<T>`: `val isEmpty: Boolean`, `val size: Integer`, `func push(element: T)`,
+//   "`Stack<T>`: `var isEmpty: Boolean`, `var size: Integer`, `func push(element: T)`,
 //    `func peek(): T`, `func pop(): T`, `func clear()`."
 // and: "A call with no value arguments constructs an empty collection
 // (`List<Integer>()`)." A `Stack` is a last-in first-out collection, which is what the
@@ -16,7 +16,7 @@
 //   -> `true 2 2 2 1 false`.
 // Executed as top-level statements (section 20). Uses print, so no platform line
 // separator can enter the expected bytes.
-val frames = Stack<Integer>()
+var frames = Stack<Integer>()
 print(frames.isEmpty)
 print(" ")
 frames.push(1)

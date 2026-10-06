@@ -57,13 +57,13 @@ import org.solvik.source.SourceSpan;
 
 /**
  * Positive parser tests: every supported construct with exact tree shape and exact source spans.
- * Inputs use explicit {@code ;} termination; newline termination and the newline/semicolon
- * equivalence properties are covered by {@link SolvikSemicolonInsertionTest} and
- * {@link SolvikSemicolonTokenStreamTest}.
+ * Inputs use explicit {@code ;} separation where a line carries more than one statement; newline
+ * termination and the newline/semicolon equivalence properties are covered by
+ * {@link SolvikStatementTerminationTest} and {@link PhysicalLineTokenStreamTest}.
  */
 public final class SolvikParserTest {
 
-    private static final String DOC = "func add(a: Integer, b: Integer): Integer {\n    return a + b;\n}\n";
+    private static final String DOC = "func add(a: Integer, b: Integer): Integer {\n    return a + b\n}\n";
 
     @Test
     public void docExampleShapeAndSpans() {
@@ -89,7 +89,7 @@ public final class SolvikParserTest {
         assertThat(body.statements().size()).isEqualTo(1);
 
         ReturnStmtNode stmt = ret(fn, 0);
-        assertNode(stmt, AstKind.RETURN_STMT, DOC, "return a + b;");
+        assertNode(stmt, AstKind.RETURN_STMT, DOC, "return a + b");
         assertThat(stmt.value().isPresent()).isTrue();
 
         BinaryExprNode bin = binary(stmt.value().get());
@@ -104,7 +104,7 @@ public final class SolvikParserTest {
     /** A {@code key: value} argument parses as a map entry with the pair's own span. */
     @Test
     public void mapConstructionParsesKeyValueEntries() {
-        String source = "func f() {\n    Map<Integer, String>(1: \"one\", 2: \"two\");\n}\n";
+        String source = "func f() {\n    Map<Integer, String>(1: \"one\", 2: \"two\")\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("map.sol", source));
         CallExprNode construction = call(expr(fn, 0).expression());
         assertThat(construction.typeArguments().size()).isEqualTo(2);
@@ -122,7 +122,7 @@ public final class SolvikParserTest {
     /** A call argument list may end with a trailing comma; it contributes no argument. */
     @Test
     public void trailingCommaInCallArgumentsIsAccepted() {
-        String src = "func f(): Unit {\n    g(1, 2,);\n}\n";
+        String src = "func f(): Unit {\n    g(1, 2,)\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("trailingarg.sol", src));
         CallExprNode c = call(expr(fn, 0).expression());
         assertThat(c.arguments().size()).isEqualTo(2);
@@ -134,7 +134,7 @@ public final class SolvikParserTest {
     /** A {@code Map} construction is an argument list, so it accepts a trailing comma too. */
     @Test
     public void trailingCommaInMapEntriesIsAccepted() {
-        String src = "func f() {\n    Map<Integer, String>(1: \"one\", 2: \"two\",);\n}\n";
+        String src = "func f() {\n    Map<Integer, String>(1: \"one\", 2: \"two\",)\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("maptrailing.sol", src));
         CallExprNode construction = call(expr(fn, 0).expression());
         assertThat(construction.arguments().size()).isEqualTo(2);
@@ -145,7 +145,7 @@ public final class SolvikParserTest {
     /** A trailing comma before a closing delimiter on the next line parses across the boundary. */
     @Test
     public void multilineArgumentListWithTrailingCommaIsAccepted() {
-        String src = "func f(): Unit {\n    g(\n        1,\n        2,\n    );\n}\n";
+        String src = "func f(): Unit {\n    g(\n        1,\n        2,\n    )\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("multilinearg.sol", src));
         CallExprNode c = call(expr(fn, 0).expression());
         assertThat(c.arguments().size()).isEqualTo(2);
@@ -155,7 +155,7 @@ public final class SolvikParserTest {
     /** A call with explicit type arguments accepts a trailing comma before its {@code )}. */
     @Test
     public void trailingCommaAfterExplicitTypeArgumentsIsAccepted() {
-        String src = "func f(): Unit {\n    List<Integer>(1, 2, 3,);\n}\n";
+        String src = "func f(): Unit {\n    List<Integer>(1, 2, 3,)\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("trailingtypearg.sol", src));
         CallExprNode c = call(expr(fn, 0).expression());
         assertThat(c.typeArguments().size()).isEqualTo(1);
@@ -166,7 +166,7 @@ public final class SolvikParserTest {
     /** A single argument with a trailing comma is still a one-argument call. */
     @Test
     public void singleArgumentWithTrailingCommaIsAccepted() {
-        String src = "func f(): Unit {\n    g(1,);\n}\n";
+        String src = "func f(): Unit {\n    g(1,)\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("singlearg.sol", src));
         CallExprNode c = call(expr(fn, 0).expression());
         assertThat(c.arguments().size()).isEqualTo(1);
@@ -176,7 +176,7 @@ public final class SolvikParserTest {
     /** A callable may omit its return type; the omitted type is `Unit` (specification section 6). */
     @Test
     public void functionMayOmitItsReturnType() {
-        String src = "func greet() {\n    return;\n}\n";
+        String src = "func greet() {\n    return\n}\n";
         CompilationUnitNode cu = parseOk("greet.sol", src);
         FunctionDeclNode fn = onlyFunction(cu);
         assertThat(fn.name()).isEqualTo("greet");
@@ -213,15 +213,11 @@ public final class SolvikParserTest {
 
     @Test
     public void literalsNamesAndStrings() {
-        String src = "func f(): Unit {\n" + //
-                "  val a: Integer = 42;\n" + //
-                "  mutable val b: Boolean = true;\n" + //
-                "  val c = \"esc\\t\";\n" + //
-                "}\n";
+        String src = "func f(): Unit {\n  var a: Integer = 42\n  var mutable b: Boolean = true\n  var c = \"esc\\t\"\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("literals.sol", src));
 
         LocalDeclNode a = local(fn, 0);
-        assertNode(a, AstKind.LOCAL_DECL, src, "val a: Integer = 42;");
+        assertNode(a, AstKind.LOCAL_DECL, src, "var a: Integer = 42");
         assertThat(a.bindingKind()).isEqualTo(BindingKind.IMMUTABLE);
         assertThat(a.name()).isEqualTo("a");
         assertThat(a.declaredType().orElseThrow().name()).isEqualTo("Integer");
@@ -230,14 +226,14 @@ public final class SolvikParserTest {
         assertThat(lit.lexeme()).isEqualTo("42");
 
         LocalDeclNode b = local(fn, 1);
-        assertNode(b, AstKind.LOCAL_DECL, src, "mutable val b: Boolean = true;");
+        assertNode(b, AstKind.LOCAL_DECL, src, "var mutable b: Boolean = true");
         assertThat(b.bindingKind()).isEqualTo(BindingKind.MUTABLE);
         BoolLiteralNode bool = (BoolLiteralNode) b.initializer();
         assertNode(bool, AstKind.BOOL_LITERAL, src, "true");
         assertThat(bool.value()).isTrue();
 
         LocalDeclNode c = local(fn, 2);
-        assertNode(c, AstKind.LOCAL_DECL, src, "val c = \"esc\\t\";");
+        assertNode(c, AstKind.LOCAL_DECL, src, "var c = \"esc\\t\"");
         assertThat(c.declaredType().isEmpty()).isTrue();
         StringLiteralNode str = (StringLiteralNode) c.initializer();
         assertNode(str, AstKind.STRING_LITERAL, src, "\"esc\\t\"");
@@ -246,7 +242,7 @@ public final class SolvikParserTest {
 
     @Test
     public void falseLiteralParsesAsBooleanFalse() {
-        String src = "func f(): Boolean {\n    return false;\n}\n";
+        String src = "func f(): Boolean {\n    return false\n}\n";
         ReturnStmtNode r = ret(onlyFunction(parseOk("bool.sol", src)), 0);
         BoolLiteralNode bool = (BoolLiteralNode) r.value().get();
         assertThat(bool.kind()).isEqualTo(AstKind.BOOL_LITERAL);
@@ -255,7 +251,7 @@ public final class SolvikParserTest {
 
     @Test
     public void binaryPrecedenceAssociativityAndParentheses() {
-        String src = "func f(): Integer {\n    val x = 1 - 2 - 3 * 4;\n    val y = (1 + 2) / 3;\n    return x;\n}\n";
+        String src = "func f(): Integer {\n    var x = 1 - 2 - 3 * 4\n    var y = (1 + 2) / 3\n    return x\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("prec.sol", src));
 
         BinaryExprNode top = binary(local(fn, 0).initializer());
@@ -279,7 +275,7 @@ public final class SolvikParserTest {
 
     @Test
     public void multiplicationBindsTighterAcrossMixedOperators() {
-        String src = "func f(a: Integer, b: Integer, c: Integer): Integer {\n    return a + b * c - a;\n}\n";
+        String src = "func f(a: Integer, b: Integer, c: Integer): Integer {\n    return a + b * c - a\n}\n";
         ReturnStmtNode r = ret(onlyFunction(parseOk("mix.sol", src)), 0);
         BinaryExprNode top = binary(r.value().get());
         assertThat(top.operator()).isEqualTo(BinaryOperator.SUB);
@@ -292,7 +288,7 @@ public final class SolvikParserTest {
 
     @Test
     public void callsMemberAccessAndFoldingOrder() {
-        String src = "func f(): Unit {\n    obj.method(1)(2);\n    g(h.a.b(3), p + q.r);\n}\n";
+        String src = "func f(): Unit {\n    obj.method(1)(2)\n    g(h.a.b(3), p + q.r)\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("calls.sol", src));
 
         CallExprNode outer = call(expr(fn, 0).expression());
@@ -321,7 +317,7 @@ public final class SolvikParserTest {
 
     @Test
     public void callOnParenthesizedExpression() {
-        String src = "func f(a: Integer, b: Integer, c: Integer): Unit {\n    (a + b).c(1);\n}\n";
+        String src = "func f(a: Integer, b: Integer, c: Integer): Unit {\n    (a + b).c(1)\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("parencall.sol", src));
         CallExprNode c = call(expr(fn, 0).expression());
         MemberAccessExprNode m = member(c.callee());
@@ -333,7 +329,7 @@ public final class SolvikParserTest {
 
     @Test
     public void zeroArgumentCallsAreDistinctFromMemberReads() {
-        String src = "func f(): Unit {\n    obj.load();\n    obj.field;\n    plain();\n}\n";
+        String src = "func f(): Unit {\n    obj.load()\n    obj.field\n    plain()\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("noargs.sol", src));
         assertNode(expr(fn, 0).expression(), AstKind.CALL_EXPR, src, "obj.load()");
         assertNode(expr(fn, 1).expression(), AstKind.MEMBER_ACCESS_EXPR, src, "obj.field");
@@ -343,7 +339,7 @@ public final class SolvikParserTest {
 
     @Test
     public void nestedParenthesesPreserveDepth() {
-        String src = "func f(a: Integer): Integer {\n    return ((a));\n}\n";
+        String src = "func f(a: Integer): Integer {\n    return ((a))\n}\n";
         ReturnStmtNode r = ret(onlyFunction(parseOk("nestparen.sol", src)), 0);
         ParenExprNode outer = paren(r.value().get());
         assertNode(outer, AstKind.PAREN_EXPR, src, "((a))");
@@ -353,25 +349,23 @@ public final class SolvikParserTest {
 
     @Test
     public void ifElseIfElseStructure() {
-        String src = "func f(c: Boolean): Unit {\n" + //
-                "    if (c) {\n        return;\n    } else if (c) {\n        return;\n    } else {\n        return;\n    }\n" + //
-                "}\n";
+        String src = "func f(c: Boolean): Unit {\n    if (c) {\n        return\n    }\n    else if (c) {\n        return\n    }\n    else {\n        return\n    }\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("if.sol", src));
         IfStmtNode if1 = (IfStmtNode) fn.body().statements().get(0);
         assertNode(if1.condition(), AstKind.NAME_REF_EXPR, src, "c");
         ElseBranchNode else1 = if1.elseBranch().orElseThrow();
         assertThat(else1.isChainedIf()).isTrue();
-        assertNode(else1, AstKind.ELSE_BRANCH, src, "else if (c) {\n        return;\n    } else {\n        return;\n    }");
+        assertNode(else1, AstKind.ELSE_BRANCH, src, "else if (c) {\n        return\n    }\n    else {\n        return\n    }");
         IfStmtNode if2 = else1.chainedIf().orElseThrow();
         ElseBranchNode else2 = if2.elseBranch().orElseThrow();
         assertThat(else2.isChainedIf()).isFalse();
-        assertNode(else2.block().orElseThrow(), AstKind.BLOCK, src, "{\n        return;\n    }");
-        assertNode(if1.thenBlock(), AstKind.BLOCK, src, "{\n        return;\n    }");
+        assertNode(else2.block().orElseThrow(), AstKind.BLOCK, src, "{\n        return\n    }");
+        assertNode(if1.thenBlock(), AstKind.BLOCK, src, "{\n        return\n    }");
     }
 
     @Test
     public void ifWithoutElseHasNoBranch() {
-        String src = "func f(c: Boolean): Unit {\n    if (c) {\n        g();\n    }\n}\n";
+        String src = "func f(c: Boolean): Unit {\n    if (c) {\n        g()\n    }\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("if.sol", src));
         IfStmtNode if1 = (IfStmtNode) fn.body().statements().get(0);
         assertThat(if1.elseBranch().isEmpty()).isTrue();
@@ -391,16 +385,17 @@ public final class SolvikParserTest {
 
     @Test
     public void bareReturnHasNoValue() {
-        String src = "func f(): Unit {\n    return;\n}\n";
+        String src = "func f(): Unit {\n    return\n}\n";
         ReturnStmtNode r = ret(onlyFunction(parseOk("bare.sol", src)), 0);
         assertThat(r.value().isEmpty()).isTrue();
         assertThat(r.children()).isEqualTo(List.of());
-        assertNode(r, AstKind.RETURN_STMT, src, "return;");
+        // The `;` is a separator outside the statement: the span ends at the keyword.
+        assertNode(r, AstKind.RETURN_STMT, src, "return");
     }
 
     @Test
     public void multipleFunctionsPreserveOrderAndSpans() {
-        String src = "func a(): Unit {\n}\nfunc b(x: Integer): Integer {\n    return x;\n}\n";
+        String src = "func a(): Unit {\n}\nfunc b(x: Integer): Integer {\n    return x\n}\n";
         CompilationUnitNode cu = parseOk("two.sol", src);
         assertThat(cu.declarations().size()).isEqualTo(2);
         assertThat(((FunctionDeclNode) cu.declarations().get(0)).name()).isEqualTo("a");
@@ -420,9 +415,9 @@ public final class SolvikParserTest {
     @Test
     public void spansAreNestedWithinParents() {
         String src = "func f(x: Integer): Integer {\n" + //
-                "    val y: Integer = (x + g(x, obj.f(1))) * 2;\n" + //
-                "    obj.a.b(1).c;\n" + //
-                "    if (true) {\n        return y;\n    } else {\n        return x;\n    }\n" + //
+                "    var y: Integer = (x + g(x, obj.f(1))) * 2\n" + //
+                "    obj.a.b(1).c\n" + //
+                "    if (true) {\n        return y\n    }\n    else {\n        return x\n    }\n" + //
                 "}\n";
         Deque<AstNode> stack = new ArrayDeque<>();
         stack.push(parseOk("nest.sol", src));
@@ -438,7 +433,7 @@ public final class SolvikParserTest {
     /** Structural invariant: children follow source order without overlap. */
     @Test
     public void siblingsFollowSourceOrder() {
-        String src = "func f(): Unit {\n    val v = h(1, 2, obj.x);\n    return v;\n}\n";
+        String src = "func f(): Unit {\n    var v = h(1, 2, obj.x)\n    return v\n}\n";
         Deque<AstNode> stack = new ArrayDeque<>();
         stack.push(parseOk("order.sol", src));
         while (!stack.isEmpty()) {

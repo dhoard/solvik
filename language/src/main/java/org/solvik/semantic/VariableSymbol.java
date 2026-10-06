@@ -20,8 +20,8 @@ import org.solvik.source.SourceSpan;
 import org.solvik.type.Type;
 
 /**
- * A variable binding: a {@code val} or {@code mutable val} local, or a function parameter. An
- * immutable local and every parameter are immutable; a {@code mutable val} local is writable. Definite assignment is tracked here
+ * A variable binding: a {@code var} or {@code var mutable} local, or a function parameter. An
+ * immutable local and every parameter are immutable; a {@code var mutable} local is writable. Definite assignment is tracked here
  * so reads of a not-yet-initialized binding can be diagnosed.
  */
 public final class VariableSymbol extends Symbol {

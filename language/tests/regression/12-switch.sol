@@ -1,11 +1,14 @@
 func name(n: Integer): String {
     switch (n) {
-        case 1:
+        case 1 {
             return "one"
-        case 2, 3:
+        }
+        case 2, 3 {
             return "few"
-        default:
+        }
+        default {
             return "many"
+        }
     }
 }
 println(name(1))

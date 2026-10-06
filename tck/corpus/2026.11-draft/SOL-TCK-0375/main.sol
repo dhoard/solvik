@@ -8,7 +8,7 @@ interface P {
     func go(): Integer
 }
 class X implements P {
-    delegate val a
+    delegate var a
 
     X() {
     }

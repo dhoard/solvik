@@ -13,12 +13,12 @@ class Target {
     }
 }
 
-val nothing: Target? = null
-val absent: (func(): String)? = nothing?.describe
+var nothing: Target? = null
+var absent: (func(): String)? = nothing?.describe
 print(absent)
 print("|")
-val something: Target? = Target()
-val present: (func(): String)? = something?.describe
+var something: Target? = Target()
+var present: (func(): String)? = something?.describe
 if (present != null) {
     print(present())
 }

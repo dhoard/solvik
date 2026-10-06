@@ -12,7 +12,7 @@ The compilation pipeline is:
 
 ```text
 Solvik source
-  -> lexer / semicolon insertion
+  -> lexer / physical-line separation
   -> parser
   -> language AST
   -> symbol/name resolution
@@ -63,7 +63,9 @@ The confidence goal for any and all work is **100%**. Never report a task as com
 - Keep class inheritance single only.
 - Prefer composition/delegation for behavior reuse.
 - Do not add implicit fallthrough to `switch`.
-- Do not implement JavaScript-style ASI. Use the lexical semicolon insertion rules in the language spec.
+- Do not implement JavaScript-style ASI. A physical newline ends a complete statement; `;` only
+  separates statements written on the same physical line and may never terminate one. Use the
+  physical-line rules in the language spec.
 - Raw strings must follow the Rust-style delimiter model specified in the language spec.
 - Do not preserve SimpleLanguage syntax or dynamic-language behavior for compatibility.
 - Use the Truffle AST backend as the Solvik backend. Do not introduce a second execution backend.
@@ -93,6 +95,26 @@ Set `SOLVIK_SKIP_CORPUS=1` to skip the corpus step (for example, a fast compile-
 `./build-all.sh` is the final quality gate. It runs `./build.sh && ./build-native.sh` and must pass before any work is considered complete. No change is done until `./build-all.sh` succeeds.
 
 ## Working Style
+
+### Creating Plans
+
+When creating an implementation plan, read and use `PLAN_TEMPLATE.md`. Save new plans as
+`docs/<DESCRIPTIVE-NAME>-PLAN.md` unless the user specifies a location; keep existing plans at
+their current paths when updating them. Replace placeholders with evidence from the current
+worktree, cite the applicable language-specification and architecture sections, and identify
+GraalVM/Truffle infrastructure to retain and legacy behavior to replace or remove. Scale detail
+to the change and mark irrelevant sections not applicable with a reason.
+
+Every plan must include scope, ordered buildable steps, positive and negative coverage for
+semantic changes, acceptance criteria, and `./build-all.sh` as the final quality gate. Separate
+planned commands from actual validation results. State whether the request is plan-only or
+includes implementation; use the authorization already given in the conversation. A plan does
+not override these instructions or the authoritative documents, authorize unrelated work, or
+resolve unspecified semantics. Report exact authority conflicts or unresolved semantic choices
+before proceeding with dependent work. Do not mark implementation complete until the required
+checks and final quality gate pass.
+
+### Modifying Subsystems
 
 Before modifying a subsystem:
 

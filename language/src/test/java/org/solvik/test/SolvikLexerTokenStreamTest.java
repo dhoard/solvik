@@ -38,7 +38,7 @@ import org.solvik.parser.generated.SolvikLexer;
  * line, column, and channel, plus the exact failing input offset of every lexical error.
  *
  * <p>Assertions were produced by driving {@link SolvikLexer} directly and recording the delivered
- * stream; they are the reference the parser and the semicolon-inserting stage are built on, so an
+ * stream; they are the reference the parser and the line-boundary stage are built on, so an
  * off-by-one in a span or a mislabelled channel fails here rather than in a later phase.
  */
 public final class SolvikLexerTokenStreamTest {
@@ -131,7 +131,7 @@ public final class SolvikLexerTokenStreamTest {
 
     @Test
     public void ordinaryTokensCarryExactOffsetsAndPositions() {
-        assertThat(rendered("val x = 1")).isEqualTo("VAL(val)@0..2:1:0 Identifier(x)@4..4:1:4 ASSIGN(=)@6..6:1:6 INTEGER_LITERAL(1)@8..8:1:8");
+        assertThat(rendered("var x = 1")).isEqualTo("VAR(var)@0..2:1:0 Identifier(x)@4..4:1:4 ASSIGN(=)@6..6:1:6 INTEGER_LITERAL(1)@8..8:1:8");
     }
 
     @Test
@@ -141,7 +141,7 @@ public final class SolvikLexerTokenStreamTest {
 
     @Test
     public void endOfInputReportsTheLineAndOffsetAfterTheLastToken() {
-        Lexed lexed = lex("val x = 1");
+        Lexed lexed = lex("var x = 1");
         assertThat(lexed.tokens()).hasSize(4);
         assertThat(lexed.eofLine()).isEqualTo(1);
         assertThat(lexed.eofColumn()).isEqualTo(9);
@@ -160,7 +160,7 @@ public final class SolvikLexerTokenStreamTest {
     @Test
     public void whitespaceOnlyInputDeliversNoSignificantTokens() {
         // Spaces and tabs are `WS` (skipped outright); every physical newline stays as a hidden
-        // NEWLINE token so the insertion stage can see the boundary.
+        // NEWLINE token so the line-boundary stage can see the boundary.
         assertThat(rendered(" ")).isEmpty();
         assertThat(rendered("  \t ")).isEmpty();
         assertThat(renderedHidden(" ")).isEmpty();
@@ -188,7 +188,7 @@ public final class SolvikLexerTokenStreamTest {
     @Test
     public void blockCommentBodyNewlinesAreInsideTheCommentToken() {
         // The comment is one hidden token whose body contains the newline: no separate NEWLINE token
-        // is emitted for it, which is why the insertion stage must inspect the comment text itself.
+        // is emitted for it, which is why the line-boundary stage must inspect the comment text itself.
         assertThat(renderedHidden("/*a\nb*/x")).isEqualTo("BLOCK_COMMENT(/*a\\nb*/)@0..6");
         // The line counter still advances across the body, so the following token is positioned on
         // the line the comment ended on, at the column where the comment closed.
@@ -436,7 +436,7 @@ public final class SolvikLexerTokenStreamTest {
     /**
      * The grammar declares exactly these token types. A new lexer rule that no test can reach, or a
      * renamed token, fails here first; the symbolic names are the vocabulary the parser and the
-     * semicolon-insertion tables are written against.
+     * line-boundary tables are written against.
      */
     @Test
     public void grammarDeclaresExactlyTheExpectedTokenVocabulary() {
@@ -448,9 +448,9 @@ public final class SolvikLexerTokenStreamTest {
             }
         }
         Set<String> expected = new LinkedHashSet<>(List.of( //
-                // `SEALED`, `OPEN`, and `VAR` are reserved tokens with no parser production: they are
+                // `SEALED`, `OPEN`, and `VAL` are reserved tokens with no parser production: they are
                 // the keywords removed in 2026.11-draft, kept reserved so old source fails with
-                // SOLV-PARS-006 instead of lexing as an identifier. `MUTABLE` and `ABSTRACT` replace them.
+                // SOLV-PARS-006 instead of lexing as an identifier. `ABSTRACT`, `MUTABLE`, and `VAR` replace them.
                 "FUNC", "STATIC", "INCLUDE", "MODULE", "ALIAS", "CLASS", "INTERFACE", "ENUM", "MUTABLE", "ABSTRACT", "SEALED", "DELEGATE", "IMPLEMENTS", "OPEN", "EXTENDS", "OVERRIDE", "THIS", "SUPER", "VAL", "VAR", "IF", "ELSE", //
                 "WHILE", "FOR", "IN", "BREAK", "CONTINUE", "RETURN", "MATCH", "ARROW", "SWITCH", "CASE", "DEFAULT", "REGEX_KW", "THROW", "TRY", "CATCH", "FINALLY", "NULL", "IS", "AS", "BOOL_LITERAL", "Identifier", "INTEGER_LITERAL", "LONG_LITERAL", "FLOATING_LITERAL", "CHARACTER_LITERAL", "STRING_LITERAL", "RAW_STRING_LITERAL", //
                 "LPAREN", "RPAREN", "LBRACE", "RBRACE", "SEMI", "ASSIGN", "COLON", "COLONCOLON", "COMMA", //

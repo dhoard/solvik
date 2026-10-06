@@ -137,11 +137,11 @@ def BAD(tid, cat, req, src, diag, note):
 
 
 OK("SOL-TCK-0353", "control", "REQ-2400",
-   'mutable val i: Integer = 0\nwhile (i < 3) {\n    print(i)\n    i = i + 1\n}\n',
+   'var mutable i: Integer = 0\nwhile (i < 3) {\n    print(i)\n    i = i + 1\n}\n',
    "012",
    "The pre-test loop prints 0, 1, and 2; the condition is checked before each body run.")
 BAD("SOL-TCK-0354", "control", "REQ-2401",
-    'func f(): Integer {\n    return;\n}\nprint(f())\n' + NEG, {},
+    'func f(): Integer {\n    return\n}\nprint(f())\n' + NEG, {},
     "A bare return in a value-returning function is the forbidden form.")
 BAD("SOL-TCK-0355", "control", "REQ-2402",
     'func f() {\n    return 1\n}\nf()\nprint("EXECUTED-INVALID")\n', {},
@@ -159,15 +159,15 @@ OK("SOL-TCK-0358", "process", "REQ-2404",
    "With no executable top-level statement the program has no entry point, prints nothing, and "
    "exits 0.")
 OK("SOL-TCK-0359", "types", "REQ-2405",
-   'func f() {\n    print("x")\n}\nval u: Unit = f()\nprint(u)\n',
+   'func f() {\n    print("x")\n}\nvar u: Unit = f()\nprint(u)\n',
    "xUnit",
    "The value-less function's result is bound to a Unit local and its fixed rendering is `Unit`.")
 BAD("SOL-TCK-0360", "control", "REQ-2406",
-    'val x = 1\nswitch (x) {\n    case x:\n        print("same")\n    default:\n'
+    'var x = 1\nswitch (x) {\n    case x {\n        print("same")\n    }\n    default {\n    }\n'
     '        print("default")\n}\nprint("EXECUTED-INVALID")\n', {},
     "A case label naming a runtime binding is not a compile-time constant.")
 BAD("SOL-TCK-0361", "control", "REQ-2407",
-    'val x = 1\nswitch (x) {\n    case regex r"1":\n        print("one")\n    default:\n'
+    'var x = 1\nswitch (x) {\n    case regex r"1" {\n        print("one")\n    }\n    default {\n    }\n'
     '        print("d")\n}\nprint("EXECUTED-INVALID")\n', {},
     "A regex case on an Integer switch value is not a String switch value.")
 

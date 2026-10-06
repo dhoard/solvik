@@ -6,12 +6,12 @@
 //   - A static member is still subject to the rule that a member may not be named after its class.
 //
 class C {
-    static mutable val x: Integer = 1
-    val x: Integer
+    static var mutable x: Integer = 1
+    var x: Integer
 
     C() {
         this.x = 2
     }
 }
-val c = C()
+var c = C()
 print("EXECUTED-INVALID")

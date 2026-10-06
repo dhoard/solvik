@@ -114,7 +114,7 @@ public final class SolvikAnonymousFunctionTest {
     public void anAnonymousFunctionInitializesABindingAndIsInvoked() {
         assertThat(run("""
             func demo(): Integer {
-                val double: func(Integer): Integer = func(value: Integer): Integer {
+                var double: func(Integer): Integer = func(value: Integer): Integer {
                     return value * 2
                 }
                 return double(21)
@@ -134,7 +134,7 @@ public final class SolvikAnonymousFunctionTest {
     public void anAnonymousFunctionWithNoParametersIsInvokedWithNone() {
         assertThat(run("""
             func demo(): String {
-                val give: func(): String = func(): String {
+                var give: func(): String = func(): String {
                     return "given"
                 }
                 return give()
@@ -159,7 +159,7 @@ public final class SolvikAnonymousFunctionTest {
             }
 
             func demo(): String {
-                val emit: func(String) = func(value: String) {
+                var emit: func(String) = func(value: String) {
                     shout(value)
                 }
                 emit("a")
@@ -182,7 +182,7 @@ public final class SolvikAnonymousFunctionTest {
             }
 
             func demo(): Integer {
-                val step: func(Integer): Integer = func(value: Integer): Integer {
+                var step: func(Integer): Integer = func(value: Integer): Integer {
                     return triple(value) + 1
                 }
                 return step(5)
@@ -204,7 +204,7 @@ public final class SolvikAnonymousFunctionTest {
     public void aValueReturningAnonymousFunctionMustWriteItsReturnType() {
         assertThat(firstCode("""
             func demo(): Integer {
-                val step: func(Integer): Integer = func(value: Integer) {
+                var step: func(Integer): Integer = func(value: Integer) {
                     return value + 1
                 }
                 return step(1)
@@ -222,7 +222,7 @@ public final class SolvikAnonymousFunctionTest {
     @Test
     public void aValueReturningAnonymousFunctionNeedsAReturnOnEveryPath() {
         assertThat(first("func demo(): Integer {\n"
-                        + "    val step: func(): Integer = func(): Integer {\n"
+                        + "    var step: func(): Integer = func(): Integer {\n"
                         + "        print(\"no result\")\n"
                         + "    }\n"
                         + "    return step()\n"
@@ -250,13 +250,13 @@ public final class SolvikAnonymousFunctionTest {
     public void twoEvaluationsOfOneAnonymousFunctionAreDistinct() {
         assertThat(run("""
             func demo(): Boolean {
-                val maker: func(): func(): Integer = func(): func(): Integer {
+                var maker: func(): func(): Integer = func(): func(): Integer {
                     return func(): Integer {
                         return 7
                     }
                 }
-                val one = maker()
-                val two = maker()
+                var one = maker()
+                var two = maker()
                 return one == two
             }
             print(demo())
@@ -273,13 +273,13 @@ public final class SolvikAnonymousFunctionTest {
     public void eachFreshValueIsStillCallable() {
         assertThat(run("""
             func demo(): String {
-                val maker: func(): func(): Integer = func(): func(): Integer {
+                var maker: func(): func(): Integer = func(): func(): Integer {
                     return func(): Integer {
                         return 7
                     }
                 }
-                val one = maker()
-                val two = maker()
+                var one = maker()
+                var two = maker()
                 return one() .. two()
             }
             print(demo())
@@ -296,10 +296,10 @@ public final class SolvikAnonymousFunctionTest {
     public void reReadingABindingPreservesTheValueItStored() {
         assertThat(run("""
             func demo(): Boolean {
-                val stored: func(): Integer = func(): Integer {
+                var stored: func(): Integer = func(): Integer {
                     return 1
                 }
-                val again: func(): Integer = stored
+                var again: func(): Integer = stored
                 return stored == again
             }
             print(demo())
@@ -318,10 +318,10 @@ public final class SolvikAnonymousFunctionTest {
     public void twoWriteSitesProduceInequalValues() {
         assertThat(run("""
             func demo(): Boolean {
-                val left: func(): Integer = func(): Integer {
+                var left: func(): Integer = func(): Integer {
                     return 1
                 }
-                val right: func(): Integer = func(): Integer {
+                var right: func(): Integer = func(): Integer {
                     return 1
                 }
                 return left == right
@@ -341,7 +341,7 @@ public final class SolvikAnonymousFunctionTest {
     public void anAnonymousFunctionValueRendersAsFunc() {
         assertThat(run("""
             func demo(): String {
-                val value: func(): Integer = func(): Integer {
+                var value: func(): Integer = func(): Integer {
                     return 1
                 }
                 print(value)
@@ -367,12 +367,12 @@ public final class SolvikAnonymousFunctionTest {
     public void aBodyDeclarationMayShadowAnOuterBinding() {
         assertThat(run("""
             func demo(): Integer {
-                val base: Integer = 3
-                val compute: func(): Integer = func(): Integer {
-                    val base: Integer = 10
+                var base: Integer = 3
+                var compute: func(): Integer = func(): Integer {
+                    var base: Integer = 10
                     return base
                 }
-                val outer: Integer = compute()
+                var outer: Integer = compute()
                 return outer * 100 + base
             }
             print(demo())
@@ -394,7 +394,7 @@ public final class SolvikAnonymousFunctionTest {
             }
 
             func demo(): Integer {
-                val combine: func(Integer): Integer = func(value: Integer): Integer {
+                var combine: func(Integer): Integer = func(value: Integer): Integer {
                     return twice(value) + value
                 }
                 return combine(4)
@@ -414,7 +414,7 @@ public final class SolvikAnonymousFunctionTest {
     public void readingAnEnclosingLocalIsAnUnlistedCapture() {
         Diagnostic diagnostic = first("""
             func demo(base: Integer): Integer {
-                val compute: func(Integer): Integer = func(value: Integer): Integer {
+                var compute: func(Integer): Integer = func(value: Integer): Integer {
                     return value + base
                 }
                 return compute(1)
@@ -425,7 +425,7 @@ public final class SolvikAnonymousFunctionTest {
     }
 
     /**
-     * The unlisted-capture rule covers a write as well as a read, so the enclosing {@code mutable val} is
+     * The unlisted-capture rule covers a write as well as a read, so the enclosing {@code var mutable} is
      * reported at the assignment target inside the body and not merely at a read.
      *
      * <p>The same sentence of section 6 governs both: the dependency "must appear in an explicit capture
@@ -435,8 +435,8 @@ public final class SolvikAnonymousFunctionTest {
     public void writingAnEnclosingLocalIsAnUnlistedCapture() {
         assertThat(first("""
             func demo(): Integer {
-                mutable val total: Integer = 0
-                val bump: func() = func() {
+                var mutable total: Integer = 0
+                var bump: func() = func() {
                     total = total + 1
                 }
                 bump()
@@ -448,7 +448,7 @@ public final class SolvikAnonymousFunctionTest {
 
     /**
      * A name that no enclosing function declares is still an unknown name, not a capture: the
-     * specification reserves the capture diagnostic for a name that resolves to "a `val` local declared
+     * specification reserves the capture diagnostic for a name that resolves to "a `var` local declared
      * in an enclosing function scope; an immutable parameter of an enclosing function; another function
      * value held by an immutable binding; or `this`", and a typo is none of those (section 6).
      */
@@ -456,7 +456,7 @@ public final class SolvikAnonymousFunctionTest {
     public void anUnknownNameInsideTheBodyIsStillAnUnknownName() {
         assertThat(firstCode("""
             func demo(): Integer {
-                val compute: func(): Integer = func(): Integer {
+                var compute: func(): Integer = func(): Integer {
                     return nothingDeclaredAnywhere
                 }
                 return compute()
@@ -475,10 +475,10 @@ public final class SolvikAnonymousFunctionTest {
     public void usingThisInsideTheBodyIsAnUnlistedCapture() {
         assertThat(first("""
             class Widget {
-                val id: Integer = 1
+                var id: Integer = 1
 
                 func viaClosure(): Integer {
-                    val read: func(): Integer = func(): Integer {
+                    var read: func(): Integer = func(): Integer {
                         return this.id
                     }
                     return read()
@@ -501,7 +501,7 @@ public final class SolvikAnonymousFunctionTest {
     @Test
     public void thisWithNoEnclosingReceiverIsStillOutsideAClass() {
         assertThat(firstCode("""
-            val read: func(): Integer = func(): Integer {
+            var read: func(): Integer = func(): Integer {
                 return this.id
             }
             print(1)
@@ -542,7 +542,7 @@ public final class SolvikAnonymousFunctionTest {
     public void aReturnInsideTheBodyReturnsFromTheBody() {
         assertThat(run("""
             func demo(): String {
-                val give: func(): Integer = func(): Integer {
+                var give: func(): Integer = func(): Integer {
                     return 7
                 }
                 print(give())
@@ -562,12 +562,12 @@ public final class SolvikAnonymousFunctionTest {
     public void breakCannotCrossTheFunctionBoundary() {
         assertThat(first("""
             func demo(): Integer {
-                mutable val count: Integer = 0
-                val body: func(): Integer = func(): Integer {
+                var mutable count: Integer = 0
+                var body: func(): Integer = func(): Integer {
                     break
                     return 0
                 }
-                mutable val i: Integer = 0
+                var mutable i: Integer = 0
                 while (i < 3) {
                     i = i + 1
                     count = count + body()
@@ -588,9 +588,9 @@ public final class SolvikAnonymousFunctionTest {
     public void breakInsideTheBodysOwnLoopIsLegal() {
         assertThat(run("""
             func demo(): Integer {
-                val countTo: func(Integer): Integer = func(limit: Integer): Integer {
-                    mutable val seen: Integer = 0
-                    mutable val i: Integer = 0
+                var countTo: func(Integer): Integer = func(limit: Integer): Integer {
+                    var mutable seen: Integer = 0
+                    var mutable i: Integer = 0
                     while (true) {
                         i = i + 1
                         if (i > limit) {
@@ -613,11 +613,11 @@ public final class SolvikAnonymousFunctionTest {
     public void continueCannotCrossTheFunctionBoundary() {
         assertThat(first("""
             func demo(): Integer {
-                val body: func(): Integer = func(): Integer {
+                var body: func(): Integer = func(): Integer {
                     continue
                     return 0
                 }
-                mutable val i: Integer = 0
+                var mutable i: Integer = 0
                 while (i < 2) {
                     i = i + 1
                     body()
@@ -664,7 +664,7 @@ public final class SolvikAnonymousFunctionTest {
             }
 
             func demo(): String {
-                val outer: func(): func(): String = func(): func(): String {
+                var outer: func(): func(): String = func(): func(): String {
                     return func(): String {
                         return label(3)
                     }
@@ -688,13 +688,13 @@ public final class SolvikAnonymousFunctionTest {
             }
 
             class Holder {
-                val step: func(Integer): Integer = func(value: Integer): Integer {
+                var step: func(Integer): Integer = func(value: Integer): Integer {
                     return triple(value) + 1
                 }
             }
 
             func demo(): Integer {
-                val holder = Holder()
+                var holder = Holder()
                 return holder.step(3)
             }
             print(demo())
@@ -712,13 +712,13 @@ public final class SolvikAnonymousFunctionTest {
     public void anInnerAnonymousFunctionIsFreshPerOuterCall() {
         assertThat(run("""
             func demo(): Boolean {
-                val outer: func(): func(): Integer = func(): func(): Integer {
+                var outer: func(): func(): Integer = func(): func(): Integer {
                     return func(): Integer {
                         return 2
                     }
                 }
-                val first = outer()
-                val second = outer()
+                var first = outer()
+                var second = outer()
                 return first == second
             }
             print(demo())
@@ -729,17 +729,17 @@ public final class SolvikAnonymousFunctionTest {
      * An anonymous function may be invoked immediately where the call's syntax allows the expression,
      * confirming the value the expression produces is the value that gets called.
      *
-     * <p>The explicit {@code ;} inside the body is required by semicolon insertion: at a physical newline
-     * a synthetic {@code SEMI} is emitted only when the unmatched {@code (} depth is zero
-     * (docs/LANGUAGE_SPEC.md section 2), and here the enclosing call's {@code (} is still open. Section
-     * 6's own examples avoid the case by writing the binding form.
+     * <p>The braces are written inside the call, so the body's closing brace and the call's closing
+     * paren take their own lines: the strict closing-brace rule of section 16 admits nothing but a
+     * comment after a standalone {@code}}, which is why the closer closes on a line of its own.
      */
     @Test
     public void anAnonymousFunctionMayBeInvokedImmediately() {
         assertThat(run("""
             print((func(): Integer {
-                return 1 + 2;
-            })())
+                return 1 + 2
+            }
+            )())
             """)).isEqualTo("3");
     }
 
@@ -752,7 +752,7 @@ public final class SolvikAnonymousFunctionTest {
     public void anAnonymousValueIsAssignableUnderFunctionTypeVariance() {
         assertThat(run("""
             mutable class Animal {
-                val name: String = "animal"
+                var name: String = "animal"
             }
 
             mutable class Dog extends Animal {
@@ -763,7 +763,7 @@ public final class SolvikAnonymousFunctionTest {
             }
 
             func demo(): String {
-                val asDog: func(Dog): String = func(animal: Animal): String {
+                var asDog: func(Dog): String = func(animal: Animal): String {
                     return describe(animal)
                 }
                 return asDog(Dog())
@@ -783,13 +783,14 @@ public final class SolvikAnonymousFunctionTest {
             }
 
             func demo(): String {
-                val raiser: func(): Integer = func(): Integer {
+                var raiser: func(): Integer = func(): Integer {
                     throw Boom("exploded")
                 }
                 try {
                     raiser()
                     return "no exception"
-                } catch (error: Boom) {
+                }
+                catch (error: Boom) {
                     return "caught " .. error.getMessage()
                 }
             }

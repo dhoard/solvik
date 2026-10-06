@@ -1,4 +1,4 @@
-val xs1: List<Integer> = List(96, 6)
+var xs1: List<Integer> = List(96, 6)
 
 xs1.add(99)
 
@@ -7,7 +7,7 @@ println(xs1.size)
 println(xs1.get(0))
 
 class Box2<T> {
-    mutable val value: T
+    var mutable value: T
     Box2(value: T) {
         this.value = value
     }
@@ -16,16 +16,16 @@ class Box2<T> {
     }
 }
 
-val box3: Box2<Boolean> = Box2(true)
+var box3: Box2<Boolean> = Box2(true)
 
 println(box3.get())
 
 println(box3 is Any)
 
-val s4: Set<String> = Set("a", "b", "a")
+var s4: Set<String> = Set("a", "b", "a")
 
 println(s4.size)
 
-val st5: Stack<Integer> = Stack(1, 2, 3)
+var st5: Stack<Integer> = Stack(1, 2, 3)
 
 println(st5.size)

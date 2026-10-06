@@ -219,9 +219,9 @@ print("0417")
         exp={"languageExit": 0, "stdoutBase64": base64.b64encode(b"000").decode("ascii")},
         note="A `List`, a `List` of parenthesized nullable function values, and a `Map` with "
              "function-typed values are declared; each is empty, so each size prints 0.",
-        src="""val callbacks: List<func(Integer): String> = List()
-val optionalCallbacks: List<(func(Integer): String)?> = List()
-val factories: Map<String, func(Integer): String> = Map()
+        src="""var callbacks: List<func(Integer): String> = List()
+var optionalCallbacks: List<(func(Integer): String)?> = List()
+var factories: Map<String, func(Integer): String> = Map()
 print(callbacks.size)
 print(optionalCallbacks.size)
 print(factories.size)
@@ -233,9 +233,9 @@ print(factories.size)
         note="Static properties of parenthesized nullable function type and of nullable-result "
              "function type are declared, one initialized to `null` and two with no initializer.",
         src="""class Holder {
-    static val operation: (func(Integer): String)? = null
-    static val sharedOperation: (func(Integer): String)?
-    static val nullableResult: func(Integer): String?
+    static var operation: (func(Integer): String)? = null
+    static var sharedOperation: (func(Integer): String)?
+    static var nullableResult: func(Integer): String?
 }
 print("0419")
 """,
@@ -246,7 +246,7 @@ print("0419")
         note="A non-null function-typed static property is initialized to `null`, which the non-null "
              "assignment rule refuses and section 7 pins to the assignment diagnostic.",
         src="""class Holder {
-    static val operation: func(Integer): String = null
+    static var operation: func(Integer): String = null
 }
 print("EXECUTED-INVALID")
 """,
@@ -316,7 +316,7 @@ print("EXECUTED-INVALID")
         exp={"diagnostic": {"family": "TYPE", "code": "SOLV-TYPE-025"}},
         note="An `Integer` is tested against a function type; the written target is the defect the "
              "section names, so the rejection is the non-reifiable-target diagnostic.",
-        src="""val value: Integer = 1
+        src="""var value: Integer = 1
 if (value is func(Integer): String) {
     print("matched")
 }
@@ -328,8 +328,8 @@ print("EXECUTED-INVALID")
         exp={"diagnostic": {"family": "TYPE", "code": "SOLV-TYPE-025"}},
         note="An `Any` holding an `Integer` is cast to a function type, which the non-reifiability "
              "rule forbids independently of the operand's runtime value.",
-        src="""val value: Any = 1
-val operation = value as func(Integer): String
+        src="""var value: Any = 1
+var operation = value as func(Integer): String
 print("EXECUTED-INVALID")
 """,
     ),

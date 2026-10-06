@@ -16,7 +16,7 @@
 // (protocol.md section 4.1) and the requirement is recorded
 // with `diagnosticNormative: false`. This is a genuine specification gap worth raising.
 // Sentinel per TCK.md section 10; the compile-only phase proves non-execution.
-val x: Double = 1.5
-val y: Float = x
+var x: Double = 1.5
+var y: Float = x
 print(y)
 println("EXECUTED-INVALID")

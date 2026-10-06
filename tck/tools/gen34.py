@@ -38,7 +38,7 @@ REQS_SPEC = {
                 "dispatch table, so a `static func toString()` cannot replace `Any.toString()` any "
                 "more than an instance method of another name can, and `instance.toString()` keeps "
                 "reaching the universal member.",
-                "for a class declaring `static val toString: Integer` and inheriting the default "
+                "for a class declaring `static var toString: Integer` and inheriting the default "
                 "`Any.toString()`, the expression `C.toString` reads the static cell and `instance` "
                 "formatting still calls `Any.toString()`."],
         note="A class declares `static func toString` and an instance calls `toString()`. The "
@@ -81,12 +81,12 @@ def BAD(tid, cat, req, src, note):
 
 OK("SOL-TCK-0415", "objects", "REQ-3200",
    'class C {\n    static func toString(): String {\n        return "static"\n    }\n\n'
-   '    C() {\n    }\n}\nval c = C()\nprint("st" .. c.toString())\n',
+   '    C() {\n    }\n}\nvar c = C()\nprint("st" .. c.toString())\n',
    "stC",
    "The instance call reaches the universal member and prints the class name `C`, not the static "
    "method's text.")
 BAD("SOL-TCK-0416", "types", "REQ-3201",
-    'class A {\n    A() {\n    }\n}\nval a: A = A()\nval b = a as? A\n' + NEG,
+    'class A {\n    A() {\n    }\n}\nvar a: A = A()\nvar b = a as? A\n' + NEG,
     "The deferred `as?` spelling is not defined and is a parse error.")
 
 

@@ -12,7 +12,7 @@
 // (protocol.md section 4.1) and the requirement is
 // recorded with `diagnosticNormative: false`.
 // Sentinel per TCK.md section 10; the compile-only phase proves non-execution.
-val big: Long = 5L
-val f: Float = 1.0f
+var big: Long = 5L
+var f: Float = 1.0f
 print(big + f)
 println("EXECUTED-INVALID")

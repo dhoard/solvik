@@ -11,5 +11,5 @@ enum Result<T, E> {
 func get(): Result<Integer, String> {
     return Result.Ok(5)
 }
-val r = get()
+var r = get()
 print("exp" .. r.expect("msg"))

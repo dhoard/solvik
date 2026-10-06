@@ -57,7 +57,7 @@ What each requirement asserts, and why it needs the tests it has:
     analyzer reaches by different routes, so each is its own program with a body written not to introduce a
     second root cause -- a passing match is then about the placement under test rather than about an unrelated
     report. SOL-TCK-0457 and SOL-TCK-0458 are the mutable pair the revision distinguishes by span, and that
-    pair is the whole content of the sentence: a host that silently captured the unlisted `mutable val` fails 0458, and
+    pair is the whole content of the sentence: a host that silently captured the unlisted `var mutable` fails 0458, and
     one that reported the item-side case with the unlisted code, or with none, fails 0457.
 
   * REQ-3322 -- the boundary. An anonymous function introduces a function boundary and a lexical scope holding
@@ -74,7 +74,10 @@ the exact placement under test: `SOLV-SEM-057`, `SOLV-SEM-058`, `SOLV-RESOL-001`
 itself. What is deliberately *not* pinned is any code the section describes in prose without naming: the
 ordinary return diagnostics that "apply inside an anonymous function exactly as they do in a declaration", the
 standalone-statement rejection, the assignment-to-parameter case, and an empty or malformed capture list, whose
-revision sentence says `is a parse error` and no table row covers. Those assert `{"family": ...}` alone -- the
+revision sentence says `is a parse error` and no table row covers. Those assert `{
+    "family": ...
+}
+` alone -- the
 division gen38 draws for SOL-TCK-0439 and SOL-TCK-0441, and for the same reason: pinning a code the document
 never states for that placement makes this implementation's choice look specification-mandated.
 
@@ -141,13 +144,13 @@ NO_ALIASES = "Capture aliases and arbitrary capture expressions are not supporte
 
 # --- REQ-3320: what capture binds, and how far it reaches
 ITEM_ELIGIBLE = ("A capture item is an identifier or `this`. It must resolve at the closure-creation site to "
-                 "one of: a `val` local declared in an enclosing function scope; an immutable parameter of an "
+                 "one of: a `var` local declared in an enclosing function scope; an immutable parameter of an "
                  "enclosing function; another function value held by an immutable binding; or `this` in an "
                  "enclosing instance method or constructor.")
 CAPTURED_AT_CREATION = ("Each listed binding's value is captured when evaluation reaches the "
                         "anonymous-function expression.")
 REFERENCE_NOT_GRAPH = ("Capturing an object copies the reference, not the reachable object graph, so later "
-                       "mutation of that object's `mutable val` properties remains observable through the captured "
+                       "mutation of that object's `var mutable` properties remains observable through the captured "
                        "reference.")
 TRANSITIVE = "Capture is transitive only through explicit values."
 NO_FLATTEN = ("A closure that captures another closure lists that function-valued binding and stores the "
@@ -159,10 +162,10 @@ GLOBALS = ("Top-level and module-qualified function declarations are globally re
 TOP_RECURSION = "Recursion through named top-level functions needs no capture."
 
 # --- REQ-3321: capture diagnostics
-NO_VAR_CAPTURE = ("A closure must not list or otherwise capture a `mutable val` local. Naming a `mutable val` in a capture "
+NO_VAR_CAPTURE = ("A closure must not list or otherwise capture a `var mutable` local. Naming a `var mutable` in a capture "
                   "list is `SEM_MUTABLE_CAPTURE` (`SOLV-SEM-057`), reported on that capture item, and a read "
                   "or write of that captured name in the body is reported with the same code.")
-UNLISTED_VAR = ("Referencing the same outer `mutable val` without listing it remains `SEM_UNLISTED_CAPTURE` at the "
+UNLISTED_VAR = ("Referencing the same outer `var mutable` without listing it remains `SEM_UNLISTED_CAPTURE` at the "
                 "body reference; the compiler never silently converts it into a capture.")
 UNLISTED_BODY = ("An outer local or parameter referenced by the body but omitted from the capture list is "
                  "`SEM_UNLISTED_CAPTURE` (`SOLV-SEM-058`), reported on the body reference. This applies to "
@@ -266,7 +269,7 @@ REQS_SPEC = {
     "REQ-3321": dict(
         section="6. Functions (Explicit immutable closure capture; required diagnostics)",
         kind="compile-time",
-        summary=("A `mutable val` named in a capture list is `SOLV-SEM-057`, an unlisted outer local or uncaptured "
+        summary=("A `var mutable` named in a capture list is `SOLV-SEM-057`, an unlisted outer local or uncaptured "
                  "`this` is `SOLV-SEM-058` at the body reference, an unknown item is `SOLV-RESOL-001`, `this` "
                  "with no receiver is `SOLV-RESOL-005`, and a duplicate item or item colliding with a "
                  "parameter is `SOLV-RESOL-002`"),
@@ -274,11 +277,11 @@ REQS_SPEC = {
         oracle=(
             "Each report is a program of its own with the body written not to introduce a second root cause. "
             "SOL-TCK-0457 and SOL-TCK-0458 are the two mutable-state halves the revision distinguishes by span "
-            "-- `SOLV-SEM-057` at the item that names a `mutable val`, plain `SOLV-SEM-058` at a body reference to the "
-            "*same kind* of outer `mutable val` that was never listed. That pair is the whole content of the sentence: "
+            "-- `SOLV-SEM-057` at the item that names a `var mutable`, plain `SOLV-SEM-058` at a body reference to the "
+            "*same kind* of outer `var mutable` that was never listed. That pair is the whole content of the sentence: "
             "a host that silently captured the unlisted variable fails 0458, and one that reported the "
             "item-side case with the unlisted code, or with none, fails 0457. SOL-TCK-0459 and SOL-TCK-0460 "
-            "assert the body-reference code for an omitted `val` and for `this` used without `[this]`. "
+            "assert the body-reference code for an omitted `var` and for `this` used without `[this]`. "
             "SOL-TCK-0461 and SOL-TCK-0462 are the two halves of the duplicate-name rule -- `[base, base]`, "
             "whose body never mentions the duplicated name, and an item colliding with a parameter. "
             "SOL-TCK-0463 and SOL-TCK-0464 pin the remaining item codes, an unknown name and `this` in a "
@@ -322,17 +325,18 @@ TESTS = [
     return f(2)
 }
 
-val double: func(Integer): Integer = func(value: Integer): Integer {
+var double: func(Integer): Integer = func(value: Integer): Integer {
     return value * 2
 }
 
-val report: func(Integer): Unit = func(value: Integer) {
+var report: func(Integer): Unit = func(value: Integer) {
     print("[" .. value.toString() .. "]")
 }
 
-val nested: Integer = invoke(func(value: Integer): Integer {
-    return value - 100;
-})
+var nested: Integer = invoke(func(value: Integer): Integer {
+    return value - 100
+}
+)
 
 print(invoke(double).toString() .. "\\n")
 report(7)
@@ -346,11 +350,11 @@ print(nested.toString())
              "stdoutBase64": base64.b64encode(b"v3|unit").decode("ascii")},
         note="The same form rule at two other types: a closure returning String and a Unit closure "
              "discarding its argument, so neither the result type nor the Unit default rests on one shape",
-        src="""val formatter: func(Integer): String = func(value: Integer): String {
+        src="""var formatter: func(Integer): String = func(value: Integer): String {
     return "v" .. value.toString()
 }
 
-val consume: func(String) = func(value: String) {
+var consume: func(String) = func(value: String) {
     print(value)
 }
 
@@ -364,7 +368,7 @@ consume("unit")
         note="Omitting the return type declares Unit, and the ordinary return diagnostics apply inside an "
              "anonymous body, so a body that returns a value there is rejected",
         src="""class Form {
-    static val h: func(Integer): Integer = func(value: Integer) {
+    static var h: func(Integer): Integer = func(value: Integer) {
         print(value.toString())
     }
 }
@@ -402,8 +406,8 @@ print("EXECUTED-INVALID")
     }
 }
 
-val first = makeHalf()
-val second = makeHalf()
+var first = makeHalf()
+var second = makeHalf()
 
 print((makeHalf() === makeHalf()).toString() .. "\\n")
 print((first === second).toString() .. "\\n")
@@ -430,23 +434,23 @@ func first(list: List<func(Integer): Integer>): Integer {
 }
 
 func run(): String {
-    val offset = 100
-    val scale = func [offset](value: Integer): Integer {
+    var offset = 100
+    var scale = func [offset](value: Integer): Integer {
         return value * offset
     }
-    val maybe: func(Integer): Integer? = func [offset](value: Integer): Integer {
+    var maybe: func(Integer): Integer? = func [offset](value: Integer): Integer {
         return value + offset
     }
-    val cells: List<func(Integer): Integer> = List<func(Integer): Integer>()
-    val cellClosure = func [offset](value: Integer): Integer {
+    var cells: List<func(Integer): Integer> = List<func(Integer): Integer>()
+    var cellClosure = func [offset](value: Integer): Integer {
         return offset
     }
     cells.add(cellClosure)
 
-    val direct = scale(2).toString()
-    val argument = throughParameter(scale).toString()
-    val nullable = (maybe(1) ?? 0).toString()
-    val inList = first(cells).toString()
+    var direct = scale(2).toString()
+    var argument = throughParameter(scale).toString()
+    var nullable = (maybe(1) ?? 0).toString()
+    var inList = first(cells).toString()
     return direct .. "|" .. argument .. "|" .. nullable .. "|" .. inList
 }
 
@@ -490,7 +494,7 @@ print("EXECUTED-INVALID")
              "closure reaches the inner captured value, and each creation binds the value that existed at "
              "that moment",
         src="""class Cell {
-    mutable val n: Integer = 0
+    var mutable n: Integer = 0
 
     func bump() {
         this.n = this.n + 1
@@ -504,26 +508,26 @@ func withFactor(factor: Integer): func(Integer): Integer {
 }
 
 func run(): String {
-    val cell = Cell()
-    val peek = func [cell](): Integer {
+    var cell = Cell()
+    var peek = func [cell](): Integer {
         return cell.n
     }
     cell.bump()
     cell.bump()
 
-    val offset = 100
-    val scale = func [offset](value: Integer): Integer {
+    var offset = 100
+    var scale = func [offset](value: Integer): Integer {
         return value * offset
     }
-    val composed = func [scale](value: Integer): Integer {
+    var composed = func [scale](value: Integer): Integer {
         return scale(value) + 1
     }
 
-    val observed = peek().toString()
-    val scaled = scale(2).toString()
-    val throughStored = composed(3).toString()
-    val firstCreation = withFactor(4)(5).toString()
-    val secondCreation = withFactor(2)(5).toString()
+    var observed = peek().toString()
+    var scaled = scale(2).toString()
+    var throughStored = composed(3).toString()
+    var firstCreation = withFactor(4)(5).toString()
+    var secondCreation = withFactor(2)(5).toString()
     return observed .. "|" .. scaled .. "|" .. throughStored .. "|" .. firstCreation .. "|" .. secondCreation
 }
 
@@ -537,7 +541,7 @@ print(run())
         note="A receiver is captured by `[this]` and every intervening closure must list and forward it "
              "itself, so a value reaches a body only through the written path",
         src="""class Adder {
-    mutable val base: Integer = 40
+    var mutable base: Integer = 40
 
     func adder(): func(Integer): Integer {
         return func [this](value: Integer): Integer {
@@ -555,7 +559,7 @@ print(run())
 }
 
 func run(): String {
-    val adder = Adder()
+    var adder = Adder()
     return adder.adder()(2).toString() .. "|" .. adder.nested()()().toString()
 }
 
@@ -581,10 +585,10 @@ func fact(n: Integer): Integer {
 }
 
 func run(): String {
-    val usesGlobal = func(value: Integer): Integer {
+    var usesGlobal = func(value: Integer): Integer {
         return twice(value)
     }
-    val recursive = func(n: Integer): Integer {
+    var recursive = func(n: Integer): Integer {
         return fact(n)
     }
     return usesGlobal(21).toString() .. "|" .. recursive(5).toString()
@@ -597,9 +601,9 @@ print(run())
     dict(
         tid="SOL-TCK-0457", req="REQ-3321", cat="objects", outcome="COMPILE_ERROR",
         exp={"diagnostic": {"code": "SOLV-SEM-057"}},
-        note="A `mutable val` named in a capture list is rejected at the capture item, which capture cannot bind",
+        note="A `var mutable` named in a capture list is rejected at the capture item, which capture cannot bind",
         src="""func run(): func(Integer): Integer {
-    mutable val total = 0
+    var mutable total = 0
     return func [total](value: Integer): Integer {
         return total + value
     }
@@ -611,10 +615,10 @@ print("EXECUTED-INVALID")
     dict(
         tid="SOL-TCK-0458", req="REQ-3321", cat="objects", outcome="COMPILE_ERROR",
         exp={"diagnostic": {"code": "SOLV-SEM-058"}},
-        note="An unlisted outer `mutable val` read by the body is an unlisted-capture diagnostic at the reference: "
+        note="An unlisted outer `var mutable` read by the body is an unlisted-capture diagnostic at the reference: "
              "the compiler never silently converts it into a capture",
         src="""func run(): func(Integer): Integer {
-    mutable val offset = 100
+    var mutable offset = 100
     return func(value: Integer): Integer {
         return value + offset
     }
@@ -626,10 +630,10 @@ print("EXECUTED-INVALID")
     dict(
         tid="SOL-TCK-0459", req="REQ-3321", cat="names", outcome="COMPILE_ERROR",
         exp={"diagnostic": {"code": "SOLV-SEM-058"}},
-        note="A body reference to an outer `val` the capture list omits is reported on the body reference, "
+        note="A body reference to an outer `var` the capture list omits is reported on the body reference, "
              "which is where an omitted capture becomes visible",
         src="""func run(): func(Integer): Integer {
-    val offset = 100
+    var offset = 100
     return func(value: Integer): Integer {
         return value + offset
     }
@@ -644,7 +648,7 @@ print("EXECUTED-INVALID")
         note="The unlisted-capture rule applies to the receiver too: a body may use `this` only when `[this]` "
              "is written",
         src="""class Holder {
-    mutable val n: Integer = 1
+    var mutable n: Integer = 1
 
     func read(): func(): Integer {
         return func(): Integer {
@@ -721,13 +725,13 @@ print("EXECUTED-INVALID")
              "binding with no capture entry and a body local may be declared, while the outer value stays "
              "readable outside",
         src="""func run(): String {
-    val width = 100
-    val inner = func(width: Integer): String {
-        val doubled = width * 2
+    var width = 100
+    var inner = func(width: Integer): String {
+        var doubled = width * 2
         return doubled.toString()
     }
-    val shadowed = func(): Integer {
-        val width = 7
+    var shadowed = func(): Integer {
+        var width = 7
         return width
     }
     return inner(3) .. "|" .. shadowed().toString() .. "|" .. width.toString()
@@ -757,7 +761,7 @@ print("EXECUTED-INVALID")
         note="Anonymous self-recursion through the binding being initialized is a read-before-initialization "
              "error, and the body never mentions the name so the report is about the capture item alone",
         src="""func run(): func(Integer): Integer {
-    val selfRef = func [selfRef](value: Integer): Integer {
+    var selfRef = func [selfRef](value: Integer): Integer {
         return value
     }
     return selfRef

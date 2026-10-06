@@ -13,7 +13,7 @@ class Registry {
 }
 
 func use() {
-    val factory: Any = Registry.make
+    var factory: Any = Registry.make
     print("bound")
 }
 

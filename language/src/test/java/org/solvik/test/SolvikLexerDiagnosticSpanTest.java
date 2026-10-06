@@ -148,7 +148,7 @@ public final class SolvikLexerDiagnosticSpanTest {
 
     @Test
     public void anErrorDeepInALoneCarriageReturnFileIsNotClampedToTheFirstLine() {
-        String text = "val a = 1\rval b = 2\rval @ = 3\r";
+        String text = "var a = 1\rvar b = 2\rvar @ = 3\r";
         List<Diagnostic> diagnostics = lexicalDiagnostics(text);
         assertThat(diagnostics).hasSize(1);
         Diagnostic d = diagnostics.get(0);
@@ -178,7 +178,7 @@ public final class SolvikLexerDiagnosticSpanTest {
     public void lexicalAndParserDiagnosticsCoexistInALoneCarriageReturnFile() {
         // The bad character ends the statement, so the following `=` is a separate parser error; the
         // lexer span must be exact while the parser span keeps its own token-derived position.
-        String text = "val a = 1\rval b = 2\rval @ = 3\r";
+        String text = "var a = 1\rvar b = 2\rvar @ = 3\r";
         SourceFile file = source(text);
         SolvikParseResult result = SolvikParser.parse(file);
         Diagnostic lexerError = null;
@@ -207,7 +207,7 @@ public final class SolvikLexerDiagnosticSpanTest {
 
     @Test
     public void unterminatedStringSpanStartsAtItsOpeningQuote() {
-        String text = "func f(): Unit {\n    val s = \"oops;\n}\n";
+        String text = "func f(): Unit {\n    var s = \"oops;\n}\n";
         SourceFile file = source(text);
         SolvikParseResult result = SolvikParser.parse(file);
         Diagnostic d = firstWithCode(result, DiagnosticCode.LEXER_ERROR);
@@ -219,7 +219,7 @@ public final class SolvikLexerDiagnosticSpanTest {
 
     @Test
     public void multiCharacterLiteralSpansCoverBothReportedFailures() {
-        String text = "func f(): Unit {\n    val c = 'ab';\n}\n";
+        String text = "func f(): Unit {\n    var c = 'ab'\n}\n";
         SourceFile file = source(text);
         SolvikParseResult result = SolvikParser.parse(file);
         List<Diagnostic> lexical = new ArrayList<>();
@@ -238,7 +238,7 @@ public final class SolvikLexerDiagnosticSpanTest {
     public void unterminatedRawStringKeepsItsOpeningDelimiterSpan() {
         // The raw-string diagnostic is a distinct code positioned at the opening delimiter, and it
         // names the exact closing delimiter that was expected.
-        String text = "func f(): Unit {\n    val s = r#\"abc;\n}\n";
+        String text = "func f(): Unit {\n    var s = r#\"abc\n}\n";
         SourceFile file = source(text);
         SolvikParseResult result = SolvikParser.parse(file);
         Diagnostic d = firstWithCode(result, DiagnosticCode.LEXER_UNTERMINATED_RAW_STRING);
@@ -262,7 +262,7 @@ public final class SolvikLexerDiagnosticSpanTest {
     public void everyLexicalDiagnosticSpanSelectsASingleOffendingCharacter() {
         // A one-character span is the invariant these diagnostics rely on for a caret-style display,
         // regardless of which reporting path produced the span.
-        String[] inputs = {"@", "@@@", "a@b", "func f(): Unit {\n @\n}\n", "func f(): Unit {\r @\r}\r", "\"abc", "'AB'", "\uFEFFval x = 1\n"};
+        String[] inputs = {"@", "@@@", "a@b", "func f(): Unit {\n @\n}\n", "func f(): Unit {\r @\r}\r", "\"abc", "'AB'", "\uFEFFvar x = 1\n"};
         for (String text : inputs) {
             for (Diagnostic d : lexicalDiagnostics(text)) {
                 assertThat(d.span().length()).as("span length for input " + style(text) + " in " + text.replace("\n", "\\n").replace("\r", "\\r")).isEqualTo(1);
@@ -276,7 +276,7 @@ public final class SolvikLexerDiagnosticSpanTest {
         // the parser reports nothing. SOLV-LEX-003 is raised against the whole literal by the
         // semantic layer (see SolvikExecutionNegativeTest), which is why the one-character
         // lexical-span rule above does not apply to it.
-        String text = "func f(): Unit {\n    val s = \"bad\\q\";\n}\n";
+        String text = "func f(): Unit {\n    var s = \"bad\\q\"\n}\n";
         SolvikParseResult result = SolvikParser.parse(source(text));
         assertThat(result.isSuccess()).isTrue();
         assertThat(result.diagnostics().all()).isEmpty();

@@ -1,15 +1,16 @@
 class Point {
-    val x: Integer
-    val y: Integer
+    var x: Integer
+    var y: Integer
 
     Point(x: Integer, y: Integer) {
         this.x = x
         this.y = y
     }
 }
-val a: Point? = Point(3, 4)
+var a: Point? = Point(3, 4)
 if (a === null) {
     print("isnull")
-} else {
+}
+else {
     print("el" .. a.y)
 }

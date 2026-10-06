@@ -2,7 +2,7 @@
 //   "`include P alias p` binds the prefix `p` to the included file's module instead."
 // and: "The included declarations are reached through the prefix with the `::` namespace
 // separator" -- the same qualified form the section shows for a class
-// (`val point: math::Point = math::Point(1)`).
+// (`var point: math::Point = math::Point(1)`).
 //
 // Expected bytes derived by hand from the program text:
 //   * `g::Point(6)` invokes the class constructor, whose parameter is written `v:
@@ -16,7 +16,7 @@
 // separator can enter the expected bytes.
 include "lib/m.sol" alias g
 
-val p: g::Point = g::Point(6)
+var p: g::Point = g::Point(6)
 print(p.x)
 print(" ")
 print(g::scale(3))

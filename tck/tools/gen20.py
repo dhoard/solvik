@@ -38,7 +38,7 @@ M_DEF = """func add(a: Integer, b: Integer): Integer {
 GEOM = """module geom
 
 class Point {
-    mutable val x: Integer
+    var mutable x: Integer
 
     Point(v: Integer) {
         this.x = v
@@ -73,7 +73,7 @@ print(com_example_math::add(2, 3))
 //   "`include P alias p` binds the prefix `p` to the included file's module instead."
 // and: "The included declarations are reached through the prefix with the `::` namespace
 // separator" -- the same qualified form the section shows for a class
-// (`val point: math::Point = math::Point(1)`).
+// (`var point: math::Point = math::Point(1)`).
 //
 // Expected bytes derived by hand from the program text:
 //   * `g::Point(6)` invokes the class constructor, whose parameter is written `v:
@@ -87,7 +87,7 @@ print(com_example_math::add(2, 3))
 // separator can enter the expected bytes.
 include "lib/m.sol" alias g
 
-val p: g::Point = g::Point(6)
+var p: g::Point = g::Point(6)
 print(p.x)
 print(" ")
 print(g::scale(3))
@@ -375,7 +375,7 @@ REQUIREMENTS = [
       kind="module", quotes=[
         "`include P alias p` binds the prefix `p` to the included file's module instead."],
       tests=["SOL-TCK-0093"],
-      notes="The section's own examples show both a function call and a class construction through a prefix (`val point: math::Point = math::Point(1)`), so the test covers one of each. Constructor argument passes through unchanged, verified against section 7's constructor rule."),
+      notes="The section's own examples show both a function call and a class construction through a prefix (`var point: math::Point = math::Point(1)`), so the test covers one of each. Constructor argument passes through unchanged, verified against section 7's constructor rule."),
  dict(id="REQ-1002", section="20. File Inclusion",
       summary="An `alias` naming a file in the implicit default module is rejected as SOLV-RESOL-014",
       kind="compile-time", quotes=[

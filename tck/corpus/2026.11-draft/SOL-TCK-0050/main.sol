@@ -11,7 +11,7 @@
 // baking the platform line separator into a portable oracle, which the specification
 // deliberately leaves platform-defined, so this test covers only the `..` clause.
 class Money {
-    val amount: Integer
+    var amount: Integer
 
     Money(amount: Integer) {
         this.amount = amount
@@ -22,5 +22,5 @@ class Money {
     }
 }
 
-val m: Any = Money(5)
+var m: Any = Money(5)
 print("[" .. m .. "]")

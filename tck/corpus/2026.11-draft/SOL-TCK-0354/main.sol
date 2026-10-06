@@ -5,7 +5,7 @@
 //   - `return;` is valid only in a function declared without a return type; `return value` requires the value to be assignable to the declared return type.
 //
 func f(): Integer {
-    return;
+    return
 }
 print(f())
 

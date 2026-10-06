@@ -98,7 +98,7 @@ public final class SymbolTable {
      * current scope, so ordinary code is unaffected.
      *
      * <p>A top-level binding counts, because the specification makes it one: "a top-level
-     * `val`, whether or not it is `mutable`, is therefore a local of the implicit main, not a
+     * `var`, whether or not it is `mutable`, is therefore a local of the implicit main, not a
      * global". A top-level
      * {@code func} does not, because it is declared in the root scope this walk stops at, which is what
      * makes the spec's "Recursion through named top-level functions needs no capture" hold.

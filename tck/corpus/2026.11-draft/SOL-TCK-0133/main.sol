@@ -12,12 +12,15 @@ class Probe {
         return "one"
     }
 }
-val result = switch (Probe().tick()) {
-    case "one":
+var result = switch (Probe().tick()) {
+    case "one" {
         "one"
-    case "two":
+    }
+    case "two" {
         "two"
-    default:
+    }
+    default {
         "other"
+    }
 }
 print(result)

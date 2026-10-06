@@ -1,6 +1,6 @@
 // Solvik toString and `..` concatenation: a class-specific representation plus scalar rendering.
 class Money {
-    val cents: Integer
+    var cents: Integer
 
     Money(cents: Integer) {
         this.cents = cents
@@ -11,11 +11,11 @@ class Money {
     }
 }
 
-val price = Money(1250)
+var price = Money(1250)
 println(price)
 println(price.toString())
 println("price=" .. price)
 println("scalars: " .. 3 .. ", " .. true .. ", " .. 'x' .. ", " .. 2.5)
 
-val missing: String? = null
+var missing: String? = null
 println(missing)

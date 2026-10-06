@@ -23,12 +23,17 @@ func takeAny(value: Any): String {
 
 // Every non-null function type has `Any` as its top supertype, so a function value is
 // assignable to `Any` and may be passed where `Any` is expected.
-val asAny: Any = format
+var asAny: Any = format
 
 // The shared type join understands function types: these two branches have identical
 // parameter types and identical result types, so the join is that function type and the
 // joined value stays callable.
-val flag: Boolean = true
-val joined = if (flag) { format } else { describe }
+var flag: Boolean = true
+var joined = if (flag) {
+    format
+}
+else {
+    describe
+}
 
 print(takeAny(asAny) .. "|" .. takeAny(joined) .. "|" .. joined(2))

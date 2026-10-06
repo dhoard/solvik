@@ -11,7 +11,8 @@
 func requireName(name: String?): String {
     return if (name != null) {
         name
-    } else {
+    }
+    else {
         return "fallback"
     }
 }

@@ -55,8 +55,8 @@ class Badge implements Label {
 }
 
 class ShapeCounter {
-    val inner: Shape
-    mutable val evaluations: Integer = 0
+    var inner: Shape
+    var mutable evaluations: Integer = 0
     ShapeCounter(inner: Shape) {
         this.inner = inner
     }
@@ -68,10 +68,10 @@ class ShapeCounter {
 
 // The receiver's runtime class selects the implementation, whether the reference is written against
 // the base type or the concrete one, and an inherited method binds what the table supplies.
-val shape: Shape = Shape()
-val triangle: Shape = Triangle()
-val shapeName: func(): String = shape.name
-val triangleName: func(): String = triangle.name
+var shape: Shape = Shape()
+var triangle: Shape = Triangle()
+var shapeName: func(): String = shape.name
+var triangleName: func(): String = triangle.name
 println(shapeName())
 println(triangleName())
 println(triangle.sides())
@@ -91,26 +91,26 @@ println(Triangle().viaSuper()())
 
 // Virtual dispatch reaches an interface member through an interface-typed receiver, including a
 // defaulted one, and it runs against the conforming instance.
-val badge: Label = Badge()
-val text: func(): String = badge.text
-val shout: func(): String = badge.shout
+var badge: Label = Badge()
+var text: func(): String = badge.text
+var shout: func(): String = badge.shout
 println(text())
 println(shout())
 
 // The receiver expression is evaluated exactly once, when the value is created.
-val counter = ShapeCounter(Shape())
-val before = counter.evaluations
-val method: func(): String = counter.target().name
+var counter = ShapeCounter(Shape())
+var before = counter.evaluations
+var method: func(): String = counter.target().name
 println(counter.evaluations - before)
 println(method())
 println(counter.evaluations - before)
 
 // Each successful evaluation creates a distinct identity, even for one receiver and method, and
 // copying through a binding preserves it. Display and hashing are the fixed function-value rules.
-val receiver = Shape()
-val first: func(): String = receiver.name
-val second: func(): String = receiver.name
-val copied = first
+var receiver = Shape()
+var first: func(): String = receiver.name
+var second: func(): String = receiver.name
+var copied = first
 println(first === second)
 println(copied === first)
 println(copied.toString())
@@ -119,22 +119,22 @@ println(copied.hashCode() == first.hashCode())
 
 // A reference through a nullable receiver is a nullable function value: null with a null receiver,
 // the bound method otherwise. On a non-null receiver `?.` keeps the non-null type.
-val absent: Shape? = null
-val none: (func(): String)? = absent?.name
+var absent: Shape? = null
+var none: (func(): String)? = absent?.name
 println(none)
-val present: Shape? = Triangle()
-val some: (func(): String)? = present?.name
+var present: Shape? = Triangle()
+var some: (func(): String)? = present?.name
 if (some != null) {
     println(some())
 }
-val concrete = Shape()
-val direct: func(): String = concrete?.name
+var concrete = Shape()
+var direct: func(): String = concrete?.name
 println(direct())
 
 // A property whose declared type is a function type reads its stored value; member resolution decides
 // statically which kind of read a name is, because no property and method share one member name.
 class Holder {
-    mutable val stored: func(): Integer
+    var mutable stored: func(): Integer
     func storedMethod(): Integer {
         return 4
     }
@@ -145,9 +145,9 @@ class Holder {
     }
 }
 
-val holder = Holder()
-val fromProperty: func(): Integer = holder.stored
-val fromMethod: func(): Integer = holder.storedMethod
+var holder = Holder()
+var fromProperty: func(): Integer = holder.stored
+var fromMethod: func(): Integer = holder.storedMethod
 println(fromProperty())
 println(fromMethod())
 
@@ -160,7 +160,7 @@ class Box {
 }
 
 class Cell<T> {
-    val stored: T
+    var stored: T
     Cell(stored: T) {
         this.stored = stored
     }
@@ -169,12 +169,12 @@ class Cell<T> {
     }
 }
 
-val box = Box()
-val pickInteger: func(Integer): Integer = box.pick
-val pickString: func(String): String = box.pick
+var box = Box()
+var pickInteger: func(Integer): Integer = box.pick
+var pickString: func(String): String = box.pick
 println(pickInteger(42))
 println(pickString("s"))
-val cell: Cell<Integer> = Cell(1)
-val swapString: func(String): String = cell.swap
+var cell: Cell<Integer> = Cell(1)
+var swapString: func(String): String = cell.swap
 println(swapString("swapped"))
 println(cell.stored)

@@ -15,7 +15,9 @@ specification rather than by adopting what the launcher prints:
     rejections here are asserted BARE. This is the same reading already applied to
     SOL-TCK-0135 and SOL-TCK-0204, applied consistently rather than re-decided.
   * `SOLV-TYPE-004` and `SOLV-PARS-001` occur ZERO times in the specification, so every
-    invalid-operand and every parse rejection in this batch is a bare `{}`.
+    invalid-operand and every parse rejection in this batch is a bare `{
+    }
+    `.
   * `SOLV-RESOL-004` is named, but only as "a member of a `Result` receiver that is not a
     `Result` operation", so an unknown member on an `Any` receiver is asserted bare.
   * `SOLV-TYPE-014` is named only as "a bare member read of a `Result` operation", so a
@@ -88,7 +90,7 @@ REQS = {
   summary="Assignments are statements, not value-producing expressions, so an assignment is rejected wherever an expression is required while a statement assignment to a mutable local is accepted",
   kind="syntax",
   notes="Four positions are refused -- nested inside another assignment, as an initializer, as a controlling condition, and as a call argument -- because 'not value-producing' is a statement about every expression position and one position alone cannot distinguish it from a local syntactic restriction. The accepted control assigns as a statement and prints the assigned value. Rejections are bare: the specification names no code for this, and these are parse-level refusals.",
-  quotes=["Assignments are statements, not value-producing expressions. The target must be a `mutable val` local or a `mutable val` property."]),
+  quotes=["Assignments are statements, not value-producing expressions. The target must be a `var mutable` local or a `var mutable` property."]),
  "REQ-1603": dict(
   section="3. Static and Strong Typing",
   summary="Operator precedence follows the stated tier order, with ?? the lowest tier and arithmetic tighter than the comparison and logical tiers above it",
@@ -129,7 +131,7 @@ NEG = '\nprint("EXECUTED-INVALID")\n'
 # Two classes with character-identical member declarations: a structural type system
 # would consider them interchangeable, Solvik must not.
 NOM = ('class A {\n'
-       '    val v: Integer\n'
+       '    var v: Integer\n'
        '\n'
        '    A(n: Integer) {\n'
        '        this.v = n\n'
@@ -141,7 +143,7 @@ NOM = ('class A {\n'
        '}\n'
        '\n'
        'class B {\n'
-       '    val v: Integer\n'
+       '    var v: Integer\n'
        '\n'
        '    B(n: Integer) {\n'
        '        this.v = n\n'
@@ -151,7 +153,7 @@ NOM = ('class A {\n'
        '        return this.v\n'
        '    }\n'
        '}\n')
-ASINGLE = 'class A {\n    val v: Integer\n\n    A(n: Integer) {\n        this.v = n\n    }\n\n' \
+ASINGLE = 'class A {\n    var v: Integer\n\n    A(n: Integer) {\n        this.v = n\n    }\n\n' \
           '    func get(): Integer {\n        return this.v\n    }\n}\n'
 
 S, EXPECT, CATEGORY, REQ_FOR = {}, {}, {}, {}
@@ -166,35 +168,35 @@ def add(tid, req, category, src, outcome, **exp):
 
 # --- REQ-1600 nominal typing.
 add("SOL-TCK-0206", "REQ-1600", "types",
-    NOM + 'val a = A(7)\nval b = B(8)\nprint("nom" .. a.get() .. b.get())\n',
+    NOM + 'var a = A(7)\nvar b = B(8)\nprint("nom" .. a.get() .. b.get())\n',
     "SUCCESS", stdout="nom78")
 add("SOL-TCK-0207", "REQ-1600", "types",
-    NOM + 'val b = B(8)\nval a: A = b\nprint(1)\n' + NEG, "COMPILE_ERROR", diag={})
+    NOM + 'var b = B(8)\nvar a: A = b\nprint(1)\n' + NEG, "COMPILE_ERROR", diag={})
 
 # --- REQ-1601 Any does not disable checking.
 add("SOL-TCK-0208", "REQ-1601", "types",
-    ASINGLE + 'val x: Any = A(1)\nprint(x.get())\n' + NEG, "COMPILE_ERROR", diag={})
+    ASINGLE + 'var x: Any = A(1)\nprint(x.get())\n' + NEG, "COMPILE_ERROR", diag={})
 add("SOL-TCK-0209", "REQ-1601", "types",
-    ASINGLE + 'val x: A = A(4)\nprint("own" .. x.get())\n', "SUCCESS", stdout="own4")
+    ASINGLE + 'var x: A = A(4)\nprint("own" .. x.get())\n', "SUCCESS", stdout="own4")
 add("SOL-TCK-0210", "REQ-1601", "types",
-    'val x: Any = "abc"\nval n: Integer = x\nprint(n)\n' + NEG, "COMPILE_ERROR", diag={})
+    'var x: Any = "abc"\nvar n: Integer = x\nprint(n)\n' + NEG, "COMPILE_ERROR", diag={})
 add("SOL-TCK-0211", "REQ-1601", "types",
-    ASINGLE + 'val x: Any = A(9)\nval a: A = x as A\nprint("cast" .. a.get())\n',
+    ASINGLE + 'var x: Any = A(9)\nvar a: A = x as A\nprint("cast" .. a.get())\n',
     "SUCCESS", stdout="cast9")
 add("SOL-TCK-0212", "REQ-1601", "types",
-    'val x: Any = 1\nprint(x + 1)\n' + NEG, "COMPILE_ERROR", diag={})
+    'var x: Any = 1\nprint(x + 1)\n' + NEG, "COMPILE_ERROR", diag={})
 
 # --- REQ-1602 assignment is a statement.
 add("SOL-TCK-0213", "REQ-1602", "syntax",
-    'mutable val a = 1\nmutable val b = 2\nb = a\nprint("stmt" .. b)\n', "SUCCESS", stdout="stmt1")
+    'var mutable a = 1\nvar mutable b = 2\nb = a\nprint("stmt" .. b)\n', "SUCCESS", stdout="stmt1")
 add("SOL-TCK-0214", "REQ-1602", "syntax",
-    'mutable val a = 1\nmutable val b = 2\nb = (a = 3)\nprint(b)\n' + NEG, "COMPILE_ERROR", diag={})
+    'var mutable a = 1\nvar mutable b = 2\nb = (a = 3)\nprint(b)\n' + NEG, "COMPILE_ERROR", diag={})
 add("SOL-TCK-0215", "REQ-1602", "syntax",
-    'mutable val a = 1\nval z = (a = 5)\nprint(z)\n' + NEG, "COMPILE_ERROR", diag={})
+    'var mutable a = 1\nvar z = (a = 5)\nprint(z)\n' + NEG, "COMPILE_ERROR", diag={})
 add("SOL-TCK-0216", "REQ-1602", "syntax",
-    'mutable val a = 1\nif (a = 2) {\n    print(1)\n}\n' + NEG, "COMPILE_ERROR", diag={})
+    'var mutable a = 1\nif (a = 2) {\n    print(1)\n}\n' + NEG, "COMPILE_ERROR", diag={})
 add("SOL-TCK-0217", "REQ-1602", "syntax",
-    'mutable val a = 1\nprint(a = 5)\n' + NEG, "COMPILE_ERROR", diag={})
+    'var mutable a = 1\nprint(a = 5)\n' + NEG, "COMPILE_ERROR", diag={})
 
 # --- REQ-1603 precedence tiers.
 add("SOL-TCK-0218", "REQ-1603", "syntax",
@@ -208,20 +210,20 @@ add("SOL-TCK-0221", "REQ-1603", "syntax",
 add("SOL-TCK-0222", "REQ-1603", "syntax",
     'print("is" .. (1 is Any == true))\n', "SUCCESS", stdout="istrue")
 add("SOL-TCK-0223", "REQ-1603", "syntax",
-    'val a: Integer? = 5\nprint(a ?? 1 == 2)\n' + NEG, "COMPILE_ERROR", diag={})
+    'var a: Integer? = 5\nprint(a ?? 1 == 2)\n' + NEG, "COMPILE_ERROR", diag={})
 add("SOL-TCK-0224", "REQ-1603", "syntax",
-    'val a: Integer? = 5\nprint("nn" .. ((a ?? 1) == 1))\n', "SUCCESS", stdout="nnfalse")
+    'var a: Integer? = 5\nprint("nn" .. ((a ?? 1) == 1))\n', "SUCCESS", stdout="nnfalse")
 
 # --- REQ-1604 short-circuit; REQ-1607 Boolean operand requirements.
 CF = 'func f(): Boolean {\n    print("c")\n    return true\n}\n'
 add("SOL-TCK-0225", "REQ-1604", "evaluation",
-    CF + 'val r = false && f()\nval s = true && f()\nprint("and" .. r .. s)\n',
+    CF + 'var r = false && f()\nvar s = true && f()\nprint("and" .. r .. s)\n',
     # `false && f()` short-circuits (no call); `true && f()` must evaluate f, so exactly one
     # "c" appears. Zero occurrences would mean the right operand is never evaluated at all,
     # which the second statement is present to rule out.
     "SUCCESS", stdout="candfalsetrue")
 add("SOL-TCK-0226", "REQ-1604", "evaluation",
-    CF + 'val r = true || f()\nval s = false || f()\nprint("or" .. r .. s)\n',
+    CF + 'var r = true || f()\nvar s = false || f()\nprint("or" .. r .. s)\n',
     # `true || f()` short-circuits and must not call f; `false || f()` cannot short-circuit
     # and must call it, so exactly one "c" is emitted and it precedes the final marker.
     "SUCCESS", stdout="cortruetrue")
@@ -247,15 +249,15 @@ add("SOL-TCK-0232", "REQ-1605", "evaluation",
 
 # --- REQ-1606 semantic comparability.
 add("SOL-TCK-0233", "REQ-1606", "equality",
-    NOM + 'val a = A(1)\nval b = B(1)\nprint(a == b)\n' + NEG, "COMPILE_ERROR", diag={})
+    NOM + 'var a = A(1)\nvar b = B(1)\nprint(a == b)\n' + NEG, "COMPILE_ERROR", diag={})
 add("SOL-TCK-0234", "REQ-1606", "equality",
-    NOM + 'val a = A(1)\nval b = B(1)\nval q: Any = a\nprint("esc" .. (q == b))\n',
+    NOM + 'var a = A(1)\nvar b = B(1)\nvar q: Any = a\nprint("esc" .. (q == b))\n',
     "SUCCESS", stdout="escfalse")
 add("SOL-TCK-0235", "REQ-1606", "equality",
-    NOM + 'val a = A(1)\nval b = B(1)\nprint("exp" .. a.equals(b))\n',
+    NOM + 'var a = A(1)\nvar b = B(1)\nprint("exp" .. a.equals(b))\n',
     "SUCCESS", stdout="expfalse")
 add("SOL-TCK-0236", "REQ-1606", "equality",
-    ASINGLE + 'val a = A(1)\nval q: Any = a\nprint("pcp" .. (a == q))\n',
+    ASINGLE + 'var a = A(1)\nvar q: Any = a\nprint("pcp" .. (a == q))\n',
     "SUCCESS", stdout="pcptrue")
 
 

@@ -67,7 +67,7 @@ public final class SolvikNullSafetySemanticTest {
     /** The canonical {@code Box} fixture used by the nullable member-access tests. */
     private static final String BOX = """
             class Box {
-                val value: Integer
+                var value: Integer
 
                 Box(value: Integer) {
                     this.value = value
@@ -77,13 +77,13 @@ public final class SolvikNullSafetySemanticTest {
 
     @Test
     public void nullLiteralHasTheNullType() {
-        CheckedProgram program = check("func f(): Unit {\n    val x = null\n}\n");
+        CheckedProgram program = check("func f(): Unit {\n    var x = null\n}\n");
         assertThat(program.typeOf(local(function(program, 0), 0).initializer()).orElseThrow()).isEqualTo(NullType.INSTANCE);
     }
 
     @Test
     public void nonNullValuesAreAssignableToNullableTypes() {
-        CheckedProgram program = check("func f(s: String): Unit {\n    val a: String? = s\n    val b: String? = null\n}\n");
+        CheckedProgram program = check("func f(s: String): Unit {\n    var a: String? = s\n    var b: String? = null\n}\n");
         FunctionDeclNode fn = function(program, 0);
         Type stringNullable = StringType.INSTANCE.nullableView();
         assertThat(program.symbolOf(local(fn, 0)).orElseThrow().type()).isEqualTo(stringNullable);
@@ -195,7 +195,7 @@ public final class SolvikNullSafetySemanticTest {
     public void aVarNarrowsTheSameWayUntilItIsWritten() {
         CheckedProgram program = check(BOX + """
                 func f(): Integer {
-                    mutable val box: Box? = Box(1)
+                    var mutable box: Box? = Box(1)
                     if (box != null) {
                         return box.value
                     }
@@ -227,7 +227,7 @@ public final class SolvikNullSafetySemanticTest {
     public void aWhileConditionNarrowsItsBody() {
         CheckedProgram program = check(BOX + """
                 func f(box: Box?): Integer {
-                    mutable val total: Integer = 0
+                    var mutable total: Integer = 0
                     while (box != null) {
                         total = total + box.value
                     }
@@ -248,7 +248,8 @@ public final class SolvikNullSafetySemanticTest {
                 func f(box: Box?): Integer {
                     if (box == null) {
                         return 0
-                    } else {
+                    }
+                    else {
                         return box.value
                     }
                 }
@@ -265,14 +266,14 @@ public final class SolvikNullSafetySemanticTest {
     public void nullablePropertiesAreStoredAndRead() {
         CheckedProgram program = check("""
                 class Holder {
-                    mutable val name: String?
+                    var mutable name: String?
 
                     Holder(name: String?) {
                         this.name = name
                     }
                 }
                 func f(): Unit {
-                    val holder = Holder(null)
+                    var holder = Holder(null)
                     holder.name = "Doug"
                 }
                 """);

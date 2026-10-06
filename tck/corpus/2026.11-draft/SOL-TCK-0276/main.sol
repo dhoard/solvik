@@ -1,5 +1,5 @@
 class C {
-    val equals: Integer
+    var equals: Integer
 
     C(equals: Integer) {
         this.equals = equals

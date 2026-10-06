@@ -22,7 +22,7 @@ import java.util.Objects;
  * positions from authoritative {@link SourceSpan} offsets.
  *
  * <p>Physical line breaks are {@code \n}, {@code \r}, and {@code \r\n} (counted as one break). This
- * mirrors the physical-newline notion that semicolon insertion (Phase 2) will rely on.
+ * mirrors the physical-newline notion that statement termination relies on.
  */
 public final class SourceFile {
 

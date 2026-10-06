@@ -26,8 +26,8 @@ class B implements SpeakerB {
 }
 
 class Hub implements SpeakerA {
-    delegate val x: SpeakerA
-    delegate val y: SpeakerB
+    delegate var x: SpeakerA
+    delegate var y: SpeakerB
 
     Hub(x: SpeakerA, y: SpeakerB) {
         this.x = x

@@ -1,4 +1,4 @@
-val s: String? = "ab"
-val t = "ab"
-val r: Boolean? = s?.equals(t)
+var s: String? = "ab"
+var t = "ab"
+var r: Boolean? = s?.equals(t)
 print("eq" .. r)

@@ -6,9 +6,10 @@
 // but names no diagnostic code for this site, and the implementation's own code for it does
 // not appear anywhere in LANGUAGE_SPEC.md, so pinning one here would assert a choice the
 // specification never made.
-val v = if (7) {
+var v = if (7) {
     "yes"
-} else {
+}
+else {
     "no"
 }
 print("EXECUTED-INVALID")

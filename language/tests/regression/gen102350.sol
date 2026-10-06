@@ -1,4 +1,4 @@
-val m1: Map<String, Integer> = Map("a": 1, "b": 2)
+var m1: Map<String, Integer> = Map("a": 1, "b": 2)
 
 m1.put("c", 3)
 
@@ -9,7 +9,12 @@ println(m1.containsKey("c"))
 println(m1.size)
 
 func either2(flag: Boolean): Any {
-    return if (flag) { 'b' } else { 81 }
+    return if (flag) {
+        'b'
+    }
+    else {
+        81
+    }
 }
 
 println(either2(true) is Any)

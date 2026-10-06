@@ -63,8 +63,8 @@ public final class SolvikDelegateNegativeTest {
                     func print(): Unit
                 }
                 class X implements PrinterA, PrinterB {
-                    delegate val a: PrinterA
-                    delegate val b: PrinterB
+                    delegate var a: PrinterA
+                    delegate var b: PrinterB
 
                     X(a: PrinterA, b: PrinterB) {
                         this.a = a
@@ -82,8 +82,8 @@ public final class SolvikDelegateNegativeTest {
                     func print(): Unit
                 }
                 class X implements Printer {
-                    delegate val a: Printer
-                    delegate val b: Printer
+                    delegate var a: Printer
+                    delegate var b: Printer
 
                     X(a: Printer, b: Printer) {
                         this.a = a
@@ -100,7 +100,7 @@ public final class SolvikDelegateNegativeTest {
                 class MemoryRepository {
                 }
                 class Service {
-                    delegate val repository: MemoryRepository = MemoryRepository()
+                    delegate var repository: MemoryRepository = MemoryRepository()
                 }
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_INVALID_DELEGATE_TYPE);
@@ -110,7 +110,7 @@ public final class SolvikDelegateNegativeTest {
     public void aBuiltinTypedDelegateIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 class Service {
-                    delegate val value: Integer = 1
+                    delegate var value: Integer = 1
                 }
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_INVALID_DELEGATE_TYPE);
@@ -120,7 +120,7 @@ public final class SolvikDelegateNegativeTest {
     public void anUnknownDelegateTypeIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 class Service {
-                    delegate val repository: Missing
+                    delegate var repository: Missing
                 }
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_TYPE);
@@ -133,7 +133,7 @@ public final class SolvikDelegateNegativeTest {
                     func name(): String
                 }
                 class Service implements Named {
-                    delegate val named: Named
+                    delegate var named: Named
                 }
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_CLASS_REQUIRES_INITIALIZER);
@@ -146,7 +146,7 @@ public final class SolvikDelegateNegativeTest {
                     func name(): String
                 }
                 class Service implements Named {
-                    delegate val named: Named
+                    delegate var named: Named
 
                     Service() {
                     }
@@ -162,7 +162,7 @@ public final class SolvikDelegateNegativeTest {
                     func name(): String
                 }
                 class Service implements Named {
-                    delegate val named: Named
+                    delegate var named: Named
 
                     Service(named: Named) {
                         this.named = named
@@ -180,7 +180,7 @@ public final class SolvikDelegateNegativeTest {
                     func name(): String
                 }
                 class Service implements Named {
-                    delegate val named: Named
+                    delegate var named: Named
 
                     Service(named: Named) {
                         this.named = named
@@ -205,7 +205,7 @@ public final class SolvikDelegateNegativeTest {
                     func put(value: String): Unit
                 }
                 class Service implements Sink {
-                    delegate val sink: StringSink
+                    delegate var sink: StringSink
 
                     Service(sink: StringSink) {
                         this.sink = sink
@@ -225,7 +225,7 @@ public final class SolvikDelegateNegativeTest {
                     func get(): Any
                 }
                 class Service implements Producer {
-                    delegate val producer: AnyProducer
+                    delegate var producer: AnyProducer
 
                     Service(producer: AnyProducer) {
                         this.producer = producer
@@ -242,8 +242,8 @@ public final class SolvikDelegateNegativeTest {
                     func name(): String
                 }
                 class Service implements Named {
-                    val named: Integer = 1
-                    delegate val named: Named = Memory()
+                    var named: Integer = 1
+                    delegate var named: Named = Memory()
                 }
                 class Memory implements Named {
                     func name(): String {
@@ -261,7 +261,7 @@ public final class SolvikDelegateNegativeTest {
                     func name(): String
                 }
                 class Service implements Named {
-                    delegate val run: Named
+                    delegate var run: Named
 
                     Service(run: Named) {
                         this.run = run
@@ -281,7 +281,7 @@ public final class SolvikDelegateNegativeTest {
                     func name(): String
                 }
                 class Service implements Named {
-                    delegate val named: Named = 1
+                    delegate var named: Named = 1
                 }
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
@@ -297,8 +297,8 @@ public final class SolvikDelegateNegativeTest {
                     func print(): Unit
                 }
                 class X implements PrinterA, PrinterB {
-                    delegate val a: PrinterA
-                    delegate val b: PrinterB
+                    delegate var a: PrinterA
+                    delegate var b: PrinterB
 
                     X(a: PrinterA, b: PrinterB) {
                         this.a = a

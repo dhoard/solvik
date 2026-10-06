@@ -65,11 +65,11 @@ public final class SolvikRangeParserTest {
 
     @Test
     public void rangeBodyIsTheLoopBody() {
-        String src = "func f(): Unit {\n    for (i in 1...3) {\n        val doubled = i + i\n    }\n}\n";
+        String src = "func f(): Unit {\n    for (i in 1...3) {\n        var doubled = i + i\n    }\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("range.sol", src));
         ForInStmtNode loop = (ForInStmtNode) body(fn).statements().get(0);
         assertThat(loop.body().statements().size()).isEqualTo(1);
-        assertNode(loop.body().statements().get(0), AstKind.LOCAL_DECL, src, "val doubled = i + i");
+        assertNode(loop.body().statements().get(0), AstKind.LOCAL_DECL, src, "var doubled = i + i");
     }
 
     @Test

@@ -12,8 +12,8 @@ were never committed; they are corrected in place, exactly as the
 run.
 
 Those unowned records still *described* the removed vocabulary in their free
-text: REQ-2900 opens "`var` declares a mutable binding or property", which after
-this change is a sentence about syntax the language no longer has. Requirement
+text: REQ-0300 opens "`val` declares an immutable binding or property", which
+after this change is a sentence about syntax the language no longer has. Requirement
 prose is the human-facing statement of the verdict, so leaving it stale would
 make the inventory disagree with the spec it cites -- the same defect the quote
 sync repaired, one level up.
@@ -21,8 +21,7 @@ sync repaired, one level up.
 This tool rewrites only `summary` and the free-text evidence strings, and only
 with rules whose right-hand side contains none of the removed keywords, so it is
 idempotent. The `quote` fields are deliberately *not* touched here: those must
-match the spec verbatim and are synchronized by
-`tools/sync-requirement-from-generator.py` / `tools/regenerate-inventory.py`.
+match the spec verbatim and are synchronized by the generators that own them.
 
 Records owned by a committed generator are skipped: rewriting them here would
 break the byte-for-byte reproduction `verify_regen.py` asserts, and their prose
@@ -58,20 +57,10 @@ INV_PATH = os.path.join(ROOT, 'tck', 'requirements', 'requirements.json')
 # keyed on the backticked keyword or a fixed phrase so it cannot fire on
 # ordinary English. Order matters: longer phrases first.
 PROSE_RULES = [
-    (r'\*\*`var` and `mutable val`\*\*', '**`val` and `mutable val`**'),
-    (r'`var` and `mutable val`', '`val` and `mutable val`'),
-    (r'`var` or `val`', '`val` or `mutable val`'),
-    (r'`var` and `val`', '`mutable val` and `val`'),
-    (r'`var` declares', '`mutable val` declares'),
-    (r'`var` property', '`mutable val` property'),
-    (r'`var` invalidates', '`mutable val` invalidates'),
-    (r'`var` narrowed', '`mutable val` narrowed'),
-    (r'`var` named', '`mutable val` named'),
-    (r'`var` local', '`mutable val` local'),
-    (r'`var` may be reassigned', '`mutable val` may be reassigned'),
-    (r'`var` binding', '`mutable val` binding'),
-    (r'\bdeclared `var`', 'declared `mutable val`'),
-    (r'a local declared `var`', 'a local declared `mutable val`'),
+    (r'`mutable val`', '`var mutable`'),
+    (r'\bmutable val\b', 'var mutable'),
+    (r'`val`', '`var`'),
+    (r'\bval\b', 'var'),
     (r'overriding an `open` member', 'overriding a `mutable` member'),
     (r'`open` or `override`', '`mutable` or `override`'),
     (r'an `open` member', 'a `mutable` member'),
@@ -97,7 +86,7 @@ PROSE_RULES = [
     (r'permitted subtypes', 'subclasses'),
     (r'permitted-subtype set', 'subclass relation'),
 ]
-REMOVED = re.compile(r'\b(var|sealed)\b|`open`')
+REMOVED = re.compile(r'\b(val|sealed)\b|`open`')
 
 def generator_owned_requirement_ids():
     """Requirement ids written by a committed generator, determined empirically.
@@ -162,11 +151,11 @@ def stale_records(requirements):
         ev = rec.get('evidence', {})
         if isinstance(ev, dict):
             for key in ('oracle', 'notes', 'failureModes', 'supersededReason'):
-                val = ev.get(key)
-                if isinstance(val, str):
-                    fields.append(val)
-                elif isinstance(val, list):
-                    fields.extend(x for x in val if isinstance(x, str))
+                value = ev.get(key)
+                if isinstance(value, str):
+                    fields.append(value)
+                elif isinstance(value, list):
+                    fields.extend(x for x in value if isinstance(x, str))
         hits = sorted({m.group(0) for text in fields for m in REMOVED.finditer(text)})
         if hits:
             out.append((rid, hits))
@@ -187,7 +176,7 @@ def check():
               "generator literal that produces it" % len(stale), file=sys.stderr)
         return 1
     print("requirement-prose: OK -- no requirement summary or evidence note still "
-          "describes `var`, `open`, or `sealed` as Solvik syntax")
+          "describes `val`, `open`, or `sealed` as Solvik syntax")
     return 0
 
 
@@ -216,13 +205,13 @@ def main():
         ev = rec.get('evidence', {})
         if isinstance(ev, dict):
             for key in ('oracle', 'notes', 'failureModes', 'supersededReason'):
-                val = ev.get(key)
-                if isinstance(val, str):
-                    ev[key] = repair_string_field(val, log, f"{rid}.evidence.{key}")
-                elif isinstance(val, list):
+                value = ev.get(key)
+                if isinstance(value, str):
+                    ev[key] = repair_string_field(value, log, f"{rid}.evidence.{key}")
+                elif isinstance(value, list):
                     ev[key] = [repair_string_field(x, log, f"{rid}.evidence.{key}[{i}]")
                                if isinstance(x, str) else x
-                               for i, x in enumerate(val)]
+                               for i, x in enumerate(value)]
         touched += 1
         if len(log) - unhandled_before == 0:
             unhandled.append(rid)

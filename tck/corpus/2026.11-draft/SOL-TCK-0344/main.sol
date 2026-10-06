@@ -23,5 +23,5 @@ class RockMaker implements Maker {
         return Rock()
     }
 }
-val m: Maker = RockMaker()
+var m: Maker = RockMaker()
 print("EXECUTED-INVALID")

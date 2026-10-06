@@ -9,7 +9,7 @@
 // argument satisfies section 11's requirement that each initial element "must be
 // assignable to the element type", and the two type arguments written are identical, which
 // invariance always permits. The expected bytes follow from section 11's table entry
-// `val size: Integer` for a list built from one element, which makes size 1, and from
+// `var size: Integer` for a list built from one element, which makes size 1, and from
 // section 3's `..`, which concatenates its operands: `"base="` followed by `1` is
 // `base=1`.
 // Why this control is required: without it, a rejection of SOL-TCK-0091 could be caused by
@@ -28,5 +28,5 @@ mutable class Base {
 class Derived extends Base {
 }
 
-val items = List<Base>(Derived())
+var items = List<Base>(Derived())
 print("base=" .. items.size)

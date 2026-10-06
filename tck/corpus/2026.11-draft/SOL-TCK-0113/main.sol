@@ -4,30 +4,39 @@
 // Oracle quotations verified verbatim against docs/LANGUAGE_SPEC.md:
 //   - Regex patterns may be used in `switch` cases
 //
-val a = "42"
+var a = "42"
 switch (a) {
-  case regex r#"^\d+$"#:
+  case regex r#"^\d+$"# {
     print("[number] ")
-  case regex r#"^[A-Za-z]+$"#:
+  }
+  case regex r#"^[A-Za-z]+$"# {
     print("[word] ")
-  default:
+  }
+  default {
     print("[other] ")
+  }
 }
-val b = "hi"
+var b = "hi"
 switch (b) {
-  case regex r#"^\d+$"#:
+  case regex r#"^\d+$"# {
     print("[number] ")
-  case regex r#"^[A-Za-z]+$"#:
+  }
+  case regex r#"^[A-Za-z]+$"# {
     print("[word] ")
-  default:
+  }
+  default {
     print("[other] ")
+  }
 }
-val c = "!!"
+var c = "!!"
 switch (c) {
-  case regex r#"^\d+$"#:
+  case regex r#"^\d+$"# {
     print("[number] ")
-  case regex r#"^[A-Za-z]+$"#:
+  }
+  case regex r#"^[A-Za-z]+$"# {
     print("[word] ")
-  default:
+  }
+  default {
     print("[other] ")
+  }
 }

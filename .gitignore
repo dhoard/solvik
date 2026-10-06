@@ -20,3 +20,9 @@ __pycache__/
 .project
 .classpath
 .factorypath
+
+# Amanda agent runtime and its session state: the launcher distribution (amanda/) and the
+# per-checkpoint session directory (.amanda/). Neither is project content and neither may be
+# committed; see AGENTS.md "Build" for the wrappers that are.
+/amanda/
+/.amanda/

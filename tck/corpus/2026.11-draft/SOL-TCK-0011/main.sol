@@ -7,12 +7,12 @@
 // The "does not also fabricate a branch-type mismatch" clause is part of the oracle: the
 // expected diagnostic is SOLV-SEM-042 specifically, not SOLV-TYPE-038 (the branch-result
 // code from the same table). Section 21.4 also notes statement-style `if` remains valid
-// without `else`, so the trigger here is `if` used in expression position (a `val`
+// without `else`, so the trigger here is `if` used in expression position (a `var`
 // initializer) with no `else`.
 //
 // Sentinel per TCK.md section 10; the compile-only phase proves non-execution.
-val flag: Boolean = true
-val label: String = if (flag) {
+var flag: Boolean = true
+var label: String = if (flag) {
     "yes"
 }
 println("EXECUTED-INVALID")

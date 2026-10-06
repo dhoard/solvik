@@ -12,9 +12,9 @@ func get(): Result<Integer, String> {
     return Result.Err("x")
 }
 func use(): Result<Integer, String> {
-    val v = get()?;
+    var v = get()?
     print("AFTER")
     return Result.Ok(v)
 }
-val r = use()
+var r = use()
 print("err=" .. r.isErr())

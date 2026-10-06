@@ -8,5 +8,5 @@ abstract class Shape {
     Shape() {
     }
 }
-val s = Shape()
+var s = Shape()
 print("EXECUTED-INVALID")

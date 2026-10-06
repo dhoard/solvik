@@ -229,7 +229,7 @@ public final class SolvikModuleTest {
     @Test
     public void sameNameInDifferentModulesCoexists() {
         SemanticResult result = analyze(resolve("root.sol", Map.of( //
-                        "root.sol", "include \"a.sol\" alias a\ninclude \"b.sol\" alias b\nval x: a::User = a::User()\nval y: b::User = b::User()\n", //
+                        "root.sol", "include \"a.sol\" alias a\ninclude \"b.sol\" alias b\nvar x: a::User = a::User()\nvar y: b::User = b::User()\n", //
                         "a.sol", "module mod_a\nclass User {\n}\n", //
                         "b.sol", "module mod_b\nclass User {\n}\n")));
         assertThat(result.isSuccess()).as("expected success but got " + result.diagnostics().all()).isTrue();
@@ -256,7 +256,7 @@ public final class SolvikModuleTest {
     @Test
     public void qualifiedFunctionCallResolves() {
         SemanticResult result = analyze(resolve("root.sol", Map.of( //
-                        "root.sol", "include \"m.sol\" alias m\nval r: Integer = m::add(1, 2)\n", //
+                        "root.sol", "include \"m.sol\" alias m\nvar r: Integer = m::add(1, 2)\n", //
                         "m.sol", "module math_util\nfunc add(a: Integer, b: Integer): Integer {\n    return a + b\n}\n")));
         assertThat(result.isSuccess()).as("expected success but got " + result.diagnostics().all()).isTrue();
     }
@@ -265,7 +265,7 @@ public final class SolvikModuleTest {
     public void dotSeparatedReferenceIsNotModuleAccess() {
         // `.` is member access, so `m.add` is a member access on an unknown value `m`, not a call.
         SemanticResult result = analyze(resolve("root.sol", Map.of( //
-                        "root.sol", "include \"m.sol\" alias m\nval r: Integer = m.add(1, 2)\n", //
+                        "root.sol", "include \"m.sol\" alias m\nvar r: Integer = m.add(1, 2)\n", //
                         "m.sol", "module math_util\nfunc add(a: Integer, b: Integer): Integer {\n    return a + b\n}\n")));
         assertDiagnostic(result, DiagnosticCode.RESOL_UNKNOWN_NAME);
     }
@@ -273,7 +273,7 @@ public final class SolvikModuleTest {
     @Test
     public void unaliasedModulePrefixResolves() {
         SemanticResult result = analyze(resolve("root.sol", Map.of( //
-                        "root.sol", "include \"m.sol\"\nval r: Integer = math_util::add(1, 2)\n", //
+                        "root.sol", "include \"m.sol\"\nvar r: Integer = math_util::add(1, 2)\n", //
                         "m.sol", "module math_util\nfunc add(a: Integer, b: Integer): Integer {\n    return a + b\n}\n")));
         assertThat(result.isSuccess()).as("expected success but got " + result.diagnostics().all()).isTrue();
     }
@@ -281,15 +281,15 @@ public final class SolvikModuleTest {
     @Test
     public void qualifiedConstructionResolves() {
         SemanticResult result = analyze(resolve("root.sol", Map.of( //
-                        "root.sol", "include \"m.sol\" alias m\nval b: m::Box = m::Box(7)\n", //
-                        "m.sol", "module box_mod\nclass Box {\n    val v: Integer\n    Box(v: Integer) {\n        this.v = v\n    }\n}\n")));
+                        "root.sol", "include \"m.sol\" alias m\nvar b: m::Box = m::Box(7)\n", //
+                        "m.sol", "module box_mod\nclass Box {\n    var v: Integer\n    Box(v: Integer) {\n        this.v = v\n    }\n}\n")));
         assertThat(result.isSuccess()).as("expected success but got " + result.diagnostics().all()).isTrue();
     }
 
     @Test
     public void qualifiedEnumVariantResolves() {
         SemanticResult result = analyze(resolve("root.sol", Map.of( //
-                        "root.sol", "include \"m.sol\" alias m\nval r: m::Result = m::Result.Ok(1)\n", //
+                        "root.sol", "include \"m.sol\" alias m\nvar r: m::Result = m::Result.Ok(1)\n", //
                         "m.sol", "module res_mod\nenum Result {\n    Ok(Integer)\n    Error(String)\n}\n")));
         assertThat(result.isSuccess()).as("expected success but got " + result.diagnostics().all()).isTrue();
     }
@@ -322,7 +322,7 @@ public final class SolvikModuleTest {
     @Test
     public void crossModuleEnumMatchResolves() {
         SemanticResult result = analyze(resolve("root.sol", Map.of( //
-                        "root.sol", "include \"m.sol\" alias m\nval r: m::Result = m::Result.Ok(5)\nval text = match r {\n    Ok(v) => \"ok\"\n    Error(e) => \"err\"\n}\n", //
+                        "root.sol", "include \"m.sol\" alias m\nvar r: m::Result = m::Result.Ok(5)\nvar text = match r {\n    Ok(v) => \"ok\"\n    Error(e) => \"err\"\n}\n", //
                         "m.sol", "module res_mod\nenum Result {\n    Ok(Integer)\n    Error(String)\n}\n")));
         assertThat(result.isSuccess()).as("expected success but got " + result.diagnostics().all()).isTrue();
     }
@@ -338,7 +338,7 @@ public final class SolvikModuleTest {
     @Test
     public void userDeclaredObjectIsAllowedInANamedModule() {
         SemanticResult result = analyze(resolve("root.sol", Map.of( //
-                        "root.sol", "include \"o.sol\" alias o\nval value: o::Object = o::Object()\n", //
+                        "root.sol", "include \"o.sol\" alias o\nvar value: o::Object = o::Object()\n", //
                         "o.sol", "module obj_mod\nclass Object {\n}\n")));
         assertThat(result.isSuccess()).as("expected success but got " + result.diagnostics().all()).isTrue();
     }

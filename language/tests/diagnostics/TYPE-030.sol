@@ -8,7 +8,7 @@ func identity<T>(value: T): T {
 }
 
 func demo(): Unit {
-    val ambiguous = identity
+    var ambiguous = identity
 }
 
 print(demo)

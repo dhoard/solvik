@@ -4,11 +4,13 @@
 // Oracle quotations verified verbatim against docs/LANGUAGE_SPEC.md:
 //   - Regex cases require a `String` switch value.
 //
-val x = 1
+var x = 1
 switch (x) {
-    case regex r"1":
+    case regex r"1" {
         print("one")
-    default:
+    }
+    default {
+    }
         print("d")
 }
 print("EXECUTED-INVALID")

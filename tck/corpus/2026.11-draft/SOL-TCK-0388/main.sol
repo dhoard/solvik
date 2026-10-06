@@ -5,10 +5,10 @@
 //   - The compiler must narrow the type where the checked value is stable and no intervening write can invalidate the refinement.
 //
 func f(v: Any): Integer {
-    mutable val x: Any = v
+    var mutable x: Any = v
     if (x is String) {
         x = 1
-        val s: String = x
+        var s: String = x
         return 1
     }
     return 0

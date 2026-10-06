@@ -5,34 +5,41 @@
 // Four of those named contexts appear here, each producing a fixed value: assignment
 // right-hand side yields 10, call argument yields "n", explicit return yields "nonzero",
 // and a nested construct yields 2. Expected stdout is exactly "10nnonzero2".
-mutable val score: Integer = 0
+var mutable score: Integer = 0
 score = if (true) {
     10
-} else {
+}
+else {
     0
 }
 print(score)
 print(if (false) {
     "d"
-} else {
+}
+else {
     "n"
-})
+}
+)
 func classify(value: Integer): String {
     return switch (value) {
-        case 0:
+        case 0 {
             "zero"
-        default:
+        }
+        default {
             "nonzero"
+        }
     }
 }
 print(classify(5))
-val nested = if (true) {
+var nested = if (true) {
     if (false) {
         1
-    } else {
+    }
+    else {
         2
     }
-} else {
+}
+else {
     3
 }
 print(nested)

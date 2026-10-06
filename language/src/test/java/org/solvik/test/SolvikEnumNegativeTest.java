@@ -117,7 +117,7 @@ public final class SolvikEnumNegativeTest {
     public void anEnumNameCannotBeUsedAsAValue() {
         assertThat(first(checkFails(RESULT + """
                 func f(): Unit {
-                    val r: Result = Result
+                    var r: Result = Result
                 }
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_ENUM_AS_VALUE);
     }
@@ -189,7 +189,7 @@ public final class SolvikEnumNegativeTest {
                     None
                 }
                 func f(): Unit {
-                    val none = Option.None
+                    var none = Option.None
                 }
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_CANNOT_INFER);
     }

@@ -55,12 +55,15 @@ public final class SolvikSwitchParserTest {
         CompilationUnitNode unit = parseOk("s.sol", """
                 func run(value: Integer): Unit {
                     switch (value) {
-                        case 1:
+                        case 1 {
                             print("one")
-                        case 2:
+                        }
+                        case 2 {
                             print("two")
-                        default:
+                        }
+                        default {
                             print("other")
+                        }
                     }
                 }
                 """);
@@ -80,10 +83,12 @@ public final class SolvikSwitchParserTest {
         CompilationUnitNode unit = parseOk("s.sol", """
                 func run(value: Integer): Unit {
                     switch (value) {
-                        case 1, 2, 3:
+                        case 1, 2, 3 {
                             print("small")
-                        default:
+                        }
+                        default {
                             print("other")
+                        }
                     }
                 }
                 """);
@@ -102,10 +107,12 @@ public final class SolvikSwitchParserTest {
         CompilationUnitNode unit = parseOk("s.sol", """
                 func run(value: Integer): Unit {
                     switch (value) {
-                        case 1:
+                        case 1 {
                             print("one")
                             print("again")
-                        default:
+                        }
+                        default {
+                        }
                     }
                 }
                 """);
@@ -121,12 +128,15 @@ public final class SolvikSwitchParserTest {
         CompilationUnitNode unit = parseOk("s.sol", """
                 func run(value: String?): Unit {
                     switch (value) {
-                        case null:
+                        case null {
                             print("none")
-                        case "a":
+                        }
+                        case "a" {
                             print("a")
-                        default:
+                        }
+                        default {
                             print("other")
+                        }
                     }
                 }
                 """);
@@ -141,12 +151,15 @@ public final class SolvikSwitchParserTest {
         CompilationUnitNode unit = parseOk("s.sol", """
                 func run(input: String): Unit {
                     switch (input) {
-                        case regex r#"^\\d+$"#:
+                        case regex r#"^\\d+$"# {
                             print("number")
-                        case regex "x.*":
+                        }
+                        case regex "x.*" {
                             print("x")
-                        default:
+                        }
+                        default {
                             print("other")
+                        }
                     }
                 }
                 """);
@@ -164,15 +177,19 @@ public final class SolvikSwitchParserTest {
                 func run(a: Integer, b: Integer): Unit {
                     if (a > 0) {
                         switch (a) {
-                            case 1:
+                            case 1 {
                                 switch (b) {
-                                    case 2:
+                                    case 2 {
                                         print("nested")
-                                    default:
+                                    }
+                                    default {
                                         print("inner")
+                                    }
                                 }
-                            default:
+                            }
+                            default {
                                 print("outer")
+                            }
                         }
                     }
                 }
@@ -187,10 +204,12 @@ public final class SolvikSwitchParserTest {
         String text = """
                 func run(value: Integer): Unit {
                     switch (value) {
-                        case 1:
+                        case 1 {
                             print("one")
-                        default:
+                        }
+                        default {
                             print("other")
+                        }
                     }
                 }
                 """;
@@ -206,15 +225,29 @@ public final class SolvikSwitchParserTest {
         assertThat(parseFails("s.sol", """
                 func run(): Unit {
                     switch {
-                        default:
+                        default {
                             print("x")
+                        }
                     }
                 }
                 """).hasErrors()).isTrue();
     }
 
     @Test
-    public void aCaseWithoutAColonIsRejected() {
+    public void aCaseWithAColonIsRejected() {
+        // The body's brace marks the end of the label; a colon is no longer part of any case spelling.
+        assertThat(parseFails("s.sol", """
+                func run(value: Integer): Unit {
+                    switch (value) {
+                        case 1:
+                            print("one")
+                    }
+                }
+                """).hasErrors()).isTrue();
+    }
+
+    @Test
+    public void aCaseWithoutABracedBodyIsRejected() {
         assertThat(parseFails("s.sol", """
                 func run(value: Integer): Unit {
                     switch (value) {
@@ -242,8 +275,9 @@ public final class SolvikSwitchParserTest {
         assertThat(parseFails("s.sol", """
                 func run(input: String): Unit {
                     switch (input) {
-                        case regex:
+                        case regex {
                             print("x")
+                        }
                     }
                 }
                 """).hasErrors()).isTrue();
@@ -254,8 +288,9 @@ public final class SolvikSwitchParserTest {
         assertThat(parseFails("s.sol", """
                 func run(value: Integer): Unit {
                     switch (value) {
-                        case 1,:
+                        case 1, {
                             print("one")
+                        }
                     }
                 }
                 """).hasErrors()).isTrue();

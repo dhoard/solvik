@@ -14,12 +14,13 @@ func get(): Result<Integer, String> {
 }
 func use(): Result<Integer, String> {
     try {
-        val v = get()?;
+        var v = get()?
         return Result.Ok(v)
-    } catch (e: Exception) {
+    }
+    catch (e: Exception) {
         print("CAUGHT")
         return Result.Ok(0)
     }
 }
-val r = use()
+var r = use()
 print("err=" .. r.isErr() .. " e=" .. r.unwrapErr())

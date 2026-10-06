@@ -37,7 +37,7 @@ public final class SolvikNullSafetyNegativeTest {
 
     private static final String BOX = """
             class Box {
-                val value: Integer
+                var value: Integer
 
                 Box(value: Integer) {
                     this.value = value
@@ -65,7 +65,7 @@ public final class SolvikNullSafetyNegativeTest {
 
     @Test
     public void nullAssignedToANonNullTypeIsRejected() {
-        assertThat(first(checkFails("func f(): Unit {\n    val x: String = null\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
+        assertThat(first(checkFails("func f(): Unit {\n    var x: String = null\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
 
     @Test
@@ -80,7 +80,7 @@ public final class SolvikNullSafetyNegativeTest {
 
     @Test
     public void nullableToNonNullAssignmentIsRejected() {
-        assertThat(first(checkFails("func f(s: String?): Unit {\n    val t: String = s\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
+        assertThat(first(checkFails("func f(s: String?): Unit {\n    var t: String = s\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
 
     @Test
@@ -112,7 +112,7 @@ public final class SolvikNullSafetyNegativeTest {
     public void nullablePropertyWriteWithoutACheckIsRejected() {
         String text = """
                 class Box {
-                    mutable val value: Integer
+                    var mutable value: Integer
 
                     Box(value: Integer) {
                         this.value = value
@@ -129,7 +129,7 @@ public final class SolvikNullSafetyNegativeTest {
     public void assignmentThroughASafeAccessIsRejected() {
         String text = """
                 class Box {
-                    mutable val value: Integer
+                    var mutable value: Integer
 
                     Box(value: Integer) {
                         this.value = value
@@ -144,7 +144,7 @@ public final class SolvikNullSafetyNegativeTest {
 
     @Test
     public void coalescingANonNullableLeftIsRejected() {
-        assertThat(first(checkFails("func f(): Unit {\n    val s: String = \"x\"\n    val y = s ?? \"z\"\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_NULLABLE_REQUIRED);
+        assertThat(first(checkFails("func f(): Unit {\n    var s: String = \"x\"\n    var y = s ?? \"z\"\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_NULLABLE_REQUIRED);
     }
 
     @Test
@@ -159,21 +159,21 @@ public final class SolvikNullSafetyNegativeTest {
 
     @Test
     public void nullableCastOperandIsRejected() {
-        assertThat(first(checkFails("func f(v: Any): Unit {\n    val x = v as String?\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_TYPE_OPERAND);
+        assertThat(first(checkFails("func f(v: Any): Unit {\n    var x = v as String?\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_TYPE_OPERAND);
     }
 
     @Test
     public void aWriteInsideTheCheckedBlockInvalidatesNarrowing() {
         String text = """
                 class Box {
-                    val value: Integer
+                    var value: Integer
 
                     Box(value: Integer) {
                         this.value = value
                     }
                 }
                 func f(): Integer {
-                    mutable val box: Box? = Box(1)
+                    var mutable box: Box? = Box(1)
                     if (box != null) {
                         box = null
                         return box.value
@@ -188,14 +188,14 @@ public final class SolvikNullSafetyNegativeTest {
     public void aWriteInANestedBranchInvalidatesNarrowingAfterTheIf() {
         String text = """
                 class Box {
-                    val value: Integer
+                    var value: Integer
 
                     Box(value: Integer) {
                         this.value = value
                     }
                 }
                 func f(flag: Boolean): Integer {
-                    mutable val box: Box? = Box(1)
+                    var mutable box: Box? = Box(1)
                     if (box != null) {
                         if (flag) {
                             box = null
@@ -212,14 +212,14 @@ public final class SolvikNullSafetyNegativeTest {
     public void aWriteInsideALoopInvalidatesNarrowingAfterTheLoop() {
         String text = """
                 class Box {
-                    val value: Integer
+                    var value: Integer
 
                     Box(value: Integer) {
                         this.value = value
                     }
                 }
                 func f(flag: Boolean): Integer {
-                    mutable val box: Box? = Box(1)
+                    var mutable box: Box? = Box(1)
                     if (box != null) {
                         while (flag) {
                             box = null
@@ -239,7 +239,7 @@ public final class SolvikNullSafetyNegativeTest {
 
     @Test
     public void unknownTypeInANullableAnnotationIsRejected() {
-        assertThat(first(checkFails("func f(): Unit {\n    val x: Nope? = null\n}\n")).code()).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_TYPE);
+        assertThat(first(checkFails("func f(): Unit {\n    var x: Nope? = null\n}\n")).code()).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_TYPE);
     }
 
     @Test

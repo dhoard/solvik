@@ -2,9 +2,9 @@
 // override and a constant `switch`, then exercise `==`, `===`, `Set`, `Map`, and `switch`.
 include "EqualityIncludeLibrary.sol"
 
-val a = Coordinate(1, 2)
-val b = Coordinate(1, 2)
-val c = a
+var a = Coordinate(1, 2)
+var b = Coordinate(1, 2)
+var c = a
 
 // `==` and an explicit `equals` call dispatch the override; `===` ignores it.
 println(a == b)
@@ -13,11 +13,11 @@ println(a === b)
 println(a === c)
 
 // `Set` deduplicates through the shared equality service.
-val unique: Set<Coordinate> = Set(a, b)
+var unique: Set<Coordinate> = Set(a, b)
 println(unique.size)
 
 // `Map` uses the same service for key lookup.
-val names: Map<Coordinate, String> = Map(a: "origin")
+var names: Map<Coordinate, String> = Map(a: "origin")
 println(names.get(Coordinate(1, 2)))
 
 // Constant `switch` stays consistent with `==`.

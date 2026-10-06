@@ -7,5 +7,5 @@
 // specification determines: it defers the feature and fixes `$` as literal text, which
 // is observable. `print` appends no separator, so the expected bytes are the literal
 // text of the string.
-val s = "no $ interpolation and not ${value} either"
+var s = "no $ interpolation and not ${value} either"
 print(s)

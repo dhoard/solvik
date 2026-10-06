@@ -37,7 +37,7 @@ public final class SolvikFunctionParameterTest {
     public void everyParameterRepresentationRoundTripsThroughACall() {
         assertThat(run("""
                     class Point {
-                        val x: Integer
+                        var x: Integer
 
                         Point(x: Integer) {
                             this.x = x

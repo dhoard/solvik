@@ -196,7 +196,7 @@ public final class SolvikMainTest {
     public void compileErrorReturnsOneAndWritesTheStableDiagnostic() throws IOException {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         ByteArrayOutputStream err = new ByteArrayOutputStream();
-        int code = run("    val x: Integer = \"no\"\n", new PrintStream(out), new PrintStream(err));
+        int code = run("    var x: Integer = \"no\"\n", new PrintStream(out), new PrintStream(err));
         assertThat(code).isEqualTo(1);
         assertThat(out.toString(StandardCharsets.UTF_8)).isEqualTo("");
         String message = err.toString(StandardCharsets.UTF_8);

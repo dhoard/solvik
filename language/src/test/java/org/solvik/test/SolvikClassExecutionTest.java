@@ -54,8 +54,8 @@ public final class SolvikClassExecutionTest {
     public void constructsObjectAndReadsPropertiesAndMethods() {
         assertThat(run("""
                 class User {
-                    val id: Integer
-                    mutable val name: String
+                    var id: Integer
+                    var mutable name: String
 
                     User(id: Integer, name: String) {
                         this.id = id
@@ -67,7 +67,7 @@ public final class SolvikClassExecutionTest {
                     }
                 }
 
-                    val user = User(7, "Doug")
+                    var user = User(7, "Doug")
                     println(user.id)
                     println(user.name)
                     println(user.describe())
@@ -78,8 +78,8 @@ public final class SolvikClassExecutionTest {
     public void declarationInitializersRunWithoutAConstructor() {
         assertThat(run("""
                 class Counter {
-                    mutable val count: Integer = 0
-                    val label: String = "c"
+                    var mutable count: Integer = 0
+                    var label: String = "c"
 
                     func increment(): Unit {
                         this.count = this.count + 1
@@ -90,7 +90,7 @@ public final class SolvikClassExecutionTest {
                     }
                 }
 
-                    val counter = Counter()
+                    var counter = Counter()
                     counter.increment()
                     counter.increment()
                     println(counter.value())
@@ -102,14 +102,14 @@ public final class SolvikClassExecutionTest {
     public void mutablePropertiesCanBeWrittenAfterConstruction() {
         assertThat(run("""
                 class Box {
-                    mutable val value: Integer
+                    var mutable value: Integer
 
                     Box(start: Integer) {
                         this.value = start
                     }
                 }
 
-                    val box = Box(1)
+                    var box = Box(1)
                     box.value = box.value + 41
                     println(box.value)
                 """)).isEqualTo("42\n");
@@ -119,7 +119,7 @@ public final class SolvikClassExecutionTest {
     public void unqualifiedMethodCallDispatchesOnThis() {
         assertThat(run("""
                 class Greeter {
-                    val name: String
+                    var name: String
 
                     Greeter(name: String) {
                         this.name = name
@@ -142,8 +142,8 @@ public final class SolvikClassExecutionTest {
     public void immutablePropertyAssignedInConstructorIsReadable() {
         assertThat(run("""
                 class Point {
-                    val x: Integer
-                    val y: Integer
+                    var x: Integer
+                    var y: Integer
 
                     Point(x: Integer, y: Integer) {
                         this.x = x
@@ -163,7 +163,7 @@ public final class SolvikClassExecutionTest {
     public void objectDisplaysAsItsClassName() {
         assertThat(run("""
                 class Empty {
-                    val x: Integer = 0
+                    var x: Integer = 0
                 }
 
                     println(Empty())
@@ -174,15 +174,15 @@ public final class SolvikClassExecutionTest {
     public void objectsCompareByIdentity() {
         assertThat(run("""
                 class Marker {
-                    val id: Integer
+                    var id: Integer
                     Marker(id: Integer) {
                         this.id = id
                     }
                 }
 
-                    val a = Marker(1)
-                    val b = a
-                    val c = Marker(1)
+                    var a = Marker(1)
+                    var b = a
+                    var c = Marker(1)
                     println(a == b)
                     println(a == c)
                 """)).isEqualTo("true\nfalse\n");
@@ -192,14 +192,14 @@ public final class SolvikClassExecutionTest {
     public void initIsAnOrdinaryIdentifier() {
         assertThat(run("""
                 class Engine {
-                    mutable val value: Integer = 0
+                    var mutable value: Integer = 0
 
                     Engine(init: Integer) {
                         this.value = init
                     }
 
                     func bump(): Integer {
-                        val init = 5
+                        var init = 5
                         this.value = this.value + init
                         return this.value
                     }
@@ -212,7 +212,7 @@ public final class SolvikClassExecutionTest {
                 }
 
                 class Slot {
-                    mutable val init: Integer = 3
+                    var mutable init: Integer = 3
                 }
 
                     println(Engine(10).bump())
@@ -229,10 +229,10 @@ public final class SolvikClassExecutionTest {
         // the property write inside the method is the qualified one.
         assertThat(run("""
                 class Counter {
-                    mutable val total: Integer = 0
+                    var mutable total: Integer = 0
 
                     func add(amount: Integer): Integer {
-                        val total = amount * 2
+                        var total = amount * 2
                         this.total = this.total + amount
                         return total
                     }
@@ -242,11 +242,11 @@ public final class SolvikClassExecutionTest {
                     }
                 }
 
-                mutable val counter: Counter = Counter();
-                println(counter.add(4));
-                println(counter.sum());
-                println(counter.add(1));
-                println(counter.sum());
+                var mutable counter: Counter = Counter()
+                println(counter.add(4))
+                println(counter.sum())
+                println(counter.add(1))
+                println(counter.sum())
                 """)).isEqualTo("8\n4\n2\n5\n");
     }
 
@@ -256,35 +256,35 @@ public final class SolvikClassExecutionTest {
         // property is mutated through `this` exactly like a scalar one.
         assertThat(run("""
                 class Bag {
-                    val items: Set<Integer> = Set<Integer>()
-                    val counts: Map<String, Integer> = Map<String, Integer>()
+                    var items: Set<Integer> = Set<Integer>()
+                    var counts: Map<String, Integer> = Map<String, Integer>()
 
                     func add(value: Integer): Unit {
-                        this.items.add(value);
+                        this.items.add(value)
                     }
 
                     func hit(key: String): Integer {
-                        mutable val next: Integer = 1;
+                        var mutable next: Integer = 1
                         if (this.counts.containsKey(key)) {
-                            next = this.counts.get(key) + 1;
+                            next = this.counts.get(key) + 1
                         }
-                        this.counts.put(key, next);
-                        return next;
+                        this.counts.put(key, next)
+                        return next
                     }
 
                     func size(): Integer {
-                        return this.items.size;
+                        return this.items.size
                     }
                 }
 
-                mutable val bag: Bag = Bag();
-                bag.add(1);
-                bag.add(2);
-                bag.add(1);
-                println(bag.size());
-                println(bag.hit("x"));
-                println(bag.hit("x"));
-                println(bag.hit("y"));
+                var mutable bag: Bag = Bag()
+                bag.add(1)
+                bag.add(2)
+                bag.add(1)
+                println(bag.size())
+                println(bag.hit("x"))
+                println(bag.hit("x"))
+                println(bag.hit("y"))
                 """)).isEqualTo("2\n1\n2\n1\n");
     }
 
@@ -292,18 +292,18 @@ public final class SolvikClassExecutionTest {
     public void inheritedPropertiesAreReachableThroughThisInASubclass() {
         assertThat(run("""
                 mutable class Base {
-                    val id: Integer = 5
+                    var id: Integer = 5
                 }
 
                 class Derived extends Base {
-                    mutable val extra: Integer = 2
+                    var mutable extra: Integer = 2
 
                     func show(): Integer {
-                        return this.id + this.extra;
+                        return this.id + this.extra
                     }
                 }
 
-                println(Derived().show());
+                println(Derived().show())
                 """)).isEqualTo("7\n");
     }
 
@@ -313,7 +313,7 @@ public final class SolvikClassExecutionTest {
         // `var x = 1` then `x = 2` must produce 2, exercising the lowering-time slot reuse.
         assertThat(run("""
                 func tally(): Integer {
-                    mutable val counter = 5
+                    var mutable counter = 5
                     counter = counter + 1
                     counter = counter * 7
                     return counter
@@ -330,7 +330,7 @@ public final class SolvikClassExecutionTest {
                         println("before")
 
                     class Broken {
-                        val value: Integer
+                        var value: Integer
                     }
                     """, "broken.sol")));
         }

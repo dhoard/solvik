@@ -1,5 +1,5 @@
-val s = "ab"
-val f = s.toString
+var s = "ab"
+var f = s.toString
 print(1)
 
 print("EXECUTED-INVALID")

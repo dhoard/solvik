@@ -235,7 +235,7 @@ availability, definite-initialization state) instead of resetting it, because an
 checked from inside an enclosing one. So `return` returns from the body, `break`/`continue` cannot
 cross the boundary, an enclosing method's type parameters are not visible, and an enclosing receiver
 is recorded without being reachable. Globals stay visible because they resolve outside the lexical
-chain; a top-level `val`/`var` is hidden, because the spec makes it "a local of the implicit main,
+chain; a top-level `var`, whether or not it is `mutable`, is hidden, because the spec makes it "a local of the implicit main,
 not a global".
 
 **`SEM_UNLISTED_CAPTURE` (SOLV-SEM-058) is live**, reported on the body reference for a read or a
@@ -251,7 +251,7 @@ class members must still be named), and `language/tests/diagnostics/SEM-058.sol`
 
 **Known limitation, pre-existing and shared with `ifExpr`:** semicolon insertion does not fire inside
 call parentheses, so an anonymous function written as a call argument needs an explicit `;` in its
-body or must be bound to a `val` first. The spec's own examples use the binding form.
+body or must be bound to a `var` first. The spec's own examples use the binding form.
 
 **Not done here:** a TCK batch for anonymous functions — since written. Phase 5 took `REQ-3312`..`REQ-3316`
 for generic function values and the reserved range then opened: `REQ-3317` (written form and the omitted
@@ -485,7 +485,7 @@ outstanding and remain reserved from REQ-3317 upward.
 
 The batch is position-enumerating rather than representative, because section 6 states the rule as a
 property of *positions*: SOL-TCK-0436 places one generic reference in a static-property initializer, an
-instance-property initializer, four `val` initializers, a static-property assignment, and a generic type
+instance-property initializer, four `var` initializers, a static-property assignment, and a generic type
 argument at once, at four mutually incompatible monomorphic types. A sampled test would leave most of
 those positions unexercised and still pass. The four rejection programs likewise isolate the four distinct
 routes to "insufficient" — no expected type, an expected `Any`, an expected unbounded type parameter, and
@@ -804,7 +804,7 @@ and that host wrong-arity invocation is controlled.
   value and never call it, which is how `SolvikHashInvariantTest` uses it.
 * **Two ASI traps that will bite anyone writing the example or the interop programs** (both
   reproduced against `./standalone/target/solvik`, not inherited from notes): a single-line anonymous
-  body (`val f: func(Integer): Integer = func(v: Integer): Integer { return v }`) does not parse —
+  body (`var f: func(Integer): Integer = func(v: Integer): Integer { return v }`) does not parse —
   `SOLV-PARS-001` "extraneous input `}` expecting `';'`" — because semicolon insertion needs a
   physical newline before the `}`; and a multi-line anonymous body written as a *call argument*
   (`apply(func(v: Integer): Integer {\n    return v\n})`) does not parse either — `SOLV-PARS-001`
@@ -812,7 +812,7 @@ and that host wrong-arity invocation is controlled.
   fires on its `}`. A *named* function may keep a single-line body (`func f(): Integer { return 1 }`
   parses and runs), so the rule is specific to anonymous bodies. The form that works, verified to
   print correctly, is an initializer with a multi-line body:
-  `val h = func(v: Integer): Integer {\n    return v + 41\n}` bound first and passed by name. Captures
+  `var h = func(v: Integer): Integer {\n    return v + 41\n}` bound first and passed by name. Captures
   follow the same rule.
 
 ### Suggested order (all items delivered)
@@ -863,8 +863,8 @@ was `Any` — not callable, and not accepted by any written function type. Measu
 pair the first sentence's own example shape supplies:
 
 ```text
-val joined = if (flag) { dogToDog } else { animalToAnimal }   // inferred Any
-val chosen: func(Dog): Animal = joined   // SOLV-TYPE-001: found: Any
+var joined = if (flag) { dogToDog } else { animalToAnimal }   // inferred Any
+var chosen: func(Dog): Animal = joined   // SOLV-TYPE-001: found: Any
 println(joined(Dog()))                   // SOLV-TYPE-002: callee is not a function type
 ```
 

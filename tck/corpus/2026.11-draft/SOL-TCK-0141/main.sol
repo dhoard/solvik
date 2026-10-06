@@ -7,7 +7,7 @@
 // `hashCode` override declared without `equals`". Override syntax mirrors the
 // spec-validated hashCode/equals example used by SOL-TCK-0003.
 class OnlyHash {
-    val n: Integer
+    var n: Integer
 
     OnlyHash(n: Integer) {
         this.n = n

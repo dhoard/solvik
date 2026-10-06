@@ -166,7 +166,7 @@ public final class SolvikFunctionValueTest {
                     return "v" .. value.toString()
                 }
 
-                val formatter: func(Integer): String = format
+                var formatter: func(Integer): String = format
                 println(formatter(42))
                 println(format(42))
                 """)).isEqualTo("v42\nv42\n");
@@ -224,7 +224,7 @@ public final class SolvikFunctionValueTest {
                     return value + 2
                 }
 
-                mutable val operation: func(Integer): Integer = first
+                var mutable operation: func(Integer): Integer = first
                 println(operation(1))
                 operation = second
                 println(operation(1))
@@ -244,7 +244,7 @@ public final class SolvikFunctionValueTest {
                     return 42
                 }
 
-                val callbacks: List<func(): Integer> = List()
+                var callbacks: List<func(): Integer> = List()
                 callbacks.add(answer)
                 println(callbacks.size)
                 println(callbacks.get(0)())
@@ -282,14 +282,14 @@ public final class SolvikFunctionValueTest {
      * A predeclared function is a value like any other declaration.
      *
      * <p>"The same rule applies to module-qualified functions and to the predeclared functions", with the
-     * worked example `val output: func(Any?): Unit = println` (section 6).
+     * worked example `var output: func(Any?): Unit = println` (section 6).
      */
     @Test
     public void aPredeclaredFunctionIsUsableAsAValue() {
         assertThat(run("""
-                val output: func(Any?): Unit = println
+                var output: func(Any?): Unit = println
                 output("through the value")
-                val same: func(Any?): Unit = println
+                var same: func(Any?): Unit = println
                 println(output === same)
                 """)).isEqualTo("through the value\ntrue\n");
     }
@@ -315,8 +315,8 @@ public final class SolvikFunctionValueTest {
 
                 println(format === format)
                 println(format !== format)
-                val first: func(Integer): String = format
-                val second: func(Integer): String = format
+                var first: func(Integer): String = format
+                var second: func(Integer): String = format
                 println(first === second)
                 println(first === format)
                 """)).isEqualTo("true\nfalse\ntrue\ntrue\n");
@@ -337,7 +337,7 @@ public final class SolvikFunctionValueTest {
                     return 1
                 }
 
-                val boxed: (func(): Integer)? = value
+                var boxed: (func(): Integer)? = value
                 println(boxed == value)
                 println(boxed === value)
                 println(value == value)
@@ -382,8 +382,8 @@ public final class SolvikFunctionValueTest {
                     return 1
                 }
 
-                val first: func(): Integer = shared
-                val second: func(): Integer = shared
+                var first: func(): Integer = shared
+                var second: func(): Integer = shared
                 println(first.hashCode() == second.hashCode())
                 println(shared.hashCode() == first.hashCode())
                 println(first.hashCode() == first.hashCode())
@@ -413,7 +413,7 @@ public final class SolvikFunctionValueTest {
                 println(named)
                 println(named.toString())
                 println(named .. "")
-                val boxed: (func(Integer): String)? = named
+                var boxed: (func(Integer): String)? = named
                 println(boxed)
                 """)).isEqualTo("func func\nfunc\nfunc\nfunc\n");
     }
@@ -431,7 +431,7 @@ public final class SolvikFunctionValueTest {
                 func named(): Unit {
                 }
 
-                val anything: Any = named
+                var anything: Any = named
                 println(anything)
                 println(anything.toString())
                 """)).isEqualTo("func\nfunc\n");
@@ -446,7 +446,7 @@ public final class SolvikFunctionValueTest {
     @Test
     public void aNullNullableFunctionValueRendersAsNull() {
         assertThat(run("""
-                val absent: (func(): Unit)? = null
+                var absent: (func(): Unit)? = null
                 println(absent)
                 """)).isEqualTo("null\n");
     }
@@ -514,7 +514,8 @@ public final class SolvikFunctionValueTest {
                 func guarded(operation: func(): Integer): String {
                     try {
                         return "returned " .. operation().toString()
-                    } catch (error: Failure) {
+                    }
+                    catch (error: Failure) {
                         return "caught " .. error.getMessage()
                     }
                 }
@@ -555,7 +556,7 @@ public final class SolvikFunctionValueTest {
                     return isEven(value - 1)
                 }
 
-                val throughValue: func(Integer): Integer = fib
+                var throughValue: func(Integer): Integer = fib
                 println(fib(10))
                 println(throughValue(10))
                 println(isEven(10))
@@ -575,7 +576,7 @@ public final class SolvikFunctionValueTest {
                     print("once")
                 }
 
-                val operation: func(): Unit = announce
+                var operation: func(): Unit = announce
                 operation()
                 println("")
                 """)).isEqualTo("once\n");
@@ -593,7 +594,7 @@ public final class SolvikFunctionValueTest {
                 func quiet(): Unit {
                 }
 
-                val operation: func(): Unit = quiet
+                var operation: func(): Unit = quiet
                 println(operation())
                 println(quiet())
                 """)).isEqualTo("Unit\nUnit\n");
@@ -619,7 +620,7 @@ public final class SolvikFunctionValueTest {
                 }
                 """, """
                 include "lib.sol" alias m
-                val qualified: func(Integer): String = m::render
+                var qualified: func(Integer): String = m::render
                 println(qualified(1))
                 """)).isEqualTo("r1\n");
     }
@@ -669,7 +670,7 @@ public final class SolvikFunctionValueTest {
                 }
 
                 func use(): Unit {
-                    val f = identity
+                    var f = identity
                 }
                 """)).isEqualTo(DiagnosticCode.TYPE_CANNOT_INFER);
     }
@@ -688,7 +689,7 @@ public final class SolvikFunctionValueTest {
                 }
 
                 func use(): Unit {
-                    val operation: func(): Integer = value
+                    var operation: func(): Integer = value
                     operation<Integer>()
                 }
                 """)).isEqualTo(DiagnosticCode.TYPE_NOT_GENERIC);
@@ -708,7 +709,7 @@ public final class SolvikFunctionValueTest {
                 }
 
                 func use(): Integer {
-                    val operation: func(Integer, Integer): Integer = takesTwo
+                    var operation: func(Integer, Integer): Integer = takesTwo
                     return operation(1)
                 }
                 """)).isEqualTo(DiagnosticCode.TYPE_ARITY_MISMATCH);
@@ -728,7 +729,7 @@ public final class SolvikFunctionValueTest {
                 }
 
                 func use(): Integer {
-                    val operation: func(Integer): Integer = takesInteger
+                    var operation: func(Integer): Integer = takesInteger
                     return operation("text")
                 }
                 """)).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
@@ -789,7 +790,7 @@ public final class SolvikFunctionValueTest {
     public void callingANonFunctionTypedBindingIsRejected() {
         assertThat(firstCode("""
                 func use(): Unit {
-                    val x = 1
+                    var x = 1
                     x()
                 }
                 """)).isEqualTo(DiagnosticCode.TYPE_NOT_CALLABLE);
@@ -809,7 +810,7 @@ public final class SolvikFunctionValueTest {
                 }
 
                 func use(): Integer {
-                    val operation: (func(): Integer)? = value
+                    var operation: (func(): Integer)? = value
                     return operation()
                 }
                 """)).isEqualTo(DiagnosticCode.TYPE_NOT_CALLABLE);
@@ -831,10 +832,10 @@ public final class SolvikFunctionValueTest {
                 }
 
                 class Boxed {
-                    val operation: func(Integer): Integer = triple
+                    var operation: func(Integer): Integer = triple
                 }
 
-                val box = Boxed()
+                var box = Boxed()
                 println(box.operation(3))
                 """)).isEqualTo("9\n");
     }
@@ -859,7 +860,7 @@ public final class SolvikFunctionValueTest {
                 }
 
                 class Step {
-                    val amount: Integer = 1
+                    var amount: Integer = 1
 
                     func move(value: Integer): Integer {
                         return value + this.amount
@@ -870,17 +871,17 @@ public final class SolvikFunctionValueTest {
                     return operation(41)
                 }
 
-                val amount = 1
+                var amount = 1
 
-                val closure = func [amount](value: Integer): Integer {
+                var closure = func [amount](value: Integer): Integer {
                     return value + amount
                 }
 
-                val anonymous = func(value: Integer): Integer {
+                var anonymous = func(value: Integer): Integer {
                     return value + 1
                 }
 
-                val stepper = Step()
+                var stepper = Step()
 
                 println(apply(named))
                 println(apply(anonymous))
@@ -911,11 +912,12 @@ public final class SolvikFunctionValueTest {
     public void incomparableFunctionTypeBranchesJoinToACallableFunctionType() {
         assertThat(run(ANIMAL_HIERARCHY + """
 
-                val flag = true
+                var flag = true
 
-                val operation = if (flag) {
+                var operation = if (flag) {
                     dogToDog
-                } else {
+                }
+                else {
                     animalToAnimal
                 }
 
@@ -937,15 +939,17 @@ public final class SolvikFunctionValueTest {
 
                 func pick(kind: Integer): func(Dog): Animal {
                     return switch (kind) {
-                        case 1:
+                        case 1 {
                             dogToDog
+                        }
 
-                        default:
+                        default {
                             animalToAnimal
+                        }
                     }
                 }
 
-                val chosen: func(Dog): Animal = pick(1)
+                var chosen: func(Dog): Animal = pick(1)
                 println(chosen(Dog()).label())
                 """)).isEqualTo("animal\n");
     }
@@ -970,23 +974,33 @@ public final class SolvikFunctionValueTest {
     public void aJoinedFunctionTypeFillsNeitherAWiderParameterNorANarrowerResult() {
         String widerParameter = ANIMAL_HIERARCHY + """
 
-                val flag: Boolean = true
-                val joined = if (flag) { dogToDog } else { animalToAnimal }
-                val wide: func(Animal): Animal = joined
+                var flag: Boolean = true
+                var joined = if (flag) {
+                    dogToDog
+                }
+                else {
+                    animalToAnimal
+                }
+                var wide: func(Animal): Animal = joined
                 """;
         Diagnostic parameter = onlyDiagnostic(widerParameter);
         assertThat(parameter.code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
-        assertCovers(widerParameter, "val wide: func(Animal): Animal = joined", "joined", parameter);
+        assertCovers(widerParameter, "var wide: func(Animal): Animal = joined", "joined", parameter);
 
         String narrowerResult = ANIMAL_HIERARCHY + """
 
-                val flag: Boolean = true
-                val joined = if (flag) { dogToDog } else { animalToAnimal }
-                val narrow: func(Dog): Dog = joined
+                var flag: Boolean = true
+                var joined = if (flag) {
+                    dogToDog
+                }
+                else {
+                    animalToAnimal
+                }
+                var narrow: func(Dog): Dog = joined
                 """;
         Diagnostic result = onlyDiagnostic(narrowerResult);
         assertThat(result.code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
-        assertCovers(narrowerResult, "val narrow: func(Dog): Dog = joined", "joined", result);
+        assertCovers(narrowerResult, "var narrow: func(Dog): Dog = joined", "joined", result);
     }
 
     /**
@@ -1016,11 +1030,12 @@ public final class SolvikFunctionValueTest {
                     return value.toString()
                 }
 
-                val flag = true
+                var flag = true
 
-                val operation = if (flag) {
+                var operation = if (flag) {
                     takeInteger
-                } else {
+                }
+                else {
                     takeSide
                 }
 
@@ -1050,11 +1065,12 @@ public final class SolvikFunctionValueTest {
                     return first.toString()
                 }
 
-                val flag = true
+                var flag = true
 
-                val operation = if (flag) {
+                var operation = if (flag) {
                     unary
-                } else {
+                }
+                else {
                     binary
                 }
 
@@ -1087,19 +1103,19 @@ public final class SolvikFunctionValueTest {
     public void aFunctionTypeWithTheWrongVarianceDirectionIsRejected() {
         String parameter = ANIMAL_HIERARCHY + """
 
-                val wrong: func(Animal): Animal = dogToDog
+                var wrong: func(Animal): Animal = dogToDog
                 """;
         Diagnostic narrower = onlyDiagnostic(parameter);
         assertThat(narrower.code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
-        assertCovers(parameter, "val wrong: func(Animal): Animal = dogToDog", "dogToDog", narrower);
+        assertCovers(parameter, "var wrong: func(Animal): Animal = dogToDog", "dogToDog", narrower);
 
         String result = ANIMAL_HIERARCHY + """
 
-                val narrow: func(Dog): Dog = animalToAnimal
+                var narrow: func(Dog): Dog = animalToAnimal
                 """;
         Diagnostic tooSpecific = onlyDiagnostic(result);
         assertThat(tooSpecific.code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
-        assertCovers(result, "val narrow: func(Dog): Dog = animalToAnimal", "animalToAnimal", tooSpecific);
+        assertCovers(result, "var narrow: func(Dog): Dog = animalToAnimal", "animalToAnimal", tooSpecific);
     }
 
     /**
@@ -1119,12 +1135,12 @@ public final class SolvikFunctionValueTest {
                     return value
                 }
 
-                val exact: func(Long): Long = longToLong
-                val widened: func(Integer): Long = longToLong
+                var exact: func(Long): Long = longToLong
+                var widened: func(Integer): Long = longToLong
                 """;
         Diagnostic diagnostic = onlyDiagnostic(program);
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
-        assertCovers(program, "val widened: func(Integer): Long = longToLong", "longToLong", diagnostic);
+        assertCovers(program, "var widened: func(Integer): Long = longToLong", "longToLong", diagnostic);
     }
 
     /**
@@ -1143,22 +1159,22 @@ public final class SolvikFunctionValueTest {
     public void genericTypeArgumentsContainingFunctionTypesStayInvariant() {
         String program = ANIMAL_HIERARCHY + """
 
-                val matching: List<func(Animal): Dog> = List()
-                val accepted: List<func(Animal): Dog> = matching
-                val forward: List<func(Dog): Animal> = matching
+                var matching: List<func(Animal): Dog> = List()
+                var accepted: List<func(Animal): Dog> = matching
+                var forward: List<func(Dog): Animal> = matching
                 """;
         Diagnostic diagnostic = onlyDiagnostic(program);
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
-        assertCovers(program, "val forward: List<func(Dog): Animal> = matching", "matching", diagnostic);
+        assertCovers(program, "var forward: List<func(Dog): Animal> = matching", "matching", diagnostic);
 
         String reverse = ANIMAL_HIERARCHY + """
 
-                val narrow: List<func(Dog): Animal> = List()
-                val backward: List<func(Animal): Dog> = narrow
+                var narrow: List<func(Dog): Animal> = List()
+                var backward: List<func(Animal): Dog> = narrow
                 """;
         Diagnostic reversed = onlyDiagnostic(reverse);
         assertThat(reversed.code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
-        assertCovers(reverse, "val backward: List<func(Animal): Dog> = narrow", "narrow", reversed);
+        assertCovers(reverse, "var backward: List<func(Animal): Dog> = narrow", "narrow", reversed);
     }
 
     /**
@@ -1180,8 +1196,8 @@ public final class SolvikFunctionValueTest {
                     return value * 2
                 }
 
-                val first: Any = double
-                val second: Any = double
+                var first: Any = double
+                var second: Any = double
                 println(first === second)
                 """;
         Diagnostic diagnostic = onlyDiagnostic(program);
@@ -1193,8 +1209,8 @@ public final class SolvikFunctionValueTest {
                     return value * 2
                 }
 
-                val stored: Any = double
-                val opaque: Any = 1
+                var stored: Any = double
+                var opaque: Any = 1
                 println(stored !== opaque)
                 """;
         Diagnostic reversed = onlyDiagnostic(otherOperator);

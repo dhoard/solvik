@@ -57,6 +57,34 @@ public enum DiagnosticCode {
      */
     PARSER_UNSUPPORTED_REMOVED_SYNTAX("SOLV-PARS-006"),
 
+    /** A closing brace shares its physical line with another significant token (section 16). */
+    PARSER_BRACE_SHARES_LINE("SOLV-PARS-007"),
+    /** A clause keyword - {@code else}, {@code catch}, {@code finally} - does not begin its physical line. */
+    PARSER_CLAUSE_NOT_AT_LINE_START("SOLV-PARS-008"),
+    /**
+     * A body's opening brace begins a physical line instead of sitting on the line of the construct
+     * that introduces the scope. A stand-alone scope block writes its brace this way legally, which is
+     * why the rule is reported only for an introducer that can only be followed by a body.
+     */
+    PARSER_BRACE_NOT_ON_INTRODUCING_LINE("SOLV-PARS-009"),
+    /** A token other than a comment follows an opening brace on its physical line (section 16). */
+    PARSER_CONTENT_AFTER_OPEN_BRACE("SOLV-PARS-010"),
+
+    /**
+     * The three-clause {@code for} was removed by the 2026.11 physical-line revision; the form is
+     * rejected at the {@code for} keyword with the replacement named (docs/LANGUAGE_SPEC.md section
+     * 17). Like {@link #PARSER_UNSUPPORTED_REMOVED_SYNTAX} for removed keywords, this reports a
+     * removed construct rather than silently reinterpreting it.
+     */
+    PARSER_REMOVED_THREE_CLAUSE_FOR("SOLV-PARS-011"),
+
+    /**
+     * A {@code ;} did not separate two constructs written on one physical line: another physical
+     * line, end of file, or a stand-alone closing brace followed it, so it tried to terminate a
+     * construct rather than separate two (docs/LANGUAGE_SPEC.md section 16).
+     */
+    PARSER_SEMI_ENDS_LINE("SOLV-PARS-012"),
+
     /** Name resolution: no declaration is visible for the referenced name. */
     RESOL_UNKNOWN_NAME("SOLV-RESOL-001"),
     /** Name resolution: the same name is declared twice in one scope. */
@@ -182,10 +210,6 @@ public enum DiagnosticCode {
     SEM_LOOP_CONTROL_OUTSIDE_LOOP("SOLV-SEM-002"),
     /** Semantic validation: a value-producing expression is used as a statement and is not a call. */
     SEM_VALUE_EXPRESSION_STATEMENT("SOLV-SEM-003"),
-    /** Semantic validation: a {@code for} initializer is neither a local declaration nor an assignment. */
-    SEM_FOR_INITIALIZER("SOLV-SEM-004"),
-    /** Semantic validation: a {@code for} update clause is not an assignment. */
-    SEM_FOR_UPDATE("SOLV-SEM-005"),
     /** Semantic validation: a class without a constructor has a property without an initializer. */
     SEM_CLASS_REQUIRES_INITIALIZER("SOLV-SEM-006"),
     /** Semantic validation: a class declares more than one constructor. */
@@ -306,12 +330,12 @@ public enum DiagnosticCode {
     SEM_UNLISTED_CAPTURE("SOLV-SEM-058"),
 
     /**
-     * Function values: a capture item names a mutable ({@code mutable val}) binding, or an anonymous function
+     * Function values: a capture item names a mutable ({@code var mutable}) binding, or an anonymous function
      * body reads or writes a name that its own capture list named as such a binding
      * (docs/LANGUAGE_SPEC.md section 6, "Explicit immutable closure capture"). The item reports this on
      * the capture item and the body use reports it on the body reference; both placements are specified
      * and both report this one code. Only a name the list itself named reaches the body placement — a
-     * body use of a {@code mutable val} the list never named is the unlisted-capture diagnostic instead, since
+     * body use of a {@code var mutable} the list never named is the unlisted-capture diagnostic instead, since
      * no capture of it was ever written. Capture is immutable by rule, so mutable state is shared
      * through a captured immutable object reference instead.
      */

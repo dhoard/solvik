@@ -23,7 +23,7 @@ import java.util.Objects;
 /**
  * A computed member of a built-in collection ({@code List}, {@code Set}, {@code Map}, or {@code Stack})
  * before its type parameters are substituted by a receiver's type arguments (docs/LANGUAGE_SPEC.md
- * section 11). A member is a read-only {@code val} property or a callable method.
+ * section 11). A member is a read-only {@code var} property or a callable method.
  *
  * <p>Each parameter slot is written as either a {@link TypeParameterType} of the collection (for a
  * slot bound to a type parameter) or a concrete type (for a slot such as an {@code Integer} index).
@@ -63,7 +63,7 @@ public final class BuiltinCollectionMember {
         return returnType;
     }
 
-    /** Whether this member is a read-only {@code val} property rather than a callable method. */
+    /** Whether this member is a read-only {@code var} property rather than a callable method. */
     public boolean isProperty() {
         return property;
     }

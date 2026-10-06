@@ -5,7 +5,7 @@
 //   - A class with no explicit constructor has an implicit zero-argument initializer only when all properties have declaration initializers.
 //
 class User {
-    mutable val name: String
+    var mutable name: String
 }
-val u = User()
+var u = User()
 print("EXECUTED-INVALID")

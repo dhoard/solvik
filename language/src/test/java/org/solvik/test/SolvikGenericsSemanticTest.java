@@ -44,7 +44,7 @@ public final class SolvikGenericsSemanticTest {
 
     private static final String GENERIC_BOX = """
             class Box<T> {
-                mutable val value: T
+                var mutable value: T
 
                 Box(value: T) {
                     this.value = value
@@ -76,7 +76,7 @@ public final class SolvikGenericsSemanticTest {
     @Test
     public void genericClassHasTypeParametersAndApplicationIsCanonical() {
         CheckedProgram program = check(GENERIC_BOX + """
-                    val box = Box(5)
+                    var box = Box(5)
                 """);
         ClassType box = (ClassType) program.classSymbol("Box").orElseThrow().type();
         assertThat(box.typeParameters().size()).isEqualTo(1);
@@ -93,7 +93,7 @@ public final class SolvikGenericsSemanticTest {
     @Test
     public void constructionInfersTheTypeArgumentFromTheConstructorArgument() {
         CheckedProgram program = check(GENERIC_BOX + """
-                    val intBox = Box(5)
+                    var intBox = Box(5)
                 """);
         LocalDeclNode declaration = (LocalDeclNode) program.unit().statements().get(0);
         Type inferred = program.typeOf(declaration.initializer()).orElseThrow();
@@ -165,7 +165,7 @@ public final class SolvikGenericsSemanticTest {
     public void nestedGenericApplicationsAreCanonicalAndTyped() {
         CheckedProgram program = check("""
                 class Box<T> {
-                    mutable val value: T
+                    var mutable value: T
 
                     Box(value: T) {
                         this.value = value
@@ -239,7 +239,7 @@ public final class SolvikGenericsSemanticTest {
                     func get(): T
                 }
                 class Holder<T> implements Container<T> {
-                    mutable val value: T
+                    var mutable value: T
 
                     Holder(value: T) {
                         this.value = value
@@ -272,7 +272,7 @@ public final class SolvikGenericsSemanticTest {
     public void inheritedGenericMembersSubstituteThroughTheSupertype() {
         CheckedProgram program = check("""
                 mutable class Box<T> {
-                    mutable val value: T
+                    var mutable value: T
 
                     Box(value: T) {
                         this.value = value
@@ -302,7 +302,7 @@ public final class SolvikGenericsSemanticTest {
     public void genericSubclassSubstitutesThroughAGenericSupertype() {
         CheckedProgram program = check("""
                 mutable class Box<T> {
-                    mutable val value: T
+                    var mutable value: T
 
                     Box(value: T) {
                         this.value = value
@@ -324,7 +324,7 @@ public final class SolvikGenericsSemanticTest {
     public void genericApplicationsRemainAssignableToAny() {
         CheckedProgram program = check("""
                 class Box<T> {
-                    mutable val value: T
+                    var mutable value: T
 
                     Box(value: T) {
                         this.value = value
@@ -346,7 +346,7 @@ public final class SolvikGenericsSemanticTest {
                     return value
                 }
                 func store<T>(value: T): Unit {
-                    val stored: Any = value
+                    var stored: Any = value
                 }
                 """);
         TypeParameterType parameter = program.function("widen").orElseThrow().typeParameters().get(0);

@@ -4,9 +4,10 @@
 // Oracle quotations verified verbatim against docs/LANGUAGE_SPEC.md:
 //   - Every expression `switch` must contain exactly one `default`, and it must remain last. `switch` does not gain enum exhaustiveness; that remains the responsibility of `match`. Requiring `default` makes value production explicit for `Integer`, `String`, and regex dispatch, while a statement `switch` may still omit `default` and do nothing when no label matches.
 //
-val input = "42"
-val v = switch (input) {
-  case regex r#"^\d+$"#:
+var input = "42"
+var v = switch (input) {
+  case regex r#"^\d+$"# {
     "number"
+  }
 }
 print(v)

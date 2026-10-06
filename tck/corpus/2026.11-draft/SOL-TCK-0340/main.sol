@@ -21,5 +21,5 @@ class B extends A {
     }
 }
 print("start")
-val b = B()
+var b = B()
 print("end")

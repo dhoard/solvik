@@ -107,7 +107,10 @@ name in a value position, `SOLV-TYPE-030` for an unconstrained generic method re
 for the deferred callables the required-diagnostics paragraph enumerates by name -- a static method reference,
 a constructor, an enum variant, a bare read of a fixed language-defined member, and a synthesized `Result`
 operation. The universal-member and `super` refusals land on that same code in this implementation but assert
-`{"family": "TYPE"}` rather than the code, because section 6 routes them to the compile-time error that
+`{
+    "family": "TYPE"
+}
+` rather than the code, because section 6 routes them to the compile-time error that
 section 3 and section 23.4 already require, those sections' own bare-member-read sentences name no code, and
 REQ-1805 already carries that family-only choice for the same reason. The nullable-receiver refusal likewise
 asserts the family, since the sentence says only "is illegal" and states no code at all. A category that
@@ -184,7 +187,7 @@ NON_NULL_KEPT = ("When the receiver's static type is non-null, `?.` retains the 
 CONTEXTUAL = ("It must be instantiated to one monomorphic function type at each value-reference site, and "
               "that instantiation is contextual:")
 GENERIC_REF = ("A generic method reference is instantiated contextually under the same monomorphic rules as a "
-               "generic top-level function reference, so `val operation: func(Integer): Integer = "
+               "generic top-level function reference, so `var operation: func(Integer): Integer = "
                "object.identity` is accepted and an unconstrained reference is `SOLV-TYPE-030`.")
 
 # --- REQ-3330: only a declared callable binds, and function-typed properties
@@ -405,8 +408,8 @@ TESTS = [
     }
 }
 
-val formatter = Formatter()
-val operation: func(Integer): String = formatter.format
+var formatter = Formatter()
+var operation: func(Integer): String = formatter.format
 print(operation(42))
 """,
     ),
@@ -416,7 +419,7 @@ print(operation(42))
         note="The same value shape crosses a result and a parameter boundary and is called three times, so "
              "the witness is not an initializer position alone",
         src="""class Adder {
-    val offset: Integer
+    var offset: Integer
     Adder(offset: Integer) {
         this.offset = offset
     }
@@ -461,10 +464,10 @@ class Leaf extends Mid {
     }
 }
 
-val base: Base = Base()
-val leaf: Base = Leaf()
-val fromBase: func(): String = base.name
-val fromLeaf: func(): String = leaf.name
+var base: Base = Base()
+var leaf: Base = Leaf()
+var fromBase: func(): String = base.name
+var fromLeaf: func(): String = leaf.name
 print(fromBase())
 print("|")
 print(fromLeaf())
@@ -487,10 +490,10 @@ class Cat extends Animal {
     }
 }
 
-val animal: Animal = Animal()
-val cat: Animal = Cat()
-val animalMethod: func(): String = animal.sound
-val catMethod: func(): String = cat.sound
+var animal: Animal = Animal()
+var cat: Animal = Cat()
+var animalMethod: func(): String = animal.sound
+var catMethod: func(): String = cat.sound
 print(animalMethod())
 print("|")
 print(catMethod())
@@ -520,11 +523,11 @@ class Loud implements Speaker {
     }
 }
 
-val dog: Speaker = Dog()
-val loud: Speaker = Loud()
-val dogSpeak: func(): String = dog.speak
-val loudSpeak: func(): String = loud.speak
-val dogShout: func(): String = dog.shout
+var dog: Speaker = Dog()
+var loud: Speaker = Loud()
+var dogSpeak: func(): String = dog.speak
+var loudSpeak: func(): String = loud.speak
+var dogShout: func(): String = dog.shout
 print(dogSpeak())
 print("|")
 print(loudSpeak())
@@ -548,15 +551,15 @@ class FrenchGreeter implements Greeter {
 }
 
 class Host implements Greeter {
-    delegate val greeter: Greeter
+    delegate var greeter: Greeter
 
     Host(greeter: Greeter) {
         this.greeter = greeter
     }
 }
 
-val host = Host(FrenchGreeter())
-val method: func(): String = host.greet
+var host = Host(FrenchGreeter())
+var method: func(): String = host.greet
 print(method())
 """,
     ),
@@ -566,7 +569,7 @@ print(method())
         note="The specification's own example: two reads of `formatter.format` are two bound-value "
              "creations and therefore unequal, while each still dispatches to the receiver's implementation",
         src="""class Formatter {
-    val tag: String
+    var tag: String
     Formatter(tag: String) {
         this.tag = tag
     }
@@ -575,7 +578,7 @@ print(method())
     }
 }
 
-val formatter = Formatter("f")
+var formatter = Formatter("f")
 print(formatter.format === formatter.format)
 print("|")
 print(formatter.format())
@@ -591,8 +594,8 @@ print(formatter.format())
         note="A counted receiver expression is evaluated once at creation and never again on calls, the "
              "retained receiver's own state is what the calls observe, and a copy keeps the value's identity",
         src="""class Wrapper {
-    val inner: Target
-    mutable val evaluations: Integer = 0
+    var inner: Target
+    var mutable evaluations: Integer = 0
     Wrapper(inner: Target) {
         this.inner = inner
     }
@@ -603,7 +606,7 @@ print(formatter.format())
 }
 
 class Target {
-    val label: String
+    var label: String
     Target(label: String) {
         this.label = label
     }
@@ -612,10 +615,10 @@ class Target {
     }
 }
 
-val wrapper = Wrapper(Target("x"))
-val baseline = wrapper.evaluations
-val method: func(): String = wrapper.target().describe
-val copied = method
+var wrapper = Wrapper(Target("x"))
+var baseline = wrapper.evaluations
+var method: func(): String = wrapper.target().describe
+var copied = method
 print(wrapper.evaluations - baseline)
 print("|")
 print(method())
@@ -623,7 +626,7 @@ print("|")
 print(copied())
 print("|")
 print(copied === method)
-val again: func(): String = wrapper.target().describe
+var again: func(): String = wrapper.target().describe
 print("|")
 print(again === method)
 print("|")
@@ -734,10 +737,10 @@ print(Mid().greet())
     }
 }
 
-val formatter = Formatter()
-val first: func(): String = formatter.format
-val second: func(): String = formatter.format
-val copied = first
+var formatter = Formatter()
+var first: func(): String = formatter.format
+var second: func(): String = formatter.format
+var copied = first
 print(first === second)
 print("|")
 print(copied === first)
@@ -760,12 +763,12 @@ print(first === first)
     }
 }
 
-val nothing: Target? = null
-val absent: (func(): String)? = nothing?.describe
+var nothing: Target? = null
+var absent: (func(): String)? = nothing?.describe
 print(absent)
 print("|")
-val something: Target? = Target()
-val present: (func(): String)? = something?.describe
+var something: Target? = Target()
+var present: (func(): String)? = something?.describe
 if (present != null) {
     print(present())
 }
@@ -783,7 +786,7 @@ if (present != null) {
 }
 
 func use(target: Target?) {
-    val method: func(): String = target.describe
+    var method: func(): String = target.describe
     print(method())
 }
 
@@ -802,8 +805,8 @@ print("EXECUTED-INVALID")
     }
 }
 
-val target = Target()
-val method: func(): String = target?.describe
+var target = Target()
+var method: func(): String = target?.describe
 print(method())
 """,
     ),
@@ -820,9 +823,9 @@ print(method())
     }
 }
 
-val box = Box()
-val fromInteger: func(Integer): Integer = box.pick
-val fromString: func(String): String = box.pick
+var box = Box()
+var fromInteger: func(Integer): Integer = box.pick
+var fromString: func(String): String = box.pick
 print(fromInteger(42))
 print("|")
 print(fromString("s"))
@@ -834,7 +837,7 @@ print(fromString("s"))
         note="The generic method sits on a generic class read through `Cell(Integer)`, so the receiver's own "
              "type arguments are already closed and only the method's parameter is inferred",
         src="""mutable class Cell<T> {
-    val stored: T
+    var stored: T
     Cell(stored: T) {
         this.stored = stored
     }
@@ -843,8 +846,8 @@ print(fromString("s"))
     }
 }
 
-val cell: Cell<Integer> = Cell(1)
-val swapString: func(String): String = cell.swap
+var cell: Cell<Integer> = Cell(1)
+var swapString: func(String): String = cell.swap
 print(swapString("swapped"))
 print("|")
 print(cell.stored)
@@ -862,7 +865,7 @@ print(cell.stored)
 }
 
 func use(box: Box) {
-    val method: Any = box.pick
+    var method: Any = box.pick
     print(method)
 }
 
@@ -881,14 +884,14 @@ print("EXECUTED-INVALID")
     override func toString(): String {
         return "p"
     }
-    val x: Integer
+    var x: Integer
     Point(x: Integer) {
         this.x = x
     }
 }
 
 func use(point: Point) {
-    val render: Any = point.toString
+    var render: Any = point.toString
     print("bound")
 }
 
@@ -912,7 +915,7 @@ print("EXECUTED-INVALID")
 
 class Derived extends Base {
     func use(): Any {
-        val method: Any = super.equals
+        var method: Any = super.equals
         return method
     }
 }
@@ -932,7 +935,7 @@ print("EXECUTED-INVALID")
 }
 
 func use() {
-    val factory: Any = Registry.make
+    var factory: Any = Registry.make
     print("bound")
 }
 
@@ -946,7 +949,7 @@ print("EXECUTED-INVALID")
         note="A function-typed property reads the stored value while a same-shaped method read creates a "
              "bound value, and the two different results show member resolution chose correctly",
         src="""class Holder {
-    mutable val stored: func(): Integer
+    var mutable stored: func(): Integer
     func storedMethod(): Integer {
         return 4
     }
@@ -957,9 +960,9 @@ print("EXECUTED-INVALID")
     }
 }
 
-val holder = Holder()
-val fromProperty: func(): Integer = holder.stored
-val fromMethod: func(): Integer = holder.storedMethod
+var holder = Holder()
+var fromProperty: func(): Integer = holder.stored
+var fromMethod: func(): Integer = holder.storedMethod
 print(fromProperty())
 print("|")
 print(fromMethod())

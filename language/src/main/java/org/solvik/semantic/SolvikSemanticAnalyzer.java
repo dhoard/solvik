@@ -95,7 +95,6 @@ import org.solvik.ast.statement.ContinueStmtNode;
 import org.solvik.ast.statement.ElseBranchNode;
 import org.solvik.ast.statement.ExprStmtNode;
 import org.solvik.ast.statement.ForInStmtNode;
-import org.solvik.ast.statement.ForStmtNode;
 import org.solvik.ast.statement.IfStmtNode;
 import org.solvik.ast.statement.LocalDeclNode;
 import org.solvik.ast.statement.RegexCaseLabelNode;
@@ -331,20 +330,20 @@ public final class SolvikSemanticAnalyzer {
     private CapturedValue currentBoundaryReceiver;
     /**
      * The capture item names that the anonymous function whose body is being checked rejected as
-     * {@code mutable val}s, so a body read or write of one reports the mutable-capture code the specification
+     * {@code var mutable}s, so a body read or write of one reports the mutable-capture code the specification
      * assigns it. Empty outside an anonymous function body, and read only by
      * {@link #reportCapturedMutableUse}.
      */
     private Set<String> currentRejectedCaptures = Set.of();
     /**
      * The capture item names this closure's capture list reported and bound nothing for, other than the
-     * {@code mutable val} names carried by {@link #currentRejectedCaptures}: an unknown name, the binding under
+     * {@code var mutable} names carried by {@link #currentRejectedCaptures}: an unknown name, the binding under
      * initialization, and an item naming something capture cannot bind. A body reference to one of these
      * names is reported nowhere, because the item already reported the one root cause.
      *
      * <p>"After an invalid capture item is reported, body checking must not cascade the same root cause
      * into an unlisted-capture or unknown-name diagnostic" (docs/LANGUAGE_SPEC.md section 6). The
-     * {@code mutable val} case needs the opposite treatment -- it earns the same code again at each body use -- so
+     * {@code var mutable} case needs the opposite treatment -- it earns the same code again at each body use -- so
      * the two sets are deliberately separate rather than one "rejected names" set.
      */
     private Set<String> suppressedCaptureNames = Set.of();
@@ -465,10 +464,10 @@ public final class SolvikSemanticAnalyzer {
      * capture entry" — and that same passage keeps a genuine typo an unknown name, because a name no
      * enclosing function declares is hidden by nothing.
      *
-     * <p>A {@code mutable val} that the capture list <em>does</em> name never reaches here: the item is rejected as
+     * <p>A {@code var mutable} that the capture list <em>does</em> name never reaches here: the item is rejected as
      * a mutable capture and its name is recorded so the body reports the mutable-capture code for it, as
-     * the specification requires. An unlisted {@code mutable val} does reach here, and stays this diagnostic —
-     * "Referencing the same outer `mutable val` without listing it remains `SEM_UNLISTED_CAPTURE` at the body
+     * the specification requires. An unlisted {@code var mutable} does reach here, and stays this diagnostic —
+     * "Referencing the same outer `var mutable` without listing it remains `SEM_UNLISTED_CAPTURE` at the body
      * reference; the compiler never silently converts it into a capture".
      */
     private boolean reportUnlistedCapture(String name, SourceSpan span) {
@@ -481,10 +480,10 @@ public final class SolvikSemanticAnalyzer {
     }
 
     /**
-     * Reports a body reference to a {@code mutable val} that this closure's capture list names, and returns true
+     * Reports a body reference to a {@code var mutable} that this closure's capture list names, and returns true
      * when it did. Such a name is deliberately not bound in the body's scope — binding a mirror of it
      * would be exactly the silent conversion the specification forbids — so a use of it resolves to
-     * nothing and has to be classified here rather than by resolution. "Naming a `mutable val` in a capture list
+     * nothing and has to be classified here rather than by resolution. "Naming a `var mutable` in a capture list
      * is {@code SEM_MUTABLE_CAPTURE} ({@code SOLV-SEM-057}), reported on that capture item, and a read or
      * write of that captured name in the body is reported with the same code": one code, two placements,
      * and the program is already rejected by the item report that precedes this one.
@@ -493,7 +492,7 @@ public final class SolvikSemanticAnalyzer {
         if (!currentRejectedCaptures.contains(name)) {
             return false;
         }
-        error(DiagnosticCode.SEM_MUTABLE_CAPTURE, span, "an anonymous function body uses capture item '" + name + "' which names a mutable 'mutable val' binding");
+        error(DiagnosticCode.SEM_MUTABLE_CAPTURE, span, "an anonymous function body uses capture item '" + name + "' which names a mutable 'var mutable' binding");
         return true;
     }
 
@@ -505,7 +504,7 @@ public final class SolvikSemanticAnalyzer {
      * initialization, or an item naming something capture cannot bind -- and resolving the same spelling in
      * the body finds nothing only because that item bound nothing. Reporting it again as an unknown name
      * would restate the item's defect as a second, unrelated one, which the specification forbids. A
-     * {@code mutable val} named by the list is handled by {@link #reportCapturedMutableUse} instead, because the
+     * {@code var mutable} named by the list is handled by {@link #reportCapturedMutableUse} instead, because the
      * specification assigns that case a code at <em>both</em> placements.
      */
     private boolean suppressesCascade(String name) {
@@ -1668,7 +1667,7 @@ public final class SolvikSemanticAnalyzer {
      *
      * <p>Pushing the declared type is what makes a property position a context in the sense section 6
      * needs: a generic function reference written there is instantiated to the property's declared
-     * function type, so {@code val id: func(Integer): Integer = identity} behaves the same way as an
+     * function type, so {@code var id: func(Integer): Integer = identity} behaves the same way as an
      * instance member and as a local. Leaving the type out would make instantiation work in one declared
      * position and fail in another for the same written expression, and the difference would be an
      * accident of where the declaration sits rather than a rule a reader could state.
@@ -1880,7 +1879,7 @@ public final class SolvikSemanticAnalyzer {
             typeParameterScope = Map.of();
             symbols.enterFunctionBoundaryScope();
             enclosingReceiverAvailable = previousClass != null || previousInterface != null || previousReceiverAvailable;
-            // The names this closure's capture list named as `mutable val`s. The item check rejected each of them
+            // The names this closure's capture list named as `var mutable`s. The item check rejected each of them
             // and bound none of them, so a body use has to be classified from this set rather than by
             // resolution -- binding a mirror would be the silent conversion the specification forbids.
             currentRejectedCaptures = function.rejectedCaptureNames();
@@ -2033,7 +2032,6 @@ public final class SolvikSemanticAnalyzer {
             case LOCAL_DECL -> checkLocalDecl((LocalDeclNode) statement);
             case IF_STMT -> checkIf((IfStmtNode) statement);
             case WHILE_STMT -> checkWhile((WhileStmtNode) statement);
-            case FOR_STMT -> checkFor((ForStmtNode) statement);
             case FOR_IN_STMT -> checkForIn((ForInStmtNode) statement);
             case SWITCH_STMT -> checkSwitch((SwitchStmtNode) statement);
             case BLOCK -> checkBlock((BlockNode) statement);
@@ -2146,50 +2144,6 @@ public final class SolvikSemanticAnalyzer {
         restoreNarrowing(narrowingBefore);
         dropWrittenSince(writtenBefore);
         definitelyInitialized = before;
-    }
-
-    private void checkFor(ForStmtNode statement) {
-        symbols.enterScope();
-        if (statement.initializer().isPresent()) {
-            StatementNode initializer = statement.initializer().get();
-            if (initializer instanceof LocalDeclNode local) {
-                checkLocalDecl(local);
-            } else if (initializer instanceof AssignStmtNode assign) {
-                checkAssign(assign);
-            } else if (initializer instanceof ExprStmtNode expressionStatement) {
-                checkExpression(expressionStatement.expression());
-                error(DiagnosticCode.SEM_FOR_INITIALIZER, initializer.span(), "for initializer must be a local declaration or an assignment");
-            }
-        }
-        Set<PropertySymbol> before = copyInitialized();
-        Map<VariableSymbol, Type> narrowingBefore = copyNarrowing();
-        Set<VariableSymbol> writtenBefore = new HashSet<>(writtenVariables);
-        if (statement.condition().isPresent()) {
-            Type condition = checkExpression(statement.condition().get());
-            requireBoolean(condition, statement.condition().get());
-            Refinement refinement = refinementOf(statement.condition().get());
-            if (refinement != null) {
-                applyRefinement(refinement, refinement.whenTrue);
-            }
-        }
-        loopDepth++;
-        breakDepth++;
-        checkBlock(statement.body());
-        breakDepth--;
-        loopDepth--;
-        if (statement.update().isPresent()) {
-            StatementNode update = statement.update().get();
-            if (update instanceof AssignStmtNode assign) {
-                checkAssign(assign);
-            } else if (update instanceof ExprStmtNode expressionStatement) {
-                checkExpression(expressionStatement.expression());
-                error(DiagnosticCode.SEM_FOR_UPDATE, update.span(), "for update clause must be an assignment");
-            }
-        }
-        restoreNarrowing(narrowingBefore);
-        dropWrittenSince(writtenBefore);
-        definitelyInitialized = before;
-        symbols.exitScope();
     }
 
     /**
@@ -2601,7 +2555,7 @@ public final class SolvikSemanticAnalyzer {
             checkMemberAssign(member, value, valueType, genericReferenceValue);
             return;
         }
-        error(DiagnosticCode.TYPE_INVALID_ASSIGNMENT_TARGET, target.span(), "assignment target must be a mutable local or a mutable val property");
+        error(DiagnosticCode.TYPE_INVALID_ASSIGNMENT_TARGET, target.span(), "assignment target must be a mutable local or a var mutable property");
     }
 
     /**
@@ -3050,7 +3004,7 @@ public final class SolvikSemanticAnalyzer {
      * emits the same canonical value from the same site.
      *
      * <p>A predeclared function is <em>not</em> generic and so is never instantiated: lowering gives each
-     * one a real call target, since {@code val output: func(Any?): Unit = println} is specified.
+     * one a real call target, since {@code var output: func(Any?): Unit = println} is specified.
      */
     private Type functionValueOf(ExpressionNode reference, FunctionSymbol function) {
         if (!function.typeParameters().isEmpty()) {
@@ -3127,7 +3081,7 @@ public final class SolvikSemanticAnalyzer {
      * Instantiates a generic *method* reference to one monomorphic function type under the expected type
      * in scope (docs/LANGUAGE_SPEC.md section 6, "Bound method references": "A generic method reference is
      * instantiated contextually under the same monomorphic rules as a generic top-level function
-     * reference, so {@code val operation: func(Integer): Integer = object.identity} is accepted and an
+     * reference, so {@code var operation: func(Integer): Integer = object.identity} is accepted and an
      * unconstrained reference is {@code SOLV-TYPE-030}").
      *
      * <p>The rules are the same as {@link #instantiateGenericValue} and are reused rather than rewritten,
@@ -3586,7 +3540,7 @@ public final class SolvikSemanticAnalyzer {
                 }
                 // An unqualified call whose target resolves to nothing still has to be classified the way a
                 // plain name reference is: an outer function-valued binding the capture list omitted is an
-                // unlisted capture, a captured `mutable val` is the mutable-capture code, and a name an already
+                // unlisted capture, a captured `var mutable` is the mutable-capture code, and a name an already
                 // reported capture item named earns no further report. Only after none of those apply is this
                 // genuinely an unknown name (docs/LANGUAGE_SPEC.md section 6).
                 if (reportCapturedMutableUse(name.name(), name.span()) || suppressesCascade(name.name()) || reportUnlistedCapture(name.name(), name.span())) {
@@ -4684,7 +4638,7 @@ public final class SolvikSemanticAnalyzer {
      * function type", and an argument position whose parameter has a function type supplies one. Without
      * it, {@code apply(identity, 1)} would report {@code SOLV-TYPE-030} for a callee whose parameter type
      * is known without consulting the argument, while the equivalent
-     * {@code val f: func(Integer): Integer = identity} compiled — a difference no reader could predict.
+     * {@code var f: func(Integer): Integer = identity} compiled — a difference no reader could predict.
      *
      * <p>Every caller that reaches here knows its parameter types before the arguments are examined: a
      * call through a function value reads them from the value's monomorphic function type, and a call on a
@@ -4900,7 +4854,7 @@ public final class SolvikSemanticAnalyzer {
      * Resolves a built-in collection construction {@code List<T>(...)}, {@code Set<T>(...)},
      * {@code Map<K, V>(key: value, ...)}, or {@code Stack<T>(...)} (docs/LANGUAGE_SPEC.md section 11).
      * Explicit type arguments bind the descriptor's type parameters; a construction that omits them
-     * infers them from the enclosing expected type, so {@code val l: List<Integer> = List(1, 2)} resolves
+     * infers them from the enclosing expected type, so {@code var l: List<Integer> = List(1, 2)} resolves
      * {@code T} from the left-hand side. A construction with no expected type and no explicit type
      * arguments has no evidence for the type parameters. Value arguments become the collection's
      * initial elements, and a {@code Map} takes {@code key: value} entries.
@@ -4916,7 +4870,7 @@ public final class SolvikSemanticAnalyzer {
         Type constructed;
         if (typeArguments.isEmpty()) {
             // Infer the type parameters from the enclosing declaration's expected type, so
-            // {@code mutable val l: List<Integer> = List(1, 2)} resolves T from the left-hand side. A
+            // {@code var mutable l: List<Integer> = List(1, 2)} resolves T from the left-hand side. A
             // construction with no enclosing expected type has no evidence for the element type.
             Type expected = expectedTypes.isEmpty() ? null : expectedTypes.peek();
             if (!(expected instanceof ParameterizedType parameterized) || parameterized.base() != collection) {
@@ -5062,7 +5016,7 @@ public final class SolvikSemanticAnalyzer {
      *
      * <p>{@code declaredReturnType} is unified against the expected type in scope when, and only when,
      * {@code fromExpectedType} says an argument was deferred — which is what keeps
-     * {@code val made: func(String): String = compose(identity)} working. {@code compose<T>(f: func(T): T)}
+     * {@code var made: func(String): String = compose(identity)} working. {@code compose<T>(f: func(T): T)}
      * names {@code T} only inside its one parameter, and that parameter is the deferred argument, so the
      * only remaining evidence is the declared type the call is being checked against — the same evidence a
      * generic variant construction already takes from its enclosing declaration, and the same reason the
@@ -5103,7 +5057,7 @@ public final class SolvikSemanticAnalyzer {
      * Resolves the type arguments of a variant construction (docs/LANGUAGE_SPEC.md section 12, and the
      * error-handling phases). Type parameters are first bound positionally from the argument types;
      * any still-unbound parameter is filled from the enclosing expected type when that expected type is
-     * a generic application of the same enum, so {@code val r: Result<T, E> = Ok(v)} and {@code return
+     * a generic application of the same enum, so {@code var r: Result<T, E> = Ok(v)} and {@code return
      * Err(e)ENCE in a {@code Result}-returning function resolve both arguments. A parameter with no
      * evidence at all is uninferable and yields its error, exactly like any other generic construction.
      */
@@ -5459,7 +5413,7 @@ public final class SolvikSemanticAnalyzer {
      * <p>The capture list is resolved in the enclosing scope <em>before</em> the body is checked, because a
      * capture item names a binding of the enclosing function and so must resolve where the expression is
      * written and not where its body is. {@link #resolveCaptures} produces both the values to bind in the
-     * body and the rejected {@code mutable val} names the body has to report, from that one resolution pass.
+     * body and the rejected {@code var mutable} names the body has to report, from that one resolution pass.
      */
     private Type checkAnonymousFunction(AnonymousFunctionExprNode expression) {
         Map<String, TypeParameterType> previousScope = typeParameterScope;
@@ -5480,7 +5434,7 @@ public final class SolvikSemanticAnalyzer {
      * Resolves one anonymous function's capture items against the closure-creation site (docs/LANGUAGE_SPEC.md
      * section 6, "Explicit immutable closure capture") in a single pass, producing both the values to bind
      * in the body — in source order, which the specification uses as environment order — and the names it
-     * rejected as {@code mutable val}s.
+     * rejected as {@code var mutable}s.
      *
      * <p>One pass over one resolution is the point: the rejected names have to reach the body so it can
      * report the mutable-capture code for each use, and a second lookup could disagree with the first
@@ -5496,7 +5450,7 @@ public final class SolvikSemanticAnalyzer {
      * <p>An item that resolves to an immutable local or parameter is recorded directly, with the enclosing
      * binding as its source: lowering gives it a slot of its own in the closure's frame, so the value is
      * copied at creation and a later reassignment of the enclosing binding is invisible through the
-     * closure. An item that names a {@code mutable val} is reported and its name recorded, never bound — binding a
+     * closure. An item that names a {@code var mutable} is reported and its name recorded, never bound — binding a
      * mirror of it would be the silent conversion the specification forbids. An item naming {@code this} is
      * recorded with no source binding and becomes the receiver of the created value.
      */
@@ -5547,7 +5501,7 @@ public final class SolvikSemanticAnalyzer {
                 continue;
             }
             if (binding.isMutable()) {
-                error(DiagnosticCode.SEM_MUTABLE_CAPTURE, item.span(), "capture item '" + item.name() + "' names a mutable 'mutable val' binding, which capture cannot bind");
+                error(DiagnosticCode.SEM_MUTABLE_CAPTURE, item.span(), "capture item '" + item.name() + "' names a mutable 'var mutable' binding, which capture cannot bind");
                 rejected.add(item.name());
                 continue;
             }
@@ -5558,7 +5512,7 @@ public final class SolvikSemanticAnalyzer {
 
     /**
      * What one capture list resolved to: the values its accepted items bind in the body, the names its
-     * rejected {@code mutable val} items leave unbound so the body can still report them, and the names its other
+     * rejected {@code var mutable} items leave unbound so the body can still report them, and the names its other
      * reported items leave unbound so the body reports them no further.
      */
     private record Captures(List<CapturedValue> bound, Set<String> rejected, Set<String> suppressed) {
@@ -5872,8 +5826,6 @@ public final class SolvikSemanticAnalyzer {
             }
             case WHILE_STMT:
                 return loopCompletion(((WhileStmtNode) statement).body());
-            case FOR_STMT:
-                return loopCompletion(((ForStmtNode) statement).body());
             case FOR_IN_STMT:
                 return loopCompletion(((ForInStmtNode) statement).body());
             default:

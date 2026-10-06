@@ -11,6 +11,6 @@ class Loud {
         return 4
     }
 }
-val p: Loud? = Loud()
-val q: Loud? = null
+var p: Loud? = Loud()
+var q: Loud? = null
 print("rev" .. (q == p))

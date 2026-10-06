@@ -18,7 +18,7 @@ func pair<A, B>(a: A, b: B): List<A> {
     return List<A>(a)
 }
 
-val made: func(String): String = identity
+var made: func(String): String = identity
 
 print(identity<Integer>(7).toString() .. "\n")
 print(identity("text") .. "\n")

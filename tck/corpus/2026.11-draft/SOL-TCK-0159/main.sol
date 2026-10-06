@@ -5,9 +5,11 @@ mutable class OtherError extends RuntimeException {
 func guard() {
     try {
         throw ParseError("one")
-    } catch (e: ParseError) {
+    }
+    catch (e: ParseError) {
         print("[" .. e.getMessage() .. "]")
-    } catch (e: OtherError) {
+    }
+    catch (e: OtherError) {
         print("[" .. e.getMessage() .. "]")
     }
 }

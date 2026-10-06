@@ -21,5 +21,5 @@ class Person implements Named {
     }
 }
 
-val p: Named = Person()
+var p: Named = Person()
 print(p.shout())

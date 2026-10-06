@@ -24,11 +24,11 @@ class Loud implements Speaker {
     }
 }
 
-val dog: Speaker = Dog()
-val loud: Speaker = Loud()
-val dogSpeak: func(): String = dog.speak
-val loudSpeak: func(): String = loud.speak
-val dogShout: func(): String = dog.shout
+var dog: Speaker = Dog()
+var loud: Speaker = Loud()
+var dogSpeak: func(): String = dog.speak
+var loudSpeak: func(): String = loud.speak
+var dogShout: func(): String = dog.shout
 print(dogSpeak())
 print("|")
 print(loudSpeak())

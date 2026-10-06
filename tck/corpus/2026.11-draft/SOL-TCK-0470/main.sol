@@ -23,10 +23,10 @@ class Leaf extends Mid {
     }
 }
 
-val base: Base = Base()
-val leaf: Base = Leaf()
-val fromBase: func(): String = base.name
-val fromLeaf: func(): String = leaf.name
+var base: Base = Base()
+var leaf: Base = Leaf()
+var fromBase: func(): String = base.name
+var fromLeaf: func(): String = leaf.name
 print(fromBase())
 print("|")
 print(fromLeaf())

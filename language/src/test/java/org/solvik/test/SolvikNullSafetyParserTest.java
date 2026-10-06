@@ -64,14 +64,14 @@ public final class SolvikNullSafetyParserTest {
 
     @Test
     public void nullableLocalTypeIsRecorded() {
-        String src = "func f(): Unit {\n    val x: Integer? = null\n}\n";
+        String src = "func f(): Unit {\n    var x: Integer? = null\n}\n";
         LocalDeclNode declaration = local(onlyFunction(parseOk("nulllocal.sol", src)), 0);
         assertThat(declaration.declaredType().orElseThrow().isNullable()).isTrue();
     }
 
     @Test
     public void nullLiteralIsItsOwnNode() {
-        String src = "func f(): Unit {\n    val x = null\n}\n";
+        String src = "func f(): Unit {\n    var x = null\n}\n";
         LocalDeclNode declaration = local(onlyFunction(parseOk("null.sol", src)), 0);
         assertNode(declaration.initializer(), AstKind.NULL_LITERAL, src, "null");
     }
@@ -104,7 +104,7 @@ public final class SolvikNullSafetyParserTest {
 
     @Test
     public void coalescingBindsLooserThanLogicalOr() {
-        String src = "func f(): Integer {\n    val x = a ?? b || c\n}\n";
+        String src = "func f(): Integer {\n    var x = a ?? b || c\n}\n";
         LocalDeclNode declaration = local(onlyFunction(parseOk("coalesce.sol", src)), 0);
         BinaryExprNode coalesce = binary(declaration.initializer());
         assertThat(coalesce.operator()).isEqualTo(BinaryOperator.COALESCE);
@@ -113,7 +113,7 @@ public final class SolvikNullSafetyParserTest {
 
     @Test
     public void coalescingIsLeftAssociative() {
-        String src = "func f(): Integer {\n    val x = a ?? b ?? c\n}\n";
+        String src = "func f(): Integer {\n    var x = a ?? b ?? c\n}\n";
         BinaryExprNode outer = binary(local(onlyFunction(parseOk("coalescechain.sol", src)), 0).initializer());
         assertThat(outer.operator()).isEqualTo(BinaryOperator.COALESCE);
         assertThat(binary(outer.left()).operator()).isEqualTo(BinaryOperator.COALESCE);
@@ -161,7 +161,7 @@ public final class SolvikNullSafetyParserTest {
 
     @Test
     public void nullTerminatesAStatement() {
-        String src = "func f(): Unit {\n    val x: Integer? = null\n    val y: Integer? = null\n}\n";
+        String src = "func f(): Unit {\n    var x: Integer? = null\n    var y: Integer? = null\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("nullterm.sol", src));
         assertThat(fn.body().statements().size()).isEqualTo(2);
     }

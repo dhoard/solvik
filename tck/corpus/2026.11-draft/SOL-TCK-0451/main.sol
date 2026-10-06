@@ -16,23 +16,23 @@ func first(list: List<func(Integer): Integer>): Integer {
 }
 
 func run(): String {
-    val offset = 100
-    val scale = func [offset](value: Integer): Integer {
+    var offset = 100
+    var scale = func [offset](value: Integer): Integer {
         return value * offset
     }
-    val maybe: func(Integer): Integer? = func [offset](value: Integer): Integer {
+    var maybe: func(Integer): Integer? = func [offset](value: Integer): Integer {
         return value + offset
     }
-    val cells: List<func(Integer): Integer> = List<func(Integer): Integer>()
-    val cellClosure = func [offset](value: Integer): Integer {
+    var cells: List<func(Integer): Integer> = List<func(Integer): Integer>()
+    var cellClosure = func [offset](value: Integer): Integer {
         return offset
     }
     cells.add(cellClosure)
 
-    val direct = scale(2).toString()
-    val argument = throughParameter(scale).toString()
-    val nullable = (maybe(1) ?? 0).toString()
-    val inList = first(cells).toString()
+    var direct = scale(2).toString()
+    var argument = throughParameter(scale).toString()
+    var nullable = (maybe(1) ?? 0).toString()
+    var inList = first(cells).toString()
     return direct .. "|" .. argument .. "|" .. nullable .. "|" .. inList
 }
 

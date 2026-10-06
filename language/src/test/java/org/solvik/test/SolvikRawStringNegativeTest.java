@@ -39,7 +39,7 @@ public final class SolvikRawStringNegativeTest {
     }
 
     private static String funcTemplate(String literal) {
-        return "func f(): Unit {\n    val s = " + literal + "\n}\n";
+        return "func f(): Unit {\n    var s = " + literal + "\n}\n";
     }
 
     /**

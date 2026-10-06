@@ -158,7 +158,7 @@ public final class SolvikInheritanceNegativeTest {
 
     @Test
     public void bareSuperAsAValueIsRejected() {
-        Diagnostic diagnostic = first(checkFails("mutable class A {\n}\nclass B extends A {\n    func f(): A {\n        val x = super;\n        return x;\n    }\n}\n"));
+        Diagnostic diagnostic = first(checkFails("mutable class A {\n}\nclass B extends A {\n    func f(): A {\n        var x = super\n        return x\n    }\n}\n"));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_SUPER_AS_VALUE);
     }
 
@@ -171,7 +171,7 @@ public final class SolvikInheritanceNegativeTest {
                 }
                 class B extends A {
                     B() {
-                        val y = 1
+                        var y = 1
                         super(1)
                     }
                 }
@@ -202,7 +202,7 @@ public final class SolvikInheritanceNegativeTest {
                     }
                 }
                 class B extends A {
-                    val y: Integer = 1
+                    var y: Integer = 1
                 }
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_MISSING_SUPER_INIT_IMPLICIT);
@@ -212,10 +212,10 @@ public final class SolvikInheritanceNegativeTest {
     public void redeclaringAnInheritedPropertyIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 mutable class A {
-                    val x: Integer = 1
+                    var x: Integer = 1
                 }
                 class B extends A {
-                    val x: Integer = 2
+                    var x: Integer = 2
                 }
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_DUPLICATE_NAME);
@@ -225,7 +225,7 @@ public final class SolvikInheritanceNegativeTest {
     public void writingAnInheritedValPropertyIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 mutable class A {
-                    val x: Integer = 1
+                    var x: Integer = 1
                 }
                 class B extends A {
                     func reset(): Unit {

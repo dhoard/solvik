@@ -72,14 +72,14 @@ public final class SolvikIncludeSemanticTest {
     @Test
     public void earlierTopLevelLocalIsVisibleToLaterIncludedStatement() {
         assertOk(analyze("root.sol", Map.of( //
-                        "root.sol", "val x: Integer = 1\ninclude \"later.sol\"\n", //
+                        "root.sol", "var x: Integer = 1\ninclude \"later.sol\"\n", //
                         "later.sol", "println(x)\n")));
     }
 
     @Test
     public void laterTopLevelLocalIsUnknownToEarlierIncludedStatement() {
         SemanticResult result = analyze("root.sol", Map.of( //
-                        "root.sol", "include \"later.sol\"\nval x: Integer = 1\n", //
+                        "root.sol", "include \"later.sol\"\nvar x: Integer = 1\n", //
                         "later.sol", "println(x)\n"));
         assertThat(result.isSuccess()).as("an earlier statement must not see a later local").isFalse();
     }

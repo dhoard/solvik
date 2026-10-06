@@ -14,10 +14,11 @@ reports can be bound to a durable semantic identity. The identifier `2026.10-dra
 not yet declared stable. A source-control commit hash may identify audit input but is not a semantic
 version and grants no compatibility promise. A new specification revision is declared only when the
 normative semantics change; released revisions are immutable.
-Revision `2026.11-draft` changes the vocabulary of declaration and closure. `var` is removed and its
-meaning is carried by `mutable val`; `open` is removed and replaced by `mutable`; `sealed` is removed
-and replaced by `abstract`. The three now obey one rule: no marker means locked, `mutable` unlocks, and
-`abstract` locks construction while opening extension. `val`, `override`, and every other keyword are
+Revision `2026.11-draft` fixes the vocabulary of declaration and closure. `var` is the one binding
+keyword and `mutable` follows it to permit reassignment, so `val` is removed and replaced by `var`;
+`open` is removed and replaced by `mutable`; `sealed` is removed and replaced by `abstract`. The
+unlock markers obey one rule: no marker means locked, `mutable` unlocks, and `abstract` locks
+construction while opening extension. `override` and every other keyword are
 unchanged, and `final` remains a prose term for the default state rather than a keyword, which is what
 it has always been. `mutable` is rejected on an `abstract` class by the grammar, because `abstract`
 already grants extension and no bit remains for `mutable` to flip. The revision retires closed class
@@ -28,7 +29,7 @@ superseded. Exhaustiveness over `enum` and `error` variants is unchanged and rem
 sum-type mechanism. `override` is retained deliberately: `mutable` grants permission downward and
 `override` asserts intent upward, and only the assertion can invalidate a stale signature, which is
 what keeps a renamed or drifted supertype method from becoming a silent non-override. The removed
-keywords are not reused as identifiers: a program that writes `var`, `open`, or `sealed` is reported as
+keywords are not reused as identifiers: a program that writes `val`, `open`, or `sealed` is reported as
 `SOLV-PARS-006` naming its replacement. See `KEYWORD_CHANGES.md` for the migration and the retired
 `SOLV-SEM-039`.
 
@@ -42,7 +43,7 @@ pre-1.0 specification.
 
 `must` and `must not` define required behavior. Features explicitly marked `deferred` are not part of the language until this document defines them. An implementation must not invent semantics for a deferred or unspecified feature.
 
-Solvik is a strongly and statically typed general-purpose language with familiar TypeScript/Kotlin-like syntax, explicit mutability, safe object-oriented defaults, composition/delegation, controlled inheritance, null safety, exhaustive pattern matching, first-class regular expressions, Rust-style raw strings, and Go-style semicolon insertion.
+Solvik is a strongly and statically typed general-purpose language with familiar TypeScript/Kotlin-like syntax, explicit mutability, safe object-oriented defaults, composition/delegation, controlled inheritance, null safety, exhaustive pattern matching, first-class regular expressions, Rust-style raw strings, and physical-line statement termination.
 
 Solvik source files use the `.sol` extension. The language id is `solvik` and the MIME type is `application/x-solvik`.
 
@@ -64,13 +65,13 @@ Solvik should be:
 
 ### Lexical basics
 
-Identifiers use `[A-Za-z_][A-Za-z0-9_]*`; keywords are reserved and `$` is not an identifier character. `//` starts a line comment. `/* ... */` is a non-nesting block comment. Comments are otherwise whitespace, but their physical newlines remain visible to semicolon insertion.
+Identifiers use `[A-Za-z_][A-Za-z0-9_]*`; keywords are reserved and `$` is not an identifier character. `//` starts a line comment. `/* ... */` is a non-nesting block comment. Comments are otherwise whitespace, but a newline inside a comment is still a physical newline for statement termination (section 16).
 
-`mutable` and `abstract` are keywords and each opens a construct, so neither ever terminates a line for
-semicolon insertion (section 16). The keywords removed by this revision — `var`, `open`, and `sealed` —
+`mutable` and `abstract` are keywords and each opens a construct, so neither ever ends a line
+(section 16). The keywords removed by this revision — `val`, `open`, and `sealed` —
 are not identifiers: a program that writes one is reported as `SOLV-PARS-006` on that token, naming the
 replacement. Reserving them keeps a removed keyword from silently changing what an existing program
-means, which is what would happen if `var x = 1` became an assignment to a variable named `var`.
+means, which is what would happen if `val x = 1` became an assignment to a variable named `val`.
 
 Decimal integer literals contain ASCII digits and have type `Integer` in the initial typed core. A literal outside the signed 32-bit range is a compile-time error until additional literal forms are specified.
 
@@ -80,45 +81,59 @@ A character literal uses single quotes and contains exactly one Unicode scalar v
 
 ## 2. Variables and Mutability
 
-`val` declares an immutable binding/property.
+`var` declares an immutable binding/property.
 
 ```solvik
-val name: String = "Doug"
-val count = 1
+var name: String = "Doug"
+var count = 1
+var count: Integer = 1
 ```
 
 Reassignment is illegal:
 
 ```solvik
-val count = 1
+var count = 1
 count = 2 // compile error
 ```
 
-`mutable val` declares a mutable binding/property.
+`var mutable` declares a mutable binding/property.
 
 ```solvik
-mutable val count: Integer = 0
+var mutable count: Integer = 0
+count = count + 1
+var mutable total = 1
+```
+
+No other marker declares a binding, and `var` is the only binding keyword: a binding is immutable
+unless `mutable` follows it. `mutable` is a modifier on the declaration, never a binding kind of its
+own, so `var mutable` is the complete form and a bare `mutable` is a compile-time error. The canonical
+forms are `var name = expression`, `var name: Type = expression`, `var mutable name = expression`,
+and `var mutable name: Type = expression`: the declaration keyword comes first and a modifier that
+permits reassignment follows it.
+
+Reassignment uses ordinary `=` assignment on an existing binding and is legal only when the binding
+was declared `mutable`:
+
+```solvik
+var mutable count = 0
+count = 1
 count = count + 1
 ```
 
-No other marker declares a binding, and `val` is the only binding keyword: a binding is immutable
-unless `mutable` precedes it. `mutable` is a modifier on the declaration, never a binding kind of its
-own, so `mutable val` is the complete form and a bare `mutable` is a compile-time error.
-
-`val` freezes the binding, not the complete reachable object graph, and neither form is a compile-time
+`var` freezes the binding, not the complete reachable object graph, and neither form is a compile-time
 constant: the initializer is an ordinary runtime expression. That is why the writable form is not
 named `const`, which is reserved for future compile-time constants.
 
 ```solvik
 class User {
-    mutable val name: String
+    var mutable name: String
 
     User(name: String) {
         this.name = name
     }
 }
 
-val user = User("Doug")
+var user = User("Doug")
 user.name = "Douglas" // valid
 user = User("Other")  // compile error
 ```
@@ -131,26 +146,26 @@ Two unrelated classes with identical members are not assignment-compatible.
 
 ```solvik
 class A {
-    val value: String
+    var value: String
 }
 
 class B {
-    val value: String
+    var value: String
 }
 
-val a: A = B("x") // compile error
+var a: A = B("x") // compile error
 ```
 
 `Any` must never behave like TypeScript's `any`. Assigning a value to `Any` does not disable type checking.
 
 ```solvik
-val x: Any = "hello"
-val n: Integer = x // compile error
+var x: Any = "hello"
+var n: Integer = x // compile error
 ```
 
 A checked cast or type refinement is required.
 
-Assignments are statements, not value-producing expressions. The target must be a `mutable val` local or a `mutable val` property. Calls require exact arity, and each argument must be assignable to its declared parameter type.
+Assignments are statements, not value-producing expressions. The target must be a `var mutable` local or a `var mutable` property. Calls require exact arity, and each argument must be assignable to its declared parameter type.
 
 Operator precedence, from lowest to highest, is:
 
@@ -376,9 +391,9 @@ assignability uses the ordinary invalid-operand diagnostic; a compatible pair wi
 operand uses `SOLV-TYPE-039`.
 
 ```solvik
-val a = Point(1, 2)
-val b = Point(1, 2)
-val c = a
+var a = Point(1, 2)
+var b = Point(1, 2)
+var c = a
 
 a == b   // false without an override; true when Point.equals compares fields
 a === b  // false
@@ -432,7 +447,7 @@ Phase 4 implements `Integer` as the initial numeric type. `Byte`, `Short`, `Long
 
 No other conversion is implicit. `Integer` does not widen to `Float` (the 24-bit `Float` significand cannot hold every `Integer`), and `Long` widens to neither `Float` nor `Double` (64 bits exceed the 53-bit significand). No narrowing is implicit. Every other conversion, including all narrowing and every precision-losing conversion, uses an explicit built-in type call such as `Long(value)`; an out-of-range integral conversion raises a Solvik runtime arithmetic error and an out-of-range constant conversion is a compile-time error. Because a widening never overflows or loses precision, an implicit widening introduces no new runtime arithmetic error.
 
-Widening is a coercion applied at conversion sites, not a subtype relation: numeric types remain siblings under `Number`, nominal assignment, generics, hashing, type tests, and casts are unchanged, and a widening never appears in a type join (section 21.7). A widening is applied where an expression must match a declared target type (a `val` or property initializer, a function or method argument, a `return`, an assignment, or a collection element/key/value) and, for arithmetic, ordering, and equality operators, by widening each operand to the least common widened numeric type of the two operands — the unique minimal type both operands can widen or stay to. When two numeric operands have no such common type (for example `Long` and `Float`) the operator is ill-typed. Widening never applies to identity operators (`===`/`!==`), which remain governed by section 3.
+Widening is a coercion applied at conversion sites, not a subtype relation: numeric types remain siblings under `Number`, nominal assignment, generics, hashing, type tests, and casts are unchanged, and a widening never appears in a type join (section 21.7). A widening is applied where an expression must match a declared target type (a `var` or property initializer, a function or method argument, a `return`, an assignment, or a collection element/key/value) and, for arithmetic, ordering, and equality operators, by widening each operand to the least common widened numeric type of the two operands — the unique minimal type both operands can widen or stay to. When two numeric operands have no such common type (for example `Long` and `Float`) the operator is ill-typed. Widening never applies to identity operators (`===`/`!==`), which remain governed by section 3.
 
 Integral arithmetic is checked and raises a Solvik runtime arithmetic error on overflow. `Float` and `Double` follow IEEE 754 arithmetic. Arithmetic operands are widened as described above and produce their common widened type; operands of the same type produce that type.
 
@@ -461,14 +476,14 @@ not declare the exception types it may throw, and callers are not forced to hand
 Types are non-null by default.
 
 ```solvik
-val name: String = "Doug"
-val bad: String = null // compile error
+var name: String = "Doug"
+var bad: String = null // compile error
 ```
 
 `T?` denotes a nullable type.
 
 ```solvik
-val name: String? = null
+var name: String? = null
 ```
 
 `null` is assignable only to nullable types. If `S` is a subtype of `T`, then `S` is assignable to `T?` and `S?` is assignable to `T?`; `S?` is not assignable to non-null `T`.
@@ -476,13 +491,13 @@ val name: String? = null
 Safe member access:
 
 ```solvik
-val rendered: String? = name?.toString()
+var rendered: String? = name?.toString()
 ```
 
 Null coalescing:
 
 ```solvik
-val display = name ?? "Unknown"
+var display = name ?? "Unknown"
 ```
 
 For `receiver?.member`, the member is evaluated only when the receiver is non-null and the result type is the member type made nullable. For `left ?? right`, `left` must be nullable; the result is the common type of non-null `left` and `right`.
@@ -497,7 +512,7 @@ if (name != null) {
 
 The reference-identity null tests `name === null` and `name !== null` narrow the same way.
 
-Narrowing is permitted only when the analyzed value cannot be written or invalidated along that control-flow path. A write to a `mutable val` invalidates its prior narrowing.
+Narrowing is permitted only when the analyzed value cannot be written or invalidated along that control-flow path. A write to a `var mutable` invalidates its prior narrowing.
 
 ## 6. Functions
 
@@ -513,7 +528,7 @@ Parameter types must be explicit in the initial implementation. A function's ret
 
 A function that returns normally without a value has return type `Unit`, whether that type is omitted or written explicitly. `Nothing` remains the bottom type for computations that never complete normally.
 
-The program scope contains declarations and executable statements, which may be interleaved freely. When the root source uses compile-time inclusion (section 20), the declarations and statements of every expanded file participate in this one program; a file that declares a `module` places its top-level declarations in that module's namespace, and an included module may be referenced through a namespace prefix (section 20). The top-level statements, in include-expansion order, form the body of an implicit `func main()`; a top-level `val`, whether or not it is `mutable`, is therefore a local of the implicit main, not a global. Declaration lookup remains order-independent within a module, so a declaration may be referenced from a physically earlier file or statement. The entry point is always implicit: declaring a function named `main` explicitly, in the root or in any included file, is a compile-time error. A program with no executable top-level statements has no entry point and does nothing. A call may be used as a statement. Other value-producing expressions cannot stand alone as statements. `return;` is valid only in a function declared without a return type; `return value` requires the value to be assignable to the declared return type.
+The program scope contains declarations and executable statements, which may be interleaved freely. When the root source uses compile-time inclusion (section 20), the declarations and statements of every expanded file participate in this one program; a file that declares a `module` places its top-level declarations in that module's namespace, and an included module may be referenced through a namespace prefix (section 20). The top-level statements, in include-expansion order, form the body of an implicit `func main()`; a top-level `var`, whether or not it is `mutable`, is therefore a local of the implicit main, not a global. Declaration lookup remains order-independent within a module, so a declaration may be referenced from a physically earlier file or statement. The entry point is always implicit: declaring a function named `main` explicitly, in the root or in any included file, is a compile-time error. A program with no executable top-level statements has no entry point and does nothing. A call may be used as a statement. Other value-producing expressions cannot stand alone as statements. `return;` is valid only in a function declared without a return type; `return value` requires the value to be assignable to the declared return type.
 
 Functions are not overloaded in the initial language: two functions with the same name in one scope are a compile-time error. The executable entry point is the implicit `main` formed by the program's executable top-level statements. Command-line argument binding is deferred. A program that reaches the end of its entry point exits with status `0`; the predeclared `exit(code: Integer)` function terminates the program immediately with the given status.
 
@@ -525,12 +540,12 @@ A brace-delimited block may stand alone as a statement. A scope block introduces
 
 ```solvik
 {
-    val result: String = parseHeader()
+    var result: String = parseHeader()
     handleHeader(result)
 }
 
 {
-    val result: String = parseBody()
+    var result: String = parseBody()
     handleBody(result)
 }
 ```
@@ -612,10 +627,10 @@ local, parameter, return, property, or static property, as a generic type argume
 type of a nullable type, and in the parameter or return position of another function type:
 
 ```solvik
-val formatter: func(Integer): String = format
-val optional: (func(Integer): String)? = null
-val factory: func(): func(Integer): String = makeFormatter
-val callbacks: List<func(String): Unit> = List()
+var formatter: func(Integer): String = format
+var optional: (func(Integer): String)? = null
+var factory: func(): func(Integer): String = makeFormatter
+var callbacks: List<func(String): Unit> = List()
 ```
 
 Parentheses are required when nullability applies to the function value itself:
@@ -669,8 +684,8 @@ applications even though the function types inside them are comparable.
 A call expression may invoke any expression whose non-null static type is a function type:
 
 ```solvik
-val operation: func(Integer): Integer = double
-val result = operation(21)
+var operation: func(Integer): Integer = double
+var result = operation(21)
 ```
 
 The callee expression is evaluated exactly once before any argument. Arguments are then evaluated
@@ -694,7 +709,7 @@ func format(value: Integer): String {
     return value.toString()
 }
 
-val formatter: func(Integer): String = format
+var formatter: func(Integer): String = format
 println(formatter(42))
 ```
 
@@ -703,8 +718,8 @@ direct invocation. The same rule applies to module-qualified functions and to th
 functions:
 
 ```solvik
-val render: func(Integer): String = text::render
-val output: func(Any?): Unit = println
+var render: func(Integer): String = text::render
+var output: func(Any?): Unit = println
 ```
 
 Name resolution keeps the existing lexical precedence: a visible local or parameter with the same
@@ -736,11 +751,11 @@ implicit tail result, and the ordinary return diagnostics apply inside an anonym
 as they do in a declaration.
 
 ```solvik
-val double: func(Integer): Integer = func(value: Integer): Integer {
+var double: func(Integer): Integer = func(value: Integer): Integer {
     return value * 2
 }
 
-val consume: func(String) = func(value: String) {
+var consume: func(String) = func(value: String) {
     println(value)
 }
 ```
@@ -761,8 +776,8 @@ An anonymous function has no implicit access to local values from an enclosing f
 dependency must appear in an explicit capture list between `func` and the parameter list:
 
 ```solvik
-val factor = 3
-val scale = func [factor](value: Integer): Integer {
+var factor = 3
+var scale = func [factor](value: Integer): Integer {
     return value * factor
 }
 ```
@@ -772,7 +787,7 @@ example above has type `func(Integer): Integer`, because callers supply `value` 
 declaration visibly binds `factor` into the function value.
 
 A capture item is an identifier or `this`. It must resolve at the closure-creation site to one of: a
-`val` local declared in an enclosing function scope; an immutable parameter of an enclosing
+`var` local declared in an enclosing function scope; an immutable parameter of an enclosing
 function; another function value held by an immutable binding; or `this` in an enclosing instance
 method or constructor. The capture list uses source order as environment order. A duplicate capture
 item, and a capture item with the same name as one of the anonymous function's parameters, is
@@ -781,7 +796,7 @@ capture list is a parse error, because a non-capturing anonymous function is wri
 
 Each listed binding's value is captured when evaluation reaches the anonymous-function expression.
 Capturing an object copies the reference, not the reachable object graph, so later mutation of that
-object's `mutable val` properties remains observable through the captured reference.
+object's `var mutable` properties remains observable through the captured reference.
 
 An outer local or parameter referenced by the body but omitted from the capture list is
 `SEM_UNLISTED_CAPTURE` (`SOLV-SEM-058`), reported on the body reference. This applies to `this` as
@@ -790,17 +805,17 @@ remains `SOLV-RESOL-001`, and `this` where no instance receiver exists remains `
 Top-level and module-qualified function declarations are globally resolved declarations rather than
 local state and need no capture entry; there are no globals to capture.
 
-A closure must not list or otherwise capture a `mutable val` local. Naming a `mutable val` in a capture
+A closure must not list or otherwise capture a `var mutable` local. Naming a `var mutable` in a capture
 list is `SEM_MUTABLE_CAPTURE` (`SOLV-SEM-057`), reported on that capture item, and a read or write of
 that captured name in the body is reported with the same code. Referencing the same outer
-`mutable val` without listing it remains `SEM_UNLISTED_CAPTURE` at the body reference; the compiler
+`var mutable` without listing it remains `SEM_UNLISTED_CAPTURE` at the body reference; the compiler
 never silently converts it into a capture. A capture item that resolves to something other than an
 eligible immutable local, parameter, or `this` is `SEM_INVALID_CAPTURE` (`SOLV-SEM-059`), reported on
 the capture item.
 
 ```solvik
-mutable val total = 0
-val add = func [total](value: Integer) {
+var mutable total = 0
+var add = func [total](value: Integer) {
     total = total + value // rejected at [total]: SEM_MUTABLE_CAPTURE
 }
 ```
@@ -809,15 +824,15 @@ Mutable state may be shared explicitly through a captured immutable object refer
 
 ```solvik
 class Counter {
-    mutable val value: Integer = 0
+    var mutable value: Integer = 0
 
     func increment() {
         this.value = this.value + 1
     }
 }
 
-val counter = Counter()
-val increment = func [counter]() {
+var counter = Counter()
+var increment = func [counter]() {
     counter.increment()
 }
 ```
@@ -844,8 +859,8 @@ func identity<T>(value: T): T {
     return value
 }
 
-val integerIdentity: func(Integer): Integer = identity
-val stringIdentity: func(String): String = identity
+var integerIdentity: func(Integer): Integer = identity
+var stringIdentity: func(String): String = identity
 ```
 
 The expected function type supplies constraints for every declared type parameter. The compiler
@@ -859,7 +874,7 @@ runtime type dispatch.
 A generic function reference with no expected function type is `SOLV-TYPE-030`:
 
 ```solvik
-val ambiguous = identity // SOLV-TYPE-030: the type parameters cannot be inferred
+var ambiguous = identity // SOLV-TYPE-030: the type parameters cannot be inferred
 ```
 
 An expected `Any`, an unbounded type parameter, or any other type that does not expose a complete
@@ -879,8 +894,8 @@ class Formatter {
     }
 }
 
-val formatter = Formatter()
-val operation: func(Integer): String = formatter.format
+var formatter = Formatter()
+var operation: func(Integer): String = formatter.format
 println(operation(42))
 ```
 
@@ -899,14 +914,14 @@ that invokes the immediate superclass implementation without virtual redispatch,
 immediate `super.method(...)` call.
 
 A generic method reference is instantiated contextually under the same monomorphic rules as a
-generic top-level function reference, so `val operation: func(Integer): Integer = object.identity`
+generic top-level function reference, so `var operation: func(Integer): Integer = object.identity`
 is accepted and an unconstrained reference is `SOLV-TYPE-030`.
 
 A normal member reference on a nullable receiver is illegal. Safe member access produces a nullable
 function value and evaluates the receiver once:
 
 ```solvik
-val operation: (func(Integer): String)? = formatter?.format
+var operation: (func(Integer): String)? = formatter?.format
 ```
 
 If the receiver is null the result is null and no bound function is created; if it is non-null the
@@ -938,8 +953,10 @@ reference-identity hash. These operations are fixed and cannot be overridden. Th
 ```solvik
 format === format // true: canonical named function value
 
-val first = func() {}
-val second = func() {}
+var first = func() {
+}
+var second = func() {
+}
 first === second // false
 first === first  // true
 
@@ -975,7 +992,7 @@ Function values add an indirect call path; they do not replace direct calls, and
 
 | Code name | Stable code | Trigger and primary span |
 |---|---|---|
-| `SEM_MUTABLE_CAPTURE` | `SOLV-SEM-057` | an anonymous function lists or otherwise reads or writes a captured `mutable val` local; the captured name reference |
+| `SEM_MUTABLE_CAPTURE` | `SOLV-SEM-057` | an anonymous function lists or otherwise reads or writes a captured `var mutable` local; the captured name reference |
 | `SEM_UNLISTED_CAPTURE` | `SOLV-SEM-058` | an anonymous-function body uses an eligible outer local, parameter, or `this` that its capture list omits; the body reference |
 | `SEM_INVALID_CAPTURE` | `SOLV-SEM-059` | a capture item resolves to something other than an eligible immutable local, parameter, or `this`; the capture item |
 
@@ -1001,8 +1018,8 @@ means locked.
 
 ```solvik
 class User {
-    val id: Long
-    mutable val name: String
+    var id: Long
+    var mutable name: String
 
     User(id: Long, name: String) {
         this.id = id
@@ -1066,8 +1083,8 @@ A class declares its constructor as a class member whose name is the class name,
 
 ```solvik
 class User {
-    val id: Long
-    mutable val name: String
+    var id: Long
+    var mutable name: String
 
     User(id: Long, name: String) {
         this.id = id
@@ -1076,7 +1093,7 @@ class User {
 }
 ```
 
-Calling the class name invokes its constructor. A class has at most one constructor declaration. Every property without a declaration initializer must be assigned exactly once on every successful constructor path before it is read; a `val` property cannot be assigned afterward.
+Calling the class name invokes its constructor. A class has at most one constructor declaration. Every property without a declaration initializer must be assigned exactly once on every successful constructor path before it is read; a `var` property cannot be assigned afterward.
 
 A constructor is not a method. It is not inherited, cannot carry `mutable` or `override`, is not declared by an interface, is not forwarded by a `delegate`, and cannot be invoked as `this.User(...)`. For a generic class `Box<T>`, the constructor is named `Box`, not `Box<T>`. A class member declaration other than the constructor cannot have the same name as its class.
 
@@ -1096,8 +1113,8 @@ enum are parse errors rather than semantic ones.
 
 ```solvik
 class Counter {
-    static val limit: Integer = 10
-    static mutable val attempts: Integer = 0
+    static var limit: Integer = 10
+    static var mutable attempts: Integer = 0
 
     static func reset() {
         Counter.attempts = 0
@@ -1107,14 +1124,14 @@ class Counter {
         Counter.attempts = 1
     }
 
-    val id: Integer = 1
+    var id: Integer = 1
 }
 ```
 
 A static member is referenced through the class name: `Counter.limit`, `Counter.attempts = 5`, and
 `Counter.reset()`. The class name in that position is a receiver, not a value: it is legal only as the
 root of a static member reference, and a class name used anywhere else remains `SOLV-TYPE-016`. In
-particular `val c = Counter` and a read through an instance such as `instance.limit` are rejected. A
+particular `var c = Counter` and a read through an instance such as `instance.limit` are rejected. A
 module-qualified class reaches the same members, as in `math::Counter.reset()`.
 
 The class name is required even inside the class's own static members: a static property is read and
@@ -1147,7 +1164,7 @@ member may use those names. Those names are reserved to protect the universal `A
 instance members reached through virtual dispatch; a static member never enters the dispatch table, so a
 `static func toString()` cannot replace `Any.toString()` any more than an instance method of another name
 can, and `instance.toString()` keeps reaching the universal member. Both spellings are reachable at once:
-for a class declaring `static val toString: Integer` and inheriting the default `Any.toString()`, the
+for a class declaring `static var toString: Integer` and inheriting the default `Any.toString()`, the
 expression `C.toString` reads the static cell and `instance` formatting still calls `Any.toString()`.
 
 A class declares **at most one** class initializer block. A second block is `SOLV-SEM-046`, reported on
@@ -1202,7 +1219,7 @@ interface Named {
     func name(): String
 
     func greeting(): String {
-        return "Hello " + name()
+        return "Hello " .. name()
     }
 }
 ```
@@ -1224,21 +1241,22 @@ Composition is a primary language design mechanism.
 Delegation removes forwarding boilerplate.
 
 ```solvik
-interface Repository<T> {
-    func find(id: Long): T?
-    func save(value: T)
+interface UserRepository {
+    func find(id: Long): User?
+
+    func save(value: User)
 }
 
-class UserService implements Repository<User> {
-    delegate val repository: Repository<User>
+class UserService implements UserRepository {
+    delegate var repository: UserRepository
 
-    UserService(repository: Repository<User>) {
+    UserService(repository: UserRepository) {
         this.repository = repository
     }
 }
 ```
 
-The compiler synthesizes forwarding behavior for interface members supplied by a delegate. A delegate is an immutable, explicitly typed property that must be initialized under the normal constructor rules.
+The compiler synthesizes forwarding behavior for interface members supplied by a delegate. A delegate is an immutable, explicitly typed property that must be initialized under the normal constructor rules. The declared type of a delegate property must be an interface type written without type arguments: forwarding is synthesized from the declared interface contract, so a delegate whose type annotation instantiates a generic interface is rejected as `SOLV-SEM-025` (`SEM_INVALID_DELEGATE_TYPE`).
 
 Explicit methods declared on the class take precedence over delegated members.
 
@@ -1246,8 +1264,8 @@ Ambiguous delegation must be a compile-time error.
 
 ```solvik
 class X implements Printable {
-    delegate val a: PrinterA
-    delegate val b: PrinterB
+    delegate var a: PrinterA
+    delegate var b: PrinterB
 
     // compile error if both supply print() and X does not explicitly resolve it
 }
@@ -1273,10 +1291,10 @@ Solvik supports nominal generics.
 
 ```solvik
 class Box<T> {
-    mutable val value: T
+    var mutable value: T
 }
 
-val names: List<String>
+var names: List<String> = List("a", "b")
 ```
 
 Generic type arguments are invariant. The initial runtime uses erasure while preserving complete compile-time checking. A runtime type test against a non-reified type argument is a compile-time error.
@@ -1285,7 +1303,7 @@ Generic type arguments are invariant. The initial runtime uses erasure while pre
 
 A collection is constructed with a class-style call. The type arguments may be written explicitly
 (`List<Integer>(1, 2, 3)`) or omitted to infer them from the declared type of the left-hand side
-(`val names: List<String> = List("a", "b")`); a construction that writes neither is a compile-time
+(`var names: List<String> = List("a", "b")`); a construction that writes neither is a compile-time
 error. A call with no value arguments constructs an empty collection (`List<Integer>()`).
 
 For `List`, `Set`, and `Stack`, the value arguments are the initial elements and each must be
@@ -1294,15 +1312,15 @@ assignable to the element type; `Set` keeps only the first of equal elements. `M
 keeps its position and takes the latest value. A `key: value` entry is meaningful only in a `Map`
 construction, and a positional value is not valid in a `Map` construction.
 
-* `List<T>`: `val isEmpty: Boolean`, `val size: Integer`, `func add(element: T)`, `func get(index: Integer): T`,
+* `List<T>`: `var isEmpty: Boolean`, `var size: Integer`, `func add(element: T)`, `func get(index: Integer): T`,
   `func removeAt(index: Integer): T`, `func set(index: Integer, element: T)`, `func clear()`. An invalid index
   raises a Solvik runtime bounds error.
-* `Set<T>`: `val isEmpty: Boolean`, `val size: Integer`, `func add(element: T): Boolean`,
+* `Set<T>`: `var isEmpty: Boolean`, `var size: Integer`, `func add(element: T): Boolean`,
   `func contains(element: T): Boolean`, `func remove(element: T): Boolean`, `func clear()`.
-* `Map<K, V>`: `val isEmpty: Boolean`, `val size: Integer`, `func put(key: K, value: V)`,
+* `Map<K, V>`: `var isEmpty: Boolean`, `var size: Integer`, `func put(key: K, value: V)`,
   `func get(key: K): V`, `func containsKey(key: K): Boolean`, `func remove(key: K): Boolean`,
   `func clear()`. `get` for a missing key raises a Solvik collection error.
-* `Stack<T>`: `val isEmpty: Boolean`, `val size: Integer`, `func push(element: T)`, `func peek(): T`,
+* `Stack<T>`: `var isEmpty: Boolean`, `var size: Integer`, `func push(element: T)`, `func peek(): T`,
   `func pop(): T`, `func clear()`. `peek` and `pop` on an empty stack raise a Solvik collection error.
 
 Collection literals beyond a constructor call, iteration protocols, and collection variance remain
@@ -1333,9 +1351,9 @@ branch result is an expression; because a block is an expression (section 21), a
 brace-delimited block for multiple statements followed by a tail result.
 
 ```solvik
-val message = match result {
-    Ok(value) => "value=" + value
-    Err(error) => "error=" + error
+var message = match result {
+    Ok(value) => "value=" .. value
+    Err(error) => "error=" .. error
 }
 ```
 
@@ -1372,28 +1390,35 @@ Cases never implicitly fall through.
 
 ```solvik
 switch (value) {
-    case 1:
+    case 1 {
         print("one")
+    }
 
-    case 2:
+    case 2 {
         print("two")
+    }
 
-    default:
+    default {
         print("other")
+    }
 }
 ```
 
 No `break` is required to terminate a case.
 
-Cases are tested in source order and exactly the first matching case executes. Each case body is an implicit block. A `break` inside a case is illegal unless it exits a loop nested inside that case.
+Cases are tested in source order and exactly the first matching case executes. Every `case` and
+`default` body is a real braced lexical scope (section 16): the body's `{` closes the label's line,
+there is no colon after a label, and bindings declared in one case body are independent of every
+other body. A `break` inside a case is illegal unless it exits a loop nested inside that case.
 
 Constant case expressions must be compile-time constants assignable to the switched value's type. Regex cases require a `String` switch value. A switch contains at most one `default`, and it must be last.
 
 Initial Solvik does not provide a `fallthrough` keyword. Shared cases are expressed directly, for example:
 
 ```solvik
-case 1, 2:
+case 1, 2 {
     print("one or two")
+}
 ```
 
 ## 14. Regex
@@ -1420,21 +1445,24 @@ The initial portable pattern syntax supports literals, `.`, `^`, `$`, character 
 Regex construction accepts raw strings:
 
 ```solvik
-val number = Regex(r#"^\d+$"#)
+var number = Regex(r#"^\d+$"#)
 ```
 
 Regex patterns may be used in `switch` cases:
 
 ```solvik
 switch (input) {
-    case regex r#"^\d+$"#:
+    case regex r#"^\d+$"# {
         print("number")
+    }
 
-    case regex r#"^[A-Za-z]+$"#:
+    case regex r#"^[A-Za-z]+$"# {
         print("word")
+    }
 
-    default:
+    default {
         print("other")
+    }
 }
 ```
 
@@ -1449,7 +1477,7 @@ Regex match/capture binding in `switch` is deferred.
 Normal strings cannot contain an unescaped physical newline. They support exactly `\\`, `\"`, `\n`, `\r`, `\t`, `\0`, and `N` (`\N`). Any other escape is a lexical error.
 
 ```solvik
-val message = "hello\nworld"
+var message = "hello\nworld"
 ```
 
 String interpolation is deferred. A `$` has no interpolation meaning in the initial implementation.
@@ -1478,13 +1506,13 @@ correct native line separator when executed on another.
 Examples:
 
 ```solvik
-val onlyNative = "\N"
-val leading = "\Nindented"
-val trailing = "end\N"
-val multiple = "a\Nb\Nc"
-val explicitLf = "\n"
-val explicitCrlf = "\r\n"
-val escapedBackslashN = "\\N"  // literal backslash followed by 'N'
+var onlyNative = "\N"
+var leading = "\Nindented"
+var trailing = "end\N"
+var multiple = "a\Nb\Nc"
+var explicitLf = "\n"
+var explicitCrlf = "\r\n"
+var escapedBackslashN = "\\N"  // literal backslash followed by 'N'
 ```
 
 Raw strings do not process `\N`; the two characters remain literal inside a raw string.
@@ -1525,80 +1553,134 @@ An unterminated raw string is a lexical error at its opening delimiter. The diag
 Examples:
 
 ```solvik
-val regex = r#"\d+\s+"#
-val json = r#"{"name":"Doug","path":"C:\temp"}"#
-val sql = r#"
+var regex = r#"\d+\s+"#
+var json = r#"{"name":"Doug","path":"C:\temp"}"#
+var sql = r#"
 SELECT *
 FROM users
 WHERE name = 'Doug'
 "#
 ```
 
-## 16. Statement Termination
+## 16. Statement Termination and Brace Placement
 
-Solvik uses Go-style lexical semicolon insertion.
-
-Programmers may explicitly write `;`, but normal style uses newlines.
+Solvik is a physical-line language. A physical newline ends the statement, declaration, or member
+that precedes it, and the grammar requires a separator between every two constructs.
 
 ```solvik
-val x = 1
-val y = 2
+var x = 1
+var y = 2
 ```
 
-is tokenized equivalently to:
+The semicolon is a separator, not a terminator. It may separate two constructs written on the same
+physical line:
 
 ```solvik
-val x = 1;
-val y = 2;
+var a = 1; var b = 2; print(a + b)
 ```
 
-Semicolon insertion must occur in a token-stream stage after lexing and before parsing. It must not depend on parser errors.
-
-The lexer must preserve physical newline information. The token-stream stage ignores spaces and comments but treats a newline contained in a line comment or block comment as a physical newline.
-
-At a physical newline, emit one synthetic `SEMI` token when all of these conditions hold:
-
-1. the unmatched `(` and `[` nesting depths are both zero;
-2. the preceding significant token is an identifier, a literal, `break`, `continue`, `return`, `)`, `]`, or `}`;
-3. the next significant token is not `.`, `?.`, or `else`.
-
-At end of file, apply the same rule without a next-token exception. Consecutive blank lines must not emit duplicate semicolons. Explicit `;` and synthesized semicolons must both become the parser's `SEMI` token.
-
-A top-level `include` directive (section 20) ends with an explicit or inserted `SEMI` exactly like a statement. Its path is a string or raw-string literal, so a following physical newline terminates the directive under this section's ordinary rule; no include-specific termination rule exists.
-
-Expressions continue naturally after operators and commas:
+It never ends a line. A `;` that is followed by another physical line, by end of file, or by a
+stand-alone closing brace did not separate two constructs on its line and is rejected as
+`SOLV-PARS-012` (`SEMI_ENDS_LINE`) at the semicolon. So all of these are errors:
 
 ```solvik
-val total = price +
+var x = 1;
+```
+
+```solvik
+println("one"); // comment
+```
+
+```solvik
+foo(); bar();
+```
+
+```solvik
+var value = {
+    42;
+}
+```
+
+and `foo(); var a = 1; var b = 2` is the correct spelling of three statements on one line. A
+construct followed by nothing but comment to the end of its line is complete at the boundary;
+comment cannot make a `;` into a separator.
+
+Termination is decided before parsing by a line-boundary stage over the token stream, never by a
+parser error or by any insertion heuristic. The lexer preserves every physical newline (including a
+newline inside a comment, because it is still a physical newline), and the stage forwards exactly one
+parser-visible boundary token per line boundary whose last token ends a line: an identifier, a
+literal, `break`, `continue`, `return`, `)`, `]`, `}`, an explicit `;`, a completed `?` propagation,
+or `this`, `super`, and `null`, end a line; keywords that open a construct (`var`, `else`, `mutable`,
+`class`, `func`, `try`, `throw`, `static`, `case`, `default`, `enum`, `module`, `abstract`, `match`),
+an operator, and a comma do not. Blank lines and comment lines never
+add a second boundary, and the final physical line of a file is terminated by end of file, to which
+the same rule applies without a following token. Indentation has no syntactic meaning.
+
+### Expression continuation
+
+A line that cannot end is a continuation: the grammar itself absorbs the boundary tokens at the
+positions where a construct may spread across lines - after a binary operator, after a comma, before
+a `.`, `?.`, or `::`, around argument, type-argument, and pattern lists, and before a closing
+delimiter. There is no lookahead exception table and no heuristic join: a line break the grammar
+does not admit is an error at the break.
+
+```solvik
+var total = price +
     tax +
     shipping
 ```
 
-`return` followed by a newline terminates the return statement:
-
-```solvik
-return
-value
-```
-
-is equivalent to:
-
-```solvik
-return;
-value;
-```
+`return` followed by a newline is a complete bare return; the next line begins a new statement. The
+same holds of `throw` and every other keyword that ends a line: the newline terminates the
+statement, and the grammar never joins the following line.
 
 ### Member chaining
 
 Solvik supports TypeScript/Kotlin-style leading-dot chains:
 
 ```solvik
-val result = service
+var result = service
     .load()
     .transform()
 ```
 
-The semicolon-inserting token stream must suppress insertion when the next significant token is `.` or `?.`. This is the only member-chain lookahead exception; do not use general JavaScript-style heuristics.
+A line ending in `.` or `?.` cannot end, so the chain continues. This is grammar, not lookahead: the
+member-suffix position is written to absorb the boundary, and a `.` may never begin a new statement.
+
+### Brace placement
+
+Every multiline construct - a function, method, constructor, static block, control-flow body,
+`case` or `default` body, class body, interface body, enum body, `switch` body, `match` body, block
+expression, and stand-alone scope - is written with its braces on their own physical lines:
+
+```solvik
+if (condition) {
+    work()
+}
+else {
+    recover()
+}
+```
+
+Four rules hold without exception, checked against the token sequence after parsing so each is
+reported once, at its own position:
+
+1. an opening `{` is the last token of the line of the construct that introduces its scope. The
+   body it opens begins on the following line. `if (c) { work()` and `func f() {}` are violations;
+   the diagnostic names the offending token (`SOLV-PARS-010`).
+2. a `{` that begins a physical line never opens the body of a construct whose header ended on an
+   earlier line. The body brace must sit on its header's line (`SOLV-PARS-009`). A stand-alone scope
+   block has no header, so its brace may begin a line, and a scope block may follow any complete
+   construct on the next line.
+3. a closing `}` is the only significant token on its physical line. Nothing but whitespace and a
+   comment may share it (`SOLV-PARS-007`), which makes `} else {`, `};`, `})`, and `foo() }` all the
+   same mistake.
+4. a clause keyword - `else`, `catch`, `finally` - begins its own physical line, so a clause is
+   written `}` newline `else {` and never `} else {` (`SOLV-PARS-008`).
+
+An empty body is written as an opening brace on one line and a closing brace on the next; `{}` is
+rejected by rule 1.
+
 
 ## 17. Control Flow
 
@@ -1607,7 +1689,8 @@ Standard forms:
 ```solvik
 if (condition) {
     ...
-} else {
+}
+else {
     ...
 }
 
@@ -1615,14 +1698,17 @@ while (condition) {
     ...
 }
 
-for (mutable val i: Integer = 0; i < limit; i = i + 1) {
+for (i in 0..<limit) {
     ...
 }
 ```
 
 Parentheses around conditions are retained for TypeScript/Java familiarity.
 
-`if` and loop conditions must have type `Boolean`. `while` is a pre-test loop. `for` uses exactly three clauses: an optional local declaration or assignment, an optional Boolean condition, and an optional assignment. The two separators inside `for (...)` are explicit semicolons. An omitted condition is `true`. `break` and `continue` are valid only inside a loop.
+`if` and loop conditions must have type `Boolean`. `while` is a pre-test loop. There is no
+three-clause `for` statement: it would require semicolons inside its header, which section 16
+reserves for separating constructs on one line. Initializer-scoped counting loops are written as a
+scope block around a `while` loop. `break` and `continue` are valid only inside a loop.
 
 Solvik also supports range `for`-in loops:
 
@@ -1657,7 +1743,7 @@ The compiler must narrow the type where the checked value is stable and no inter
 Checked cast syntax:
 
 ```solvik
-val user = value as User
+var user = value as User
 ```
 
 An unsuccessful `as` cast raises a Solvik runtime type error. Safe-cast syntax is deferred.
@@ -1683,13 +1769,13 @@ one statically checked program.
 
 ```solvik
 include "lib/math.sol"
-include r#"lib/generated.sol"#;
+include r#"lib/generated.sol"#
 ```
 
 `include` is a reserved keyword. An include may appear only as an item of a compilation unit: it is
 not a statement and cannot appear in a function, method, constructor, block, loop, `switch`, or
-`match` branch. The path is a normal or raw string literal and the directive ends with an explicit
-or lexically inserted `SEMI` (section 16).
+`match` branch. The path is a normal or raw string literal, and the directive ends where its
+physical line ends, like any construct (section 16).
 
 An include may bind a file-local namespace prefix with an optional `alias` suffix:
 
@@ -1698,14 +1784,14 @@ include "lib/math.sol"
 include "lib/math.sol" alias math
 ```
 
-`alias` is a reserved keyword. The alias name is written after the path and is followed by the same
-explicit or inserted `SEMI`. There is no export or selective-import form. The included declarations
+`alias` is a reserved keyword. The alias name is written after the path on the same line. There is
+no export or selective-import form. The included declarations
 are reached through the prefix with the `::` namespace separator:
 
 ```solvik
 math::add(1, 2)
-val point: math::Point = math::Point(1)
-val result: math::Result = math::Result.Ok(1)
+var point: math::Point = math::Point(1)
+var result: math::Result = math::Result.Ok(1)
 ```
 
 ### Modules and namespaces
@@ -1749,7 +1835,7 @@ Unqualified name resolution within a file is, innermost first: lexical locals an
 file's own module, the implicit default module, and the built-in prelude. Built-in types and
 functions are always visible unqualified and cannot be shadowed by a module or alias name.
 
-Top-level `val` declarations, mutable or not, and executable statements are not part of any module namespace:
+Top-level `var` declarations, mutable or not, and executable statements are not part of any module namespace:
 they remain locals and statements of the single implicit `main` (section 6) and are not reachable as
 `p::name`. A qualified reference does not change the single-`main` execution model.
 
@@ -1779,7 +1865,7 @@ are not part of the language.
 ### Expansion, duplicates, and cycles
 
 Expansion is depth-first and left-to-right. Each physical file is parsed with the ordinary lexer,
-semicolon-inserting token stream, and parser. At an `include`, the target is recursively expanded and
+line-boundary token stream, and parser. At an `include`, the target is recursively expanded and
 its resolved top-level items are spliced at the include position; the directive itself is absent from
 the resolved program.
 
@@ -1804,7 +1890,7 @@ of every file that declares that module and rejects a duplicate within it. Redec
 function or type is rejected by the existing declaration checks.
 
 The expanded executable top-level statements, in expansion order, form the one implicit `main`. A
-top-level `val`, mutable or not, remains a local of that implicit main, so its visibility and definite
+top-level `var`, mutable or not, remains a local of that implicit main, so its visibility and definite
 initialization follow statement order across file boundaries. An explicit `func main` in any
 participating file remains `SOLV-SEM-001`. A fully expanded program with no executable top-level
 statements has no entry point and does nothing.
@@ -1856,12 +1942,12 @@ one value.
 ### 21.2 Block expressions
 
 ```solvik
-val answer = {
-    val base = 20
+var answer = {
+    var base = 20
     base + 22
 }
 
-val logged: Unit = {
+var logged: Unit = {
     println("done")
 }
 ```
@@ -1875,8 +1961,8 @@ empty block, a block ending in a local declaration, and a block ending in an ass
 in expression position and do not acquire an implicit `Unit` result:
 
 ```solvik
-val invalid = {
-    val local = 1
+var invalid = {
+    var local = 1
 }
 ```
 
@@ -1889,35 +1975,39 @@ tail expression.
 
 ### 21.3 Semicolons and tail expressions
 
-Explicit and synthesized semicolons are the same parser token and have the same language meaning,
-so token origin is never inspected to decide whether a value exists. All three forms below have the
-same value and type:
+Items inside a block are separated by the separator of section 16 - a physical newline or, for items
+sharing a line, an explicit `;` that separates two statements and never terminates one. Separation
+never changes meaning: no separator token carries a value, and the last item of a value-required
+block is its tail expression wherever it sits:
 
 ```solvik
-val a = { 42 }
-
-val b = {
+var a = {
     42
 }
 
-val c = {
-    42;
+var b = {
+    1; 42
 }
 ```
 
-Each is an `Integer` block expression with value `42`. Comments and blank lines before `}` do not
-affect tail selection, and a terminal assignment is a statement and never a tail expression.
+Both are `Integer` block expressions with value `42`: in the second the `;` separates two items on
+one line, and the last item is still the tail. Writing `{ 42; }` is the `SEMI_ENDS_LINE` error of
+section 16 - a `;` may not terminate the item before a line end or before `}`. Comments and blank
+lines before `}` do not affect tail selection, and a terminal assignment is a statement and never a
+tail expression.
 
 ### 21.4 `if` expressions
 
 An `if` may be used in expression position:
 
 ```solvik
-val description = if (value < 0) {
+var description = if (value < 0) {
     "negative"
-} else if (value == 0) {
+}
+else if (value == 0) {
     "zero"
-} else {
+}
+else {
     "positive"
 }
 ```
@@ -1931,7 +2021,8 @@ excluded from result joining:
 func requireName(name: String?): String {
     return if (name != null) {
         name
-    } else {
+    }
+    else {
         return "fallback"
     }
 }
@@ -1948,15 +2039,18 @@ The `switch` statement remains valid and unchanged. In expression position the s
 produces a value:
 
 ```solvik
-val message = switch (status) {
-    case Status.Ready:
+var message = switch (code) {
+    case 200 {
         "ready"
+    }
 
-    case Status.Running:
+    case 201, 202 {
         "running"
+    }
 
-    default:
+    default {
         "done"
+    }
 }
 ```
 
@@ -1973,15 +2067,18 @@ assignability, multiple labels, regex labels, duplicate and default placement, a
 a case continue to apply. Regex expression cases keep the same spelling and matching behavior:
 
 ```solvik
-val kind = switch (input) {
-    case regex r#"^\d+$"#:
+var kind = switch (input) {
+    case regex r#"^\d+$"# {
         "number"
+    }
 
-    case regex r#"^[A-Za-z]+$"#:
+    case regex r#"^[A-Za-z]+$"# {
         "word"
+    }
 
-    default:
+    default {
         "other"
+    }
 }
 ```
 
@@ -2006,14 +2103,20 @@ Every value-producing construct uses one shared join algorithm: the result is th
 declared supertype to which every normally completing branch result is assignable, including the
 existing nullability rules. No numeric promotion or widening, structural typing, dynamic typing,
 implicit conversion, or inferred union type is introduced: a numeric widening is a coercion at a
-conversion site, never a join rule, so `if (c) { 1 } else { 1L }` has type `Number`, not `Long`. If
+conversion site, never a join rule. An `if`/`else` expression whose branches yield an `Integer` and a
+`Long` is written with each brace on its own line, and its join is `Number`, not `Long`. If
 exactly one branch can complete normally, its
 result type is the construct's result type. If no branch can complete normally, the construct has
 type `Nothing`, and no runtime value is invented for it. `Unit` participates in the join as any other
 non-null value type.
 
 ```solvik
-val both = if (flag) { 1 } else { "text" } // type Any
+var both = if (flag) {
+    1
+}
+else {
+    "text"
+} // type Any
 ```
 
 A set of branches whose only shared supertypes are incomparable has no single nearest result and is a
@@ -2028,17 +2131,31 @@ assignment right-hand sides, call arguments, explicit `return` values, operands 
 constructs, and `match` branch results:
 
 ```solvik
-mutable val score: Integer = 0
-score = if (enabled) { 10 } else { 0 }
+var mutable score: Integer = 0
+score = if (enabled) {
+    10
+}
+else {
+    0
+}
 
-println(if (debug) { "debug" } else { "normal" })
+var mode = if (debug) {
+    "debug"
+}
+else {
+    "normal"
+}
+println(mode)
 
 func classify(value: Integer): String {
     return switch (value) {
-        case 0:
+        case 0 {
             "zero"
-        default:
+        }
+
+        default {
             "nonzero"
+        }
     }
 }
 ```
@@ -2097,7 +2214,8 @@ Every guest exception type carries an optional message, following Java's empty-c
 message-constructor pattern. Construction accepts a single optional trailing `String?` argument:
 
 ```solvik
-class ParseError extends RuntimeException { }
+class ParseError extends RuntimeException {
+}
 
 throw ParseError()          // no message
 throw ParseError("bad int") // message
@@ -2153,11 +2271,14 @@ exists, the value reaches the program boundary (section 22.5).
 ```solvik
 try {
     riskyOperation()
-} catch (e: ParseError) {
+}
+catch (e: ParseError) {
     recover(e)
-} catch (e: RuntimeException) {
+}
+catch (e: RuntimeException) {
     report(e)
-} finally {
+}
+finally {
     releaseResources()
 }
 ```
@@ -2212,7 +2333,8 @@ unchecked exceptions carry no `addSuppressed`/`getSuppressed` surface.
 ```solvik
 try {
     throw FirstError()
-} finally {
+}
+finally {
     throw SecondError() // FirstError is discarded; SecondError propagates
 }
 ```
@@ -2233,7 +2355,8 @@ still fall through governs the rule that a value-returning function must return 
 func ok1(): Integer {
     try {
         return 1        // accepted: the try block always returns and no handler can fall through
-    } finally {
+    }
+finally {
         println("cleanup")
     }
 }
@@ -2241,7 +2364,8 @@ func ok1(): Integer {
 func ok2(): Integer {
     try {
         println("body")
-    } finally {
+    }
+finally {
         return 7        // accepted: the finally block always transfers control
     }
 }
@@ -2249,7 +2373,8 @@ func ok2(): Integer {
 func needsMore(): Integer {
     try {
         return 1
-    } catch (e: RuntimeException) {
+    }
+catch (e: RuntimeException) {
         println("handled")  // completes normally, so the statement can fall through
     }
     return 0                // ...and therefore still requires this return
@@ -2307,7 +2432,7 @@ error payload type `E` come from the receiver's declared type arguments.
 
 ```solvik
 func f(): Result<Integer, String> {
-    val r = compute()
+    var r = compute()
     if (r.isOk()) {
         return Result.Ok(r.unwrap())
     }
@@ -2392,7 +2517,7 @@ required.
 func readConfig(): Result<Config, IoError> { ... }
 
 func loadApp(): Result<App, IoError> {
-    val config = readConfig()?   // config: Config, or return Err(IoError) from loadApp
+    var config = readConfig()?   // config: Config, or return Err(IoError) from loadApp
     return Result.Ok(App(config))
 }
 ```

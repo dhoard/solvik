@@ -17,7 +17,7 @@ mutable class Base {
 
 class Derived extends Base {
     func use(): Any {
-        val method: Any = super.equals
+        var method: Any = super.equals
         return method
     }
 }

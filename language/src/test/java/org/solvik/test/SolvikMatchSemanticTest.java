@@ -127,7 +127,7 @@ public final class SolvikMatchSemanticTest {
                 abstract class Shape {
                 }
                 class Circle extends Shape {
-                    val radius: Integer
+                    var radius: Integer
 
                     Circle(radius: Integer) {
                         this.radius = radius

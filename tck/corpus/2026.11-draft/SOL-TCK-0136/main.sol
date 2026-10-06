@@ -10,7 +10,8 @@
 func pick(k: Boolean): String {
     return if (k) {
         "x"
-    } else {
+    }
+    else {
         return "abrupt"
     }
 }

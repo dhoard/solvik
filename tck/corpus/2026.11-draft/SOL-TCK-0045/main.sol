@@ -4,7 +4,7 @@
 // accumulator stays empty. The marker prefix makes "zero iterations" observable as the
 // exact three bytes `empty:` rather than as an empty stream, which would be
 // indistinguishable from a program that never started.
-mutable val s: String = ""
+var mutable s: String = ""
 
 for (i in 0..<0) {
     s = s .. i

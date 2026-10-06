@@ -6,9 +6,9 @@
 //   - Parentheses are required when nullability applies to the function value itself:
 //   - (func(Integer): String)?  // nullable function value
 //
-val callbacks: List<func(Integer): String> = List()
-val optionalCallbacks: List<(func(Integer): String)?> = List()
-val factories: Map<String, func(Integer): String> = Map()
+var callbacks: List<func(Integer): String> = List()
+var optionalCallbacks: List<(func(Integer): String)?> = List()
+var factories: Map<String, func(Integer): String> = Map()
 print(callbacks.size)
 print(optionalCallbacks.size)
 print(factories.size)

@@ -1,8 +1,8 @@
-val s1: Set<String> = Set("a", "b", "a")
+var s1: Set<String> = Set("a", "b", "a")
 
 println(s1.size)
 
-val st2: Stack<Integer> = Stack(1, 2, 3)
+var st2: Stack<Integer> = Stack(1, 2, 3)
 
 println(st2.size)
 
@@ -19,18 +19,21 @@ class Imp4 implements I3 {
     }
 }
 
-val ifaceValue7: I3 = Imp4()
+var ifaceValue7: I3 = Imp4()
 
 println(ifaceValue7.twice6())
 
 func sw8(n: Integer): String {
     switch (n) {
-        case 5:
+        case 5 {
             return "a"
-        case 6:
+        }
+        case 6 {
             return "b"
-        default:
+        }
+        default {
             return "d"
+        }
     }
 }
 

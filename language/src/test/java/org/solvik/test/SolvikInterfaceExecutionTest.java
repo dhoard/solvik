@@ -57,7 +57,7 @@ public final class SolvikInterfaceExecutionTest {
                     func name(): String
                 }
                 class User implements Named {
-                    val label: String
+                    var label: String
 
                     User(label: String) {
                         this.label = label
@@ -86,7 +86,7 @@ public final class SolvikInterfaceExecutionTest {
                     }
                 }
                 class User implements Named {
-                    val label: String
+                    var label: String
 
                     User(label: String) {
                         this.label = label
@@ -150,7 +150,7 @@ public final class SolvikInterfaceExecutionTest {
                         return "Hi " .. name()
                     }
                 }
-                    val named: Named = User()
+                    var named: Named = User()
                     println(named.greeting())
                 """);
         assertThat(output.strip()).isEqualTo("Hi Doug");
@@ -179,7 +179,7 @@ public final class SolvikInterfaceExecutionTest {
                     print(" ")
                     println(aged.age())
                 }
-                    val user = User()
+                    var user = User()
                     describe(user, user)
                 """);
         assertThat(output.strip()).isEqualTo("Doug 42");
@@ -209,7 +209,7 @@ public final class SolvikInterfaceExecutionTest {
                 func viaB(b: B): String {
                     return b.greet()
                 }
-                    val c = C()
+                    var c = C()
                     println(viaA(c))
                     println(viaB(c))
                 """);
@@ -232,7 +232,7 @@ public final class SolvikInterfaceExecutionTest {
                     }
                 }
                 class Buffer implements Stream {
-                    val contents: String
+                    var contents: String
 
                     Buffer(contents: String) {
                         this.contents = contents
@@ -286,7 +286,7 @@ public final class SolvikInterfaceExecutionTest {
                         return "Doug"
                     }
                 }
-                    val user = User()
+                    var user = User()
                     print(user.name())
                     println("")
                 """);
@@ -305,13 +305,17 @@ public final class SolvikInterfaceExecutionTest {
                     }
                 }
                 func total(counter: Counter, limit: Integer): Integer {
-                    mutable val sum = 0
-                    for (mutable val i = 0; i < limit; i = i + 1) {
-                        sum = sum + counter.tick(i)
+                    var mutable sum = 0
+                    {
+                        var mutable i = 0
+                        while (i < limit) {
+                            sum = sum + counter.tick(i)
+                            i = i + 1
+                        }
                     }
                     return sum
                 }
-                    val counter: Counter = Doubler()
+                    var counter: Counter = Doubler()
                     println(total(counter, 4))
                 """);
         assertThat(output.strip()).isEqualTo("12");

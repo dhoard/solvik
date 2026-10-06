@@ -13,8 +13,8 @@ func get(): Result<Integer, String> {
     return Result.Ok(1)
 }
 func use(): Result<Integer, String> {
-    val r = get()
-    val b = r.isOk(1);
+    var r = get()
+    var b = r.isOk(1)
     return Result.Ok(1)
 }
 print("EXECUTED-INVALID")

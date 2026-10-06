@@ -81,7 +81,7 @@ public final class SolvikCallStackTest {
             }
 
             class Box {
-                val tag: Integer = 8
+                var tag: Integer = 8
 
                 func scaled(value: Integer): Integer {
                     return this.tag / value
@@ -107,7 +107,7 @@ public final class SolvikCallStackTest {
     /**
      * The calling code, in the file that is evaluated. The lines the assertions name: `viaValue` performs
      * its indirect call at line 4 and `apply` at line 8. A tail written after this fixture therefore
-     * begins at line 18.
+     * begins at line 19.
      */
     private static final String PREAMBLE = """
             include "lib.sol"
@@ -123,7 +123,8 @@ public final class SolvikCallStackTest {
             func guarded(operation: func(Integer): Integer): String {
                 try {
                     return "returned " .. operation(0).toString()
-                } catch (error: Boom) {
+                }
+                catch (error: Boom) {
                     return "caught " .. error.getMessage()
                 }
             }
@@ -340,9 +341,9 @@ public final class SolvikCallStackTest {
      */
     @Test
     public void anAnonymousFunctionWrittenInTheEvaluatedFileNamesThatFile() {
-        // The tail begins at line 18 of the composed program, so the anonymous body's division is line 19.
+        // The tail begins at line 19 of the composed program, so the anonymous body's division is line 20.
         List<PolyglotException.StackFrame> frames = guestFrames(program("""
-                val half: func(Integer): Integer = func (value: Integer): Integer {
+                var half: func(Integer): Integer = func (value: Integer): Integer {
                     return 100 / value
                 }
 
@@ -353,7 +354,7 @@ public final class SolvikCallStackTest {
         PolyglotException.StackFrame anonymous = frames.get(0);
         assertThat(anonymous.getRootName()).isEqualTo("<anonymous>");
         assertThat(fileOf(anonymous)).isEqualTo("root.sol");
-        assertThat(anonymous.getSourceLocation().getStartLine()).isEqualTo(19);
+        assertThat(anonymous.getSourceLocation().getStartLine()).isEqualTo(20);
         assertThat(textOf(anonymous)).isEqualTo("100 / value");
     }
 
@@ -437,7 +438,8 @@ public final class SolvikCallStackTest {
         String handlerAboveTheFault = program("""
                 try {
                     apply(makeBound())
-                } catch (error: RuntimeException) {
+                }
+                catch (error: RuntimeException) {
                     println("handler")
                 }
 

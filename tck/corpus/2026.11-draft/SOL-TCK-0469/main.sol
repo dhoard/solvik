@@ -7,7 +7,7 @@
 //   - It never reports a top-level function reference or a bound reference to a declared instance method, because this revision accepts both. Section 3 and section 23.4 retain their existing bare-member-read rejections unchanged.
 //
 class Adder {
-    val offset: Integer
+    var offset: Integer
     Adder(offset: Integer) {
         this.offset = offset
     }

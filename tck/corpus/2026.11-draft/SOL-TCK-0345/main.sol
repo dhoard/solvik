@@ -18,7 +18,7 @@ class C implements A, B {
     C() {
     }
 }
-val c = C()
+var c = C()
 print(c.speak())
 
 print("EXECUTED-INVALID")

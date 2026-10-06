@@ -12,5 +12,5 @@ class B extends A {
     B() {
     }
 }
-val b = B()
+var b = B()
 print("EXECUTED-INVALID")

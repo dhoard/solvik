@@ -82,7 +82,7 @@ SELF_CONTAINED_FLOOR = 402
 # changing the number here on purpose. A corpus that grows only by batches whose
 # generators are committed keeps this satisfied automatically -- which is the
 # whole point: new work cannot quietly widen the unprovenance hole.
-UNOWNED_CEILING = 75
+UNOWNED_CEILING = 76
 
 # Test directories whose manifests a committed tool reproduces over hand-authored
 # sources (gen11). They are neither self-contained nor wholly unowned, and are

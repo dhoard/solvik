@@ -3,8 +3,8 @@
 // expression". The block's last item assigns to an outer variable, so the block never
 // reaches a tail expression and must be rejected with SEM_BLOCK_RESULT_REQUIRED
 // (SOLV-SEM-041) rather than acquiring a `Unit` result.
-mutable val target = 0
-val invalid = {
+var mutable target = 0
+var invalid = {
     target = 5
 }
 print("EXECUTED-INVALID")

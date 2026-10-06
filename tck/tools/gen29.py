@@ -108,7 +108,7 @@ REQS_SPEC = {
                 "payload type, so a wrong-typed payload is a compile-time error",
         kind="compile-time",
         quotes=["Assignments are statements, not value-producing expressions. The target must be a "
-                "`mutable val` local or a `mutable val` property. Calls require exact arity, and "
+                "`var mutable` local or a `var mutable` property. Calls require exact arity, and "
                 "each argument must be assignable to its declared parameter type."],
         note="Variant `A` carries an `Integer` and is constructed with a `String`. A variant is a "
              "nominal constructor, so the general call-assignability rule applies; the section "
@@ -130,7 +130,7 @@ REQS_SPEC = {
         kind="compile-time",
         quotes=["The compiler must narrow the type where the checked value is stable and no "
                 "intervening write can invalidate the refinement."],
-        note="After `x is String` narrows a `mutable val`, a write to `x` occurs and a later read requires "
+        note="After `x is String` narrows a `var mutable`, a write to `x` occurs and a later read requires "
              "the narrowed type. The refinement must not survive the write, so the read is a "
              "compile-time error; no code is named, so the rejection is bare."),
     "REQ-2710": dict(
@@ -172,27 +172,27 @@ def RTE(tid, cat, req, src, category, note):
 
 
 OK("SOL-TCK-0378", "numerics", "REQ-2700",
-   'val b: Byte = Byte(1)\nval s: Short = Short(2)\nval i: Integer = Integer(3L)\n'
-   'val l: Long = Long(4)\nprint(b)\nprint("|")\nprint(s)\nprint("|")\nprint(i)\nprint("|")\n'
+   'var b: Byte = Byte(1)\nvar s: Short = Short(2)\nvar i: Integer = Integer(3L)\n'
+   'var l: Long = Long(4)\nprint(b)\nprint("|")\nprint(s)\nprint("|")\nprint(i)\nprint("|")\n'
    'print(l)\n',
    "1|2|3|4",
    "Each in-range value converts to the named target type through an explicit built-in call and "
    "prints its converted value.")
 BAD("SOL-TCK-0379", "numerics", "REQ-2701",
-    'val i: Integer = Integer(2147483648L)\nprint("EXECUTED-INVALID")\n',
+    'var i: Integer = Integer(2147483648L)\nprint("EXECUTED-INVALID")\n',
     "2147483648 is one past the signed 32-bit maximum, so the constant conversion is rejected.")
 BAD("SOL-TCK-0380", "numerics", "REQ-2701",
-    'val b: Byte = Byte(200)\nprint("EXECUTED-INVALID")\n',
+    'var b: Byte = Byte(200)\nprint("EXECUTED-INVALID")\n',
     "200 is outside the signed 8-bit range, so the constant conversion is rejected.")
 RTE("SOL-TCK-0381", "numerics", "REQ-2702",
-    'mutable val l: Long = 2147483648L\nval i: Integer = Integer(l)\nprint(i)\n',
+    'var mutable l: Long = 2147483648L\nvar i: Integer = Integer(l)\nprint(i)\n',
     "ARITHMETIC_ERROR",
     "The value is outside the Integer range and is held in a mutable binding, so the conversion "
     "faults at run time with the arithmetic category.")
 BAD("SOL-TCK-0382", "types", "REQ-2703",
-    'class A {\n    val value: String = "a"\n\n    A() {\n    }\n}\n'
-    'class B {\n    val value: String = "b"\n\n    B() {\n    }\n}\n'
-    'val x: A = B()\nprint("EXECUTED-INVALID")\n',
+    'class A {\n    var value: String = "a"\n\n    A() {\n    }\n}\n'
+    'class B {\n    var value: String = "b"\n\n    B() {\n    }\n}\n'
+    'var x: A = B()\nprint("EXECUTED-INVALID")\n',
     "The classes have identical members but no nominal relation, so the assignment is rejected.")
 BAD("SOL-TCK-0383", "objects", "REQ-2704",
     'mutable class A {\n    A() {\n    }\n}\nmutable class B {\n    B() {\n    }\n}\n'
@@ -201,27 +201,27 @@ BAD("SOL-TCK-0383", "objects", "REQ-2704",
 BAD("SOL-TCK-0384", "objects", "REQ-2705",
     'interface P {\n    func go(): Integer\n}\nclass Impl implements P {\n    Impl() {\n    }\n\n'
     '    func go(): Integer {\n        return 1\n    }\n}\nclass X implements P {\n'
-    '    delegate val a: P\n\n    X(p: P) {\n        this.a = p\n    }\n\n'
+    '    delegate var a: P\n\n    X(p: P) {\n        this.a = p\n    }\n\n'
     '    func mutate(p: P) {\n        this.a = p\n    }\n}\nprint("EXECUTED-INVALID")\n',
-    "The delegate is assigned by `mutate` after initialization, which the immutable `val` forbids.")
+    "The delegate is assigned by `mutate` after initialization, which the immutable `var` forbids.")
 BAD("SOL-TCK-0385", "abstract", "REQ-2706",
-    'abstract class Shape {\n    Shape() {\n    }\n}\nval s = Shape()\nprint("EXECUTED-INVALID")\n',
+    'abstract class Shape {\n    Shape() {\n    }\n}\nvar s = Shape()\nprint("EXECUTED-INVALID")\n',
     "An abstract class is not constructible, so its constructor call is rejected.")
 BAD("SOL-TCK-0386", "enums", "REQ-2707",
-    'enum E {\n    A(Integer)\n    B(String)\n}\nval x: E = E.A("wrong")\n'
+    'enum E {\n    A(Integer)\n    B(String)\n}\nvar x: E = E.A("wrong")\n'
     'print("EXECUTED-INVALID")\n',
     "Variant A carries an Integer payload, so the String argument is not assignable.")
 OK("SOL-TCK-0387", "objects", "REQ-2708",
    'mutable class A {\n    mutable func label(): String {\n        return "A"\n    }\n\n    A() {\n    }\n}\n'
    'mutable class B extends A {\n    mutable override func label(): String {\n        return "B"\n    }\n\n'
    '    B() {\n    }\n}\nclass C extends B {\n    override func label(): String {\n'
-   '        return super.label() .. "C"\n    }\n\n    C() {\n    }\n}\nval c = C()\nprint(c.label())\n',
+   '        return super.label() .. "C"\n    }\n\n    C() {\n    }\n}\nvar c = C()\nprint(c.label())\n',
    "BC",
    "The most derived method concatenates its own text after `super.label()`, so the printed BC "
    "shows super reached the immediate parent B rather than the root A.")
 BAD("SOL-TCK-0388", "types", "REQ-2709",
-    'func f(v: Any): Integer {\n    mutable val x: Any = v\n    if (x is String) {\n        x = 1\n'
-    '        val s: String = x\n        return 1\n    }\n    return 0\n}\n'
+    'func f(v: Any): Integer {\n    var mutable x: Any = v\n    if (x is String) {\n        x = 1\n'
+    '        var s: String = x\n        return 1\n    }\n    return 0\n}\n'
     'print("EXECUTED-INVALID")\n',
     "The write to x invalidates the is-refinement, so the later String read is rejected.")
 OK("SOL-TCK-0389", "control", "REQ-2710",

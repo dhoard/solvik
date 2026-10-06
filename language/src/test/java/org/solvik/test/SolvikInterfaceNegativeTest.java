@@ -389,7 +389,7 @@ public final class SolvikInterfaceNegativeTest {
                     func name(): String
                 }
                 func use(): Integer {
-                    val x: Integer = Named()
+                    var x: Integer = Named()
                     return x
                 }
                 """));

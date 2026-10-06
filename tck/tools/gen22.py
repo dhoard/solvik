@@ -180,7 +180,8 @@ def add(tid, src, outcome, **exp):
 add("SOL-TCK-0142", PE + '''func guard() {
     try {
         throw ParseError("bad int")
-    } catch (e: Exception) {
+    }
+    catch (e: Exception) {
         print("handled")
         print(e.getMessage())
     }
@@ -193,7 +194,8 @@ add("SOL-TCK-0143", PE + '''mutable class DeepError extends ParseError {
 func guard() {
     try {
         throw DeepError("deep")
-    } catch (e: Exception) {
+    }
+    catch (e: Exception) {
         print(e.getMessage())
     }
 }
@@ -204,7 +206,8 @@ guard()
 add("SOL-TCK-0144", PE + '''func guard() {
     try {
         throw ParseError()
-    } catch (e: ParseError) {
+    }
+    catch (e: ParseError) {
         print("[" .. e.getMessage() .. "]")
     }
 }
@@ -214,7 +217,8 @@ guard()
 add("SOL-TCK-0145", PE + '''func guard() {
     try {
         throw ParseError("bad int")
-    } catch (e: ParseError) {
+    }
+    catch (e: ParseError) {
         print("[" .. e.getMessage() .. "]")
     }
 }
@@ -225,7 +229,8 @@ guard()
 add("SOL-TCK-0146", PE + '''func guard() {
     try {
         throw ParseError("m")
-    } catch (e: ParseError) {
+    }
+    catch (e: ParseError) {
         print(e.message)
     }
 }
@@ -241,7 +246,7 @@ add("SOL-TCK-0148", PE + 'throw ParseError("a", "b")\n' + NEG,
 
 # --- REQ-1304: the message is independent of the declared constructor.
 add("SOL-TCK-0149", '''mutable class CodeError extends RuntimeException {
-    val code: Integer
+    var code: Integer
 
     CodeError(code: Integer) {
         this.code = code
@@ -250,7 +255,8 @@ add("SOL-TCK-0149", '''mutable class CodeError extends RuntimeException {
 func guard() {
     try {
         throw CodeError(7, "sub message")
-    } catch (e: CodeError) {
+    }
+    catch (e: CodeError) {
         print(e.code)
         print("[" .. e.getMessage() .. "]")
     }
@@ -262,7 +268,8 @@ guard()
 add("SOL-TCK-0150", PE + '''func guard() {
     try {
         throw ParseError("via base")
-    } catch (e: RuntimeException) {
+    }
+    catch (e: RuntimeException) {
         print("[" .. e.getMessage() .. "]")
     }
 }
@@ -270,20 +277,20 @@ guard()
 ''', "SUCCESS", stdout="[via base]")
 
 # --- REQ-1306: message/getMessage reserved on exception types, ordinary elsewhere.
-add("SOL-TCK-0151", 'class Bad extends RuntimeException {\n    val message: String = "mine"\n}\n' + NEG,
+add("SOL-TCK-0151", 'class Bad extends RuntimeException {\n    var message: String = "mine"\n}\n' + NEG,
     "COMPILE_ERROR", diag={"family": "SEM", "code": "SOLV-SEM-037"})
 
 add("SOL-TCK-0152", 'class Bad extends RuntimeException {\n    func getMessage(): String {\n        return "mine"\n    }\n}\n' + NEG,
     "COMPILE_ERROR", diag={"family": "SEM", "code": "SOLV-SEM-037"})
 
 add("SOL-TCK-0153", '''class Note {
-    val message: String = "fine"
+    var message: String = "fine"
 
     func getMessage(): String {
         return this.message
     }
 }
-val n = Note()
+var n = Note()
 print(n.message)
 print(n.getMessage())
 ''', "SUCCESS", stdout="finefine")
@@ -292,7 +299,7 @@ print(n.getMessage())
 add("SOL-TCK-0154", 'throw RuntimeException("x")\n' + NEG,
     "COMPILE_ERROR", diag={})
 
-add("SOL-TCK-0155", 'class ConfigError extends ApplicationException {\n}\nfunc guard() {\n    try {\n        throw ConfigError("no config")\n    } catch (e: ApplicationException) {\n        print("[" .. e.getMessage() .. "]")\n    }\n}\nguard()\n',
+add("SOL-TCK-0155", 'class ConfigError extends ApplicationException {\n}\nfunc guard() {\n    try {\n        throw ConfigError("no config")\n    }\n    catch (e: ApplicationException) {\n        print("[" .. e.getMessage() .. "]")\n    }\n}\nguard()\n',
     "SUCCESS", stdout="[no config]")
 
 # --- REQ-1308: first matching clause in source order runs.
@@ -301,9 +308,11 @@ add("SOL-TCK-0156", PE + '''mutable class SubError extends ParseError {
 func guard() {
     try {
         throw SubError("s")
-    } catch (e: SubError) {
+    }
+    catch (e: SubError) {
         print("specific")
-    } catch (e: RuntimeException) {
+    }
+    catch (e: RuntimeException) {
         print("base")
     }
 }
@@ -314,9 +323,11 @@ guard()
 add("SOL-TCK-0157", '''func guard() {
     try {
         print("trying")
-    } catch (e: Exception) {
+    }
+    catch (e: Exception) {
         print("root")
-    } catch (e: RuntimeException) {
+    }
+    catch (e: RuntimeException) {
         print("runtime")
     }
 }
@@ -327,7 +338,8 @@ guard()
 add("SOL-TCK-0158", PE + '''func guard() {
     try {
         throw ParseError("x")
-    } catch (e: ParseError) {
+    }
+    catch (e: ParseError) {
         print("caught")
     }
     print(e)
@@ -341,9 +353,11 @@ add("SOL-TCK-0159", PE + '''mutable class OtherError extends RuntimeException {
 func guard() {
     try {
         throw ParseError("one")
-    } catch (e: ParseError) {
+    }
+    catch (e: ParseError) {
         print("[" .. e.getMessage() .. "]")
-    } catch (e: OtherError) {
+    }
+    catch (e: OtherError) {
         print("[" .. e.getMessage() .. "]")
     }
 }
@@ -356,10 +370,12 @@ add("SOL-TCK-0160", PE + '''func guard() {
     try {
         try {
             throw ParseError("kept")
-        } catch (e: ParseError) {
+        }
+        catch (e: ParseError) {
             throw e
         }
-    } catch (again: ParseError) {
+    }
+    catch (again: ParseError) {
         print("outer")
         print("[" .. again.getMessage() .. "]")
     }
@@ -373,7 +389,8 @@ add("SOL-TCK-0161", '''class Plain {
 func guard() {
     try {
         print("trying")
-    } catch (e: Plain) {
+    }
+    catch (e: Plain) {
         print("caught")
     }
 }
@@ -384,14 +401,16 @@ guard()
 add("SOL-TCK-0162", PE + '''func guarded() {
     try {
         throw ParseError("p")
-    } finally {
+    }
+    finally {
         print("released")
     }
 }
 func driver() {
     try {
         guarded()
-    } catch (e: Exception) {
+    }
+    catch (e: Exception) {
         print("handled")
         print("[" .. e.getMessage() .. "]")
     }
@@ -403,7 +422,8 @@ driver()
 add("SOL-TCK-0163", PE + '''func guard() {
     try {
         print("body")
-    } finally {
+    }
+    finally {
         print("fin")
     }
 }
@@ -431,7 +451,8 @@ func middle() {
 func driver() {
     try {
         middle()
-    } catch (e: Exception) {
+    }
+    catch (e: Exception) {
         print("handled")
         print("[" .. e.getMessage() .. "]")
     }

@@ -6,7 +6,7 @@
 //   - formatter.format === formatter.format // false: two bound-value creations
 //
 class Formatter {
-    val tag: String
+    var tag: String
     Formatter(tag: String) {
         this.tag = tag
     }
@@ -15,7 +15,7 @@ class Formatter {
     }
 }
 
-val formatter = Formatter("f")
+var formatter = Formatter("f")
 print(formatter.format === formatter.format)
 print("|")
 print(formatter.format())

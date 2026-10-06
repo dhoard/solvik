@@ -1,6 +1,6 @@
-val a = 1
+var a = 1
 
 
-val b = 2
+var b = 2
 
 print("z" .. a .. b)

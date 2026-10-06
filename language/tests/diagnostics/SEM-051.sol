@@ -7,6 +7,6 @@ func fail(): Result<Integer, String> {
     return Result.Err("no value")
 }
 func retry(): Result<Integer, Integer> {
-    val value = fail()?
+    var value = fail()?
     return Result.Ok(value)
 }

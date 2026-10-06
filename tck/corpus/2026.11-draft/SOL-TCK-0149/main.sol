@@ -1,5 +1,5 @@
 mutable class CodeError extends RuntimeException {
-    val code: Integer
+    var code: Integer
 
     CodeError(code: Integer) {
         this.code = code
@@ -8,7 +8,8 @@ mutable class CodeError extends RuntimeException {
 func guard() {
     try {
         throw CodeError(7, "sub message")
-    } catch (e: CodeError) {
+    }
+    catch (e: CodeError) {
         print(e.code)
         print("[" .. e.getMessage() .. "]")
     }

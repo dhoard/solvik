@@ -36,7 +36,7 @@ public final class SolvikGenericsNegativeTest {
 
     private static final String BOX = """
             class Box<T> {
-                mutable val value: T
+                var mutable value: T
 
                 Box(value: T) {
                     this.value = value
@@ -66,7 +66,7 @@ public final class SolvikGenericsNegativeTest {
     public void rawGenericTypeIsRejected() {
         assertThat(first(checkFails(BOX + """
                 func f(): Unit {
-                    val box: Box = Box(5)
+                    var box: Box = Box(5)
                 }
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_RAW_GENERIC_TYPE);
     }
@@ -83,7 +83,7 @@ public final class SolvikGenericsNegativeTest {
     public void wrongTypeArgumentCountIsRejected() {
         assertThat(first(checkFails(BOX + """
                 func f(): Unit {
-                    val box: Box<Integer, String> = Box(5)
+                    var box: Box<Integer, String> = Box(5)
                 }
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_TYPE_ARGUMENT_ARITY);
     }
@@ -92,7 +92,7 @@ public final class SolvikGenericsNegativeTest {
     public void typeArgumentsOnANonGenericTypeAreRejected() {
         assertThat(first(checkFails("""
                 func f(): Unit {
-                    val x: Integer<String> = 5
+                    var x: Integer<String> = 5
                 }
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_NOT_GENERIC);
     }
@@ -101,7 +101,7 @@ public final class SolvikGenericsNegativeTest {
     public void unknownTypeArgumentIsRejected() {
         assertThat(first(checkFails(BOX + """
                 func f(): Unit {
-                    val box: Box<Widget> = Box(5)
+                    var box: Box<Widget> = Box(5)
                 }
                 """)).code()).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_TYPE);
     }
@@ -118,7 +118,7 @@ public final class SolvikGenericsNegativeTest {
     public void typeArgumentsAreInvariant() {
         assertThat(first(checkFails(BOX + """
                 func f(): Unit {
-                    val box: Box<Integer> = Box("x")
+                    var box: Box<Integer> = Box("x")
                 }
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
@@ -127,7 +127,7 @@ public final class SolvikGenericsNegativeTest {
     public void typeArgumentsAreNotCovariant() {
         assertThat(first(checkFails(BOX + """
                 func f(): Unit {
-                    val box: Box<Any> = Box("x")
+                    var box: Box<Any> = Box("x")
                 }
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
@@ -160,7 +160,7 @@ public final class SolvikGenericsNegativeTest {
     public void duplicateTypeParameterNamesAreRejected() {
         assertThat(first(checkFails("""
                 class Pair<T, T> {
-                    mutable val value: T
+                    var mutable value: T
 
                     Pair(value: T) {
                         this.value = value
@@ -218,7 +218,7 @@ public final class SolvikGenericsNegativeTest {
     public void listIsInvariantInItsElementType() {
         assertThat(first(checkFails("""
                 func f(values: List<String>): Unit {
-                    val ints: List<Integer> = values
+                    var ints: List<Integer> = values
                 }
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
@@ -291,7 +291,7 @@ public final class SolvikGenericsNegativeTest {
                     return x
                 }
                 func f(): Unit {
-                    val y: Integer = identity("x")
+                    var y: Integer = identity("x")
                 }
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }

@@ -15,7 +15,7 @@ interface Greetable {
 }
 
 class Person implements Named, Greetable {
-    val label: String
+    var label: String
 
     Person(label: String) {
         this.label = label
@@ -30,6 +30,6 @@ class Person implements Named, Greetable {
     }
 }
 
-val n: Named = Person("Doug")
-val g: Greetable = Person("Doug")
+var n: Named = Person("Doug")
+var g: Greetable = Person("Doug")
 print(n.name() .. "/" .. g.greet())

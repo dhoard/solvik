@@ -9,5 +9,5 @@ class User {
         this.User()
     }
 }
-val u = User()
+var u = User()
 print("EXECUTED-INVALID")

@@ -19,4 +19,4 @@ func parse(text: String): Integer {
     throw ParseError("bad int")
 }
 
-val n: Integer = parse("x")
+var n: Integer = parse("x")

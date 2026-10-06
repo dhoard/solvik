@@ -3,7 +3,7 @@
 //
 // Oracle quotations verified verbatim against docs/LANGUAGE_SPEC.md:
 //   - Those names are reserved to protect the universal `Any` members, which are instance members reached through virtual dispatch; a static member never enters the dispatch table, so a `static func toString()` cannot replace `Any.toString()` any more than an instance method of another name can, and `instance.toString()` keeps reaching the universal member.
-//   - for a class declaring `static val toString: Integer` and inheriting the default `Any.toString()`, the expression `C.toString` reads the static cell and `instance` formatting still calls `Any.toString()`.
+//   - for a class declaring `static var toString: Integer` and inheriting the default `Any.toString()`, the expression `C.toString` reads the static cell and `instance` formatting still calls `Any.toString()`.
 //
 class C {
     static func toString(): String {
@@ -13,5 +13,5 @@ class C {
     C() {
     }
 }
-val c = C()
+var c = C()
 print("st" .. c.toString())

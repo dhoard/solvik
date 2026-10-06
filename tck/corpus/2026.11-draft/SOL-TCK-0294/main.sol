@@ -1,5 +1,5 @@
-val a = 2
-val b = a
+var a = 2
+var b = a
     * 3
 print("b" .. b)
 

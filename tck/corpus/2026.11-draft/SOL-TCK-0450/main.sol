@@ -11,8 +11,8 @@ func makeHalf(): func(Integer): Integer {
     }
 }
 
-val first = makeHalf()
-val second = makeHalf()
+var first = makeHalf()
+var second = makeHalf()
 
 print((makeHalf() === makeHalf()).toString() .. "\n")
 print((first === second).toString() .. "\n")

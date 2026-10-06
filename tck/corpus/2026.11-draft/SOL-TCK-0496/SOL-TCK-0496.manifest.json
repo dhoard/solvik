@@ -1,0 +1,19 @@
+{
+  "manifestSchemaVersion": 1,
+  "specVersion": "2026.11-draft",
+  "testId": "SOL-TCK-0496",
+  "category": "syntax",
+  "profile": "full-language",
+  "status": "required",
+  "requirements": [
+    "REQ-1900"
+  ],
+  "entryPoint": "main.sol",
+  "outcome": "COMPILE_ERROR",
+  "expectation": {
+    "diagnostic": {
+      "family": "PARS",
+      "code": "SOLV-PARS-012"
+    }
+  }
+}

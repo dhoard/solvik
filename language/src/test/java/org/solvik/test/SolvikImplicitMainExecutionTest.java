@@ -58,9 +58,13 @@ public final class SolvikImplicitMainExecutionTest {
     @Test
     public void topLevelLocalsAndLoopsRun() {
         assertThat(run("""
-                mutable val total = 0
-                for (mutable val i = 1; i <= 3; i = i + 1) {
-                    total = total + i
+                var mutable total = 0
+                {
+                    var mutable i = 1
+                    while (i <= 3) {
+                        total = total + i
+                        i = i + 1
+                    }
                 }
                 println(total)
                 """)).isEqualTo("6\n");
@@ -101,11 +105,11 @@ public final class SolvikImplicitMainExecutionTest {
     public void siblingScopeBlocksRunInOrderWithIndependentLocals() {
         assertThat(run("""
                 {
-                    val result = "header"
+                    var result = "header"
                     println(result)
                 }
                 {
-                    val result = "body"
+                    var result = "body"
                     println(result)
                 }
                 """)).isEqualTo("header\nbody\n");

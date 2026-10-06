@@ -8,7 +8,9 @@ copying observed output into the expectation.
 
 Section 1 is the specification's only lexical section, and unlike the diagnostic tables of
 sections 20-23 it names no diagnostic codes at all. Every rejection in this batch therefore
-carries a bare `{}` expectation: the specification normatively forbids the construct but never
+carries a bare `{
+}
+` expectation: the specification normatively forbids the construct but never
 names a code for forbidding it, and inventing one would assert a fact the specification does not
 state. The acceptance tests do the load-bearing work, and each is built so that a *plausible
 alternative lexer* produces different bytes rather than the same bytes in a different order:
@@ -78,10 +80,10 @@ REQS = {
   quotes=["`/* ... */` is a non-nesting block comment."]),
  "REQ-1404": dict(
   section="1. Design Goals (Lexical basics)",
-  summary="Comments are otherwise whitespace, but their physical newlines remain visible to semicolon insertion",
+  summary="Comments are otherwise whitespace, but a newline inside a comment is still a physical newline for statement termination",
   kind="lexical",
   notes="Two independent observables are pinned by two programs. A block comment that terminates on the same physical line lets the following statement begin normally, while a block comment whose closing delimiter lands on a later line must still let the newline inside it separate the two statements -- the expected stream is the two values with no separator, which only holds if the comment's embedded newline was seen as a terminator rather than swallowed. A lexer that replaced a block comment with nothing at all, discarding its newlines, merges the statements and fails the second arm.",
-  quotes=["Comments are otherwise whitespace, but their physical newlines remain visible to semicolon insertion."]),
+  quotes=["Comments are otherwise whitespace, but a newline inside a comment is still a physical newline for statement termination (section 16)."]),
  "REQ-1405": dict(
   section="1. Design Goals (Lexical basics)",
   summary="A decimal integer literal has type Integer in the initial typed core, and a literal outside the signed 32-bit range is a compile-time error",
@@ -129,21 +131,21 @@ def add(tid, req, category, src, outcome, **exp):
 
 # --- REQ-1400: identifier character class.
 add("SOL-TCK-0166", "REQ-1400", "lexical",
-    "val _a1B_ = 42\nprint(_a1B_)\n", "SUCCESS", stdout="42")
+    "var _a1B_ = 42\nprint(_a1B_)\n", "SUCCESS", stdout="42")
 
 add("SOL-TCK-0167", "REQ-1400", "lexical",
-    "val a = 5\nval 1a = 7" + NEG, "COMPILE_ERROR", diag={})
+    "var a = 5\nvar 1a = 7" + NEG, "COMPILE_ERROR", diag={})
 
 # --- REQ-1401: reserved keywords, leading digit.
 add("SOL-TCK-0168", "REQ-1401", "lexical",
-    "val class = 5" + NEG, "COMPILE_ERROR", diag={})
+    "var class = 5" + NEG, "COMPILE_ERROR", diag={})
 
 add("SOL-TCK-0169", "REQ-1401", "lexical",
-    "val func = 5" + NEG, "COMPILE_ERROR", diag={})
+    "var func = 5" + NEG, "COMPILE_ERROR", diag={})
 
 # --- REQ-1402: '$' is not an identifier character.
 add("SOL-TCK-0170", "REQ-1402", "lexical",
-    "val a$b = 5" + NEG, "COMPILE_ERROR", diag={})
+    "var a$b = 5" + NEG, "COMPILE_ERROR", diag={})
 
 # --- REQ-1403: non-nesting block comment.
 add("SOL-TCK-0171", "REQ-1403", "lexical",
@@ -161,28 +163,28 @@ add("SOL-TCK-0174", "REQ-1404", "lexical",
 
 # --- REQ-1405: Integer literal and the signed 32-bit range boundary.
 add("SOL-TCK-0175", "REQ-1405", "lexical",
-    "val a = 2147483647\nprint(a)\n", "SUCCESS", stdout="2147483647")
+    "var a = 2147483647\nprint(a)\n", "SUCCESS", stdout="2147483647")
 
 add("SOL-TCK-0176", "REQ-1405", "lexical",
-    "val a = 2147483648" + NEG, "COMPILE_ERROR", diag={})
+    "var a = 2147483648" + NEG, "COMPILE_ERROR", diag={})
 
 # --- REQ-1406: L-suffixed Long literals.
 add("SOL-TCK-0177", "REQ-1406", "lexical",
-    "val a: Long = 9223372036854775807L\nprint(a)\n",
+    "var a: Long = 9223372036854775807L\nprint(a)\n",
     "SUCCESS", stdout="9223372036854775807")
 
 add("SOL-TCK-0178", "REQ-1406", "lexical",
-    "val a: Integer = 5L" + NEG, "COMPILE_ERROR", diag={})
+    "var a: Integer = 5L" + NEG, "COMPILE_ERROR", diag={})
 
 # --- REQ-1407: floating-point literals, exponent, F suffix.
 add("SOL-TCK-0179", "REQ-1407", "lexical",
-    "val a: Double = 1.5\nval b: Float = 1.5F\nprint(a)\nprint(b)\n", "SUCCESS", stdout="1.51.5")
+    "var a: Double = 1.5\nvar b: Float = 1.5F\nprint(a)\nprint(b)\n", "SUCCESS", stdout="1.51.5")
 
 add("SOL-TCK-0180", "REQ-1407", "lexical",
-    "val a: Float = 1.5F\nprint(a)\n", "SUCCESS", stdout="1.5")
+    "var a: Float = 1.5F\nprint(a)\n", "SUCCESS", stdout="1.5")
 
 add("SOL-TCK-0181", "REQ-1407", "lexical",
-    "val a: Float = 1.5" + NEG, "COMPILE_ERROR", diag={})
+    "var a: Float = 1.5" + NEG, "COMPILE_ERROR", diag={})
 
 add("SOL-TCK-0182", "REQ-1407", "lexical",
     "print(1.5e3 == 1500.0)\nprint(16e-1 == 1.6)\n", "SUCCESS", stdout="truetrue")
@@ -192,7 +194,7 @@ add("SOL-TCK-0183", "REQ-1408", "lexical",
     "print('A')\nprint('\\n')\n", "SUCCESS", stdout="A\n")
 
 add("SOL-TCK-0184", "REQ-1408", "lexical",
-    "val a = 'AB'" + NEG, "COMPILE_ERROR", diag={})
+    "var a = 'AB'" + NEG, "COMPILE_ERROR", diag={})
 
 
 def verify_quotes():

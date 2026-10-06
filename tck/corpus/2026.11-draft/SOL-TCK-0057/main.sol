@@ -19,5 +19,5 @@ class Sub extends Base {
     }
 }
 
-val b: Base = Sub()
+var b: Base = Sub()
 print(b.label() .. "/" .. Base().label())

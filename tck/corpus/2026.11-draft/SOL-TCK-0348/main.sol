@@ -10,7 +10,7 @@ class Simple extends RuntimeException {
     }
 }
 class MyErr<T> extends RuntimeException {
-    val payload: T
+    var payload: T
 
     MyErr(payload: T) {
         this.payload = payload
@@ -21,7 +21,8 @@ func f() {
 }
 try {
     f()
-} catch (e: MyErr<Integer>) {
+}
+catch (e: MyErr<Integer>) {
     print("caught")
 }
 print("EXECUTED-INVALID")

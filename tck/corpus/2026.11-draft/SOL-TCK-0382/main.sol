@@ -5,16 +5,16 @@
 //   - Two unrelated classes with identical members are not assignment-compatible.
 //
 class A {
-    val value: String = "a"
+    var value: String = "a"
 
     A() {
     }
 }
 class B {
-    val value: String = "b"
+    var value: String = "b"
 
     B() {
     }
 }
-val x: A = B()
+var x: A = B()
 print("EXECUTED-INVALID")

@@ -16,8 +16,8 @@ func duplicator<T>(f: func(T): T): func(T): T {
     return f
 }
 
-val viaString: func(String): String = duplicator(identity)
-val viaInteger: func(Integer): Integer = duplicator(identity)
+var viaString: func(String): String = duplicator(identity)
+var viaInteger: func(Integer): Integer = duplicator(identity)
 
 print(viaString("ab") .. "\n")
 print(viaInteger(20).toString() .. "\n")

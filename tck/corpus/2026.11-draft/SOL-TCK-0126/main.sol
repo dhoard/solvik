@@ -9,9 +9,9 @@
 // about ordering, so bracketing both marks this stream and keeps the two derivations
 // independently checkable. If the block were treated as an expression its value
 // would be required, and section 21.2 makes that a compile-time error instead.
-mutable val x = 10
+var mutable x = 10
 {
-    val d = 7
+    var d = 7
     x = x - d
 }
 print("[")

@@ -125,7 +125,7 @@ public final class SolvikConcatTest {
     @Test
     public void nullConcatenatesAsNull() {
         assertThat(run("""
-                val s: String? = null
+                var s: String? = null
                 println("[" .. s .. "]")
                 """)).isEqualTo("[null]\n");
     }

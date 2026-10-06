@@ -36,7 +36,7 @@ import org.junit.jupiter.api.Test;
  * Exact stdout is asserted.
  *
  * <p>Receivers are deliberately non-null: the member is only callable on non-null values, so every
- * value here is a non-null literal or a constructor result. Nullable {@code val} bindings of class,
+ * value here is a non-null literal or a constructor result. Nullable {@code var} bindings of class,
  * enum, and collection types are excluded because the member call on them is a compile-time error
  * (SOLV-TYPE-024), which is covered by the negative tests.
  */
@@ -72,7 +72,8 @@ public final class SolvikEqualsExecutionTest {
                         println(true.equals(true))
                         println(Byte(1).equals(Byte(1)))
                         println(Short(-3).equals(Short(-3)))
-                        func noop() {}
+                        func noop() {
+                        }
                         println(noop().equals(noop()))
                         """)).isEqualTo("true\nfalse\ntrue\ntrue\ntrue\ntrue\ntrue\ntrue\ntrue\ntrue\n");
     }
@@ -83,8 +84,8 @@ public final class SolvikEqualsExecutionTest {
         assertThat(run("""
                         class Box {
                         }
-                        val same = Box()
-                        val other = Box()
+                        var same = Box()
+                        var other = Box()
                         println(same.equals(same))
                         println(same.equals(other))
                         """)).isEqualTo("true\nfalse\n");
@@ -124,8 +125,8 @@ public final class SolvikEqualsExecutionTest {
                                 return 1 / 0 == 0
                             }
                         }
-                        val a = Bad()
-                        val b = Bad()
+                        var a = Bad()
+                        var b = Bad()
                         println(a.equals(b))
                         """));
         assertThat(thrown).isNotNull();

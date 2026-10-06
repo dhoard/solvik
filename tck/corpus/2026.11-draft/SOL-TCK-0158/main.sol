@@ -3,7 +3,8 @@ mutable class ParseError extends RuntimeException {
 func guard() {
     try {
         throw ParseError("x")
-    } catch (e: ParseError) {
+    }
+    catch (e: ParseError) {
         print("caught")
     }
     print(e)

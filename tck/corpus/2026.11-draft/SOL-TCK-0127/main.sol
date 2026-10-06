@@ -1,20 +1,22 @@
 // Positive conformance test. Oracle derived by hand from LANGUAGE_SPEC section 21.3,
-// verbatim: "Explicit and synthesized semicolons are the same parser token and have the
-// same language meaning, so token origin is never inspected to decide whether a value
-// exists. All three forms below have the same value and type" -- and the spec lists
-// `val a = { 42 }`, the multi-line form, and `val c = { 42; }`, each "an `Integer` block
-// expression with value 42". The section adds "Comments and blank lines before `}` do not
-// affect tail selection", which the fourth form here exercises.
+// verbatim: "Separation never changes meaning: no separator token carries a value, and
+// the last item of a value-required block is its tail expression wherever it sits" -- and
+// "Comments and blank lines before `}` do not affect tail selection". Section 16 defines
+// the separator forms exercised here: a physical newline and an explicit `;`
+// separating two same-line statements.
 // Four spellings of the same value 42, so the expected stdout is "42424242". Any spelling
 // that lost the tail expression would instead be a compile-time error.
-val a = { 42 }
-val b = {
+var a = {
     42
 }
-val c = {
-    42;
+var b = {
+    var unused: Integer = 0; 42
 }
-val d = {
+var c = {
+    42
+
+}
+var d = {
     42
 
     // a comment and blank lines must not disturb tail selection

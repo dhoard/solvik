@@ -37,7 +37,7 @@ import org.junit.jupiter.api.Test;
  */
 public final class SolvikResultOperationsExecutionTest {
 
-    /** A two-variant {@code Result} declaration reused across cases (variants on separate lines for semicolon insertion). */
+    /** A two-variant {@code Result} declaration reused across cases (variants on separate lines, each terminated by its line's boundary). */
     private static final String RESULT_DECL = "enum Result<T, E> {\n    Ok(T)\n    Err(E)\n}\n";
 
     private static final class Result {
@@ -200,7 +200,7 @@ public final class SolvikResultOperationsExecutionTest {
         // A member read of a Result operation (no call) is a method used as a value.
         Result result = evaluate(RESULT_DECL
                 + "func good(): Result<Integer, String> {\n    return Result.Ok(1)\n}\n"
-                + "val op = good().unwrap\n");
+                + "var op = good().unwrap\n");
         assertThat(result.failure).as(result.output).isNotNull();
         assertThat(result.failure.getMessage().contains("SOLV-TYPE-014")).as(result.failure.getMessage()).isTrue();
         assertSpanAvailable(result.failure);

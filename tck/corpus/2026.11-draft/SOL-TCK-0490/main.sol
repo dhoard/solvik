@@ -7,7 +7,7 @@
 //   - `TYPE_FUNCTION_AS_VALUE` (`SOLV-TYPE-014`) reports a callable that this revision keeps explicitly deferred used as a value: a static method reference, a constructor, an enum variant, and a bare read of a fixed language-defined member or a synthesized `Result` operation.
 //
 class Holder {
-    mutable val stored: func(): Integer
+    var mutable stored: func(): Integer
     func storedMethod(): Integer {
         return 4
     }
@@ -18,9 +18,9 @@ class Holder {
     }
 }
 
-val holder = Holder()
-val fromProperty: func(): Integer = holder.stored
-val fromMethod: func(): Integer = holder.storedMethod
+var holder = Holder()
+var fromProperty: func(): Integer = holder.stored
+var fromMethod: func(): Integer = holder.storedMethod
 print(fromProperty())
 print("|")
 print(fromMethod())

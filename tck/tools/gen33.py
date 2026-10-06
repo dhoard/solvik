@@ -155,16 +155,16 @@ BAD("SOL-TCK-0408", "objects", "REQ-3102",
     'print("EXECUTED-INVALID")\n', {},
     "Extending a class that was not declared `mutable` or `abstract` is rejected.")
 BAD("SOL-TCK-0409", "objects", "REQ-3103",
-    'class C {\n    static mutable val n: Integer = "wrong"\n\n    C() {\n    }\n}\n'
+    'class C {\n    static var mutable n: Integer = "wrong"\n\n    C() {\n    }\n}\n'
     'print("EXECUTED-INVALID")\n',
     {"family": "TYPE", "code": "SOLV-TYPE-001"},
     "A String static initializer for an Integer property pins SOLV-TYPE-001.")
 BAD("SOL-TCK-0410", "control", "REQ-3104",
-    'val x = 1\nswitch (x) {\n    case 1:\n        print("one")\n    default:\n        print("d")\n'
-    '    default:\n        print("d2")\n}\nprint("EXECUTED-INVALID")\n', {},
+    'var x = 1\nswitch (x) {\n    case 1 {\n        print("one")\n    }\n    default {\n        print("d")\n    }\n'
+    '    default {\n        print("d2")\n    }\n}\nprint("EXECUTED-INVALID")\n', {},
     "A second default is rejected.")
 BAD("SOL-TCK-0411", "control", "REQ-3104",
-    'val x = 1\nswitch (x) {\n    default:\n        print("d")\n    case 2:\n        print("two")\n}\n'
+    'var x = 1\nswitch (x) {\n    default {\n        print("d")\n    }\n    case 2 {\n        print("two")\n    }\n}\n'
     'print("EXECUTED-INVALID")\n', {},
     "A default that is not the last clause is rejected.")
 OK("SOL-TCK-0412", "result", "REQ-3105",

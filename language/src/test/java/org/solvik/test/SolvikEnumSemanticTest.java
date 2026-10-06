@@ -172,7 +172,7 @@ public final class SolvikEnumSemanticTest {
                 func describe(color: Color): Unit {
                 }
                 func use(): Unit {
-                    val color: Color = Color.Red
+                    var color: Color = Color.Red
                     describe(color)
                 }
                 """);
@@ -272,7 +272,7 @@ public final class SolvikEnumSemanticTest {
     public void enumDeclarationsMayReferenceAnyNominalType() {
         CheckedProgram program = check("""
                 class Payload {
-                    val value: Integer
+                    var value: Integer
 
                     Payload(value: Integer) {
                         this.value = value

@@ -38,7 +38,7 @@ public final class SolvikGenericsParserTest {
     public void classTypeParameterListIsRecorded() {
         CompilationUnitNode unit = parseOk("g.sol", """
                 class Box<T> {
-                    mutable val value: T
+                    var mutable value: T
                 }
                 """);
         ClassDeclNode box = (ClassDeclNode) unit.declarations().get(0);
@@ -53,8 +53,8 @@ public final class SolvikGenericsParserTest {
     public void multipleTypeParametersKeepSourceOrder() {
         CompilationUnitNode unit = parseOk("g.sol", """
                 class Pair<K, V> {
-                    mutable val first: K
-                    mutable val second: V
+                    var mutable first: K
+                    var mutable second: V
                 }
                 """);
         ClassDeclNode pair = (ClassDeclNode) unit.declarations().get(0);

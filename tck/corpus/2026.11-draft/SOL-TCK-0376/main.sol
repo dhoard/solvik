@@ -16,7 +16,7 @@ class Impl implements P {
     }
 }
 class X implements P {
-    delegate val a: P
+    delegate var a: P
 
     X() {
     }

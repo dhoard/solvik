@@ -15,10 +15,10 @@ func echo<T>(value: T): T {
     return value
 }
 
-val asInteger: func(Integer): Integer = identity
-val asString: func(String): String = identity
-val sameShape: func(Integer): Integer = identity
-val other: func(Integer): Integer = echo
+var asInteger: func(Integer): Integer = identity
+var asString: func(String): String = identity
+var sameShape: func(Integer): Integer = identity
+var other: func(Integer): Integer = echo
 
 print((asInteger === sameShape).toString() .. "\n")
 print(asInteger.equals(asString).toString() .. "\n")

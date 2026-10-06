@@ -2,10 +2,10 @@
 // The property is assigned only on the true branch, so a false-path instance is not definitely initialized.
 //
 // Oracle quotations verified verbatim against docs/LANGUAGE_SPEC.md:
-//   - Every property without a declaration initializer must be assigned exactly once on every successful constructor path before it is read; a `val` property cannot be assigned afterward.
+//   - Every property without a declaration initializer must be assigned exactly once on every successful constructor path before it is read; a `var` property cannot be assigned afterward.
 //
 class U {
-    val name: String
+    var name: String
 
     U(c: Boolean) {
         if (c) {
@@ -13,5 +13,5 @@ class U {
         }
     }
 }
-val u = U(true)
+var u = U(true)
 print("EXECUTED-INVALID")

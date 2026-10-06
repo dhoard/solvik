@@ -1,0 +1,146 @@
+3
+3
+Solvik 42 7
+42 120
+2147483647
+2147483648
+1000
+1.5
+2.25
+3.0
+100
+300
+3
+42
+A
+z
+3
+-5
+10
+true
+6
+tab[	]nl[
+]quote["]backslash[\]native-escape[
+]
+\d+ "quoted" C:\temp
+contains "# text
+SELECT 1
+sum=6, flag=true
+solvik
+true
+false
+true
+true
+true
+Point(1;first)
+held: Point(1;first)
+first
+first
+false
+gear:4
+boosted-gear:8
+chip-boosted-gear:8
+3 wheels
+Hello Dana
+Dana!
+hey!!
+7
+21
+abc
+2
+b
+99
+c
+pass 95
+fail 30 (late)
+excused|excused
+true
+false
+trike 3 wheels
+trike 3 wheels
+true
+42
+true
+cannot parse
+42
+84
+cannot parse
+fallback
+here
+null
+first
+true
+nothing
+value:7
+123012321
+13
+medium
+42
+inner
+also inner
+zero
+number
+word
+other
+many
+mixed
+zero
+small
+large
+3
+42
+42
+20
+9
+42
+40
+tag7
+true
+101
+8
+false
+false
+via-value
+func
+true
+fn-null
+10
+8
+42
+80
+4
+9
+2
+false
+2
+true
+true
+true
+2
+10
+false
+true
+two
+two
+1
+7
+true
+x@y@5-8#2
+x
+2
+_ z
+validation: bad input
+cleanup-a
+is scaled: true
+base caught level 1
+msg: none
+scaled level 2
+ok:42
+7
+rethrowing inner
+cleanup-b
+outer caught inner
+block-tail|Unit
+no-newline and a line!
+Hello, World!
+42

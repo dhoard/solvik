@@ -1,5 +1,5 @@
 class Box1<T> {
-    mutable val value: T
+    var mutable value: T
     Box1(value: T) {
         this.value = value
     }
@@ -8,14 +8,19 @@ class Box1<T> {
     }
 }
 
-val box2: Box1<String> = Box1("b2")
+var box2: Box1<String> = Box1("b2")
 
 println(box2.get())
 
 println(box2 is Any)
 
 func either3(flag: Boolean): Any {
-    return if (flag) { 'a' } else { false }
+    return if (flag) {
+        'a'
+    }
+    else {
+        false
+    }
 }
 
 println(either3(true) is Any)

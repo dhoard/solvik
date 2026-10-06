@@ -1,13 +1,13 @@
 class Point {
-    val x: Integer
-    val y: Integer
+    var x: Integer
+    var y: Integer
 
     Point(x: Integer, y: Integer) {
         this.x = x
         this.y = y
     }
 }
-val q: Any = Point(1, 2)
-val a: Point = q as Point
-val b: Point = a
+var q: Any = Point(1, 2)
+var a: Point = q as Point
+var b: Point = a
 print("nw" .. (a === b))

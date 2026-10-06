@@ -6,12 +6,12 @@ func step(value: Integer, delta: Integer): Integer {
     return value + delta
 }
 
-val advance: func(Integer, Integer): Integer = func(value: Integer, delta: Integer): Integer {
+var advance: func(Integer, Integer): Integer = func(value: Integer, delta: Integer): Integer {
     return value + delta
 }
 
-mutable val total = 0
-mutable val i = 0
+var mutable total = 0
+var mutable i = 0
 while (i < 20000000) {
     total = advance(total, 1)
     i = i + 1

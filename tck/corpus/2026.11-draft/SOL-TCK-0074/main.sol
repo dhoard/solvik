@@ -5,12 +5,14 @@
 // two quoted sentences combine to fix this without ambiguity. The specification names no
 // stable code for it, so only the semantic diagnostic family is asserted. This is the
 // negative twin of the legal nested-loop case above.
-mutable val v: Integer = 2
+var mutable v: Integer = 2
 
 switch (v) {
-    case 1:
+    case 1 {
         break
+    }
 
-    default:
+    default {
         print("other")
+    }
 }

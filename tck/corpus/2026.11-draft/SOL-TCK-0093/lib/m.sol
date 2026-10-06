@@ -1,7 +1,7 @@
 module geom
 
 class Point {
-    mutable val x: Integer
+    var mutable x: Integer
 
     Point(v: Integer) {
         this.x = v

@@ -1,14 +1,18 @@
 // Solvik switch: constants, regex cases, first-match order, and no fallthrough.
 func classify(value: String): String {
     switch (value) {
-        case "zero":
+        case "zero" {
             return "zero"
-        case regex r#"^\d+$"#:
+        }
+        case regex r#"^\d+$"# {
             return "number"
-        case regex r#"^[A-Za-z]+$"#:
+        }
+        case regex r#"^[A-Za-z]+$"# {
             return "word"
-        default:
+        }
+        default {
             return "other"
+        }
     }
 }
 

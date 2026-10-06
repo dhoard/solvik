@@ -6,6 +6,6 @@
 //   - A static declaration initializer that is not assignable to the declared type is `SOLV-TYPE-001`.
 //
 class Holder {
-    static val operation: func(Integer): String = null
+    static var operation: func(Integer): String = null
 }
 print("EXECUTED-INVALID")

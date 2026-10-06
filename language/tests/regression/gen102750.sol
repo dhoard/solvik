@@ -1,10 +1,10 @@
-mutable val total = 0
+var mutable total = 0
 
 for (i in 1...4) {
     total = total + i
 }
 
-mutable val n = 0
+var mutable n = 0
 
 while (n < 5) {
     n = n + 1
@@ -14,7 +14,7 @@ println(total)
 
 println(n)
 
-val xs1: List<Boolean> = List(true, true)
+var xs1: List<Boolean> = List(true, true)
 
 xs1.add(false)
 

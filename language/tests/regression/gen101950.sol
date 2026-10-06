@@ -1,4 +1,4 @@
-val xs1: List<String> = List("text8", "a1")
+var xs1: List<String> = List("text8", "a1")
 
 xs1.add("x7")
 

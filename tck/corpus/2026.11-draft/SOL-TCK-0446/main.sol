@@ -12,17 +12,18 @@ func invoke(f: func(Integer): Integer): Integer {
     return f(2)
 }
 
-val double: func(Integer): Integer = func(value: Integer): Integer {
+var double: func(Integer): Integer = func(value: Integer): Integer {
     return value * 2
 }
 
-val report: func(Integer): Unit = func(value: Integer) {
+var report: func(Integer): Unit = func(value: Integer) {
     print("[" .. value.toString() .. "]")
 }
 
-val nested: Integer = invoke(func(value: Integer): Integer {
-    return value - 100;
-})
+var nested: Integer = invoke(func(value: Integer): Integer {
+    return value - 100
+}
+)
 
 print(invoke(double).toString() .. "\n")
 report(7)

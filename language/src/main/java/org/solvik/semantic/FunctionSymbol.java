@@ -157,7 +157,7 @@ public final class FunctionSymbol extends Symbol {
      * @param captures the bindings the expression's capture list resolved to, in source order; empty for
      *                a non-capturing anonymous function
      * @param suppressedCaptureNames capture item names the list reported and bound nothing for, other than
-     *                the {@code mutable val} names in {@code rejectedCaptureNames}; a body reference to one of these
+     *                the {@code var mutable} names in {@code rejectedCaptureNames}; a body reference to one of these
      *                earns no diagnostic, because the item already reported the root cause
      */
     public static FunctionSymbol anonymous(String debugName, SourceSpan declarationSpan, List<VariableSymbol> parameters, Type returnType, boolean returnTypeKnown, BlockNode body, List<CapturedValue> captures, Set<String> rejectedCaptureNames, Set<String> suppressedCaptureNames) {
@@ -372,13 +372,13 @@ public final class FunctionSymbol extends Symbol {
     }
 
     /**
-     * The names this anonymous function's capture list named as {@code mutable val}s — the items it rejected.
+     * The names this anonymous function's capture list named as {@code var mutable}s — the items it rejected.
      * They are recorded because the body still has to name them: the specification reports a read or
      * write of such a name with the mutable-capture code, and the name is deliberately bound to nothing
      * so the body cannot read a silently mirrored copy of the mutable binding.
      *
      * <p>Empty for every callable that is not an anonymous function and for one whose capture list named
-     * no {@code mutable val}.
+     * no {@code var mutable}.
      */
     public Set<String> rejectedCaptureNames() {
         return anonymousCallable == null ? Set.of() : anonymousCallable.rejectedCaptureNames();
@@ -386,12 +386,12 @@ public final class FunctionSymbol extends Symbol {
 
     /**
      * The capture item names this anonymous function's capture list reported and bound nothing for, other
-     * than the {@code mutable val} names {@link #rejectedCaptureNames()} carries. A body reference to one of these
+     * than the {@code var mutable} names {@link #rejectedCaptureNames()} carries. A body reference to one of these
      * names is reported nowhere: the item already reported the single root cause, and the specification
      * forbids restating it as an unlisted-capture or unknown-name diagnostic.
      *
      * <p>Empty for every callable that is not an anonymous function and for one whose capture list reported
-     * no item other than {@code mutable val}s.
+     * no item other than {@code var mutable}s.
      */
     public Set<String> suppressedCaptureNames() {
         return anonymousCallable == null ? Set.of() : anonymousCallable.suppressedCaptureNames();

@@ -19,7 +19,12 @@ println(call4(A1()))
 println(call4(B2()))
 
 func either5(flag: Boolean): Any {
-    return if (flag) { true } else { "text2" }
+    return if (flag) {
+        true
+    }
+    else {
+        "text2"
+    }
 }
 
 println(either5(true) is Any)

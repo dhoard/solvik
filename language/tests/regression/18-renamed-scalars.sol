@@ -1,30 +1,34 @@
-val count: Integer = 40
-val step: Integer = 2
+var count: Integer = 40
+var step: Integer = 2
 println(count + step)
-val ratio: Double = 7.9
+var ratio: Double = 7.9
 println(Integer(ratio))
-val wide: Long = Long(9)
+var wide: Long = Long(9)
 println(wide)
-val letter: Character = 'A'
+var letter: Character = 'A'
 println(letter)
-val other: Character = 'Z'
+var other: Character = 'Z'
 println(other)
-val missing: Integer? = null
+var missing: Integer? = null
 println(missing)
 println(missing is Integer)
 println(count is Integer)
 println(count is Number)
-val numbers: List<Integer> = List<Integer>(1, 2, 3)
+var numbers: List<Integer> = List<Integer>(1, 2, 3)
 println(numbers.size)
 println(numbers.get(0))
-val codes: Map<String, Integer> = Map("a": 1)
+var codes: Map<String, Integer> = Map("a": 1)
 println(codes.get("a"))
-val letters: Set<Character> = Set('a', 'b')
+var letters: Set<Character> = Set('a', 'b')
 println(letters.size)
 func twice(value: Integer): Integer {
     return value * 2
 }
 println(twice(21))
-for (mutable val i: Integer = 0; i < 3; i = i + 1) {
-    println(i)
+{
+    var mutable i: Integer = 0
+    while (i < 3) {
+        println(i)
+        i = i + 1
+    }
 }

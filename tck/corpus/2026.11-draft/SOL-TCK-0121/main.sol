@@ -4,10 +4,10 @@
 // declaration, and the tail expression uses both; `outer` is visible going in.
 // first = 1, second = first + outer = 1 + 4 = 5, tail = second + 1 = 6, so the expected
 // stdout is exactly "6".
-val outer = 4
-val v = {
-    val first = 1
-    val second = first + outer
+var outer = 4
+var v = {
+    var first = 1
+    var second = first + outer
     second + 1
 }
 print(v)

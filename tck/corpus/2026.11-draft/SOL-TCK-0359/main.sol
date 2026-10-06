@@ -8,5 +8,5 @@
 func f() {
     print("x")
 }
-val u: Unit = f()
+var u: Unit = f()
 print(u)

@@ -12,7 +12,7 @@ func second<A, B>(first: A, other: B): B {
 }
 
 class Boundary {
-    static val mismatched: func(Integer): Integer = second
+    static var mismatched: func(Integer): Integer = second
 }
 
 print("EXECUTED-INVALID")

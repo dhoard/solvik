@@ -4,7 +4,7 @@
 // Oracle quotations verified verbatim against docs/LANGUAGE_SPEC.md:
 //   - `while` is a pre-test loop.
 //
-mutable val i: Integer = 0
+var mutable i: Integer = 0
 while (i < 3) {
     print(i)
     i = i + 1

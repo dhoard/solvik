@@ -83,7 +83,7 @@ public final class SolvikEnumExecutionTest {
                     Some(T)
                 }
 
-                    val some: Option<Integer> = Option.Some(7)
+                    var some: Option<Integer> = Option.Some(7)
                     println(some == Option.Some(7))
                 """)).isEqualTo("true\n");
     }
@@ -100,7 +100,7 @@ public final class SolvikEnumExecutionTest {
                     return Color.Blue
                 }
 
-                    val color: Color = pick()
+                    var color: Color = pick()
                     println(color == Color.Blue)
                 """)).isEqualTo("true\n");
     }
@@ -157,8 +157,8 @@ public final class SolvikEnumExecutionTest {
                     return shape.name()
                 }
 
-                    val circle: Shape = Circle()
-                    val square: Shape = Square()
+                    var circle: Shape = Circle()
+                    var square: Shape = Square()
                     println(describe(circle))
                     println(describe(square))
                 """)).isEqualTo("circle\nsquare\n");
@@ -196,7 +196,7 @@ public final class SolvikEnumExecutionTest {
                     }
 
                         println("before")
-                        val bad: Result = Result.Ok("x")
+                        var bad: Result = Result.Ok("x")
                         println("after")
                     """, "test.sol")));
             assertThat(out.size()).isEqualTo(0);

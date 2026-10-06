@@ -2,7 +2,7 @@
 """Generate the variables, scope-block, switch-default, range, and include-identity batch.
 
 Closes the remaining testable obligations in sections 2, 6, 13, 17, and 20 that
-earlier batches did not enumerate: `mutable val` mutability, top-level bindings being
+earlier batches did not enumerate: `var mutable` mutability, top-level bindings being
 locals of the implicit main, scope-block independence and abrupt exits, the
 optional statement `switch` default, the range loop variable's immutability and
 scope, literal (unexpanded) include paths, and canonical include identity through
@@ -33,19 +33,19 @@ SPEC_N = norm(SPEC)
 REQS_SPEC = {
     "REQ-2900": dict(
         section="2. Variables and Mutability",
-        summary="`mutable val` declares a mutable binding or property, so a local declared `mutable val` may "
+        summary="`var mutable` declares a mutable binding or property, so a local declared `var mutable` may "
                 "be reassigned and the new value is observed",
         kind="runtime",
-        quotes=["`mutable val` declares a mutable binding/property."],
-        note="A `mutable val` local is reassigned and printed, so the observed bytes are the assigned "
-             "value; this is the positive counterpart to the `val` immutability covered by "
+        quotes=["`var mutable` declares a mutable binding/property."],
+        note="A `var mutable` local is reassigned and printed, so the observed bytes are the assigned "
+             "value; this is the positive counterpart to the `var` immutability covered by "
              "REQ-0300/REQ-0301."),
     "REQ-2901": dict(
         section="6. Functions",
-        summary="A top-level `val`, mutable or not, is a local of the implicit main, not a global, so it is "
+        summary="A top-level `var`, mutable or not, is a local of the implicit main, not a global, so it is "
                 "not visible to a user-declared function",
         kind="compile-time",
-        quotes=["a top-level `val`, whether or not it is `mutable`, is therefore a local of the implicit main, not a global."],
+        quotes=["a top-level `var`, whether or not it is `mutable`, is therefore a local of the implicit main, not a global."],
         note="A top-level binding is referenced from a declared function, which is not the implicit "
              "main. The reference is resolved against function locals and parameters only, so it is "
              "an unresolvable-name error. The section names no code, so the rejection is bare."),
@@ -124,6 +124,66 @@ REQS_SPEC = {
              "file. The included file's print runs exactly once, so a second `a` in the output "
              "would falsify the canonical-identity rule.",
     ),
+    "REQ-2909": dict(
+        section="2. Variables and Mutability",
+        summary="`var` declares an immutable binding, so a plain `var` local may be initialized and read",
+        kind="runtime",
+        quotes=["`var` declares an immutable binding/property."],
+        note="A plain `var` local is declared and printed with no reassignment, so the program "
+             "exercises the immutable default rather than the writable form."),
+    "REQ-2910": dict(
+        section="2. Variables and Mutability",
+        summary="A `var` binding may carry an explicit type annotation, so `var name: Type = expression` "
+                "declares an immutable typed binding",
+        kind="runtime",
+        quotes=["The canonical forms are `var name = expression`, `var name: Type = expression`, "
+                "`var mutable name = expression`, and `var mutable name: Type = expression`"],
+        note="The declared type is `Integer` and the initializer is an `Integer` literal, so the "
+             "program only compiles if the annotation position is accepted and the value reads back."),
+    "REQ-2911": dict(
+        section="2. Variables and Mutability",
+        summary="`var mutable` declares a mutable binding, so a typed `var mutable` local may be "
+                "reassigned and the new value is observed",
+        kind="runtime",
+        quotes=["`var mutable` declares a mutable binding/property."],
+        note="The typed mutable local is reassigned once and printed, so the observed bytes are the "
+             "assigned value rather than the initializer."),
+    "REQ-2912": dict(
+        section="2. Variables and Mutability",
+        summary="A mutable binding may be reassigned repeatedly, including from its own previous value",
+        kind="runtime",
+        quotes=["Reassignment uses ordinary `=` assignment on an existing binding and is legal only "
+                "when the binding was declared `mutable`"],
+        note="The binding is assigned three times and the final assignment reads the binding's own "
+             "previous value, so the printed result pins sequential reassignment."),
+    "REQ-2913": dict(
+        section="6. Functions",
+        summary="A nested block may shadow an outer declaration, and the inner binding is a distinct "
+                "binding, so mutating an inner `var mutable` leaves the outer immutable binding unchanged",
+        kind="runtime",
+        quotes=["A nested block may shadow an outer declaration."],
+        note="The outer immutable `var x` and the inner mutable `var mutable x` are different "
+             "bindings: the inner reassignment prints 30 and the outer read after the block still "
+             "prints 10, so a textual-identifier mutability model that conflated them would fail."),
+    "REQ-2914": dict(
+        section="2. Variables and Mutability",
+        summary="A binding is immutable unless `mutable` follows it, so a write to an outer `var` from "
+                "a nested block is rejected",
+        kind="compile-time",
+        quotes=["a binding is immutable unless `mutable` follows it"],
+        note="The write is inside a nested block and targets the outer immutable binding, so the "
+             "rejection must come from the binding's mutability rather than from the assignment's "
+             "lexical position. The specification names no stable code, so only the TYPE family is "
+             "asserted, and the sentinel proves the program never executed."),
+    "REQ-2915": dict(
+        section="2. Variables and Mutability",
+        summary="The declaration keyword comes first and `mutable` follows it, so a modifier-first "
+                "declaration is rejected during parsing",
+        kind="compile-time",
+        quotes=["`mutable` is a modifier on the declaration, never a binding kind of its own, so "
+                "`var mutable` is the complete form and a bare `mutable` is a compile-time error."],
+        note="`mutable var x = 1` puts the modifier before the declaration keyword, which the grammar "
+             "does not admit. The protocol family PARS is asserted rather than an implementation code."),
 }
 
 NEG = '\nprint("EXECUTED-INVALID")\n'
@@ -151,14 +211,14 @@ def BAD(tid, cat, req, src, diag, note, libs=None):
 
 
 OK("SOL-TCK-0390", "types", "REQ-2900",
-   'mutable val x: Integer = 1\nx = 2\nprint("var" .. x)\n',
+   'var mutable x: Integer = 1\nx = 2\nprint("var" .. x)\n',
    "var2",
-   "The `mutable val` local is reassigned and the assigned value is observed.")
+   "The `var mutable` local is reassigned and the assigned value is observed.")
 BAD("SOL-TCK-0391", "names", "REQ-2901",
-    'val x = 1\nfunc f(): Integer {\n    return x\n}\nprint("EXECUTED-INVALID")\n', {},
+    'var x = 1\nfunc f(): Integer {\n    return x\n}\nprint("EXECUTED-INVALID")\n', {},
     "A declared function cannot see the implicit main's top-level local.")
 OK("SOL-TCK-0392", "control", "REQ-2902",
-   '{\n    val result = 1\n    print("s" .. result)\n}\n{\n    val result = 2\n'
+   '{\n    var result = 1\n    print("s" .. result)\n}\n{\n    var result = 2\n'
    '    print("s" .. result)\n}\n',
    "s1s2",
    "Sibling blocks each declare the same local name and both print their own value.")
@@ -168,7 +228,7 @@ OK("SOL-TCK-0393", "control", "REQ-2903",
    "The break inside the scope block exits the enclosing range loop, so the loop body does not run "
    "to completion and only the post-loop text appears.")
 OK("SOL-TCK-0394", "control", "REQ-2904",
-   'val x = 9\nswitch (x) {\n    case 1:\n        print("one")\n}\nprint("swafter")\n',
+   'var x = 9\nswitch (x) {\n    case 1 {\n        print("one")\n    }\n}\nprint("swafter")\n',
    "swafter",
    "With no matching case and no default, the statement switch does nothing and the program "
    "continues.")
@@ -187,6 +247,35 @@ OK("SOL-TCK-0398", "modules", "REQ-2908",
    "cacz",
    "The two includes canonicalize to the same file, so the included print runs once.",
    libs={"a.sol": 'print("ca")\n', "sub/.keep": "placeholder\n"})
+
+OK("SOL-TCK-0500", "types", "REQ-2909",
+   'var x = 1\nprint("u" .. x)\n',
+   "u1",
+   "A plain `var` local is declared and read back with no reassignment.")
+OK("SOL-TCK-0501", "types", "REQ-2910",
+   'var x: Integer = 2\nprint("t" .. x)\n',
+   "t2",
+   "A typed immutable declaration binds the annotated name and reads it back.")
+OK("SOL-TCK-0502", "types", "REQ-2911",
+   'var mutable x: Integer = 3\nx = 4\nprint("m" .. x)\n',
+   "m4",
+   "A typed mutable declaration is reassigned and the assigned value is observed.")
+OK("SOL-TCK-0503", "types", "REQ-2912",
+   'var mutable c = 0\nc = 1\nc = 2\nc = c + 1\nprint("chain" .. c)\n',
+   "chain3",
+   "A mutable binding is reassigned repeatedly, including from its own previous value.")
+OK("SOL-TCK-0504", "control", "REQ-2913",
+   'var x = 10\n{\n    var mutable x = 20\n    x = 30\n    print("s" .. x)\n}\nprint("o" .. x)\n',
+   "s30o10",
+   "The inner mutable shadow is reassigned and printed; the outer immutable binding is unchanged.")
+BAD("SOL-TCK-0505", "types", "REQ-2914",
+    'var x = 10\n{\n    x = 20\n}\nprint("EXECUTED-INVALID")\n',
+    {"family": "TYPE"},
+    "A nested block cannot write to an outer immutable binding.")
+BAD("SOL-TCK-0506", "syntax", "REQ-2915",
+    'mutable var x = 1\nprint("EXECUTED-INVALID")\n',
+    {"family": "PARS"},
+    "A modifier-first declaration is a parse error; the keyword must come first.")
 
 
 def verify():

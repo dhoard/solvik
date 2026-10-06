@@ -10,7 +10,9 @@ Section 12 is the largest spec section with zero requirement coverage, and it is
 entirely without named diagnostics: `SOLV-SEM-029` and `SOLV-SEM-030` occur ZERO times in
 the specification, even though the implementation emits them for the non-exhaustive match
 and unreachable branch rules that section 12 states. Every one of those rejections
-therefore carries a bare `{}` expectation, because section 12's prose forces the rejection
+therefore carries a bare `{
+}
+` expectation, because section 12's prose forces the rejection
 but never names a code for it, and adopting an implementation-chosen code would make the
 TCK's oracle a transcription of the very implementation it exists to judge.
 
@@ -179,23 +181,23 @@ def add(tid, req, category, src, outcome, fixture=None, **exp):
 # --- REQ-1500: variants are nested nominal constructors, qualified outside an
 #     establishing context.
 add("SOL-TCK-0185", "REQ-1500", "enums",
-    ENUM + 'val c = Color.RED\nprint("qualified")\n', "SUCCESS", stdout="qualified")
+    ENUM + 'var c = Color.RED\nprint("qualified")\n', "SUCCESS", stdout="qualified")
 
 add("SOL-TCK-0186", "REQ-1500", "enums",
-    ENUM + "val c = RED" + NEG, "COMPILE_ERROR", diag={})
+    ENUM + "var c = RED" + NEG, "COMPILE_ERROR", diag={})
 
 # --- REQ-1501: inside a match over a known enum the unqualified pattern is permitted.
 add("SOL-TCK-0187", "REQ-1501", "match",
-    RES + 'val r: Result<Integer, String> = Result.Ok(42)\n'
-          'val m = match r {\n'
+    RES + 'var r: Result<Integer, String> = Result.Ok(42)\n'
+          'var m = match r {\n'
           '    Ok(v) => "ok" .. v\n'
           '    Err(e) => "err" .. e\n'
           '}\n'
           'print(m)\n', "SUCCESS", stdout="ok42")
 
 add("SOL-TCK-0188", "REQ-1501", "match",
-    RES + 'val r: Result<Integer, String> = Result.Err("bad")\n'
-          'val m = match r {\n'
+    RES + 'var r: Result<Integer, String> = Result.Err("bad")\n'
+          'var m = match r {\n'
           '    Ok(v) => "ok" .. v\n'
           '    Err(e) => "err" .. e\n'
           '}\n'
@@ -203,58 +205,58 @@ add("SOL-TCK-0188", "REQ-1501", "match",
 
 # --- REQ-1502: exhaustive over a closed variant set, unless a wildcard covers it.
 add("SOL-TCK-0189", "REQ-1502", "match",
-    ENUM + "val c = Color.GREEN\n"
-           "val n = match c {\n    RED => 1\n}\nprint(n)\n" + NEG,
+    ENUM + "var c = Color.GREEN\n"
+           "var n = match c {\n    RED => 1\n}\nprint(n)\n" + NEG,
     "COMPILE_ERROR", diag={})
 
 add("SOL-TCK-0190", "REQ-1502", "match",
-    ENUM + "val c = Color.GREEN\n"
-           "val n = match c {\n    RED => 1\n    GREEN => 2\n}\nprint(\"all\" .. n)\n",
+    ENUM + "var c = Color.GREEN\n"
+           "var n = match c {\n    RED => 1\n    GREEN => 2\n}\nprint(\"all\" .. n)\n",
     "SUCCESS", stdout="all2")
 
 add("SOL-TCK-0191", "REQ-1502", "match",
-    ENUM + "val c = Color.GREEN\n"
-           "val n = match c {\n    _ => 9\n}\nprint(\"wild\" .. n)\n",
+    ENUM + "var c = Color.GREEN\n"
+           "var n = match c {\n    _ => 9\n}\nprint(\"wild\" .. n)\n",
     "SUCCESS", stdout="wild9")
 
 # --- REQ-1503: source order; a branch shadowed by an earlier one is an error. Both arms
 #     carry the wildcard a class-typed match requires, so reachability by subsumption is the
 #     only thing distinguishing them.
 add("SOL-TCK-0192", "REQ-1503", "match",
-    TRANS + "val a: A = C()\n"
-            "val n = match a {\n    c: C => 10\n    b: B => 20\n    _ => 0\n}\nprint(\"first\" .. n)\n",
+    TRANS + "var a: A = C()\n"
+            "var n = match a {\n    c: C => 10\n    b: B => 20\n    _ => 0\n}\nprint(\"first\" .. n)\n",
     "SUCCESS", stdout="first10")
 
 add("SOL-TCK-0193", "REQ-1503", "match",
-    TRANS + "val a: A = C()\n"
-            "val n = match a {\n    b: B => 20\n    c: C => 10\n    _ => 0\n}\nprint(n)\n" + NEG,
+    TRANS + "var a: A = C()\n"
+            "var n = match a {\n    b: B => 20\n    c: C => 10\n    _ => 0\n}\nprint(n)\n" + NEG,
     "COMPILE_ERROR", diag={})
 
 add("SOL-TCK-0194", "REQ-1503", "match",
-    ENUM + "val c = Color.RED\n"
-           "val n = match c {\n    RED => 1\n    RED => 2\n    GREEN => 3\n}\nprint(n)\n" + NEG,
+    ENUM + "var c = Color.RED\n"
+           "var n = match c {\n    RED => 1\n    RED => 2\n    GREEN => 3\n}\nprint(n)\n" + NEG,
     "COMPILE_ERROR", diag={})
 
 # --- REQ-1504: an abstract class is not constructible, and a class-typed match needs `_`.
 add("SOL-TCK-0195", "REQ-1504", "abstract",
-    SIB + "val s: Shape = Sq()\n"
-          "val n = match s {\n    q: Sq => 1\n    c: Ci => 2\n}\nprint(n)\n" + NEG,
+    SIB + "var s: Shape = Sq()\n"
+          "var n = match s {\n    q: Sq => 1\n    c: Ci => 2\n}\nprint(n)\n" + NEG,
     "COMPILE_ERROR", diag={})
 
 add("SOL-TCK-0196", "REQ-1504", "abstract",
-    SIB + "val s: Shape = Ci()\n"
-          "val n = match s {\n    q: Sq => 1\n    _ => 0\n}\nprint(\"abstract\" .. n)\n",
+    SIB + "var s: Shape = Ci()\n"
+          "var n = match s {\n    q: Sq => 1\n    _ => 0\n}\nprint(\"abstract\" .. n)\n",
     "SUCCESS", stdout="abstract0")
 
 add("SOL-TCK-0197", "REQ-1504", "abstract",
-    SIB + "val s = Shape()" + NEG, "COMPILE_ERROR",
+    SIB + "var s = Shape()" + NEG, "COMPILE_ERROR",
     diag={"family": "SEM", "code": "SOLV-SEM-028"})
 
 # --- REQ-1505 / REQ-1506: the physical file boundary is inert.
 add("SOL-TCK-0198", "REQ-1505", "abstract",
     'include "lib/base.sol"\n'
     "class Sub extends Base {\n}\n"
-    "val s: Base = Sub()\nprint(\"included\")\n",
+    "var s: Base = Sub()\nprint(\"included\")\n",
     "SUCCESS",
     fixture={"lib/base.sol": "abstract class Base {\n}\n"},
     stdout="included")
@@ -262,48 +264,48 @@ add("SOL-TCK-0198", "REQ-1505", "abstract",
 add("SOL-TCK-0199", "REQ-1506", "abstract",
     "abstract class Base {\n}\n"
     "class Sub extends Base {\n}\n"
-    'val s: Base = Sub()\nval n = match s {\n    sub: Sub => 4\n    _ => 0\n}\nprint("same" .. n)\n',
+    'var s: Base = Sub()\nvar n = match s {\n    sub: Sub => 4\n    _ => 0\n}\nprint("same" .. n)\n',
     "SUCCESS", stdout="same4")
 
 # --- REQ-1507: the admitted pattern forms.
 add("SOL-TCK-0200", "REQ-1507", "match",
-    SIB + "val s: Shape = Ci()\n"
-          "val n = match s {\n    q: Sq => 1\n    c: Ci => 2\n    _ => 0\n}\nprint(\"both\" .. n)\n",
+    SIB + "var s: Shape = Ci()\n"
+          "var n = match s {\n    q: Sq => 1\n    c: Ci => 2\n    _ => 0\n}\nprint(\"both\" .. n)\n",
     "SUCCESS", stdout="both2")
 
 add("SOL-TCK-0201", "REQ-1507", "match",
-    ENUM + "val c = Color.RED\n"
-           "val n = match c {\n    RED => 1\n    GREEN => 2\n}\nprint(\"enum\" .. n)\n",
+    ENUM + "var c = Color.RED\n"
+           "var n = match c {\n    RED => 1\n    GREEN => 2\n}\nprint(\"enum\" .. n)\n",
     "SUCCESS", stdout="enum1")
 
 add("SOL-TCK-0202", "REQ-1507", "match",
-    SIB + "val s: Shape = Ci()\n"
-          "val n = match s {\n    _ => 5\n}\nprint(\"under\" .. n)\n",
+    SIB + "var s: Shape = Ci()\n"
+          "var n = match s {\n    _ => 5\n}\nprint(\"under\" .. n)\n",
     "SUCCESS", stdout="under5")
 
 # --- REQ-1508: join is the nearest common declared supertype.
 add("SOL-TCK-0203", "REQ-1508", "match",
-    ENUM + "val c = Color.RED\n"
-           "val v: Number = match c {\n    RED => 1\n    GREEN => 2L\n}\nprint(\"join\" .. v)\n",
+    ENUM + "var c = Color.RED\n"
+           "var v: Number = match c {\n    RED => 1\n    GREEN => 2L\n}\nprint(\"join\" .. v)\n",
     "SUCCESS", stdout="join1")
 
 add("SOL-TCK-0204", "REQ-1508", "match",
-    ENUM + "val c = Color.RED\n"
-           "val v: Integer = match c {\n    RED => 1\n    GREEN => 2L\n}\nprint(v)\n" + NEG,
+    ENUM + "var c = Color.RED\n"
+           "var v: Integer = match c {\n    RED => 1\n    GREEN => 2L\n}\nprint(v)\n" + NEG,
     "COMPILE_ERROR", diag={})
 
 # --- REQ-1509: a branch may be a block with a tail result; branch bodies have their
 #     own scope (both branches bind the same name `t`).
 add("SOL-TCK-0205", "REQ-1509", "match",
-    ENUM + 'val c = Color.GREEN\n'
-           'val n = match c {\n'
+    ENUM + 'var c = Color.GREEN\n'
+           'var n = match c {\n'
            '    RED => {\n'
-           '        val t = 1\n'
+           '        var t = 1\n'
            '        print("r")\n'
            '        t\n'
            '    }\n'
            '    GREEN => {\n'
-           '        val t = 2\n'
+           '        var t = 2\n'
            '        print("g")\n'
            '        t\n'
            '    }\n'

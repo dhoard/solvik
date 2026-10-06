@@ -30,7 +30,7 @@ import org.solvik.parser.generated.SolvikLexer;
 /**
  * Direct lexer-layer tests for {@code docs/LANGUAGE_SPEC.md} section 1 (lexical basics) and the
  * raw-string rules of section 15. Each case drives {@link SolvikLexer} directly (without the
- * semicolon-inserting stage or the parser) and pins the default-channel token types, spellings, and
+ * line-boundary stage or the parser) and pins the default-channel token types, spellings, and
  * source spans, plus the negative cases where the lexer must reject a malformed token. Comment and
  * numeric forms are exercised because they are the most error-prone longest-match rules.
  */
@@ -220,7 +220,7 @@ public final class SolvikLexerTest {
     public void rawStringKeepsEmbeddedNewlinesInOneToken() {
         // A raw string spans physical newlines as a single token; the following token reports the
         // correct advanced line, proving the body did not leak newlines to the token stream.
-        SolvikLexer lexer = new SolvikLexer(CharStreams.fromString("r#\"a\nb\"#\nval"));
+        SolvikLexer lexer = new SolvikLexer(CharStreams.fromString("r#\"a\nb\"#\nvar"));
         lexer.removeErrorListeners();
         Token raw = lexer.nextToken();
         assertThat(SolvikLexer.VOCABULARY.getSymbolicName(raw.getType())).isEqualTo("RAW_STRING_LITERAL");
@@ -230,7 +230,7 @@ public final class SolvikLexerTest {
         do {
             next = lexer.nextToken();
         } while (next.getChannel() != Token.DEFAULT_CHANNEL && next.getType() != Token.EOF);
-        assertThat(SolvikLexer.VOCABULARY.getSymbolicName(next.getType())).isEqualTo("VAL");
+        assertThat(SolvikLexer.VOCABULARY.getSymbolicName(next.getType())).isEqualTo("VAR");
         assertThat(next.getLine()).isEqualTo(3);
     }
 
@@ -462,7 +462,7 @@ public final class SolvikLexerTest {
     @Test
     public void lineCommentAfterCodeDoesNotLeakIntoTokens() {
         // A line comment consumes to end of line; the next token must be the code after the newline.
-        SolvikLexer lexer = new SolvikLexer(CharStreams.fromString("val x = 1 // trailing\nval y = 2"));
+        SolvikLexer lexer = new SolvikLexer(CharStreams.fromString("var x = 1 // trailing\nvar y = 2"));
         lexer.removeErrorListeners();
         List<String> defaults = new ArrayList<>();
         Token t;
@@ -471,13 +471,13 @@ public final class SolvikLexerTest {
                 defaults.add(SolvikLexer.VOCABULARY.getSymbolicName(t.getType()));
             }
         }
-        assertThat(defaults).containsExactly("VAL", "Identifier", "ASSIGN", "INTEGER_LITERAL", "VAL", "Identifier", "ASSIGN", "INTEGER_LITERAL");
+        assertThat(defaults).containsExactly("VAR", "Identifier", "ASSIGN", "INTEGER_LITERAL", "VAR", "Identifier", "ASSIGN", "INTEGER_LITERAL");
     }
 
     @Test
     public void lineCommentContentIsNotReInterpretedAsCode() {
         // '/*' inside a line comment must not begin a block comment: the line comment consumes it.
-        SolvikLexer lexer = new SolvikLexer(CharStreams.fromString("// see /* here\nval"));
+        SolvikLexer lexer = new SolvikLexer(CharStreams.fromString("// see /* here\nvar"));
         lexer.removeErrorListeners();
         Token t;
         List<String> seen = new ArrayList<>();
@@ -488,13 +488,13 @@ public final class SolvikLexerTest {
                 throw new AssertionError("block comment must not start inside a line comment");
             }
         }
-        assertThat(seen).containsExactly("VAL");
+        assertThat(seen).containsExactly("VAR");
     }
 
     @Test
     public void blockCommentContentIsNotReInterpretedAsTokens() {
         // A string-looking body inside a block comment must not become a STRING_LITERAL token.
-        SolvikLexer lexer = new SolvikLexer(CharStreams.fromString("/* \"hi\" */val"));
+        SolvikLexer lexer = new SolvikLexer(CharStreams.fromString("/* \"hi\" */var"));
         lexer.removeErrorListeners();
         Token t;
         List<String> seen = new ArrayList<>();
@@ -505,14 +505,14 @@ public final class SolvikLexerTest {
                 throw new AssertionError("string rule must not fire inside a block comment");
             }
         }
-        assertThat(seen).containsExactly("VAL");
+        assertThat(seen).containsExactly("VAR");
     }
 
     @Test
     public void newlineInsideBlockCommentPreservesLineTracking() {
         // A block comment that spans physical newlines still advances the lexer's line counter so
         // the next real token carries the correct absolute line.
-        SolvikLexer lexer = new SolvikLexer(CharStreams.fromString("val\n/* a\nb */\nx"));
+        SolvikLexer lexer = new SolvikLexer(CharStreams.fromString("var\n/* a\nb */\nx"));
         lexer.removeErrorListeners();
         Token x = null;
         Token t;
@@ -530,7 +530,7 @@ public final class SolvikLexerTest {
     @Test
     public void carriageReturnLineFeedIsAFirstClassLineTerminator() {
         // Section 16 treats CRLF, CR, and LF as physical newlines: after a CRLF, line is 2.
-        SolvikLexer lexer = new SolvikLexer(CharStreams.fromString("val\r\nx"));
+        SolvikLexer lexer = new SolvikLexer(CharStreams.fromString("var\r\nx"));
         lexer.removeErrorListeners();
         Token x = null;
         Token t;
@@ -549,7 +549,7 @@ public final class SolvikLexerTest {
     @Test
     public void rawStringWithNOneRejectsZeroHashClose() {
         // With N=1, a bare '"' does not close: the string continues past a bare quote.
-        SolvikLexer lexer = new SolvikLexer(CharStreams.fromString("r\"a\"#\"#\nval"));
+        SolvikLexer lexer = new SolvikLexer(CharStreams.fromString("r\"a\"#\"#\nvar"));
         lexer.removeErrorListeners();
         Token first = lexer.nextToken();
         assertThat(SolvikLexer.VOCABULARY.getSymbolicName(first.getType())).isEqualTo("RAW_STRING_LITERAL");
@@ -614,8 +614,8 @@ public final class SolvikLexerTest {
         assertThat(renderDefault("override")).isEqualTo("OVERRIDE(override)");
         assertThat(renderDefault("this")).isEqualTo("THIS(this)");
         assertThat(renderDefault("super")).isEqualTo("SUPER(super)");
-        assertThat(renderDefault("val")).isEqualTo("VAL(val)");
-        assertThat(renderDefault("var")).isEqualTo("VAR(var)"); // solvik-keyword: reserved
+        assertThat(renderDefault("var")).isEqualTo("VAR(var)");
+        assertThat(renderDefault("val")).isEqualTo("VAL(val)"); // solvik-keyword: reserved
         assertThat(renderDefault("if")).isEqualTo("IF(if)");
         assertThat(renderDefault("else")).isEqualTo("ELSE(else)");
         assertThat(renderDefault("while")).isEqualTo("WHILE(while)");

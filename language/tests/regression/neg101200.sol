@@ -6,6 +6,6 @@ func identity<T>(value: T): T {
 }
 
 func use(): Unit {
-    val ambiguous = identity
+    var ambiguous = identity
 }
 use()

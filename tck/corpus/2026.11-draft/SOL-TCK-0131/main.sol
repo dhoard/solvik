@@ -9,18 +9,22 @@
 // brackets are this test's own addition: a statement switch elsewhere in the corpus
 // already derives the bare bytes "two" from the statement-form rules, and sharing those
 // exact bytes would make the two expectations mutually uncheckable.
-val n = 2
-val word = switch (n) {
-    case 1:
+var n = 2
+var word = switch (n) {
+    case 1 {
         "one"
-    case 2:
+    }
+    case 2 {
         "two"
-    default:
+    }
+    default {
         "other"
+    }
 }
 switch (n) {
-    case 99:
+    case 99 {
         print("MUST-NOT-APPEAR")
+    }
 }
 print("[")
 print(word)

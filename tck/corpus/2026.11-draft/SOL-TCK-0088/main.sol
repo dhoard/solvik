@@ -15,7 +15,7 @@
 // confirms the non-repeated key is unaffected.
 // Executed as top-level statements (section 20). Uses print, so no platform line
 // separator can enter the expected bytes.
-val scores = Map<String, Integer>("a": 1, "b": 2, "a": 9)
+var scores = Map<String, Integer>("a": 1, "b": 2, "a": 9)
 print(scores.size)
 print(" ")
 print(scores.get("a"))

@@ -10,7 +10,7 @@
 //   - A static declaration initializer that is not assignable to the declared type is `SOLV-TYPE-001`.
 //
 mutable class Animal {
-    val name: String = "animal"
+    var name: String = "animal"
 }
 
 class Dog extends Animal {
@@ -21,10 +21,10 @@ class Dog extends Animal {
 // static initializers, the placement whose non-assignable diagnostic the section names
 // verbatim, so each direction is pinned.
 class Invariant {
-    static val wide: List<func(Animal): Dog> = List<func(Animal): Dog>()
-    static val narrow: List<func(Dog): Animal> = List<func(Dog): Animal>()
-    static val intoNarrow: List<func(Dog): Animal> = Invariant.wide
-    static val intoWide: List<func(Animal): Dog> = Invariant.narrow
+    static var wide: List<func(Animal): Dog> = List<func(Animal): Dog>()
+    static var narrow: List<func(Dog): Animal> = List<func(Dog): Animal>()
+    static var intoNarrow: List<func(Dog): Animal> = Invariant.wide
+    static var intoWide: List<func(Animal): Dog> = Invariant.narrow
 }
 
 print("EXECUTED-INVALID")

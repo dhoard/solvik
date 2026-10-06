@@ -7,7 +7,7 @@
 // sentinel: if the invalid program were ever executed, observable stdout would appear;
 // the compile-only phase independently proves execution did not occur.
 class Point {
-    val x: Integer
+    var x: Integer
 
     Point(x: Integer) {
         this.x = x

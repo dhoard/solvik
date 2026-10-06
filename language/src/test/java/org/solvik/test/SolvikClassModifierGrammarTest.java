@@ -30,7 +30,7 @@ import org.solvik.ast.declaration.DelegateDeclNode;
 import org.solvik.ast.declaration.FunctionDeclNode;
 import org.solvik.ast.declaration.PropertyDeclNode;
 import org.solvik.ast.statement.BindingKind;
-import org.solvik.parser.SemicolonInsertingTokenSource;
+import org.solvik.parser.PhysicalLineTokenSource;
 import org.solvik.parser.generated.SolvikLexer;
 
 /**
@@ -58,11 +58,11 @@ public final class SolvikClassModifierGrammarTest {
         return onlyClass(parseOk(name, source));
     }
 
-    /** Delivered token stream of one source, through the same insertion stage the parser reads. */
+    /** Delivered token stream of one source, through the same physical-line stage the parser reads. */
     private static List<Token> delivered(String source) {
         SolvikLexer lexer = new SolvikLexer(CharStreams.fromString(source));
         lexer.removeErrorListeners();
-        CommonTokenStream stream = new CommonTokenStream(new SemicolonInsertingTokenSource(lexer));
+        CommonTokenStream stream = new CommonTokenStream(new PhysicalLineTokenSource(lexer));
         stream.fill();
         return stream.getTokens();
     }
@@ -180,41 +180,41 @@ public final class SolvikClassModifierGrammarTest {
     /**
      * A delegate may not be marked {@code mutable}, at the grammar rather than semantically.
      *
-     * <p>A delegate is an immutable forwarding property by definition, so {@code delegate mutable
-     * val} has no reading in which the {@code mutable} does anything. Rejecting it while parsing is
+     * <p>A delegate is an immutable forwarding property by definition, so {@code delegate var mutable}
+     * has no reading in which the {@code mutable} does anything. Rejecting it while parsing is
      * what keeps the delegate node from ever having to represent the combination.
      */
     @Test
     public void aDelegateMayNotBeDeclaredMutable() {
-        parseFails("d.sol", "interface Named {\n}\nclass Widget {\n    delegate mutable val shared: Named\n}\n");
+        parseFails("d.sol", "interface Named {\n}\nclass Widget {\n    delegate var mutable shared: Named\n}\n");
     }
 
     /** A delegate is a declaration of its own, with no binding marker to read. */
     @Test
     public void aDelegateDeclaresNoBindingMarkerOfItsOwn() {
         CompilationUnitNode unit = parseOk("d.sol",
-                "interface Named {\n}\nclass Widget {\n    delegate val shared: Named\n}\n");
+                "interface Named {\n}\nclass Widget {\n    delegate var shared: Named\n}\n");
         ClassDeclNode decl = (ClassDeclNode) unit.declarations().get(1);
         List<DelegateDeclNode> delegates = decl.delegates();
         assertThat(delegates).hasSize(1);
         assertThat(delegates.get(0).name()).isEqualTo("shared");
     }
 
-    /** A {@code static mutable val} property carries both markers through to the AST. */
+    /** A {@code static var mutable} property carries both markers through to the AST. */
     @Test
     public void aStaticMutablePropertyIsDeliveredAsBothStaticAndMutable() {
-        ClassDeclNode decl = classOf("s.sol", "class Widget {\n    static mutable val count: Integer = 1\n}\n");
+        ClassDeclNode decl = classOf("s.sol", "class Widget {\n    static var mutable count: Integer = 1\n}\n");
         List<PropertyDeclNode> statics = decl.staticProperties();
         assertThat(statics).hasSize(1);
         assertThat(statics.get(0).bindingKind()).isEqualTo(BindingKind.MUTABLE);
         assertThat(decl.properties()).isEmpty();  // the property is static, not an instance property
     }
 
-    /** A plain {@code val} property is immutable, and {@code mutable val} is not. */
+    /** A plain {@code var} property is immutable, and {@code var mutable} is not. */
     @Test
     public void aPropertyBindingMarkerDistinguishesImmutableFromMutable() {
         ClassDeclNode decl = classOf("p.sol",
-                "class Widget {\n    val frozen: Integer = 1\n    mutable val moving: Integer = 2\n}\n");
+                "class Widget {\n    var frozen: Integer = 1\n    var mutable moving: Integer = 2\n}\n");
         assertThat(decl.properties()).hasSize(2);
         assertThat(decl.properties().get(0).bindingKind()).isEqualTo(BindingKind.IMMUTABLE);
         assertThat(decl.properties().get(1).bindingKind()).isEqualTo(BindingKind.MUTABLE);
@@ -234,30 +234,37 @@ public final class SolvikClassModifierGrammarTest {
      */
     @Test
     public void theNewKeywordsLexAsKeywordsAndTheirPrefixesStayIdentifiers() {
-        assertThat(names("mutable val x: Integer = 1\n")).startsWith("MUTABLE", "VAL");
+        assertThat(names("var mutable x: Integer = 1\n")).startsWith("VAR", "MUTABLE");
         assertThat(names("abstract class Widget {\n}\n")).startsWith("ABSTRACT", "CLASS");
-        assertThat(names("val mutableval: Integer = 1\n")).startsWith("VAL", "Identifier");
-        assertThat(names("val abstractly: Integer = 1\n")).startsWith("VAL", "Identifier");
+        assertThat(names("var mutableval: Integer = 1\n")).startsWith("VAR", "Identifier");
+        assertThat(names("var abstractly: Integer = 1\n")).startsWith("VAR", "Identifier");
     }
 
     /** The last arm above is a contradiction unless {@code mutable} is a keyword. */
     @Test
     public void mutableIsNotUsableAsAnIdentifier() {
-        parseFails("shadow.sol", "val mutable: Integer = 1\n");
-        parseFails("shadow.sol", "val abstract: Integer = 1\n");
+        parseFails("shadow.sol", "var mutable = 1\n");
+        parseFails("shadow.sol", "var abstract = 1\n");
+    }
+
+    /** The declaration keyword comes first, so a modifier-first binding declaration is rejected. */
+    @Test
+    public void aModifierFirstBindingDeclarationIsRejected() {
+        parseFails("prefix.sol", "mutable var x: Integer = 1\n");
+        parseFails("prefix.sol", "val x: Integer = 1\n");
     }
 
     /**
-     * A modifier at a line end is not a semicolon-insertion point.
+     * A modifier at a line end does not end its line.
      *
-     * <p>Insertion is purely lexical, and {@code mutable} followed by a newline is the one shape where
-     * an "identifier at end of line inserts a semicolon" rule would fire on a marker still waiting for
-     * the declaration it modifies. That synthetic {@code SEMI} would split the declaration in two, and
-     * because insertion happens before the parser sees anything, the resulting error would be reported
+     * <p>Boundary placement is purely lexical, and {@code mutable} followed by a newline is the one shape
+     * where a "line ending in a word ends its line" rule would fire on a marker still waiting for
+     * the declaration it modifies. A line boundary there would split the declaration in two, and
+     * because placement happens before the parser sees anything, the resulting error would be reported
      * far from its cause.
      */
     @Test
-    public void aModifierAtALineEndIsNotASemicolonInsertionPoint() {
+    public void aModifierAtALineEndDoesNotEndItsLine() {
         assertThat(spellings("mutable\n")).containsExactly("mutable");
         assertThat(spellings("abstract\n")).containsExactly("abstract");
     }
@@ -274,12 +281,12 @@ public final class SolvikClassModifierGrammarTest {
     /**
      * An ordinary statement at a line end still terminates.
      *
-     * <p>Without this arm the previous test would be satisfied by an insertion stage that inserted
+     * <p>Without this arm the previous test would be satisfied by a boundary stage that placed
      * nothing at all -- a regression the rest of the suite would report as a wave of unrelated parse
      * errors rather than as the specific thing that broke.
      */
     @Test
     public void anOrdinaryStatementAtALineEndStillTerminates() {
-        assertThat(spellings("val x: Integer = 1\nval y: Integer = 2\n")).contains(";");
+        assertThat(names("var x: Integer = 1\nvar y: Integer = 2\n")).contains("NEWLINE");
     }
 }

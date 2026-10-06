@@ -194,7 +194,7 @@ public final class SolvikNumericRuntimeTest {
     @Test
     public void nanIsUnorderedAndNeverEqualsItself() {
         assertThat(run("""
-                    val nan = 0.0 / 0.0
+                    var nan = 0.0 / 0.0
                     println(nan < 1.0)
                     println(nan > 1.0)
                     println(nan <= 1.0)

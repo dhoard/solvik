@@ -5,7 +5,7 @@
 //   - A static member has no receiver. `this` and every `super` form are rejected inside a static method body and inside a class initializer block: `this` is `SOLV-RESOL-005` and `super` is `SOLV-RESOL-006`.
 //
 class C {
-    static mutable val n: Integer = 1
+    static var mutable n: Integer = 1
 
     static func f(): Integer {
         return this.n

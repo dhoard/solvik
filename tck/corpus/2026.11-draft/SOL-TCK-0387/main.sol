@@ -29,5 +29,5 @@ class C extends B {
     C() {
     }
 }
-val c = C()
+var c = C()
 print(c.label())

@@ -20,5 +20,5 @@
 // implementation choice. TCK.md section 6 likewise forbids promoting an implementation
 // enum entry to normative status. Sentinel per TCK.md section 10: the print would be
 // observable if this invalid construction were accepted.
-val scores = Map<String, Integer>("a")
+var scores = Map<String, Integer>("a")
 print(scores.size)

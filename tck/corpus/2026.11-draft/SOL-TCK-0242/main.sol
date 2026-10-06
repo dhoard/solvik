@@ -9,7 +9,7 @@ class Sq implements Shape {
         return 4
     }
 }
-val a: Shape = Sq()
-val b: Shape = Sq()
-val c: Shape = a
+var a: Shape = Sq()
+var b: Shape = Sq()
+var c: Shape = a
 print("if" .. (a === b) .. (a === c))

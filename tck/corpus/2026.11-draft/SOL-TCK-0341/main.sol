@@ -5,16 +5,16 @@
 //   - Interfaces contain methods, not stored properties.
 //
 interface Named {
-    val name: String
+    var name: String
 }
 class U implements Named {
-    val name: String
+    var name: String
 
     U(name: String) {
         this.name = name
     }
 }
-val u = U("x")
+var u = U("x")
 print(u.name)
 
 print("EXECUTED-INVALID")

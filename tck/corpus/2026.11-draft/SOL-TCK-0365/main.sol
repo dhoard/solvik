@@ -3,15 +3,15 @@
 //
 // Oracle quotations verified verbatim against docs/LANGUAGE_SPEC.md:
 //   - The class name in that position is a receiver, not a value: it is legal only as the root of a static member reference, and a class name used anywhere else remains `SOLV-TYPE-016`.
-//   - In particular `val c = Counter` and a read through an instance such as `instance.limit` are rejected.
+//   - In particular `var c = Counter` and a read through an instance such as `instance.limit` are rejected.
 //
 class Counter {
-    static mutable val n: Integer = 0
+    static var mutable n: Integer = 0
 
     Counter() {
     }
 }
-val c = Counter()
+var c = Counter()
 print(c.n)
 
 print("EXECUTED-INVALID")

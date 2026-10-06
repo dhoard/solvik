@@ -38,16 +38,16 @@ func trace(name: String): Integer {
 
 // A property may itself hold a function value, and a call through it invokes the stored value.
 class Pipeline {
-    mutable val stage: func(Integer): Integer = scaled
+    var mutable stage: func(Integer): Integer = scaled
 }
 
-val direct: func(Integer, Integer): Integer = combine
-val same: func(Integer, Integer): Integer = combine
-val other: func(Integer, Integer): Integer = compose
+var direct: func(Integer, Integer): Integer = combine
+var same: func(Integer, Integer): Integer = combine
+var other: func(Integer, Integer): Integer = compose
 
 // A nullable function value — the parenthesized form, since `func(T): U?` instead means a non-null
 // function returning a nullable result — is invocable only after refinement.
-mutable val optional: (func(Integer): Integer)? = scaled
+var mutable optional: (func(Integer): Integer)? = scaled
 if (optional != null) {
     println(optional(5))
 }
@@ -69,7 +69,7 @@ println(apply(combine, 2, 4))
 println(scale(1)(9))
 
 // Storing a function value in a property and calling through it invokes the stored value.
-val pipeline = Pipeline()
+var pipeline = Pipeline()
 println(pipeline.stage(4))
 
 // The callee is evaluated before the arguments, and the arguments left to right.

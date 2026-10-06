@@ -3,7 +3,7 @@ abstract class Shape {
 }
 
 class Circle extends Shape {
-    val radius: Integer
+    var radius: Integer
 
     Circle(radius: Integer) {
         this.radius = radius
@@ -11,7 +11,7 @@ class Circle extends Shape {
 }
 
 class Square extends Shape {
-    val side: Integer
+    var side: Integer
 
     Square(side: Integer) {
         this.side = side

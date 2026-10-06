@@ -177,7 +177,7 @@ public final class SolvikMatchParserTest {
                     Red
                 }
                 func run(color: Color): Unit {
-                    val label = match color {
+                    var label = match color {
                         Red => "red"
                     }
                 }

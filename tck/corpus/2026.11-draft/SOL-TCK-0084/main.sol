@@ -1,7 +1,7 @@
 // Oracle derived from LANGUAGE_SPEC section 11, which states verbatim:
 //   "A collection is constructed with a class-style call. The type arguments may be
 //    written explicitly (`List<Integer>(1, 2, 3)`) or omitted to infer them from the
-//    declared type of the left-hand side (`val names: List<String> = List("a", "b")`);
+//    declared type of the left-hand side (`var names: List<String> = List("a", "b")`);
 //    a construction that writes neither is a compile-time error."
 //
 // This program is exactly the third alternative: `List(1, 2)` writes no type argument and
@@ -19,5 +19,5 @@
 // pick any of those. TCK.md section 6 likewise forbids promoting an implementation enum
 // entry to normative status. Sentinel per TCK.md section 10: the print would be observable
 // if this invalid construction were accepted.
-val nums = List(1, 2)
+var nums = List(1, 2)
 print(nums.size)

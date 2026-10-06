@@ -11,5 +11,5 @@ class User {
     User(x: Integer) {
     }
 }
-val u = User()
+var u = User()
 print("EXECUTED-INVALID")

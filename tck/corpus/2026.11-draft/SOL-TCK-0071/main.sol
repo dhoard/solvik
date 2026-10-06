@@ -5,18 +5,22 @@
 // merely "one of them": a first-match-wins implementation prints "nine", an
 // all-matches-wins implementation prints "ninenine again", and a last-match-wins one
 // prints "nine again".
-mutable val v: Integer = 9
+var mutable v: Integer = 9
 
 switch (v) {
-    case 1:
+    case 1 {
         print("one")
+    }
 
-    case 9:
+    case 9 {
         print("nine")
+    }
 
-    case 9:
+    case 9 {
         print("nine again")
+    }
 
-    default:
+    default {
         print("other")
+    }
 }

@@ -4,19 +4,19 @@
 // call-named is which hidden argument the value carries
 // (docs/LANGUAGE_SPEC.md section 6, "Bound method references").
 class Stepper {
-    val delta: Integer = 1
+    var delta: Integer = 1
 
     func step(value: Integer): Integer {
         return value + this.delta
     }
 }
 
-val stepper = Stepper()
+var stepper = Stepper()
 
-val advance: func(Integer): Integer = stepper.step
+var advance: func(Integer): Integer = stepper.step
 
-mutable val total = 0
-mutable val i = 0
+var mutable total = 0
+var mutable i = 0
 while (i < 20000000) {
     total = advance(total)
     i = i + 1

@@ -14,9 +14,9 @@ func probe(): Result<Integer, String> {
     return Result.Err("e")
 }
 func use(): Result<Integer, String> {
-    val v = probe()?;
+    var v = probe()?
     print("AFTER")
     return Result.Ok(v)
 }
-val r = use()
+var r = use()
 print("err=" .. r.isErr())

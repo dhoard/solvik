@@ -23,19 +23,19 @@ func wrap<T>(value: T): List<T> {
 }
 
 class Holder {
-    val member: func(Integer): Integer = identity
-    static mutable val shared: func(String): String = identity
+    var member: func(Integer): Integer = identity
+    static var mutable shared: func(String): String = identity
 }
 
-val integerIdentity: func(Integer): Integer = identity
-val stringIdentity: func(String): String = identity
-val pick: func(Integer, String): String = second
-val boxed: func(Integer): List<Integer> = wrap
-val callbacks: List<func(Integer): Integer> = List<func(Integer): Integer>(identity)
+var integerIdentity: func(Integer): Integer = identity
+var stringIdentity: func(String): String = identity
+var pick: func(Integer, String): String = second
+var boxed: func(Integer): List<Integer> = wrap
+var callbacks: List<func(Integer): Integer> = List<func(Integer): Integer>(identity)
 
-val holder = Holder()
+var holder = Holder()
 Holder.shared = identity
-val taken: func(String): String = Holder.shared
+var taken: func(String): String = Holder.shared
 
 print(integerIdentity(41).toString() .. "\n")
 print(stringIdentity("ab") .. "\n")

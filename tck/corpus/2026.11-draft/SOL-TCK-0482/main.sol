@@ -14,7 +14,7 @@ class Target {
 }
 
 func use(target: Target?) {
-    val method: func(): String = target.describe
+    var method: func(): String = target.describe
     print(method())
 }
 

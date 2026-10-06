@@ -1,5 +1,5 @@
 class C1 {
-    val f2: String
+    var f2: String
     C1(f2: String) {
         this.f2 = f2
     }
@@ -28,7 +28,12 @@ println(kind3('z'))
 println(kind3('z') is String)
 
 func num4(flag: Boolean): Number {
-    return if (flag) { 43 } else { 11L }
+    return if (flag) {
+        43
+    }
+    else {
+        11L
+    }
 }
 
 println(num4(true) is Number)

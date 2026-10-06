@@ -38,7 +38,7 @@ import org.solvik.ast.statement.ReturnStmtNode;
 /**
  * Phase 6 parser tests: class declarations, property declarations, constructors, instance methods,
  * and the {@code this} expression build the expected syntax AST with exact spans, including when
- * statement termination comes from semicolon insertion rather than explicit {@code ;}.
+ * statement termination comes from the physical line boundary rather than an explicit {@code ;}.
  */
 public final class SolvikClassParserTest {
 
@@ -51,8 +51,8 @@ public final class SolvikClassParserTest {
     public void classWithPropertiesConstructorAndMethodHasTheExpectedShape() {
         String src = """
                 class User {
-                    val id: Integer
-                    mutable val name: String
+                    var id: Integer
+                    var mutable name: String
 
                     User(id: Integer, name: String) {
                         this.id = id
@@ -70,14 +70,14 @@ public final class SolvikClassParserTest {
         assertThat(user.properties().size()).isEqualTo(2);
 
         PropertyDeclNode id = user.properties().get(0);
-        assertNode(id, AstKind.PROPERTY_DECL, src, "val id: Integer");
+        assertNode(id, AstKind.PROPERTY_DECL, src, "var id: Integer");
         assertThat(id.bindingKind()).isEqualTo(BindingKind.IMMUTABLE);
         assertThat(id.name()).isEqualTo("id");
         assertThat(id.declaredType().orElseThrow().name()).isEqualTo("Integer");
         assertThat(id.initializer().isEmpty()).isTrue();
 
         PropertyDeclNode name = user.properties().get(1);
-        assertNode(name, AstKind.PROPERTY_DECL, src, "mutable val name: String");
+        assertNode(name, AstKind.PROPERTY_DECL, src, "var mutable name: String");
         assertThat(name.bindingKind()).isEqualTo(BindingKind.MUTABLE);
         assertThat(name.declaredType().orElseThrow().name()).isEqualTo("String");
 
@@ -109,10 +109,10 @@ public final class SolvikClassParserTest {
 
     @Test
     public void propertyInitializerIsParsedAndSpanned() {
-        String src = "class Counter {\n    mutable val count: Integer = 0\n}\n";
+        String src = "class Counter {\n    var mutable count: Integer = 0\n}\n";
         ClassDeclNode counter = onlyClass(parseOk("counter.sol", src));
         PropertyDeclNode property = counter.properties().get(0);
-        assertNode(property, AstKind.PROPERTY_DECL, src, "mutable val count: Integer = 0");
+        assertNode(property, AstKind.PROPERTY_DECL, src, "var mutable count: Integer = 0");
         assertThat(property.initializer().isPresent()).isTrue();
         assertNode(property.initializer().get(), AstKind.INTEGER_LITERAL, src, "0");
     }
@@ -138,12 +138,12 @@ public final class SolvikClassParserTest {
     }
 
     @Test
-    public void semicolonInsertionTerminatesClassMembers() {
+    public void lineBoundariesTerminateClassMembers() {
         // No explicit `;` anywhere: property, constructor body, method body, and class body all rely
-        // on newlines, so a constructor named after its class needs no insertion-table change.
+        // on their line boundaries, each of which ends where the boundary table says it does.
         String src = """
                 class C {
-                    val value: Integer
+                    var value: Integer
 
                     C(value: Integer) {
                         this.value = value
@@ -168,7 +168,7 @@ public final class SolvikClassParserTest {
                     return C(3).value()
                 }
                 class C {
-                    val v: Integer
+                    var v: Integer
                     C(v: Integer) {
                         this.v = v
                     }
@@ -201,8 +201,8 @@ public final class SolvikClassParserTest {
     public void multiplePropertiesAndMethodsKeepSourceOrder() {
         String src = """
                 class C {
-                    val a: Integer = 1
-                    val b: Integer = 2
+                    var a: Integer = 1
+                    var b: Integer = 2
                     func first(): Integer {
                         return this.a
                     }
