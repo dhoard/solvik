@@ -1,15 +1,15 @@
 class Marker {
 }
 interface Taggable {
-    func tag(): Integer
+    method tag(): Integer
 }
 class Tagged implements Taggable {
-    func tag(): Integer {
+    method tag(): Integer {
         return 1
     }
 }
-var m1 = Marker()
-var m2 = Marker()
+var m1: Marker = Marker()
+var m2: Marker = Marker()
 println(m1 === m1)
 println(m1 === m2)
 var t1: Taggable = Tagged()

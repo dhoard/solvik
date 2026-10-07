@@ -10,7 +10,7 @@ class A {
         print("initA")
     }
 
-    static var mutable n: Integer = 5
+    var static mutable n: Integer = 5
 
     A() {
     }

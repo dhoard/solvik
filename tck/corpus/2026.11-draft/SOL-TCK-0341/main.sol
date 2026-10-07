@@ -14,7 +14,7 @@ class U implements Named {
         this.name = name
     }
 }
-var u = U("x")
+var u: U = U("x")
 print(u.name)
 
 print("EXECUTED-INVALID")

@@ -7,12 +7,12 @@
 // Re-evaluating the scrutinee for a second label comparison would emit "SSone", and
 // evaluating it once per tested label would emit more markers still.
 class Probe {
-    func tick(): String {
+    method tick(): String {
         print("S")
         return "one"
     }
 }
-var result = switch (Probe().tick()) {
+var result: String = switch (Probe().tick()) {
     case "one" {
         "one"
     }

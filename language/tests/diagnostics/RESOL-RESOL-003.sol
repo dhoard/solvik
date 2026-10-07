@@ -1,4 +1,4 @@
 // expected: SOLV-RESOL-003
-func f(): Unit {
+func f() {
     var x: NotAType = 1
 }

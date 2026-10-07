@@ -76,14 +76,15 @@ public final class SolvikNumericTest {
     @Test
     public void numericAndCharacterLiteralsHaveTheirDeclaredTypes() {
         CheckedProgram program = check("""
-                func f(): Unit {
-                    var intValue = 1
-                    var longValue = 1L
-                    var floatValue = 1.5f
-                    var doubleValue = 1.5
-                    var exponentValue = 1e3
-                    var charValue = 'A'
+                func f() {
+                    var intValue: Integer = 1
+                    var longValue: Long = 1L
+                    var floatValue: Float = 1.5f
+                    var doubleValue: Double = 1.5
+                    var exponentValue: Double = 1e3
+                    var charValue: Character = 'A'
                 }
+
                 """);
         FunctionDeclNode fn = function(program);
         assertThat(program.symbolOf(SolvikTestSupport.local(fn, 0)).orElseThrow().type()).isEqualTo(IntegerType.INSTANCE);
@@ -97,14 +98,15 @@ public final class SolvikNumericTest {
     @Test
     public void explicitConversionsProduceTheirTargetTypes() {
         CheckedProgram program = check("""
-                func f(): Unit {
-                    var b = Byte(1)
-                    var s = Short(1)
-                    var i = Integer(1L)
-                    var l = Long(1)
-                    var fl = Float(1)
-                    var d = Double(1)
+                func f() {
+                    var b: Byte = Byte(1)
+                    var s: Short = Short(1)
+                    var i: Integer = Integer(1L)
+                    var l: Long = Long(1)
+                    var fl: Float = Float(1)
+                    var d: Double = Double(1)
                 }
+
                 """);
         FunctionDeclNode fn = function(program);
         assertThat(program.symbolOf(SolvikTestSupport.local(fn, 0)).orElseThrow().type()).isEqualTo(ByteType.INSTANCE);
@@ -118,14 +120,15 @@ public final class SolvikNumericTest {
     @Test
     public void sameTypeArithmeticProducesThatNumericType() {
         CheckedProgram program = check("""
-                func f(): Unit {
-                    var b = Byte(1) + Byte(2)
-                    var s = Short(1) * Short(2)
-                    var i = 1 + 2
-                    var l = 1L - 2L
-                    var fl = 1.5f / 2.5f
-                    var d = 1.5 + 2.5
+                func f() {
+                    var b: Byte = Byte(1) + Byte(2)
+                    var s: Short = Short(1) * Short(2)
+                    var i: Integer = 1 + 2
+                    var l: Long = 1L - 2L
+                    var fl: Float = 1.5f / 2.5f
+                    var d: Double = 1.5 + 2.5
                 }
+
                 """);
         FunctionDeclNode fn = function(program);
         assertThat(program.typeOf(SolvikTestSupport.local(fn, 0).initializer()).orElseThrow()).isEqualTo(ByteType.INSTANCE);
@@ -139,14 +142,15 @@ public final class SolvikNumericTest {
     @Test
     public void sameTypeOrderingProducesBoolean() {
         CheckedProgram program = check("""
-                func f(): Unit {
-                    var b = Byte(1) < Byte(2)
-                    var s = Short(1) >= Short(2)
-                    var i = 1 > 2
-                    var l = 1L <= 2L
-                    var fl = 1.5f < 2.5f
-                    var d = 1.5 > 2.5
+                func f() {
+                    var b: Boolean = Byte(1) < Byte(2)
+                    var s: Boolean = Short(1) >= Short(2)
+                    var i: Boolean = 1 > 2
+                    var l: Boolean = 1L <= 2L
+                    var fl: Boolean = 1.5f < 2.5f
+                    var d: Boolean = 1.5 > 2.5
                 }
+
                 """);
         FunctionDeclNode fn = function(program);
         for (int i = 0; i <= 5; i++) {
@@ -157,11 +161,12 @@ public final class SolvikNumericTest {
     @Test
     public void negationKeepsTheNumericType() {
         CheckedProgram program = check("""
-                func f(): Unit {
-                    var l = -1L
-                    var d = -1.5
-                    var fl = -1.5f
+                func f() {
+                    var l: Long = -1L
+                    var d: Double = -1.5
+                    var fl: Float = -1.5f
                 }
+
                 """);
         FunctionDeclNode fn = function(program);
         assertThat(program.typeOf(SolvikTestSupport.local(fn, 0).initializer()).orElseThrow()).isEqualTo(LongType.INSTANCE);
@@ -172,13 +177,14 @@ public final class SolvikNumericTest {
     @Test
     public void numberAcceptsEveryNumericSubtype() {
         check("""
-                func f(): Unit {
+                func f() {
                     var a: Number = 1
                     var b: Number = 1L
                     var c: Number = 1.5f
                     var d: Number = 1.5
                     var e: Any = 1
                 }
+
                 """);
     }
 
@@ -234,7 +240,7 @@ public final class SolvikNumericTest {
 
     @Test
     public void integralConversionOutOfRangeAtRuntimeRaisesAnArithmeticError() {
-        PolyglotException failure = evaluate("    var x = Integer(1000)\n    println(Byte(x))\n");
+        PolyglotException failure = evaluate("    var x: Integer = Integer(1000)\n    println(Byte(x))\n");
         assertThat(failure).isNotNull();
         assertThat(failure.isSyntaxError()).isFalse();
         assertThat(failure.getMessage().contains("out of range")).as(failure.getMessage()).isTrue();

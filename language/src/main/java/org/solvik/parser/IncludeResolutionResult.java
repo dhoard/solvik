@@ -15,12 +15,8 @@
  */
 package org.solvik.parser;
 
-import java.util.Collections;
-import java.util.IdentityHashMap;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import org.solvik.ast.AstNode;
 import org.solvik.ast.CompilationUnitNode;
 import org.solvik.diagnostic.DiagnosticBag;
 import org.solvik.source.SourceCatalog;
@@ -36,13 +32,11 @@ public final class IncludeResolutionResult {
     private final CompilationUnitNode unit;
     private final DiagnosticBag diagnostics;
     private final SourceCatalog catalog;
-    private final Map<AstNode, FileScope> itemScopes;
 
-    private IncludeResolutionResult(CompilationUnitNode unit, DiagnosticBag diagnostics, SourceCatalog catalog, Map<AstNode, FileScope> itemScopes) {
+    private IncludeResolutionResult(CompilationUnitNode unit, DiagnosticBag diagnostics, SourceCatalog catalog) {
         this.unit = unit;
         this.diagnostics = Objects.requireNonNull(diagnostics, "diagnostics");
         this.catalog = Objects.requireNonNull(catalog, "catalog");
-        this.itemScopes = Collections.unmodifiableMap(new IdentityHashMap<>(Objects.requireNonNull(itemScopes, "itemScopes")));
         if (unit != null && diagnostics.hasErrors()) {
             throw new IllegalStateException("a successful resolution must not carry error diagnostics");
         }
@@ -52,15 +46,11 @@ public final class IncludeResolutionResult {
     }
 
     public static IncludeResolutionResult success(CompilationUnitNode unit, SourceCatalog catalog) {
-        return success(unit, Map.of(), catalog);
-    }
-
-    public static IncludeResolutionResult success(CompilationUnitNode unit, Map<AstNode, FileScope> itemScopes, SourceCatalog catalog) {
-        return new IncludeResolutionResult(Objects.requireNonNull(unit, "unit"), DiagnosticBag.empty(), catalog, itemScopes);
+        return new IncludeResolutionResult(Objects.requireNonNull(unit, "unit"), DiagnosticBag.empty(), catalog);
     }
 
     public static IncludeResolutionResult failure(DiagnosticBag diagnostics, SourceCatalog catalog) {
-        return new IncludeResolutionResult(null, diagnostics, catalog, Map.of());
+        return new IncludeResolutionResult(null, diagnostics, catalog);
     }
 
     public boolean isSuccess() {
@@ -84,13 +74,5 @@ public final class IncludeResolutionResult {
 
     public SourceCatalog catalog() {
         return catalog;
-    }
-
-    /**
-     * The module/namespace context of every resolved top-level item, keyed by node identity. An item
-     * absent from the map belongs to the explicit or implicit default module with no prefixes.
-     */
-    public Map<AstNode, FileScope> itemScopes() {
-        return itemScopes;
     }
 }

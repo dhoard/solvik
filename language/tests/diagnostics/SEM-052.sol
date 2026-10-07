@@ -6,6 +6,6 @@ enum Result<T, E> {
 func compute(): Result<Integer, Integer> {
     return Result.Ok(1)
 }
-func run(): Unit {
+func run() {
     compute()
 }

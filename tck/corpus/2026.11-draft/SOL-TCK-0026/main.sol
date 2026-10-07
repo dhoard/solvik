@@ -12,7 +12,7 @@
 // what the specification determines, so an unrelated extra diagnostic cannot cause a
 // spurious pass or failure.
 // Sentinel per TCK.md section 10; the compile-only phase proves non-execution.
-var s = "line
+var s: String = "line
 break"
 print(s)
 println("EXECUTED-INVALID")

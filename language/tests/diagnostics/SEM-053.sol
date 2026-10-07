@@ -1,4 +1,4 @@
 // expected: SOLV-SEM-053
-func run(): Unit {
+func run() {
     throw "not an exception type"
 }

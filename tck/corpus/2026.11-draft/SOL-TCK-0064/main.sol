@@ -7,11 +7,11 @@
 // interfaces collapsing into one. The exact text is derived from the two method bodies
 // and the `..` rendering rule (section 3), not observed.
 interface Named {
-    func name(): String
+    method name(): String
 }
 
 interface Greetable {
-    func greet(): String
+    method greet(): String
 }
 
 class Person implements Named, Greetable {
@@ -21,11 +21,11 @@ class Person implements Named, Greetable {
         this.label = label
     }
 
-    func name(): String {
+    method name(): String {
         return this.label
     }
 
-    func greet(): String {
+    method greet(): String {
         return "hi " .. this.name()
     }
 }

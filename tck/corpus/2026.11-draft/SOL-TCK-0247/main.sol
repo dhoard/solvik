@@ -1,5 +1,5 @@
-var r = Regex("a")
-var s = Regex("a")
+var r: Regex = Regex("a")
+var s: Regex = Regex("a")
 print(r === s)
 
 print("EXECUTED-INVALID")

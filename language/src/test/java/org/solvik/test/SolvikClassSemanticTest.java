@@ -37,7 +37,6 @@ import org.solvik.semantic.ResolvedMethod;
 import org.solvik.semantic.SemanticResult;
 import org.solvik.semantic.SolvikSemanticAnalyzer;
 import org.solvik.type.ClassType;
-import org.solvik.type.FunctionType;
 import org.solvik.type.IntegerType;
 import org.solvik.type.StringType;
 
@@ -75,10 +74,11 @@ public final class SolvikClassSemanticTest {
                         this.name = name
                     }
 
-                    func describe(): String {
+                    method describe(): String {
                         return this.name
                     }
                 }
+
                 """);
         ClassSymbol user = program.classSymbol("User").orElseThrow();
         assertThat(user.type() instanceof ClassType).isTrue();
@@ -135,10 +135,11 @@ public final class SolvikClassSemanticTest {
                     }
                 }
                 func use(u: User): String {
-                    var current = u.name
+                    var current: String = u.name
                     u.name = "new"
                     return current
                 }
+
                 """);
         FunctionDeclNode use = function(program, 1);
         LocalDeclNode local = (LocalDeclNode) use.body().statements().get(0);
@@ -160,16 +161,17 @@ public final class SolvikClassSemanticTest {
                     Greeter(name: String) {
                         this.name = name
                     }
-                    func greeting(): String {
+                    method greeting(): String {
                         return label()
                     }
-                    func label(): String {
+                    method label(): String {
                         return this.name
                     }
                 }
                 func use(g: Greeter): String {
                     return g.greeting()
                 }
+
                 """);
         ClassSymbol greeter = program.classSymbol("Greeter").orElseThrow();
 
@@ -184,8 +186,10 @@ public final class SolvikClassSemanticTest {
         CallExprNode explicit = (CallExprNode) ((ReturnStmtNode) use.body().statements().get(0)).value().orElseThrow();
         ResolvedMethod explicitResolved = program.methodOf(explicit).orElseThrow();
         assertThat(explicitResolved.isImplicitThis()).isFalse();
+        // A callee names a method rather than denoting a value, so the member access has no type of
+        // its own; only the call it heads has the declared result type.
         MemberAccessExprNode callee = (MemberAccessExprNode) explicit.callee();
-        assertThat(program.typeOf(callee).orElseThrow() instanceof FunctionType).isTrue();
+        assertThat(callee.memberName()).isEqualTo("greeting");
         assertThat(program.typeOf(explicit).orElseThrow()).isEqualTo(StringType.INSTANCE);
     }
 
@@ -197,10 +201,11 @@ public final class SolvikClassSemanticTest {
                     Holder(value: Integer) {
                         this.value = value
                     }
-                    func self(): Holder {
+                    method self(): Holder {
                         return this
                     }
                 }
+
                 """);
         ClassSymbol holder = program.classSymbol("Holder").orElseThrow();
         ConstructorDeclNode constructorDecl = holder.declaration().constructors().get(0);
@@ -230,9 +235,9 @@ public final class SolvikClassSemanticTest {
         CheckedProgram program = check("""
                 class Accumulator {
                     var mutable total: Integer = 0
-                    func addUpTo(limit: Integer): Integer {
+                    method addUpTo(limit: Integer): Integer {
                         {
-                            var mutable i = 0
+                            var mutable i: Integer = 0
                             while (i < limit) {
                                 this.total = this.total + i
                                 i = i + 1
@@ -241,6 +246,7 @@ public final class SolvikClassSemanticTest {
                         return this.total
                     }
                 }
+
                 """);
         ClassSymbol accumulator = program.classSymbol("Accumulator").orElseThrow();
         assertThat(accumulator.method("addUpTo").orElseThrow().returnType()).isEqualTo(IntegerType.INSTANCE);
@@ -280,10 +286,11 @@ public final class SolvikClassSemanticTest {
                     Cell(value: Integer) {
                         this.value = value
                     }
-                    func set(next: Integer): Unit {
+                    method set(next: Integer) {
                         this.value = next
                     }
                 }
+
                 """);
         ClassSymbol cell = program.classSymbol("Cell").orElseThrow();
         FunctionDeclNode set = cell.declaration().methods().get(0);
@@ -295,13 +302,14 @@ public final class SolvikClassSemanticTest {
     public void expressionStatementCanBeAMethodCall() {
         CheckedProgram program = check("""
                 class Logger {
-                    func log(): Unit {
+                    method log() {
                         println("hi")
                     }
                 }
-                func run(): Unit {
+                func run() {
                     Logger().log()
                 }
+
                 """);
         FunctionDeclNode run = function(program, 1);
         ExprStmtNode statement = (ExprStmtNode) run.body().statements().get(0);

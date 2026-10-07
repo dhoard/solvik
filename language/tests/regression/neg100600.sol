@@ -1,10 +1,10 @@
 class A1 {
-    func m3(): Integer {
+    method m3(): Integer {
         return 1
     }
 }
 class B2 extends A1 {
-    override func m3(): Integer {
+    method override m3(): Integer {
         return 2
     }
 }

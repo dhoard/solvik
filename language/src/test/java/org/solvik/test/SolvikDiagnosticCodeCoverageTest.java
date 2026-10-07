@@ -103,8 +103,11 @@ public final class SolvikDiagnosticCodeCoverageTest {
     private static final Set<DiagnosticCode> ALLOW_LIST = new LinkedHashSet<>();
 
     static {
-        ALLOW_LIST.add(DiagnosticCode.SEM_INVALID_CAPTURE);
         ALLOW_LIST.add(DiagnosticCode.TYPE_INVALID_CHARACTER_LITERAL);
+        // A local declaration always writes an initializer, and a local's name is not in scope inside
+        // that initializer, so no source can read an uninitialized local. The check remains as the
+        // analyzer's guard if the declarator ever becomes optional again.
+        ALLOW_LIST.add(DiagnosticCode.TYPE_UNINITIALIZED_VARIABLE);
     }
 
     @Test

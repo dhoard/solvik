@@ -54,10 +54,10 @@ public final class SolvikIncludeResolutionTest {
     @Test
     public void depthFirstOrderSplicesAtIncludePosition() {
         IncludeResolutionResult resolved = success("root.sol", Map.of( //
-                        "root.sol", "include \"a.sol\"\ninclude \"b.sol\"\nfunc rootFn(): Unit {\n}\n", //
-                        "a.sol", "include \"common.sol\"\nfunc aFn(): Unit {\n}\n", //
-                        "b.sol", "include \"common.sol\"\nfunc bFn(): Unit {\n}\n", //
-                        "common.sol", "func commonFn(): Unit {\n}\n"));
+                        "root.sol", "include \"a.sol\"\ninclude \"b.sol\"\nfunc rootFn() {\n}\n", //
+                        "a.sol", "include \"common.sol\"\nfunc aFn() {\n}\n", //
+                        "b.sol", "include \"common.sol\"\nfunc bFn() {\n}\n", //
+                        "common.sol", "func commonFn() {\n}\n"));
         assertThat(declarationNames(resolved.requireUnit())).isEqualTo(List.of("commonFn", "aFn", "bFn", "rootFn"));
     }
 
@@ -65,7 +65,7 @@ public final class SolvikIncludeResolutionTest {
     public void repeatedIncludeExpandsOnce() {
         IncludeResolutionResult resolved = success("root.sol", Map.of( //
                         "root.sol", "include \"a.sol\"\ninclude \"a.sol\"\n", //
-                        "a.sol", "func aFn(): Unit {\n}\n"));
+                        "a.sol", "func aFn() {\n}\n"));
         assertThat(declarationNames(resolved.requireUnit())).isEqualTo(List.of("aFn"));
     }
 
@@ -73,7 +73,7 @@ public final class SolvikIncludeResolutionTest {
     public void normalizedPathsResolveToSameIncludeOnce() {
         IncludeResolutionResult resolved = success("root.sol", Map.of( //
                         "root.sol", "include \"lib/x.sol\"\ninclude \"lib/./x.sol\"\n", //
-                        "lib/x.sol", "func xFn(): Unit {\n}\n"));
+                        "lib/x.sol", "func xFn() {\n}\n"));
         assertThat(declarationNames(resolved.requireUnit())).isEqualTo(List.of("xFn"));
     }
 
@@ -81,8 +81,8 @@ public final class SolvikIncludeResolutionTest {
     public void nestedRelativeIncludeResolvesAgainstIncludingFile() {
         IncludeResolutionResult resolved = success("root.sol", Map.of( //
                         "root.sol", "include \"lib/a.sol\"\n", //
-                        "lib/a.sol", "include \"b.sol\"\nfunc aFn(): Unit {\n}\n", //
-                        "lib/b.sol", "func bFn(): Unit {\n}\n"));
+                        "lib/a.sol", "include \"b.sol\"\nfunc aFn() {\n}\n", //
+                        "lib/b.sol", "func bFn() {\n}\n"));
         assertThat(declarationNames(resolved.requireUnit())).isEqualTo(List.of("bFn", "aFn"));
     }
 
@@ -90,7 +90,7 @@ public final class SolvikIncludeResolutionTest {
     public void absoluteIncludeResolvesDirectly() {
         IncludeResolutionResult resolved = success("root.sol", Map.of( //
                         "root.sol", "include \"/lib/x.sol\"\n", //
-                        "lib/x.sol", "func xFn(): Unit {\n}\n"));
+                        "lib/x.sol", "func xFn() {\n}\n"));
         assertThat(declarationNames(resolved.requireUnit())).isEqualTo(List.of("xFn"));
     }
 
@@ -160,7 +160,7 @@ public final class SolvikIncludeResolutionTest {
         // root.sol includes a.sol, which is well-formed but declares no include of its own.
         IncludeResolutionResult resolved = success("root.sol", Map.of( //
                         "root.sol", "include \"a.sol\"\n", //
-                        "a.sol", "func aFn(): Unit {\n}\n"));
+                        "a.sol", "func aFn() {\n}\n"));
         SourceCatalog catalog = resolved.catalog();
         assertThat(catalog.size()).isEqualTo(2);
         assertThat(catalog.file(0).name()).isEqualTo("root.sol");
@@ -171,8 +171,8 @@ public final class SolvikIncludeResolutionTest {
     public void successfullyResolvedUnitHasNoIncludeNodes() {
         IncludeResolutionResult resolved = success("root.sol", Map.of( //
                         "root.sol", "include \"a.sol\"\n", //
-                        "a.sol", "include \"b.sol\"\nfunc aFn(): Unit {\n}\n", //
-                        "b.sol", "func bFn(): Unit {\n}\n"));
+                        "a.sol", "include \"b.sol\"\nfunc aFn() {\n}\n", //
+                        "b.sol", "func bFn() {\n}\n"));
         assertThat(resolved.requireUnit().hasUnresolvedIncludes()).isFalse();
         for (var item : resolved.requireUnit().items()) {
             assertThat(item instanceof org.solvik.ast.declaration.IncludeDeclNode).isFalse();
@@ -181,7 +181,7 @@ public final class SolvikIncludeResolutionTest {
 
     @Test
     public void rootParseContractIsUnchanged() {
-        SolvikParseResult parsed = SolvikParser.parse(new SourceFile("plain.sol", "func f(): Unit {\n}\n"));
+        SolvikParseResult parsed = SolvikParser.parse(new SourceFile("plain.sol", "func f() {\n}\n"));
         assertThat(parsed.isSuccess()).isTrue();
         assertThat(parsed.requireAst().hasUnresolvedIncludes()).isFalse();
     }

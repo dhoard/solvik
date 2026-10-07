@@ -1,12 +1,12 @@
-mutable class Both2 {
+class mutable Both2 {
     Both2() {
     }
 
-    mutable override func equals(other: Any?): Boolean {
+    method override mutable equals(other: Any?): Boolean {
         return true
     }
 
-    mutable override func hashCode(): Integer {
+    method override mutable hashCode(): Integer {
         return 5
     }
 }
@@ -14,11 +14,11 @@ class OnlyEq extends Both2 {
     OnlyEq() {
     }
 
-    override func equals(other: Any?): Boolean {
+    method override equals(other: Any?): Boolean {
         return false
     }
 }
-var s = OnlyEq()
+var s: OnlyEq = OnlyEq()
 print(s)
 
 print("EXECUTED-INVALID")

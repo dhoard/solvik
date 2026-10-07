@@ -15,9 +15,9 @@ class Point {
     }
 }
 
-var first = Point(1, 2)
-var second = Point(1, 2)
-var aliasPoint = first
+var first: Point = Point(1, 2)
+var second: Point = Point(1, 2)
+var aliasPoint: Point = first
 
 // Semantic equality for a class without an `equals` override is reference identity.
 println(first == second)
@@ -44,7 +44,7 @@ println(present === missing)
 // Mutable built-in collections have allocation identity, never structural equality.
 var left: List<Integer> = List(1, 2)
 var right: List<Integer> = List(1, 2)
-var same = left
+var same: List<Integer> = left
 println(left == right)
 println(left === right)
 println(left === same)

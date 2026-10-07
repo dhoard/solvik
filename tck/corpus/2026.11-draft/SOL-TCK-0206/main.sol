@@ -5,7 +5,7 @@ class A {
         this.v = n
     }
 
-    func get(): Integer {
+    method get(): Integer {
         return this.v
     }
 }
@@ -17,10 +17,10 @@ class B {
         this.v = n
     }
 
-    func get(): Integer {
+    method get(): Integer {
         return this.v
     }
 }
-var a = A(7)
-var b = B(8)
+var a: A = A(7)
+var b: B = B(8)
 print("nom" .. a.get() .. b.get())

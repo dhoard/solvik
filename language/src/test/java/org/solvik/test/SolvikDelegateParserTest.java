@@ -39,11 +39,12 @@ public final class SolvikDelegateParserTest {
     public void specificationDelegateShapeParses() {
         CompilationUnitNode unit = parseOk("delegate.sol", """
                 interface Repository {
-                    func save(value: String): Unit
+                    method save(value: String)
                 }
                 class UserService implements Repository {
-                    delegate var repository: Repository
+                    delegate  repository: Repository
                 }
+
                 """);
         ClassDeclNode service = (ClassDeclNode) unit.declarations().get(1);
         assertThat(service.delegates().size()).isEqualTo(1);
@@ -58,11 +59,12 @@ public final class SolvikDelegateParserTest {
     public void delegateCarriesADeclarationInitializer() {
         CompilationUnitNode unit = parseOk("delegateinit.sol", """
                 interface Repository {
-                    func save(value: String): Unit
+                    method save(value: String)
                 }
                 class UserService implements Repository {
-                    delegate var repository: Repository = Repository()
+                    delegate  repository: Repository = Repository()
                 }
+
                 """);
         DelegateDeclNode repository = ((ClassDeclNode) unit.declarations().get(1)).delegates().get(0);
         assertThat(repository.initializer().isPresent()).isTrue();
@@ -73,11 +75,11 @@ public final class SolvikDelegateParserTest {
     public void delegatesAndPropertiesKeepMembersInSourceOrder() {
         CompilationUnitNode unit = parseOk("order.sol", """
                 interface Named {
-                    func name(): String
+                    method name(): String
                 }
                 class C implements Named {
                     var before: Integer
-                    delegate var shared: Named
+                    delegate  shared: Named
                     var mutable after: Integer
 
                     C(shared: Named) {
@@ -86,10 +88,11 @@ public final class SolvikDelegateParserTest {
                         this.after = 2
                     }
 
-                    func name(): String {
+                    method name(): String {
                         return "c"
                     }
                 }
+
                 """);
         ClassDeclNode c = (ClassDeclNode) unit.declarations().get(1);
         List<String> memberNames = new java.util.ArrayList<>();
@@ -109,19 +112,20 @@ public final class SolvikDelegateParserTest {
     public void aDelegateMayPrecedeOrFollowAnInitializer() {
         CompilationUnitNode unit = parseOk("mixed.sol", """
                 interface Named {
-                    func name(): String
+                    method name(): String
                 }
                 class C implements Named {
-                    delegate var shared: Named
+                    delegate  shared: Named
 
                     C(shared: Named) {
                         this.shared = shared
                     }
 
-                    func name(): String {
+                    method name(): String {
                         return shared.name()
                     }
                 }
+
                 """);
         ClassDeclNode c = (ClassDeclNode) unit.declarations().get(1);
         assertThat(c.delegates().size()).isEqualTo(1);
@@ -133,12 +137,13 @@ public final class SolvikDelegateParserTest {
     public void delegateMutableBindingIsRejected() {
         parseFails("delegatemutable.sol", """
                 interface Named {
-                    func name(): String
+                    method name(): String
                 }
                 class C implements Named {
                     // A delegate may bind only an immutable binding.
-                    delegate var mutable shared: Named
+                    delegate  mutable shared: Named
                 }
+
                 """);
     }
 
@@ -146,23 +151,27 @@ public final class SolvikDelegateParserTest {
     public void delegateRequiresAnExplicitType() {
         parseFails("delegatenotype.sol", """
                 interface Named {
-                    func name(): String
+                    method name(): String
                 }
                 class C implements Named {
-                    delegate var shared
+                    delegate  shared
                 }
+
                 """);
     }
 
     @Test
-    public void delegateRequiresTheVarKeyword() {
-        parseFails("delegatenoval.sol", """
+    public void delegateRejectsTheRetiredVarKeyword() {
+        // `delegate` is a declaration of its own, so the retired `delegate var` spelling is rejected
+        // rather than reinterpreted as a property.
+        parseFails("delegatevar.sol", """
                 interface Named {
-                    func name(): String
+                    method name(): String
                 }
                 class C implements Named {
-                    delegate shared: Named
+                    delegate var shared: Named
                 }
+
                 """);
     }
 
@@ -170,13 +179,14 @@ public final class SolvikDelegateParserTest {
     public void delegateWithoutATerminatorOnOneLineIsRejected() {
         parseFails("delegatenosemi.sol", """
                 interface Named {
-                    func name(): String
+                    method name(): String
                 }
                 class C implements Named {
-                    delegate var shared: Named func name(): String {
+                    delegate  shared: Named method name(): String {
                         return "c"
                     }
                 }
+
                 """);
     }
 
@@ -184,9 +194,10 @@ public final class SolvikDelegateParserTest {
     public void aTopLevelDelegateIsRejected() {
         parseFails("toplevel.sol", """
                 interface Named {
-                    func name(): String
+                    method name(): String
                 }
-                delegate var shared: Named
+                delegate  shared: Named
+
                 """);
     }
 
@@ -203,11 +214,12 @@ public final class SolvikDelegateParserTest {
     public void delegateNodeExposesItsDeclaredTypeAsAChild() {
         CompilationUnitNode unit = parseOk("children.sol", """
                 interface Named {
-                    func name(): String
+                    method name(): String
                 }
                 class C implements Named {
-                    delegate var shared: Named
+                    delegate  shared: Named
                 }
+
                 """);
         DelegateDeclNode shared = ((ClassDeclNode) unit.declarations().get(1)).delegates().get(0);
         List<AstNode> children = shared.children();

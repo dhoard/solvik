@@ -55,10 +55,11 @@ public final class SolvikExpressionOrientedNegativeTest {
     public void emptyBlockExpressionIsRejected() {
         assertThat(hasCode(checkFails("""
                 func f(): Integer {
-                    var x = {
+                    var x: Nothing = {
                     }
                     return x
                 }
+
                 """), DiagnosticCode.SEM_BLOCK_RESULT_REQUIRED)).isTrue();
     }
 
@@ -66,11 +67,12 @@ public final class SolvikExpressionOrientedNegativeTest {
     public void blockEndingInLocalDeclarationIsRejected() {
         assertThat(hasCode(checkFails("""
                 func f(): Integer {
-                    var x = {
-                        var local = 1
+                    var x: Nothing = {
+                        var local: Integer = 1
                     }
                     return x
                 }
+
                 """), DiagnosticCode.SEM_BLOCK_RESULT_REQUIRED)).isTrue();
     }
 
@@ -78,12 +80,13 @@ public final class SolvikExpressionOrientedNegativeTest {
     public void blockEndingInAssignmentIsRejected() {
         assertThat(hasCode(checkFails("""
                 func f(): Integer {
-                    var x = {
-                        var mutable local = 1
+                    var x: Nothing = {
+                        var mutable local: Integer = 1
                         local = 2
                     }
                     return x
                 }
+
                 """), DiagnosticCode.SEM_BLOCK_RESULT_REQUIRED)).isTrue();
     }
 
@@ -91,11 +94,12 @@ public final class SolvikExpressionOrientedNegativeTest {
     public void expressionIfWithoutElseIsRejected() {
         DiagnosticBag bag = checkFails("""
                 func f(flag: Boolean): Integer {
-                    var x = if (flag) {
+                    var x: Integer = if (flag) {
                         1
                     }
                     return x
                 }
+
                 """);
         assertThat(hasCode(bag, DiagnosticCode.SEM_IF_EXPRESSION_MISSING_ELSE)).isTrue();
         assertThat(hasCode(bag, DiagnosticCode.TYPE_BRANCH_RESULT)).as("missing else must not cascade into a join error").isFalse();
@@ -105,13 +109,14 @@ public final class SolvikExpressionOrientedNegativeTest {
     public void expressionSwitchWithoutDefaultIsRejected() {
         DiagnosticBag bag = checkFails("""
                 func f(value: Integer): String {
-                    var x = switch (value) {
+                    var x: String = switch (value) {
                         case 1 {
                             "one"
                         }
                     }
                     return x
                 }
+
                 """);
         assertThat(hasCode(bag, DiagnosticCode.SEM_SWITCH_EXPRESSION_MISSING_DEFAULT)).isTrue();
         assertThat(hasCode(bag, DiagnosticCode.TYPE_BRANCH_RESULT)).as("missing default must not cascade into a join error").isFalse();
@@ -121,7 +126,7 @@ public final class SolvikExpressionOrientedNegativeTest {
     public void nonBooleanIfExpressionConditionIsRejected() {
         assertThat(hasCode(checkFails("""
                 func f(): Integer {
-                    var x = if (1) {
+                    var x: Integer = if (1) {
                         1
                     }
                     else {
@@ -129,6 +134,7 @@ public final class SolvikExpressionOrientedNegativeTest {
                     }
                     return x
                 }
+
                 """), DiagnosticCode.TYPE_CONDITION_NOT_BOOLEAN)).isTrue();
     }
 
@@ -148,9 +154,9 @@ public final class SolvikExpressionOrientedNegativeTest {
     public void expressionSwitchCaseWithoutTailResultIsRejected() {
         assertThat(hasCode(checkFails("""
                 func f(value: Integer): Integer {
-                    var x = switch (value) {
+                    var x: Integer = switch (value) {
                         case 1 {
-                            var local = 1
+                            var local: Integer = 1
                         }
                         default {
                             0
@@ -158,6 +164,7 @@ public final class SolvikExpressionOrientedNegativeTest {
                     }
                     return x
                 }
+
                 """), DiagnosticCode.SEM_BLOCK_RESULT_REQUIRED)).isTrue();
     }
 
@@ -165,7 +172,7 @@ public final class SolvikExpressionOrientedNegativeTest {
     public void duplicateDefaultInExpressionSwitchIsRejected() {
         assertThat(hasCode(checkFails("""
                 func f(value: Integer): Integer {
-                    var x = switch (value) {
+                    var x: Integer = switch (value) {
                         case 1 {
                             1
                         }
@@ -178,6 +185,7 @@ public final class SolvikExpressionOrientedNegativeTest {
                     }
                     return x
                 }
+
                 """), DiagnosticCode.SEM_SWITCH_DUPLICATE_DEFAULT)).isTrue();
     }
 
@@ -185,7 +193,7 @@ public final class SolvikExpressionOrientedNegativeTest {
     public void defaultNotLastInExpressionSwitchIsRejected() {
         assertThat(hasCode(checkFails("""
                 func f(value: Integer): Integer {
-                    var x = switch (value) {
+                    var x: Integer = switch (value) {
                         default {
                             0
                         }
@@ -195,6 +203,7 @@ public final class SolvikExpressionOrientedNegativeTest {
                     }
                     return x
                 }
+
                 """), DiagnosticCode.SEM_SWITCH_DEFAULT_NOT_LAST)).isTrue();
     }
 
@@ -202,7 +211,7 @@ public final class SolvikExpressionOrientedNegativeTest {
     public void misplacedDefaultInExpressionSwitchReportsASingleDiagnostic() {
         DiagnosticBag bag = checkFails("""
                 func f(value: Integer): Integer {
-                    var x = switch (value) {
+                    var x: Integer = switch (value) {
                         default {
                             0
                         }
@@ -215,6 +224,7 @@ public final class SolvikExpressionOrientedNegativeTest {
                     }
                     return x
                 }
+
                 """);
         assertThat(bag.all()).extracting(Diagnostic::code).containsExactly(
                 DiagnosticCode.SEM_SWITCH_DEFAULT_NOT_LAST);
@@ -224,12 +234,13 @@ public final class SolvikExpressionOrientedNegativeTest {
     public void branchLocalNameDoesNotLeakOutOfTheBlock() {
         assertThat(hasCode(checkFails("""
                 func f(): Integer {
-                    var x = {
-                        var hidden = 1
+                    var x: Integer = {
+                        var hidden: Integer = 1
                         hidden
                     }
                     return hidden
                 }
+
                 """), DiagnosticCode.RESOL_UNKNOWN_NAME)).isTrue();
     }
 
@@ -279,11 +290,12 @@ public final class SolvikExpressionOrientedNegativeTest {
                 func f(result: Result): Integer {
                     return match result {
                         Ok(value) => {
-                            var local = 1
+                            var local: Integer = 1
                         }
                         Error(message) => 0
                     }
                 }
+
                 """), DiagnosticCode.SEM_BLOCK_RESULT_REQUIRED)).isTrue();
     }
 
@@ -291,9 +303,9 @@ public final class SolvikExpressionOrientedNegativeTest {
     public void diagnosticInAnIncludedFilePointsToThatFile() {
         IncludeResolutionResult resolved = VirtualIncludeFiles.resolve("root.sol", Map.of(
                 "root.sol", "include \"lib.sol\"\n",
-                "lib.sol", "func bad(): Integer {\n    var x = {\n        var local = 1\n    }\n    return x\n}\n"));
+                "lib.sol", "func bad(): Integer {\n    var x: Nothing = {\n        var local: Integer = 1\n    }\n    return x\n}\n"));
         assertThat(resolved.isSuccess()).as("resolution must succeed: " + resolved.diagnostics().all()).isTrue();
-        SemanticResult result = SolvikSemanticAnalyzer.analyze(resolved.requireUnit(), resolved.itemScopes());
+        SemanticResult result = SolvikSemanticAnalyzer.analyze(resolved.requireUnit());
         assertThat(result.isSuccess()).isFalse();
         Diagnostic diagnostic = result.diagnostics().all().stream()
                 .filter(d -> d.code() == DiagnosticCode.SEM_BLOCK_RESULT_REQUIRED)
@@ -306,13 +318,14 @@ public final class SolvikExpressionOrientedNegativeTest {
     public void missingElseInsideABlockTailStillReportsTheDedicatedDiagnostic() {
         assertThat(hasCode(checkFails("""
                 func f(flag: Boolean): Integer {
-                    var x = {
+                    var x: Integer = {
                         if (flag) {
                             1
                         }
                     }
                     return x
                 }
+
                 """), DiagnosticCode.SEM_IF_EXPRESSION_MISSING_ELSE)).isTrue();
     }
 
@@ -320,7 +333,7 @@ public final class SolvikExpressionOrientedNegativeTest {
     public void missingDefaultInsideABlockTailStillReportsTheDedicatedDiagnostic() {
         assertThat(hasCode(checkFails("""
                 func f(value: Integer): Integer {
-                    var x = {
+                    var x: Integer = {
                         switch (value) {
                             case 1 {
                                 1
@@ -329,6 +342,7 @@ public final class SolvikExpressionOrientedNegativeTest {
                     }
                     return x
                 }
+
                 """), DiagnosticCode.SEM_SWITCH_EXPRESSION_MISSING_DEFAULT)).isTrue();
     }
 
@@ -336,11 +350,12 @@ public final class SolvikExpressionOrientedNegativeTest {
     public void aValueBlockTailWithAnUnresolvedNameStillReportsThatError() {
         assertThat(hasCode(checkFails("""
                 func f(): Integer {
-                    var x = {
+                    var x: Nothing = {
                         missing
                     }
                     return 0
                 }
+
                 """), DiagnosticCode.RESOL_UNKNOWN_NAME)).isTrue();
     }
 }

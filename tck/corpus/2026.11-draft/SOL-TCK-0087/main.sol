@@ -15,5 +15,5 @@
 // implementation choice rather than the specification. TCK.md section 6 likewise forbids
 // promoting an implementation enum entry to normative status. Sentinel per TCK.md
 // section 10: the print would be observable if this invalid test were accepted.
-var nums = List<Integer>(1, 2)
+var nums: List<Integer> = List<Integer>(1, 2)
 print(nums is List<Integer>)

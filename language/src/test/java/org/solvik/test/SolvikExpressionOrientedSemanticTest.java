@@ -23,6 +23,7 @@ import org.solvik.ast.CompilationUnitNode;
 import org.solvik.ast.declaration.FunctionDeclNode;
 import org.solvik.ast.statement.LocalDeclNode;
 import org.solvik.semantic.CheckedProgram;
+import org.solvik.diagnostic.DiagnosticCode;
 import org.solvik.semantic.SemanticResult;
 import org.solvik.semantic.SolvikSemanticAnalyzer;
 import org.solvik.type.IntegerType;
@@ -30,7 +31,6 @@ import org.solvik.type.NothingType;
 import org.solvik.type.AnyType;
 import org.solvik.type.StringType;
 import org.solvik.type.Type;
-import org.solvik.type.UnitType;
 
 /** Positive semantic tests for expression-oriented constructs (docs/LANGUAGE_SPEC.md section 21). */
 public final class SolvikExpressionOrientedSemanticTest {
@@ -40,6 +40,17 @@ public final class SolvikExpressionOrientedSemanticTest {
         SemanticResult result = SolvikSemanticAnalyzer.analyze(unit);
         assertThat(result.isSuccess()).as("analysis must succeed: " + result.diagnostics().all()).isTrue();
         return result.requireProgram();
+    }
+
+    private static SemanticResult checkFails(String text) {
+        CompilationUnitNode unit = parseOk("expr.sol", text);
+        SemanticResult result = SolvikSemanticAnalyzer.analyze(unit);
+        assertThat(result.isSuccess()).as("analysis must fail but succeeded").isFalse();
+        return result;
+    }
+
+    private static DiagnosticCode error(SemanticResult result) {
+        return result.diagnostics().all().get(0).code();
     }
 
     private static Type initializerType(CheckedProgram program, String functionName) {
@@ -56,37 +67,33 @@ public final class SolvikExpressionOrientedSemanticTest {
     public void blockExpressionResultTypes() {
         assertThat(initializerType(check("""
                 func a(): Integer {
-                    var x = {
+                    var x: Integer = {
                         1
                     }
                     return x
                 }
+
                 """), "a")).isSameAs(IntegerType.INSTANCE);
         assertThat(initializerType(check("""
                 func a(): Integer {
-                    var x = {
-                        var local = 10; local + 20
+                    var x: Integer = {
+                        var local: Integer = 10; local + 20
                     }
                     return x
                 }
+
                 """), "a")).isSameAs(IntegerType.INSTANCE);
         assertThat(initializerType(check("""
-                func a(): Unit {
-                    var x: Unit = {
-                        println("done")
-                    }
-                }
-                """), "a")).isSameAs(UnitType.INSTANCE);
-        assertThat(initializerType(check("""
                 func a(): Integer {
-                    var x = {
-                        var inner = {
+                    var x: Integer = {
+                        var inner: Integer = {
                             20
                         }
                         ; inner + 22
                     }
                     return x
                 }
+
                 """), "a")).isSameAs(IntegerType.INSTANCE);
     }
 
@@ -94,7 +101,7 @@ public final class SolvikExpressionOrientedSemanticTest {
     public void ifExpressionJoinsIntegerAndStringToAny() {
         Type type = initializerType(check("""
                 func a(flag: Boolean): Integer {
-                    var x = if (flag) {
+                    var x: Any = if (flag) {
                         1
                     }
                     else {
@@ -102,6 +109,7 @@ public final class SolvikExpressionOrientedSemanticTest {
                     }
                     return 1
                 }
+
                 """), "a");
         assertThat(type).isSameAs(AnyType.INSTANCE);
     }
@@ -110,7 +118,7 @@ public final class SolvikExpressionOrientedSemanticTest {
     public void ifExpressionJoinsExactSubtypeAndNullable() {
         assertThat(initializerType(check("""
                 func a(flag: Boolean): Integer {
-                    var x = if (flag) {
+                    var x: Integer = if (flag) {
                         1
                     }
                     else {
@@ -118,10 +126,11 @@ public final class SolvikExpressionOrientedSemanticTest {
                     }
                     return x
                 }
+
                 """), "a")).isSameAs(IntegerType.INSTANCE);
         assertThat(initializerType(check("""
                 func a(flag: Boolean, value: String?): String? {
-                    var x = if (flag) {
+                    var x: String? = if (flag) {
                         value
                     }
                     else {
@@ -129,28 +138,42 @@ public final class SolvikExpressionOrientedSemanticTest {
                     }
                     return x
                 }
+
                 """), "a")).isSameAs(StringType.INSTANCE.nullableView());
     }
 
+    /**
+     * A block or conditional that produces no value cannot be bound: there is no source type for "no
+     * value", so the initializer is rejected exactly as any other non-value is.
+     */
     @Test
-    public void unitTailResultsJoinToUnit() {
-        assertThat(initializerType(check("""
-                func a(flag: Boolean): Unit {
-                    var x: Unit = if (flag) {
+    public void noValueTailResultsCannotBeBound() {
+        assertThat(error(checkFails("""
+                func a() {
+                    var x: Integer = {
+                        println("done")
+                    }
+                }
+
+                """))).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
+        assertThat(error(checkFails("""
+                func a(flag: Boolean) {
+                    var x: Integer = if (flag) {
                         println("a")
                     }
                     else {
                         println("b")
                     }
                 }
-                """), "a")).isSameAs(UnitType.INSTANCE);
+
+                """))).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
 
     @Test
     public void abruptBranchIsExcludedFromTheJoin() {
         assertThat(initializerType(check("""
                 func a(name: String?): String {
-                    var x = if (name != null) {
+                    var x: String = if (name != null) {
                         name
                     }
                     else {
@@ -158,6 +181,7 @@ public final class SolvikExpressionOrientedSemanticTest {
                     }
                     return x
                 }
+
                 """), "a")).isSameAs(StringType.INSTANCE);
     }
 
@@ -165,7 +189,7 @@ public final class SolvikExpressionOrientedSemanticTest {
     public void ifWithAllAbruptBranchesHasTypeNothing() {
         assertThat(initializerType(check("""
                 func a(flag: Boolean): Integer {
-                    var x = if (flag) {
+                    var x: Nothing = if (flag) {
                         return 1
                     }
                     else {
@@ -173,6 +197,7 @@ public final class SolvikExpressionOrientedSemanticTest {
                     }
                     return 0
                 }
+
                 """), "a")).isSameAs(NothingType.INSTANCE);
     }
 
@@ -180,7 +205,7 @@ public final class SolvikExpressionOrientedSemanticTest {
     public void switchExpressionJoinsCaseResults() {
         assertThat(initializerType(check("""
                 func a(value: Integer): String {
-                    var x = switch (value) {
+                    var x: String = switch (value) {
                         case 1 {
                             "one"
                         }
@@ -190,6 +215,7 @@ public final class SolvikExpressionOrientedSemanticTest {
                     }
                     return x
                 }
+
                 """), "a")).isSameAs(StringType.INSTANCE);
     }
 
@@ -236,7 +262,7 @@ public final class SolvikExpressionOrientedSemanticTest {
     @Test
     public void statementIfWithoutElseAndStatementSwitchWithoutDefaultRemainValid() {
         check("""
-                func run(value: Integer, debug: Boolean): Unit {
+                func run(value: Integer, debug: Boolean) {
                     if (debug) {
                         print("debug")
                     }
@@ -246,6 +272,7 @@ public final class SolvikExpressionOrientedSemanticTest {
                         }
                     }
                 }
+
                 """);
     }
 
@@ -257,7 +284,7 @@ public final class SolvikExpressionOrientedSemanticTest {
                     Error(String)
                 }
                 func a(result: Result): Integer {
-                    var x = match result {
+                    var x: Integer = match result {
                         Ok(value) => {
                             print("ok")
                             value
@@ -269,6 +296,7 @@ public final class SolvikExpressionOrientedSemanticTest {
                     }
                     return x
                 }
+
                 """), "a")).isSameAs(IntegerType.INSTANCE);
     }
 
@@ -279,7 +307,7 @@ public final class SolvikExpressionOrientedSemanticTest {
                     return 0
                 }
                 func a(value: String?): Integer {
-                    var x = if (value != null) {
+                    var x: Integer = if (value != null) {
                         need(value)
                     }
                     else {
@@ -287,6 +315,7 @@ public final class SolvikExpressionOrientedSemanticTest {
                     }
                     return x
                 }
+
                 """), "a")).isSameAs(IntegerType.INSTANCE);
     }
 
@@ -294,7 +323,7 @@ public final class SolvikExpressionOrientedSemanticTest {
     public void switchAbruptCaseIsExcludedFromTheJoin() {
         assertThat(initializerType(check("""
                 func a(value: Integer): String {
-                    var x = switch (value) {
+                    var x: String = switch (value) {
                         case 0 {
                             return "zero"
                         }
@@ -304,6 +333,7 @@ public final class SolvikExpressionOrientedSemanticTest {
                     }
                     return x
                 }
+
                 """), "a")).isSameAs(StringType.INSTANCE);
     }
 
@@ -311,20 +341,20 @@ public final class SolvikExpressionOrientedSemanticTest {
     public void branchesJoinToACommonInterface() {
         Type type = initializerType(check("""
                 interface Named {
-                    func name(): String
+                    method name(): String
                 }
                 class A implements Named {
-                    func name(): String {
+                    method name(): String {
                         return "a"
                     }
                 }
                 class B implements Named {
-                    func name(): String {
+                    method name(): String {
                         return "b"
                     }
                 }
                 func f(flag: Boolean): Named {
-                    var x = if (flag) {
+                    var x: Named = if (flag) {
                         A()
                     }
                     else {
@@ -332,6 +362,7 @@ public final class SolvikExpressionOrientedSemanticTest {
                     }
                     return x
                 }
+
                 """), "f");
         assertThat(type.name()).isEqualTo("Named");
     }

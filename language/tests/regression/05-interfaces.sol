@@ -1,6 +1,6 @@
 interface Greeter {
-    func greet(): String
-    func greeting(): String {
+    method greet(): String
+    method greeting(): String {
         return "Hello, " .. greet()
     }
 }
@@ -9,12 +9,12 @@ class Named implements Greeter {
     Named(name: String) {
         this.name = name
     }
-    func greet(): String {
+    method greet(): String {
         return this.name
     }
 }
 class Service implements Greeter {
-    delegate var greeter: Greeter
+    delegate greeter: Greeter
     Service(greeter: Greeter) {
         this.greeter = greeter
     }

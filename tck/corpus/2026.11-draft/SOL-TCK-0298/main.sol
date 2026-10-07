@@ -1,5 +1,5 @@
-var c = true
-var r = if (c) {
+var c: Boolean = true
+var r: Integer = if (c) {
     1
 }
 else {

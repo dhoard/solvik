@@ -6,14 +6,14 @@
 // which is permitted to vary covariantly) makes the rejection direction unambiguous, so
 // this cannot be misread as a permissive covariance rule. Semantic family only; the
 // specification names no code for this rule.
-mutable class Base {
-    mutable func label(): String {
+class mutable Base {
+    method mutable label(): String {
         return "base"
     }
 }
 
 class Sub extends Base {
-    override func label(x: Integer): String {
+    method override label(x: Integer): String {
         return "sub"
     }
 }

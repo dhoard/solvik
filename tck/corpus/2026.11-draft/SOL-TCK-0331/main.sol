@@ -4,7 +4,7 @@
 // Oracle quotations verified verbatim against docs/LANGUAGE_SPEC.md:
 //   - A subclass constructor must invoke `super(arguments)` as its first statement when the superclass has no zero-argument initializer; otherwise `super()` is implicit.
 //
-mutable class A {
+class mutable A {
     A(x: Integer) {
     }
 }
@@ -12,5 +12,5 @@ class B extends A {
     B() {
     }
 }
-var b = B()
+var b: B = B()
 print("EXECUTED-INVALID")

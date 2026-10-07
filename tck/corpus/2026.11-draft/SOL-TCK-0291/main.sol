@@ -1,4 +1,4 @@
-var a = 1
-var b = a +
+var a: Integer = 1
+var b: Integer = a +
     1
 print("b" .. b)

@@ -2,7 +2,7 @@
 // The parameter has no type; the declaration is rejected before execution.
 //
 // Oracle quotations verified verbatim against docs/LANGUAGE_SPEC.md:
-//   - Parameter types must be explicit in the initial implementation.
+//   - Parameter types must be explicit.
 //
 func f(a) {
     print(a)

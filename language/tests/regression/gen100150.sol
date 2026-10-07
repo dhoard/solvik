@@ -3,7 +3,7 @@ class Box1<T> {
     Box1(value: T) {
         this.value = value
     }
-    func get(): T {
+    method get(): T {
         return this.value
     }
 }

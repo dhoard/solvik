@@ -98,12 +98,12 @@ Set `SOLVIK_SKIP_CORPUS=1` to skip the corpus step (for example, a fast compile-
 
 ### Creating Plans
 
-When creating an implementation plan, read and use `PLAN_TEMPLATE.md`. Save new plans as
-`docs/<DESCRIPTIVE-NAME>-PLAN.md` unless the user specifies a location; keep existing plans at
-their current paths when updating them. Replace placeholders with evidence from the current
-worktree, cite the applicable language-specification and architecture sections, and identify
-GraalVM/Truffle infrastructure to retain and legacy behavior to replace or remove. Scale detail
-to the change and mark irrelevant sections not applicable with a reason.
+When creating an implementation plan, read and use `PLAN_TEMPLATE.md`. Save new plans in the
+`plans/` directory as `plans/<DESCRIPTIVE-NAME>-PLAN.md` unless the user specifies a location;
+keep existing plans at their current paths when updating them. Replace placeholders with
+evidence from the current worktree, cite the applicable language-specification and architecture
+sections, and identify GraalVM/Truffle infrastructure to retain and legacy behavior to replace
+or remove. Scale detail to the change and mark irrelevant sections not applicable with a reason.
 
 Every plan must include scope, ordered buildable steps, positive and negative coverage for
 semantic changes, acceptance criteria, and `./build-all.sh` as the final quality gate. Separate

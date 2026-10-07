@@ -71,8 +71,7 @@ org.solvik
 │   ├── ClassType
 │   ├── InterfaceType
 │   ├── NullableType
-│   ├── TypeParameter
-│   └── FunctionType
+│   └── TypeParameter
 ├── semantic
 │   ├── SymbolTable
 │   ├── Resolver
@@ -149,18 +148,19 @@ Type
 ├── EnumType
 ├── NullableType
 ├── TypeParameterType
-└── FunctionType
+└── (no other type)
 ```
 
 `AnyType` is the compiler representation of the sole non-null root type `Any`; there is no
 `Object` type in the model. Built-in numeric/class hierarchy metadata belongs in the type
 environment.
 
-`FunctionType` is the only structural type in the model and the only one whose assignability is not
-a walk of the nominal hierarchy: parameters are contravariant and the result covariant, equal
-function types are canonicalized to one instance so identity-based compiler caches hold, and `Any`
-is the supertype of every non-null function type. Structural comparison is confined to this class;
-no other type may compare structurally, which is what keeps user classes and interfaces nominal.
+There is no function type in the model: a callable is a declaration, so no type has to describe it,
+and assignability is always a walk of the nominal hierarchy with the numeric widening rules applied
+at conversion sites. `UnitType` is the internal no-value sentinel: it has no source spelling, no
+supertype, and no members, so an expression that produces no value is never assignable to a value
+type. Nothing else in the model compares structurally, which is what keeps user classes and
+interfaces nominal.
 
 Do not use reflection over JVM classes as the primary source of Solvik subtype relationships.
 
@@ -240,70 +240,49 @@ the result never depends on class declaration order.
 
 Do not prematurely build a JVM-like vtable if Truffle call-site specialization provides a simpler implementation.
 
-## Function Values and Indirect Calls
+## Callables Are Declarations
 
-LANGUAGE_SPEC.md section 6 defines first-class function values. Two distinct things must stay
-distinct in the implementation:
+LANGUAGE_SPEC.md section 6 makes a callable a declaration rather than a value: there are no function
+types, no function values, no anonymous functions, no capture lists, and no bound method references.
+The implementation therefore has one call path and one runtime shape for callables.
 
-- a **direct callable symbol**: a `FunctionSymbol` resolved by static analysis and lowered to a
-  fixed call target. `sum(1, 2)` keeps this path. It must never be lowered into "construct a
-  function value, then invoke it", because that would trade a statically resolved call for an
-  allocation and an indirect call.
-- a **function value**: a guest-visible immutable reference value with its own identity, produced
-  only where the language requires a value. It is a runtime object, never a compile-time symbol
-  wearing a different name, and it never carries per-execution state in a compilation-final node
-  field.
+- A **callable declaration** is a `FunctionSymbol` resolved by static analysis. `func` declares a
+  module-scope function and `method` declares a class or interface member; both are declarations, so
+  neither denotes a value.
+- A **direct call** resolves its callee during resolution and type analysis and lowers to a fixed
+  call target. Nothing constructs an intermediate value, and there is no indirect call path.
+- A **callee** is not an expression: the analyzer records no type for the callee node of a call, and
+  a callable name written in a value position is `TYPE_FUNCTION_AS_VALUE` (`SOLV-TYPE-014`).
+- A callable that writes no `: Type` **produces no value**. The internal no-value sentinel is not a
+  source type, takes no part in assignability or joins, and cannot be bound, passed, or printed.
 
 Compile-time facts, all recorded before lowering so lowering redoes no analysis:
 
 | Fact | Recorded by |
 |---|---|
-| the selected `FunctionSymbol` of a named function reference | resolution |
-| the instantiated `FunctionType` and type-parameter substitution of a generic reference | resolution |
-| the resolved method and receiver mode of a bound method reference (`virtual`, `super`, safe) | member resolution |
-| the ordered capture descriptors, their resolved symbols and static types | capture analysis |
-| whether an anonymous function captures nothing | capture analysis |
-| the function type of an indirect call site | type analysis |
+| the selected `FunctionSymbol` of a call | resolution |
+| the instantiated signature and type-argument substitution of a generic call | resolution and type analysis |
+| the resolved method, receiver mode (`virtual`, `super`, safe), and whether the receiver is implicit | member resolution |
+| whether a callable produces a value | resolution, from the written return type |
+| the declaring module of every declaration | include expansion, carried on `CompilationUnitNode` |
 
-**Capture analysis** runs at the anonymous-function expression, before its parameter and body scope
-are entered, and preserves written order. It rejects a duplicate item, a capture/parameter name
-collision, an item that is not an eligible immutable local, parameter, function value, or `this`, a
-`var mutable` item, and a self-reference to the binding being initialized. Body checking then resolves only
-parameters, body locals, written captures, and top-level/module declarations; an eligible enclosing
-binding reached without being listed is `SEM_UNLISTED_CAPTURE`, and after an invalid capture item is
-reported a poisoned placeholder must prevent the same root cause from re-reporting as an unknown
-name or an omitted capture.
+**Lowering.** A call lowers to an invocation node that evaluates its receiver (when there is one)
+and then its arguments left to right, then performs the call. No node evaluates a callee expression,
+caches an indirect target, or assembles a hidden environment: there are no captures, no anonymous
+roots, and no bound-value allocation. A member call dispatches through the receiver's runtime class
+table, whose entry is the effective implementation. A call to a callable that produces no value is
+lowered as an expression node whose result the surrounding statement discards.
 
-**Runtime representation.** A guest function value is a closed family over a stable call target
-plus an immutable environment: a canonical named value (one instance per declared function per
-context), an anonymous value (a fresh instance per evaluation, sharing one lowered root), and a
-bound value (a fresh instance per evaluation, retaining one already-evaluated receiver). Equality
-and hashing are reference identity through the shared equality/hash services, display is the fixed
-`func`, and the value reports executable at the interop boundary. A declared callable's existing
-execution handle may back these values but must not be exposed as one, and must not conflate the
-one declared target with the several identities anonymous and bound values create. Named-value
-canonicalization is context-local: two contexts never share a function value or captured state.
+**Representation.** `SolvikFunction` is a declared callable's execution handle: a call target plus
+the frame metadata a call needs. It is created once per declaration per context and is never exposed
+to guest code as a value. A no-value call returns the single static sentinel, which no source
+expression has as its type.
 
-**Lowering.** A direct call lowers exactly as before. An indirect call gets a dedicated invocation
-node that evaluates the callee once, evaluates arguments left to right, caches a stable target with
-`DirectCallNode` while the site is monomorphic, falls back to `IndirectCallNode` when it is not, and
-supplies any hidden environment or receiver argument according to the value's kind. Captures reach a
-closure body through hidden runtime arguments or an equivalent immutable runtime object, never by
-mutating a shared AST node. A safe bound reference uses a conditional node that allocates nothing on
-the null path. Primitive parameters, captures, and results keep their frame kinds: crossing a
-function-value boundary must not box a primitive.
-
-**Instrumentation.** An anonymous root carries a source section derived from its own expression, so
-a stack trace names the physical file and the anonymous site. Indirect calls carry the same call
-instrumentation tags as direct calls. Solvik nodes carry no instrumentation tags at all today: no
-node reports itself instrumentable, so the source-section and execution event queries of an
-instrument observe nothing in a Solvik program, which makes that equality observable only as the
-equality of the call stacks a direct and an indirect call of one callable report.
-`SolvikCallStackTest` asserts that equality from a real multi-file program. That is a consequence of
-how indirect calls are lowered rather than a tag-level oracle: there is no tag to compare, and the
-quoted equality becomes testable at the tag level only when some call path acquires tags, at which
-point the same equality must hold under them. A debugger-facing frame label may differ from the
-guest value's display text, which is always `func`.
+**Instrumentation.** Roots carry the source section of the declaration they implement, so a stack
+frame names the physical file, the root name, and the faulting expression. Solvik nodes carry no
+instrumentation tags, so source-section and execution-event queries of an instrument observe
+nothing in a Solvik program; `SolvikCallStackTest` asserts the observable part from a real
+multi-file program: the frame chain, its root names, and the file and source text each frame names.
 
 **Closed world.** No reflective signature discovery, dynamic class generation, JVM lambda, or
 `MethodHandle` lookup from a guest type. New runtime classes must be reachable through ordinary
@@ -321,7 +300,7 @@ Compiler:
   `IdentityDomain` built from the program's declared class and interface types plus the mutable
   built-in collections; the domain must not be inferred from Java implementation class names in
   several visitors;
-- `Any`, scalars, `Unit`, enums, `Regex`, `RegexMatch`, and unbounded type parameters are
+- `Any`, scalars, enums, `Regex`, `RegexMatch`, and unbounded type parameters are
   rejected for identity even when assignment-compatible, using `SOLV-TYPE-039`;
 - null refinement treats `x === null`/`x !== null` exactly like `x == null`/`x != null`, and only
   when identity typing succeeded.
@@ -340,7 +319,7 @@ Runtime:
 - the left operand is the dynamic receiver; a user class dispatches its effective `equals` override
   exactly once and only after the null precheck, and an absent override falls back to reference
   identity;
-- built-in scalars and `Unit` use fixed IEEE/value rules, collections use reference identity, and
+- built-in scalars use fixed IEEE/value rules, collections use reference identity, and
   `Regex`/`RegexMatch` use source text and an immutable snapshot, so engine caching and interning
   never become observable;
 - specialization must not change semantics when a call site later receives another runtime kind
@@ -368,7 +347,7 @@ invariant, where the unindexed scan returns `true`. Requiring `override hashCode
 compiler cannot prove anything about a method body.
 
 So the index may be applied only where the invariant is guaranteed by construction rather than by
-user discipline: the fixed rules in `SolvikHash`, which cover `null`, the scalars, `Unit`, enum
+user discipline: the fixed rules in `SolvikHash`, which cover `null`, the scalars, enum
 values, `Regex`, and `RegexMatch`, and read exactly the fields the matching equality rule reads.
 Keys whose effective `hashCode` is a user override cannot be indexed without accepting that a
 user-visible wrong answer is reachable from code the compiler must accept. If indexed keys and
@@ -383,7 +362,7 @@ For:
 
 ```solvik
 class Service implements Logger {
-    delegate var logger: Logger
+    delegate logger: Logger
 }
 ```
 
@@ -510,12 +489,9 @@ Their analysis and lowering responsibilities are located as follows.
   cases. Abrupt paths are represented by control flow and never by a fabricated value.
 - **Shared result-type joining.** `org.solvik.type.TypeJoin` is the single join used by `match`, block,
   `if`, and `switch` result typing, so their results cannot drift. It returns no join for branches whose
-  only shared supertypes are incomparable. Function types are the one structural family it understands:
-  `TypeJoin.leastCommonFunctionSupertype` forms the least common function supertype of two incomparable
-  same-arity function types from the more specific of each parameter pair and the nearest common result,
-  and it yields no join — leaving the declared hierarchy to decide — when a parameter pair is unrelated,
-  the arities differ, or the results have no unique join, so a join never manufactures a function type
-  (docs/LANGUAGE_SPEC.md section 6).
+  only shared supertypes are incomparable. It understands only nominal types: no join manufactures a
+  structural type, and the no-value sentinel takes no part in a join (docs/LANGUAGE_SPEC.md
+  section 6).
 - **Expression-`switch` totality checking.** `checkSwitchExpr` requires exactly one last `default`
   and rejects a case body that can complete normally without a tail result; regex and constant label
   checking is shared with the statement form through `checkSwitchCases`. Exhaustiveness for a closed
@@ -622,7 +598,7 @@ through the existing pipeline with no second backend and no runtime re-analysis.
 - **Operation typing.** `SolvikSemanticAnalyzer.resolveMethodReturnType` routes a `Result`-typed
   receiver to `checkResultMethodCall`, which types `isOk`/`isErr` as `Boolean`, `unwrap` as the
   success argument `T`, `unwrapErr` as the error argument `E`, `expect(String)` as `T`, and `ignore`
-  as `Unit`, validating arity and argument types through the shared `checkArguments` helper. Unknown
+  as producing no value, validating arity and argument types through the shared `checkArguments` helper. Unknown
   members are `RESOL_UNKNOWN_MEMBER`. `resolveMemberRead` rejects a bare member read of an operation
   name as `TYPE_FUNCTION_AS_VALUE` and any other name as `RESOL_UNKNOWN_MEMBER`, mirroring how the
   built-in `Regex`/`RegexMatch`/collection members are handled.
@@ -646,7 +622,7 @@ through the existing pipeline with no second backend and no runtime re-analysis.
   success and propagated error types must be assignable to that boundary (`SEM_RESULT_PROPAGATION_TYPE_MISMATCH`).
 - **Must-consume rule.** A `Result` value used as a standalone statement is `SEM_UNUSED_RESULT`, so an
   error cannot be silently discarded. `?`, `match`, and any non-`Result`-yielding operation consume a
-  value; `ignore()` yields `Unit` and is the explicit discard. This is enforced in
+  value; `ignore()` produces no value and is the explicit discard. This is enforced in
   `SolvikSemanticAnalyzer.checkExprStmt` against the recorded expression type, before lowering.
 
 ## Generics

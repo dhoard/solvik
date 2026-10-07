@@ -1,5 +1,5 @@
-module app_main
+// The implicit entry point of the default module including a file that declares a named module and
+// calling its function through the module name (docs/LANGUAGE_SPEC.md section 20).
+include "ModulesLib.sol"
 
-include "ModulesLib.sol" alias math
-
-println(math::double(21))
+println(math_utils::double(21))

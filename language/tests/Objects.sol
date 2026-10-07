@@ -1,8 +1,8 @@
 // Solvik composition: an interface default method served by a delegate, plus null safety.
 interface Greeter {
-    func greet(): String
+    method greet(): String
 
-    func greeting(): String {
+    method greeting(): String {
         return "Hello, " .. greet()
     }
 }
@@ -14,13 +14,13 @@ class Named implements Greeter {
         this.name = name
     }
 
-    func greet(): String {
+    method greet(): String {
         return this.name
     }
 }
 
 class Service implements Greeter {
-    delegate var greeter: Greeter
+    delegate greeter: Greeter
 
     Service(greeter: Greeter) {
         this.greeter = greeter

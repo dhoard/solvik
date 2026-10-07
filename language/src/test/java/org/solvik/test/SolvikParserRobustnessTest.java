@@ -114,7 +114,7 @@ public final class SolvikParserRobustnessTest {
 
     @Test
     public void unclosedCallChainNestingIsDiagnosedInsteadOfOverflowingTheStack() {
-        String src = "func f(): Unit {\n    " + repeat("f(", FORMERLY_FATAL_DEPTH) + "1\n}\n";
+        String src = "func f() {\n    " + repeat("f(", FORMERLY_FATAL_DEPTH) + "1\n}\n";
         assertThat(checkContract("deep-call.sol", src).isSuccess()).isFalse();
     }
 
@@ -126,61 +126,50 @@ public final class SolvikParserRobustnessTest {
 
     @Test
     public void unclosedTypeArgumentNestingIsDiagnosedInsteadOfOverflowingTheStack() {
-        String src = "func f(): Unit {\n    var x: " + repeat("List<", FORMERLY_FATAL_DEPTH) + "Integer\n}\n";
+        String src = "func f() {\n    var x: " + repeat("List<", FORMERLY_FATAL_DEPTH) + "Integer\n}\n";
         assertThat(checkContract("deep-typeargs.sol", src).isSuccess()).isFalse();
     }
 
     @Test
     public void unclosedBlockNestingIsDiagnosedInsteadOfOverflowingTheStack() {
-        String src = "func f(): Unit " + repeat("{", FORMERLY_FATAL_DEPTH) + "\n";
+        String src = "func f() " + repeat("{", FORMERLY_FATAL_DEPTH) + "\n";
         assertThat(checkContract("deep-blocks.sol", src).isSuccess()).isFalse();
     }
 
-    /**
-     * A function type nests through its own grammar rule, so reaching it recurses along a path the
-     * parenthesis and type-argument cases above never walk: `functionTypeRef` contains a `typeRef` in
-     * both its parameter list and its result.
-     */
+    /** An unclosed nested expression must be diagnosed instead of overflowing the stack. */
     @Test
-    public void unclosedFunctionTypeNestingIsDiagnosedInsteadOfOverflowingTheStack() {
-        String src = "func f(cb: " + repeat("func(", FORMERLY_FATAL_DEPTH) + "Unit): Unit {\n}\n";
-        assertThat(checkContract("deep-function-type.sol", src).isSuccess()).isFalse();
-    }
-
-    /** An anonymous function nests a whole callable body, which no other expression form does. */
-    @Test
-    public void unclosedAnonymousFunctionNestingIsDiagnosedInsteadOfOverflowingTheStack() {
-        String src = "func f(): Integer {\n" + repeat("    var v = func(p: Integer): Integer {\n", FORMERLY_FATAL_DEPTH);
-        assertThat(checkContract("deep-anonymous.sol", src).isSuccess()).isFalse();
+    public void unclosedNestedExpressionIsDiagnosedInsteadOfOverflowingTheStack() {
+        String src = "func f(): Integer {\n    var v: Integer = " + repeat("(", FORMERLY_FATAL_DEPTH) + "1\n}\n";
+        assertThat(checkContract("deep-expression.sol", src).isSuccess()).isFalse();
     }
 
     @Test
     public void strayClosingDelimitersFarBeyondTheStackLimitAreDiagnosed() {
         // A stream far longer than the former fatal depth of stray closers must still only produce
         // diagnostics: the parser must not recurse per stray token.
-        assertThat(checkContract("stray-parens.sol", "func f(): Unit {\n    " + repeat(")", FORMERLY_FATAL_DEPTH) + "1\n}\n").isSuccess()).isFalse();
-        assertThat(checkContract("stray-braces.sol", "func f(): Unit " + repeat("}", FORMERLY_FATAL_DEPTH) + "\n").isSuccess()).isFalse();
+        assertThat(checkContract("stray-parens.sol", "func f() {\n    " + repeat(")", FORMERLY_FATAL_DEPTH) + "1\n}\n").isSuccess()).isFalse();
+        assertThat(checkContract("stray-braces.sol", "func f() " + repeat("}", FORMERLY_FATAL_DEPTH) + "\n").isSuccess()).isFalse();
     }
 
     // ---- Deeply nested valid programs must compile ----------------------------------------------
 
     @Test
     public void balancedNestingFarBeyondTheFormerStackLimitParses() {
-        String src = "func f(): Integer {\n    var x = " + repeat("(", FORMERLY_FATAL_BALANCED_DEPTH) + "1" + repeat(")", FORMERLY_FATAL_BALANCED_DEPTH) + "\n    return x\n}\n";
+        String src = "func f(): Integer {\n    var x: Integer = " + repeat("(", FORMERLY_FATAL_BALANCED_DEPTH) + "1" + repeat(")", FORMERLY_FATAL_BALANCED_DEPTH) + "\n    return x\n}\n";
         SolvikParseResult result = checkContract("balanced-parens.sol", src);
         assertThat(result.isSuccess()).as("a valid program must parse at this depth").isTrue();
     }
 
     @Test
     public void deepCallChainInAValidProgramParses() {
-        String src = "func f(): Unit {\n    " + repeat("f(", FORMERLY_FATAL_BALANCED_DEPTH) + repeat(")", FORMERLY_FATAL_BALANCED_DEPTH) + "\n}\n";
+        String src = "func f() {\n    " + repeat("f(", FORMERLY_FATAL_BALANCED_DEPTH) + repeat(")", FORMERLY_FATAL_BALANCED_DEPTH) + "\n}\n";
         assertThat(checkContract("balanced-call.sol", src).isSuccess()).isTrue();
     }
 
     @Test
     public void deeplyNestedControlFlowParsesWithoutUnboundedCost() {
         for (int depth : new int[] {20, 100, FORMERLY_FATAL_BALANCED_DEPTH}) {
-            String src = "func f(): Unit {\n" + repeat("if (true) {\n", depth) + repeat("}\n", depth) + "}\n";
+            String src = "func f() {\n" + repeat("if (true) {\n", depth) + repeat("}\n", depth) + "}\n";
             long started = System.nanoTime();
             assertThat(checkContract("nested-if-" + depth + ".sol", src).isSuccess()).as("nested if at depth " + depth).isTrue();
             long elapsedMillis = (System.nanoTime() - started) / 1_000_000;
@@ -193,8 +182,8 @@ public final class SolvikParserRobustnessTest {
     @Test
     public void deeplyNestedBlockAndSwitchBodiesParseWithoutUnboundedCost() {
         for (int depth : new int[] {100, FORMERLY_FATAL_BALANCED_DEPTH}) {
-            String blocks = "func f(): Unit {\n" + repeat("{\n", depth) + repeat("}\n", depth) + "}\n";
-            String switches = "func f(v: Integer): Unit {\n" + repeat("switch (v) {\ncase 1 {\n", depth) + "1\n" + repeat("}\n}\n", depth) + "}\n";
+            String blocks = "func f() {\n" + repeat("{\n", depth) + repeat("}\n", depth) + "}\n";
+            String switches = "func f(v: Integer) {\n" + repeat("switch (v) {\ncase 1 {\n", depth) + "1\n" + repeat("}\n}\n", depth) + "}\n";
             for (String src : List.of(blocks, switches)) {
                 long started = System.nanoTime();
                 assertThat(checkContract("nested.sol", src).isSuccess()).as("nested construct at depth " + depth).isTrue();
@@ -224,7 +213,7 @@ public final class SolvikParserRobustnessTest {
     public void theNestingDiagnosticSpansTheWholeFileAndNamesTheProblem() {
         // A call chain recurses through a different grammar rule than a parenthesized expression, so
         // the capacity diagnostic is pinned for more than one right-recursive path.
-        String src = "func f(): Unit {\n    " + repeat("f(", 400_000) + repeat(")", 400_000) + "\n}\n";
+        String src = "func f() {\n    " + repeat("f(", 400_000) + repeat(")", 400_000) + "\n}\n";
         SolvikParseResult result = parse("span.sol", src);
         Diagnostic tooDeep = null;
         for (Diagnostic d : result.diagnostics().all()) {
@@ -247,35 +236,52 @@ public final class SolvikParserRobustnessTest {
      * <p>A function type appears in every written type position, so its nesting is a program-shape
      * question the front end must answer the same way parentheses and type arguments do.
      */
+    /**
+     * Nested generic type arguments nest a type reference the same way, and the front end must answer
+     * that program shape without unbounded cost.
+     */
     @Test
-    public void deeplyNestedFunctionTypesParseWithoutUnboundedCost() {
+    public void deeplyNestedTypeArgumentsParseWithoutUnboundedCost() {
         for (int depth : new int[] {20, 100, FORMERLY_FATAL_BALANCED_DEPTH}) {
-            String src = "func f(cb: " + repeat("func(", depth) + "func(): Unit" + repeat("): Unit", depth)
-                    + "): Unit {\n}\n";
+            String src = "func f(cb: " + repeat("List<", depth) + "Integer" + repeat(">", depth) + ") {\n}\n";
             long started = System.nanoTime();
-            assertThat(checkContract("nested-function-type-" + depth + ".sol", src).isSuccess())
-                    .as("nested function types at depth " + depth).isTrue();
+            assertThat(checkContract("nested-type-argument-" + depth + ".sol", src).isSuccess())
+                    .as("nested type arguments at depth " + depth).isTrue();
             long elapsedMillis = (System.nanoTime() - started) / 1_000_000;
-            assertThat(elapsedMillis).as("nested function types at depth " + depth + " must parse in well under a second").isLessThan(5_000);
+            assertThat(elapsedMillis).as("nested type arguments at depth " + depth + " must parse in well under a second").isLessThan(5_000);
         }
     }
 
     /**
-     * An anonymous function nests a complete callable body inside an expression, which is the deepest
-     * expression nesting the language allows, so the balanced direction is pinned for it too. The
-     * program is deliberately a chain of declarations whose initializers are anonymous functions, each
-     * body written on its own lines so the line boundary terminates it.
+     * The deepest expression nesting the language allows is a parenthesized chain inside one statement,
+     * so the balanced direction is pinned for a chain of nested blocks as well.
      */
     @Test
-    public void deeplyNestedAnonymousFunctionBodiesParseWithoutUnboundedCost() {
+    public void deeplyNestedStatementBlocksParseWithoutUnboundedCost() {
         for (int depth : new int[] {20, 100, FORMERLY_FATAL_BALANCED_DEPTH}) {
-            String src = "func f(): Integer {\n" + repeat("    var v = func(p: Integer): Integer {\n", depth)
-                    + "        return 0\n" + repeat("    }\n", depth) + "    return 0\n}\n";
+            String src = "func f() {\n" + repeat("    {\n", depth) + "        println(1)\n" + repeat("    }\n", depth) + "}\n";
             long started = System.nanoTime();
-            assertThat(checkContract("nested-anonymous-" + depth + ".sol", src).isSuccess())
-                    .as("nested anonymous bodies at depth " + depth).isTrue();
+            assertThat(checkContract("nested-blocks-" + depth + ".sol", src).isSuccess())
+                    .as("nested blocks at depth " + depth).isTrue();
             long elapsedMillis = (System.nanoTime() - started) / 1_000_000;
-            assertThat(elapsedMillis).as("nested anonymous bodies at depth " + depth + " must parse in well under a second").isLessThan(5_000);
+            assertThat(elapsedMillis).as("nested blocks at depth " + depth + " must parse in well under a second").isLessThan(5_000);
+        }
+    }
+
+    /**
+     * A parenthesized expression nests inside another expression, whose operand chain is as deep as the
+     * language allows, so the balanced direction is pinned for a chain of nested expressions too.
+     */
+    @Test
+    public void deeplyNestedExpressionsParseWithoutUnboundedCost() {
+        for (int depth : new int[] {20, 100, FORMERLY_FATAL_BALANCED_DEPTH}) {
+            String src = "func f(): Integer {\n    var v: Integer = " + repeat("(", depth) + "1" + repeat(")", depth)
+                    + "\n    return v\n}\n";
+            long started = System.nanoTime();
+            assertThat(checkContract("nested-expressions-" + depth + ".sol", src).isSuccess())
+                    .as("nested expressions at depth " + depth).isTrue();
+            long elapsedMillis = (System.nanoTime() - started) / 1_000_000;
+            assertThat(elapsedMillis).as("nested expressions at depth " + depth + " must parse in well under a second").isLessThan(5_000);
         }
     }
 
@@ -309,17 +315,17 @@ public final class SolvikParserRobustnessTest {
     public void singleCharacterMutationsOfWellFormedProgramsNeverThrow() {
         String[] seeds = { //
                 "func add(a: Integer, b: Integer): Integer {\n    return a + b\n}\nprintln(add(1, 2))\n", //
-                "class Point {\n    var x: Integer = 0\n    Point(theX: Integer) {\n        x = theX\n    }\n    func getX(): Integer {\n        return x\n    }\n}\n", //
-                "interface Shape {\n    func area(): Integer\n    func name(): String {\n        return \"shape\"\n    }\n}\n", //
+                "class Point {\n    var x: Integer = 0\n    Point(theX: Integer) {\n        x = theX\n    }\n    method getX(): Integer {\n        return x\n    }\n}\n", //
+                "interface Shape {\n    method area(): Integer\n    method name(): String {\n        return \"shape\"\n    }\n}\n", //
                 "enum Color {\n    Red\n    Green(Integer)\n}\nfunc f(c: Color): Integer {\n    return match c {\n        Red => 1,\n        Green(v) => v\n    }\n}\n", //
-                "func f(): Unit {\n    switch (1) {\n    case 1, 2:\n        println(1)\n        break\n    default:\n        println(0)\n    }\n}\n", //
-                "func f(v: Any): Unit {\n    if (v is String) {\n        println(v)\n    } else {\n        println(v as Integer)\n    }\n}\n", //
-                "func f(): Unit {\n    var s = r#\"raw \"value\"\"# .. \"tail\"\n    println(s)\n}\n", //
-                "func id<T>(v: T): T {\n    return v\n}\nfunc f(): Unit {\n    println(id<Integer>(3))\n}\n", //
-                "func f(v: Integer?): Unit {\n    var x = v ?? 0\n    println(x)\n}\n", //
-                "func f(): Unit {\n    for (i in 0...10) {\n        if (i == 5) {\n            continue\n        }\n        println(i)\n    }\n}\n", //
+                "func f() {\n    switch (1) {\n    case 1, 2:\n        println(1)\n        break\n    default:\n        println(0)\n    }\n}\n", //
+                "func f(v: Any) {\n    if (v is String) {\n        println(v)\n    } else {\n        println(v as Integer)\n    }\n}\n", //
+                "func f() {\n    var s: String = r#\"raw \"value\"\"# .. \"tail\"\n    println(s)\n}\n", //
+                "func id<T>(v: T): T {\n    return v\n}\nfunc f() {\n    println(id<Integer>(3))\n}\n", //
+                "func f(v: Integer?) {\n    var x: Integer = v ?? 0\n    println(x)\n}\n", //
+                "func f() {\n    for (i in 0...10) {\n        if (i == 5) {\n            continue\n        }\n        println(i)\n    }\n}\n", //
                 "module app\nfunc f(): Unit {\n    var x = if (true) { 1 } else { 2 }\n}\n", //
-                "interface I {\n    func ping(): Integer\n}\nclass C {\n    delegate var d: I\n}\n"};
+                "interface I {\n    method ping(): Integer\n}\nclass C {\n    delegate  d: I\n}\n"};
         char[] mutations = {'(', ')', '{', '}', ';', ',', ':', '.', '<', '>', '=', '?', '!', '*', '+', '-', '/', '&', '|', '@', '#', '\\', '\'', '"', '\n', ' ', '\t', 'r', '1', 'x', 'e', 'a', 'v', 'f', 'i', '\r'};
         Random random = new Random(9_999L);
         for (String seed : seeds) {
@@ -343,8 +349,8 @@ public final class SolvikParserRobustnessTest {
     /** The parser is a function of its input: the same source must give the same outcome. */
     @Test
     public void parsingIsRepeatableForAcceptedAndRejectedInput() {
-        String accepted = "func f(): Integer {\n    var x = 1 + 2\n    return x\n}\n";
-        String rejected = "func f(): Unit {\n    g(1) h(2)\n}\n";
+        String accepted = "func f(): Integer {\n    var x: Integer = 1 + 2\n    return x\n}\n";
+        String rejected = "func f() {\n    g(1) h(2)\n}\n";
         for (int run = 0; run < 3; run++) {
             assertThat(render(parse("a.sol", accepted))).isEqualTo(render(parse("a.sol", accepted)));
             assertThat(render(parse("r.sol", rejected))).isEqualTo(render(parse("r.sol", rejected)));
@@ -375,7 +381,7 @@ public final class SolvikParserRobustnessTest {
     /** An accepted parse carries no diagnostics; a rejected parse carries no AST. */
     @Test
     public void acceptedAndRejectedResultsAreMutuallyExclusive() {
-        List<String> sources = List.of("", "\n", "func f(): Unit {\n}\n", "func f(): Unit {\n    @\n}\n", "func f(): Unit {\n    var x = (1\n}\n");
+        List<String> sources = List.of("", "\n", "func f() {\n}\n", "func f() {\n    @\n}\n", "func f(): Unit {\n    var x = (1\n}\n");
         for (String src : sources) {
             SolvikParseResult result = checkContract("exclusive.sol", src);
             assertThat(result.isSuccess() ^ result.diagnostics().hasErrors()).as("exactly one outcome for " + preview(src)).isTrue();

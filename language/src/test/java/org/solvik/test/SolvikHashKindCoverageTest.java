@@ -46,185 +46,181 @@ public class SolvikHashKindCoverageTest {
     }
 
     private static final String PROGRAM = """
-            class Scalar {
-                var id: Integer
+                class Scalar {
+                    var id: Integer
 
-                Scalar(id: Integer) {
-                    this.id = id
-                }
-
-                override func equals(other: Any?): Boolean {
-                    if (other is Scalar) {
-                        return this.id == other.id
+                    Scalar(id: Integer) {
+                        this.id = id
                     }
-                    return false
+
+                    method override equals(other: Any?): Boolean {
+                        if (other is Scalar) {
+                            return this.id == other.id
+                        }
+                        return false
+                    }
+
+                    method override hashCode(): Integer {
+                        return this.id
+                    }
                 }
 
-                override func hashCode(): Integer {
-                    return this.id
+                enum Payload {
+                    One
+                    Two(Integer)
+                    Three(Integer, String)
+                    Four(Scalar)
                 }
-            }
 
-            enum Payload {
-                One
-                Two(Integer)
-                Three(Integer, String)
-                Four(Scalar)
-            }
+                var mutable boolSeen: Set<Boolean> = Set()
+                println(true.hashCode() == false.hashCode())
+                boolSeen.add(true)
+                boolSeen.add(true)
+                boolSeen.add(false)
+                println(boolSeen.size)
 
-            var mutable boolSeen: Set<Boolean> = Set()
-            println(true.hashCode() == false.hashCode())
-            boolSeen.add(true)
-            boolSeen.add(true)
-            boolSeen.add(false)
-            println(boolSeen.size)
+                var mutable charSeen: Set<Character> = Set()
+                println('a'.hashCode() == 'a'.hashCode())
+                charSeen.add('a')
+                charSeen.add('b')
+                println(charSeen.size)
 
-            var mutable charSeen: Set<Character> = Set()
-            println('a'.hashCode() == 'a'.hashCode())
-            charSeen.add('a')
-            charSeen.add('b')
-            println(charSeen.size)
+                var mutable intSeen: Set<Integer> = Set()
+                println((7).hashCode() == (7).hashCode())
+                intSeen.add(7)
+                intSeen.add(7)
+                intSeen.add(8)
+                println(intSeen.size)
 
-            var mutable intSeen: Set<Integer> = Set()
-            println((7).hashCode() == (7).hashCode())
-            intSeen.add(7)
-            intSeen.add(7)
-            intSeen.add(8)
-            println(intSeen.size)
+                var mutable longSeen: Set<Long> = Set()
+                println(9L.hashCode() == 9L.hashCode())
+                longSeen.add(9L)
+                longSeen.add(9L)
+                longSeen.add(10L)
+                println(longSeen.size)
 
-            var mutable longSeen: Set<Long> = Set()
-            println(9L.hashCode() == 9L.hashCode())
-            longSeen.add(9L)
-            longSeen.add(9L)
-            longSeen.add(10L)
-            println(longSeen.size)
+                var mutable byteSeen: Set<Byte> = Set()
+                println(Byte(3).hashCode() == Byte(3).hashCode())
+                byteSeen.add(Byte(3))
+                byteSeen.add(Byte(3))
+                println(byteSeen.size)
 
-            var mutable byteSeen: Set<Byte> = Set()
-            println(Byte(3).hashCode() == Byte(3).hashCode())
-            byteSeen.add(Byte(3))
-            byteSeen.add(Byte(3))
-            println(byteSeen.size)
+                var mutable shortSeen: Set<Short> = Set()
+                println(Short(4).hashCode() == Short(4).hashCode())
+                shortSeen.add(Short(4))
+                shortSeen.add(Short(4))
+                println(shortSeen.size)
 
-            var mutable shortSeen: Set<Short> = Set()
-            println(Short(4).hashCode() == Short(4).hashCode())
-            shortSeen.add(Short(4))
-            shortSeen.add(Short(4))
-            println(shortSeen.size)
+                var mutable doubleSeen: Set<Double> = Set()
+                println(1.5.hashCode() == 1.5.hashCode())
+                doubleSeen.add(1.5)
+                doubleSeen.add(1.5)
+                doubleSeen.add(2.5)
+                println(doubleSeen.size)
 
-            var mutable doubleSeen: Set<Double> = Set()
-            println(1.5.hashCode() == 1.5.hashCode())
-            doubleSeen.add(1.5)
-            doubleSeen.add(1.5)
-            doubleSeen.add(2.5)
-            println(doubleSeen.size)
+                var mutable zeroSeen: Set<Double> = Set()
+                println(0.0.hashCode() == -0.0.hashCode())
+                zeroSeen.add(0.0)
+                zeroSeen.add(-0.0)
+                println(zeroSeen.size)
 
-            var mutable zeroSeen: Set<Double> = Set()
-            println(0.0.hashCode() == -0.0.hashCode())
-            zeroSeen.add(0.0)
-            zeroSeen.add(-0.0)
-            println(zeroSeen.size)
+                var mutable floatSeen: Set<Float> = Set()
+                println(Float(1.5).hashCode() == Float(1.5).hashCode())
+                floatSeen.add(Float(1.5))
+                floatSeen.add(Float(1.5))
+                println(floatSeen.size)
 
-            var mutable floatSeen: Set<Float> = Set()
-            println(Float(1.5).hashCode() == Float(1.5).hashCode())
-            floatSeen.add(Float(1.5))
-            floatSeen.add(Float(1.5))
-            println(floatSeen.size)
+                var mutable stringSeen: Set<String> = Set()
+                println("ab".hashCode() == "ab".hashCode())
+                stringSeen.add("ab")
+                stringSeen.add("ab")
+                stringSeen.add("cd")
+                println(stringSeen.size)
 
-            var mutable stringSeen: Set<String> = Set()
-            println("ab".hashCode() == "ab".hashCode())
-            stringSeen.add("ab")
-            stringSeen.add("ab")
-            stringSeen.add("cd")
-            println(stringSeen.size)
+                var mutable enumSeen: Set<Payload> = Set()
+                println(Payload.One.hashCode() == Payload.One.hashCode())
+                enumSeen.add(Payload.One)
+                enumSeen.add(Payload.One)
+                enumSeen.add(Payload.Two(1))
+                enumSeen.add(Payload.Two(1))
+                enumSeen.add(Payload.Three(1, "x"))
+                println(enumSeen.size)
 
-            var mutable unitSeen: Set<Unit> = Set()
-            var mutable unitValue: Unit = println("")
-            unitSeen.add(unitValue)
-            println(unitSeen.size)
+                var mutable payloadSeen: Set<Payload> = Set()
+                payloadSeen.add(Payload.Four(Scalar(3)))
+                payloadSeen.add(Payload.Four(Scalar(3)))
+                println(payloadSeen.size)
+                println(Payload.Four(Scalar(3)).hashCode() == Payload.Four(Scalar(3)).hashCode())
 
-            var mutable enumSeen: Set<Payload> = Set()
-            println(Payload.One.hashCode() == Payload.One.hashCode())
-            enumSeen.add(Payload.One)
-            enumSeen.add(Payload.One)
-            enumSeen.add(Payload.Two(1))
-            enumSeen.add(Payload.Two(1))
-            enumSeen.add(Payload.Three(1, "x"))
-            println(enumSeen.size)
+                var mutable regexSeen: Set<Regex> = Set()
+                var mutable pattern: Regex = Regex("a+")
+                regexSeen.add(pattern)
+                regexSeen.add(Regex("a+"))
+                println(regexSeen.size)
 
-            var mutable payloadSeen: Set<Payload> = Set()
-            payloadSeen.add(Payload.Four(Scalar(3)))
-            payloadSeen.add(Payload.Four(Scalar(3)))
-            println(payloadSeen.size)
-            println(Payload.Four(Scalar(3)).hashCode() == Payload.Four(Scalar(3)).hashCode())
-
-            var mutable regexSeen: Set<Regex> = Set()
-            var mutable pattern: Regex = Regex("a+")
-            regexSeen.add(pattern)
-            regexSeen.add(Regex("a+"))
-            println(regexSeen.size)
-
-            var mutable maybeFound: RegexMatch? = pattern.find("aaa")
-            if (maybeFound != null) {
-                var mutable found: RegexMatch = maybeFound
-                var mutable maybeAgain: RegexMatch? = pattern.find("aaa")
-                var mutable matchSeen: Set<RegexMatch> = Set(found)
-                if (maybeAgain != null) {
-                    matchSeen.add(maybeAgain)
+                var mutable maybeFound: RegexMatch? = pattern.find("aaa")
+                if (maybeFound != null) {
+                    var mutable found: RegexMatch = maybeFound
+                    var mutable maybeAgain: RegexMatch? = pattern.find("aaa")
+                    var mutable matchSeen: Set<RegexMatch> = Set(found)
+                    if (maybeAgain != null) {
+                        matchSeen.add(maybeAgain)
+                    }
+                    println(matchSeen.size)
+                    println(found.start.hashCode() == found.start.hashCode())
+                    println(found.value.hashCode() == "aaa".hashCode())
                 }
-                println(matchSeen.size)
-                println(found.start.hashCode() == found.start.hashCode())
-                println(found.value.hashCode() == "aaa".hashCode())
-            }
 
-            var mutable listOne: List<Integer> = List(1, 2)
-            var mutable listTwo: List<Integer> = List(1, 2)
-            var mutable listSeen: Set<List<Integer>> = Set(listOne)
-            listSeen.add(listOne)
-            listSeen.add(listTwo)
-            println(listSeen.size)
+                var mutable listOne: List<Integer> = List(1, 2)
+                var mutable listTwo: List<Integer> = List(1, 2)
+                var mutable listSeen: Set<List<Integer>> = Set(listOne)
+                listSeen.add(listOne)
+                listSeen.add(listTwo)
+                println(listSeen.size)
 
-            var mutable innerList: List<Integer> = List(1)
-            var mutable innerSet: Set<Integer> = Set(1)
-            var mutable innerMap: Map<Integer, Integer> = Map()
-            var mutable innerStack: Stack<Integer> = Stack()
-            var mutable mixedSeen: Set<Any> = Set(innerSet, innerMap, innerStack)
-            println(mixedSeen.size)
+                var mutable innerList: List<Integer> = List(1)
+                var mutable innerSet: Set<Integer> = Set(1)
+                var mutable innerMap: Map<Integer, Integer> = Map()
+                var mutable innerStack: Stack<Integer> = Stack()
+                var mutable mixedSeen: Set<Any> = Set(innerSet, innerMap, innerStack)
+                println(mixedSeen.size)
 
-            var mutable scalarSeen: Set<Scalar> = Set()
-            scalarSeen.add(Scalar(1))
-            scalarSeen.add(Scalar(1))
-            println(scalarSeen.size)
+                var mutable scalarSeen: Set<Scalar> = Set()
+                scalarSeen.add(Scalar(1))
+                scalarSeen.add(Scalar(1))
+                println(scalarSeen.size)
 
-            var mutable nothing: Any? = null
-            println(nothing?.hashCode() == null)
-            var mutable nullSeen: Set<Any?> = Set()
-            nullSeen.add(null)
-            nullSeen.add(null)
-            println(nullSeen.size)
+                var mutable nothing: Any? = null
+                println(nothing?.hashCode() == null)
+                var mutable nullSeen: Set<Any?> = Set()
+                nullSeen.add(null)
+                nullSeen.add(null)
+                println(nullSeen.size)
 
-            var mutable keys: Map<Any?, Integer> = Map()
-            keys.put(1, 1)
-            keys.put("one", 2)
-            keys.put(Scalar(5), 3)
-            keys.put(Payload.Two(2), 4)
-            keys.put(null, 5)
-            println(keys.size)
-            println(keys.get(Scalar(5)))
-            println(keys.get(null))
+                var mutable keys: Map<Any?, Integer> = Map()
+                keys.put(1, 1)
+                keys.put("one", 2)
+                keys.put(Scalar(5), 3)
+                keys.put(Payload.Two(2), 4)
+                keys.put(null, 5)
+                println(keys.size)
+                println(keys.get(Scalar(5)))
+                println(keys.get(null))
 
-            var mutable deepKey: List<Integer> = List(1, 2)
-            var mutable deep: Map<List<Integer>, Integer> = Map(deepKey: 6)
-            // Collections key by reference identity, so only the same instance finds the entry.
-            println(deep.get(deepKey))
-            println(deep.size)
+                var mutable deepKey: List<Integer> = List(1, 2)
+                var mutable deep: Map<List<Integer>, Integer> = Map(deepKey: 6)
+                // Collections key by reference identity, so only the same instance finds the entry.
+                println(deep.get(deepKey))
+                println(deep.size)
+
         """;
 
     /**
      * One line per `println`, in order. Each is the number of distinct values a `Set` kept, or a hash
-     * agreement check. The blank line after the `true` for `String` is produced by `println("")` when
-     * building the `Unit` value, and `unitSeen` then keeps one entry because all `Unit` are equal. Two
-     * `List`s with equal content stay two entries because collections key by reference identity, and
-     * `0.0` with `-0.0` collapses to one because Solvik floating equality is IEEE `==`.
+     * agreement check. The no-value sentinel is not a bindable guest value, so this program has no
+     * line for it; {@code SolvikHashInvariantTest} covers it directly. Two `List`s with equal content
+     * stay two entries because collections key by reference identity, and `0.0` with `-0.0` collapses
+     * to one because Solvik floating equality is IEEE `==`.
      */
     private static final String EXPECTED_LINES = """
             false
@@ -247,8 +243,6 @@ public class SolvikHashKindCoverageTest {
             1
             true
             2
-
-            1
             true
             3
             1

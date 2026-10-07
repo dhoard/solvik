@@ -1,5 +1,5 @@
-var a = 2
-var b = a
+var a: Integer = 2
+var b: Integer = a
     * 3
 print("b" .. b)
 

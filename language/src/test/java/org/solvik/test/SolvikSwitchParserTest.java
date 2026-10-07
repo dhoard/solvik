@@ -53,7 +53,7 @@ public final class SolvikSwitchParserTest {
     @Test
     public void switchRecordsScrutineeAndCasesInSourceOrder() {
         CompilationUnitNode unit = parseOk("s.sol", """
-                func run(value: Integer): Unit {
+                func run(value: Integer) {
                     switch (value) {
                         case 1 {
                             print("one")
@@ -66,6 +66,7 @@ public final class SolvikSwitchParserTest {
                         }
                     }
                 }
+
                 """);
         SwitchStmtNode statement = switchInFunction(unit, "run");
         assertThat(statement.kind()).isEqualTo(AstKind.SWITCH_STMT);
@@ -81,7 +82,7 @@ public final class SolvikSwitchParserTest {
     @Test
     public void groupedConstantLabelsShareOneCase() {
         CompilationUnitNode unit = parseOk("s.sol", """
-                func run(value: Integer): Unit {
+                func run(value: Integer) {
                     switch (value) {
                         case 1, 2, 3 {
                             print("small")
@@ -91,6 +92,7 @@ public final class SolvikSwitchParserTest {
                         }
                     }
                 }
+
                 """);
         SwitchCaseNode first = switchInFunction(unit, "run").cases().get(0);
         assertThat(first.labels().size()).isEqualTo(3);
@@ -105,7 +107,7 @@ public final class SolvikSwitchParserTest {
     @Test
     public void eachCaseBodyIsAnImplicitBlock() {
         CompilationUnitNode unit = parseOk("s.sol", """
-                func run(value: Integer): Unit {
+                func run(value: Integer) {
                     switch (value) {
                         case 1 {
                             print("one")
@@ -115,6 +117,7 @@ public final class SolvikSwitchParserTest {
                         }
                     }
                 }
+
                 """);
         SwitchStmtNode statement = switchInFunction(unit, "run");
         assertThat(statement.cases().get(0).body().kind()).isEqualTo(AstKind.BLOCK);
@@ -126,7 +129,7 @@ public final class SolvikSwitchParserTest {
     @Test
     public void stringConstantsAndNullAreConstantLabels() {
         CompilationUnitNode unit = parseOk("s.sol", """
-                func run(value: String?): Unit {
+                func run(value: String?) {
                     switch (value) {
                         case null {
                             print("none")
@@ -139,6 +142,7 @@ public final class SolvikSwitchParserTest {
                         }
                     }
                 }
+
                 """);
         SwitchStmtNode statement = switchInFunction(unit, "run");
         assertThat(((ConstantCaseLabelNode) statement.cases().get(0).labels().get(0)).expression().kind()).isEqualTo(AstKind.NULL_LITERAL);
@@ -149,7 +153,7 @@ public final class SolvikSwitchParserTest {
     @Test
     public void rawAndNormalRegexPatternsAreRecorded() {
         CompilationUnitNode unit = parseOk("s.sol", """
-                func run(input: String): Unit {
+                func run(input: String) {
                     switch (input) {
                         case regex r#"^\\d+$"# {
                             print("number")
@@ -162,6 +166,7 @@ public final class SolvikSwitchParserTest {
                         }
                     }
                 }
+
                 """);
         SwitchStmtNode statement = switchInFunction(unit, "run");
         RegexCaseLabelNode raw = (RegexCaseLabelNode) statement.cases().get(0).labels().get(0);
@@ -174,7 +179,7 @@ public final class SolvikSwitchParserTest {
     @Test
     public void switchNestsInsideBlocksAndOtherSwitches() {
         CompilationUnitNode unit = parseOk("s.sol", """
-                func run(a: Integer, b: Integer): Unit {
+                func run(a: Integer, b: Integer) {
                     if (a > 0) {
                         switch (a) {
                             case 1 {
@@ -193,6 +198,7 @@ public final class SolvikSwitchParserTest {
                         }
                     }
                 }
+
                 """);
         SwitchStmtNode outer = (SwitchStmtNode) ((org.solvik.ast.statement.IfStmtNode) ((FunctionDeclNode) unit.declarations().get(0)).body().statements().get(0)).thenBlock().statements().get(0);
         SwitchStmtNode inner = (SwitchStmtNode) outer.cases().get(0).body().statements().get(0);
@@ -202,7 +208,7 @@ public final class SolvikSwitchParserTest {
     @Test
     public void switchStatementSpanCoversTheWholeConstruct() {
         String text = """
-                func run(value: Integer): Unit {
+                func run(value: Integer) {
                     switch (value) {
                         case 1 {
                             print("one")
@@ -212,6 +218,7 @@ public final class SolvikSwitchParserTest {
                         }
                     }
                 }
+
                 """;
         CompilationUnitNode unit = parseOk("s.sol", text);
         SwitchStmtNode statement = switchInFunction(unit, "run");
@@ -223,13 +230,14 @@ public final class SolvikSwitchParserTest {
     @Test
     public void aSwitchWithoutAScrutineeIsRejected() {
         assertThat(parseFails("s.sol", """
-                func run(): Unit {
+                func run() {
                     switch {
                         default {
                             print("x")
                         }
                     }
                 }
+
                 """).hasErrors()).isTrue();
     }
 
@@ -237,62 +245,67 @@ public final class SolvikSwitchParserTest {
     public void aCaseWithAColonIsRejected() {
         // The body's brace marks the end of the label; a colon is no longer part of any case spelling.
         assertThat(parseFails("s.sol", """
-                func run(value: Integer): Unit {
+                func run(value: Integer) {
                     switch (value) {
                         case 1:
                             print("one")
                     }
                 }
+
                 """).hasErrors()).isTrue();
     }
 
     @Test
     public void aCaseWithoutABracedBodyIsRejected() {
         assertThat(parseFails("s.sol", """
-                func run(value: Integer): Unit {
+                func run(value: Integer) {
                     switch (value) {
                         case 1
                             print("one")
                     }
                 }
+
                 """).hasErrors()).isTrue();
     }
 
     @Test
     public void aCaseWithoutALabelIsRejected() {
         assertThat(parseFails("s.sol", """
-                func run(value: Integer): Unit {
+                func run(value: Integer) {
                     switch (value) {
                         case:
                             print("one")
                     }
                 }
+
                 """).hasErrors()).isTrue();
     }
 
     @Test
     public void aRegexCaseWithoutAPatternIsRejected() {
         assertThat(parseFails("s.sol", """
-                func run(input: String): Unit {
+                func run(input: String) {
                     switch (input) {
                         case regex {
                             print("x")
                         }
                     }
                 }
+
                 """).hasErrors()).isTrue();
     }
 
     @Test
     public void aTrailingCommaInCaseLabelsIsRejected() {
         assertThat(parseFails("s.sol", """
-                func run(value: Integer): Unit {
+                func run(value: Integer) {
                     switch (value) {
                         case 1, {
                             print("one")
                         }
                     }
                 }
+
                 """).hasErrors()).isTrue();
     }
 }

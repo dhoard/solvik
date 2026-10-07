@@ -1,12 +1,12 @@
 interface I1 {
-    func base3(): Integer
-    func twice4(): Integer {
+    method base3(): Integer
+    method twice4(): Integer {
         return this.base3() * 2
     }
 }
 
 class Imp2 implements I1 {
-    func base3(): Integer {
+    method base3(): Integer {
         return 39
     }
 }
@@ -21,14 +21,14 @@ func cmp6(a: Double, b: Double): Boolean {
 
 println(cmp6(44.0, 96.0))
 
-mutable class A7 {
-    mutable func v9(): Integer {
+class mutable A7 {
+    method mutable v9(): Integer {
         return 27
     }
 }
 
 class B8 extends A7 {
-    override func v9(): Integer {
+    method override v9(): Integer {
         return 18
     }
 }

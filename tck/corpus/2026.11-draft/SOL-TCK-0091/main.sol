@@ -19,8 +19,8 @@
 // as a declared type. TCK.md section 6 forbids promoting the implementation's enum entry to
 // normative status. Sentinel per TCK.md section 10: the print would be observable if this
 // invalid assignment were accepted.
-mutable class Base {
-    func label(): String {
+class mutable Base {
+    method label(): String {
         return "base"
     }
 }
@@ -28,6 +28,6 @@ mutable class Base {
 class Derived extends Base {
 }
 
-var items = List<Derived>(Derived())
+var items: List<Derived> = List<Derived>(Derived())
 var box: List<Base> = items
 print(box.size)

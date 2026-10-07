@@ -19,6 +19,6 @@
 // exclude the alternatives in which this rejection would be caused by a broken module
 // system rather than by `instead`. Sentinel per TCK.md section 10: the print would be
 // observable if the reference resolved.
-include "lib/m.sol" alias m
+include "lib/m.sol"
 
-print(com_example_math::add(2, 3))
+print(other_math::add(2, 3))

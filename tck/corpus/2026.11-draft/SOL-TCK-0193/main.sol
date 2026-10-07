@@ -1,11 +1,11 @@
-abstract class A {
+class abstract A {
 }
-mutable class B extends A {
+class mutable B extends A {
 }
 class C extends B {
 }
 var a: A = C()
-var n = match a {
+var n: Integer = match a {
     b: B => 20
     c: C => 10
     _ => 0

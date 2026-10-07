@@ -11,6 +11,6 @@ enum Result<T, E> {
 func get(): Result<Integer, String> {
     return Result.Ok(1)
 }
-var r = get()
+var r: Result<Integer, String> = get()
 print(r.isOk())
 print(r.isErr())

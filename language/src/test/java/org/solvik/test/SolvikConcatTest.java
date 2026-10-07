@@ -134,11 +134,12 @@ public final class SolvikConcatTest {
     public void objectOverrideParticipatesInConcatenation() {
         assertThat(run("""
                 class Tag {
-                    override func toString(): String {
+                    method override toString(): String {
                         return "TAG"
                     }
                 }
                 println("<" .. Tag() .. ">")
+
                 """)).isEqualTo("<TAG>\n");
     }
 }

@@ -167,9 +167,9 @@ public final class SolvikParser {
             parser.setErrorHandler(new BailErrorStrategy());
             parser.getInterpreter().setPredictionMode(PredictionMode.SLL);
             CompilationUnitContext tree = parser.compilationUnit();
-            if (lexerErrors.sawError() || hasRemovedFor(tree)) {
-                // A removed three-clause `for` defers to the reporting stage, which owns the
-                // diagnostic; the fast stage never builds an AST around a rejected construct.
+            if (lexerErrors.sawError() || hasRemovedSyntax(tree)) {
+                // Retired syntax defers to the reporting stage, which owns the diagnostic; the fast
+                // stage never builds an AST around a rejected construct.
                 return null;
             }
             return SolvikParseResult.success(new SolvikAstBuilder(source).build(tree));
@@ -192,11 +192,11 @@ public final class SolvikParser {
 
         CompilationUnitContext tree = parser.compilationUnit();
         DiagnosticBag bag = listener.build();
-        List<Diagnostic> removedFor = removedForDiagnostics(tree, source);
-        if (!removedFor.isEmpty()) {
+        List<Diagnostic> removed = removedSyntaxDiagnostics(tree, source);
+        if (!removed.isEmpty()) {
             DiagnosticBag.Builder builder = DiagnosticBag.builder();
             bag.all().forEach(builder::add);
-            removedFor.forEach(builder::add);
+            removed.forEach(builder::add);
             return SolvikParseResult.failure(builder.build());
         }
         if (bag.hasErrors()) {
@@ -207,31 +207,28 @@ public final class SolvikParser {
     }
 
     /**
-     * The removed three-clause {@code for} is matched by the grammar for exactly one reason: so a
-     * program written against the old revision is named at its {@code for} keyword with the
-     * replacement spelled out, instead of failing as a generic syntax error at the first {@code ;}.
-     * The construct has no AST node and no execution path; this detection is the whole of it
-     * (docs/LANGUAGE_SPEC.md section 17).
+     * The {@code removed*} productions are matched by the grammar for exactly one reason: so a program
+     * written against the retired syntax model is named at its own first token with the replacement
+     * spelled out, instead of failing as a generic syntax error a few tokens later. The constructs
+     * have no AST node and no execution path; this detection is the whole of them
+     * (docs/LANGUAGE_SPEC.md sections 2, 6, 7, 9, 17, 20).
      */
-    private static boolean hasRemovedFor(org.antlr.v4.runtime.tree.ParseTree tree) {
-        return !removedForDiagnostics(tree, null).isEmpty();
+    private static boolean hasRemovedSyntax(org.antlr.v4.runtime.tree.ParseTree tree) {
+        return !removedSyntaxDiagnostics(tree, null).isEmpty();
     }
 
-    /** One diagnostic per removed {@code for}, anchored at its keyword; empty span skips the bag. */
-    private static List<Diagnostic> removedForDiagnostics(org.antlr.v4.runtime.tree.ParseTree tree, SourceFile source) {
+    /** One diagnostic per retired construct, anchored at the construct's first token. */
+    private static List<Diagnostic> removedSyntaxDiagnostics(org.antlr.v4.runtime.tree.ParseTree tree, SourceFile source) {
         List<Diagnostic> found = new java.util.ArrayList<>();
         org.antlr.v4.runtime.tree.ParseTreeWalker.DEFAULT.walk(new org.antlr.v4.runtime.tree.ParseTreeListener() {
             @Override
             public void enterEveryRule(org.antlr.v4.runtime.ParserRuleContext ctx) {
-                if (ctx instanceof org.solvik.parser.generated.SolvikParser.RemovedForStmtContext removed) {
-                    if (source != null) {
-                        found.add(Diagnostic.error(DiagnosticCode.PARSER_REMOVED_THREE_CLAUSE_FOR,
-                                tokenSpan(removed.getStart(), source), REMOVED_FOR_MESSAGE));
-                    } else {
-                        found.add(Diagnostic.error(DiagnosticCode.PARSER_REMOVED_THREE_CLAUSE_FOR,
-                                SourceSpan.of(0, 0, 0), REMOVED_FOR_MESSAGE));
-                    }
+                Diagnosis diagnosis = diagnosisFor(ctx);
+                if (diagnosis == null) {
+                    return;
                 }
+                SourceSpan span = source == null ? SourceSpan.of(0, 0, 0) : tokenSpan(ctx.getStart(), source);
+                found.add(Diagnostic.error(diagnosis.code(), span, diagnosis.message()));
             }
 
             @Override
@@ -249,17 +246,64 @@ public final class SolvikParser {
         return found;
     }
 
+    /** The diagnostic a retired construct earns, or {@code null} for every live construct. */
+    private static Diagnosis diagnosisFor(org.antlr.v4.runtime.ParserRuleContext ctx) {
+        if (ctx instanceof org.solvik.parser.generated.SolvikParser.RemovedForStmtContext) {
+            return new Diagnosis(DiagnosticCode.PARSER_REMOVED_THREE_CLAUSE_FOR,
+                    "the three-clause `for` syntax was removed in 2026.11-draft; use a range `for` over an "
+                    + "integer range or a scope block around a `while` loop");
+        }
+        if (ctx instanceof org.solvik.parser.generated.SolvikParser.RemovedFuncMemberContext) {
+            return new Diagnosis(DiagnosticCode.PARSER_REMOVED_DECLARATION,
+                    "'func' cannot declare a class or interface member; write 'method name(...) { ... }'");
+        }
+        if (ctx instanceof org.solvik.parser.generated.SolvikParser.RemovedInferredLocalDeclContext) {
+            return new Diagnosis(DiagnosticCode.PARSER_REMOVED_DECLARATION,
+                    "a local declaration must write its type; write 'var name: Type = expression'");
+        }
+        if (ctx instanceof org.solvik.parser.generated.SolvikParser.RemovedDelegateVarContext) {
+            return new Diagnosis(DiagnosticCode.PARSER_REMOVED_DECLARATION,
+                    "'delegate var' is not a declaration; write 'delegate name: InterfaceType'");
+        }
+        if (ctx instanceof org.solvik.parser.generated.SolvikParser.RemovedModuleHeaderContext) {
+            return new Diagnosis(DiagnosticCode.PARSER_REMOVED_DECLARATION,
+                    "a module is a braced block; write 'module Name { ... }' and put declarations inside it");
+        }
+        if (ctx instanceof org.solvik.parser.generated.SolvikParser.RemovedIncludeAliasContext) {
+            return new Diagnosis(DiagnosticCode.PARSER_REMOVED_DECLARATION,
+                    "an include includes source and binds no name; remove the 'alias' suffix and name the module "
+                    + "with a 'module Name { ... }' block");
+        }
+        if (ctx instanceof org.solvik.parser.generated.SolvikParser.RemovedClassModifierPrefixContext) {
+            return new Diagnosis(DiagnosticCode.PARSER_REMOVED_DECLARATION,
+                    "a class modifier follows the 'class' keyword; write 'class mutable Name' or 'class abstract Name'");
+        }
+        if (ctx instanceof org.solvik.parser.generated.SolvikParser.RemovedMemberModifierPrefixContext) {
+            return new Diagnosis(DiagnosticCode.PARSER_REMOVED_DECLARATION,
+                    "a member modifier follows the declaration keyword; write 'method static', 'method mutable', "
+                    + "'method override mutable', or 'var static mutable'");
+        }
+        if (ctx instanceof org.solvik.parser.generated.SolvikParser.RemovedAnonymousFunctionExprContext) {
+            return new Diagnosis(DiagnosticCode.PARSER_REMOVED_FUNCTION_VALUE,
+                    "function values were removed; declare a 'func' and call it directly");
+        }
+        if (ctx instanceof org.solvik.parser.generated.SolvikParser.RemovedFunctionTypeRefContext) {
+            return new Diagnosis(DiagnosticCode.PARSER_REMOVED_FUNCTION_VALUE,
+                    "function types were removed; declare a 'func' and call it directly");
+        }
+        return null;
+    }
+
+    /** A retired construct's stable code and replacement-naming message. */
+    private record Diagnosis(DiagnosticCode code, String message) {
+    }
+
     /** Character span of a token; mirrors the error listener's anchoring of parser diagnostics. */
     private static SourceSpan tokenSpan(org.antlr.v4.runtime.Token token, SourceFile source) {
         int start = token.getStartIndex();
         int stop = Math.max(token.getStopIndex(), start - 1);
         return SourceSpan.of(source.id(), start, Math.min(stop + 1, source.textLength()));
     }
-
-    /** The user-facing removal message; the specification names the two replacements it offers. */
-    private static final String REMOVED_FOR_MESSAGE =
-            "the three-clause `for` syntax was removed in 2026.11-draft; use a range `for` over an "
-            + "integer range or a scope block around a `while` loop";
 
     private static SolvikLexer newLexer(SourceFile source) {
         SolvikLexer lexer = new SolvikLexer(CharStreams.fromString(source.text(), source.name()));

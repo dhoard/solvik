@@ -5,7 +5,7 @@
 // names the stable code SEM_BLOCK_RESULT_REQUIRED = SOLV-SEM-041, whose primary span is
 // the "offending block or case body". The trailing print is a sentinel only: a compile
 // rejection prevents it from running.
-var invalid = {
-    var local = 1
+var invalid: Nothing = {
+    var local: Integer = 1
 }
 print("EXECUTED-INVALID")

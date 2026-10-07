@@ -79,7 +79,7 @@ public final class SolvikVariableMutabilityTest {
 
     @Test
     public void immutableDeclarationBindsAndReads() {
-        assertThat(run("var x = 10\nprint(x)")).isEqualTo("10");
+        assertThat(run("var x: Integer = 10\nprint(x)")).isEqualTo("10");
     }
 
     @Test
@@ -91,7 +91,7 @@ public final class SolvikVariableMutabilityTest {
 
     @Test
     public void mutableDeclarationReassigns() {
-        assertThat(run("var mutable x = 10\nx = 20\nprint(x)")).isEqualTo("20");
+        assertThat(run("var mutable x: Integer = 10\nx = 20\nprint(x)")).isEqualTo("20");
     }
 
     @Test
@@ -101,7 +101,7 @@ public final class SolvikVariableMutabilityTest {
 
     @Test
     public void mutableBindingMayBeAssignedRepeatedly() {
-        assertThat(run("var mutable count = 0\ncount = 1\ncount = 2\ncount = count + 1\nprint(count)"))
+        assertThat(run("var mutable count: Integer = 0\ncount = 1\ncount = 2\ncount = count + 1\nprint(count)"))
                 .isEqualTo("3");
     }
 
@@ -109,13 +109,13 @@ public final class SolvikVariableMutabilityTest {
 
     @Test
     public void anInnerMutableBindingShadowsAnOuterImmutableOne() {
-        String src = "var x = 10\n{\n    var mutable x = 20\n    x = 30\n    print(x)\n}\nprint(x)";
+        String src = "var x: Integer = 10\n{\n    var mutable x: Integer = 20\n    x = 30\n    print(x)\n}\nprint(x)";
         assertThat(run(src)).isEqualTo("3010");
     }
 
     @Test
     public void anInnerImmutableBindingShadowsAnOuterMutableOne() {
-        String src = "var mutable x = 10\n{\n    var x = 20\n    print(x)\n}\nx = 11\nprint(x)";
+        String src = "var mutable x: Integer = 10\n{\n    var x: Integer = 20\n    print(x)\n}\nx = 11\nprint(x)";
         assertThat(run(src)).isEqualTo("2011");
     }
 
@@ -132,9 +132,10 @@ public final class SolvikVariableMutabilityTest {
                     }
                 }
 
-                var user = User("Doug")
+                var user: User = User("Doug")
                 user.name = "Douglas"
                 print(user.name)
+
                 """;
         assertThat(run(src)).isEqualTo("Douglas");
     }
@@ -143,9 +144,9 @@ public final class SolvikVariableMutabilityTest {
 
     @Test
     public void immutableReassignmentIsRejected() {
-        Diagnostic diagnostic = first(checkFails("var x = 10\nx = 20\n"));
+        Diagnostic diagnostic = first(checkFails("var x: Integer = 10\nx = 20\n"));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_ASSIGN_TO_IMMUTABLE);
-        assertThat(diagnostic.span().startOffset()).isEqualTo("var x = 10\n".length());
+        assertThat(diagnostic.span().startOffset()).isEqualTo("var x: Integer = 10\n".length());
     }
 
     @Test
@@ -156,7 +157,7 @@ public final class SolvikVariableMutabilityTest {
 
     @Test
     public void mutationOfAnOuterImmutableBindingFromANestedScopeIsRejected() {
-        String src = "var x = 10\n{\n    x = 20\n}\n";
+        String src = "var x: Integer = 10\n{\n    x = 20\n}\n";
         Diagnostic diagnostic = first(checkFails(src));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_ASSIGN_TO_IMMUTABLE);
         assertThat(diagnostic.span().startOffset()).isEqualTo(src.indexOf("x = 20"));
@@ -164,7 +165,7 @@ public final class SolvikVariableMutabilityTest {
 
     @Test
     public void reassigningAParameterIsRejected() {
-        Diagnostic diagnostic = first(checkFails("func f(p: Integer): Unit {\n    p = 1\n}\n"));
+        Diagnostic diagnostic = first(checkFails("func f(p: Integer) {\n    p = 1\n}\n"));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_ASSIGN_TO_IMMUTABLE);
     }
 
@@ -179,9 +180,10 @@ public final class SolvikVariableMutabilityTest {
                     }
                 }
 
-                func f(c: C): Unit {
+                func f(c: C) {
                     c.name = "b"
                 }
+
                 """;
         Diagnostic diagnostic = first(checkFails(src));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_ASSIGN_TO_IMMUTABLE);

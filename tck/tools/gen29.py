@@ -134,15 +134,12 @@ REQS_SPEC = {
              "the narrowed type. The refinement must not survive the write, so the read is a "
              "compile-time error; no code is named, so the rejection is bare."),
     "REQ-2710": dict(
-        section="6. Functions",
-        summary="Writing the `: Unit` return type explicitly is permitted and equivalent to "
-                "omitting it",
-        kind="runtime",
-        quotes=["A function's return type is written only when the function returns a value; a "
-                "declaration that omits the return type returns no value and has type `Unit`. "
-                "Writing `: Unit` explicitly is permitted but redundant."],
-        note="The function declares `: Unit` and is called as a statement; the side effect is the "
-             "observable, so the explicit spelling is accepted and behaves as the omitted one."),
+  section='6. Functions',
+  summary='Writing the `: Unit` return type explicitly is permitted and equivalent to omitting it',
+  kind='runtime',
+  quotes=["A callable's return type is written only when the callable produces a value: a declaration that writes no `: Type` produces no value at all, and no source type names that result."],
+  tests=['SOL-TCK-0389'],
+  note='The function declares `: Unit` and is called as a statement; the side effect is the observable, so the explicit spelling is accepted and behaves as the omitted one.'),
 }
 
 NEG = '\nprint("EXECUTED-INVALID")\n'
@@ -195,27 +192,88 @@ BAD("SOL-TCK-0382", "types", "REQ-2703",
     'var x: A = B()\nprint("EXECUTED-INVALID")\n',
     "The classes have identical members but no nominal relation, so the assignment is rejected.")
 BAD("SOL-TCK-0383", "objects", "REQ-2704",
-    'mutable class A {\n    A() {\n    }\n}\nmutable class B {\n    B() {\n    }\n}\n'
-    'class C extends A, B {\n    C() {\n    }\n}\nprint("EXECUTED-INVALID")\n',
+    (('class mutable A {\n'
+    '    A() {\n'
+    '    }\n'
+    '}\n'
+    'class mutable B {\n'
+    '    B() {\n'
+    '    }\n'
+    '}\n'
+    'class C extends A, B {\n'
+    '    C() {\n'
+    '    }\n'
+    '}\n'
+    'print("EXECUTED-INVALID")\n'
+    '')),
     "Two superclass names are forbidden.")
 BAD("SOL-TCK-0384", "objects", "REQ-2705",
-    'interface P {\n    func go(): Integer\n}\nclass Impl implements P {\n    Impl() {\n    }\n\n'
-    '    func go(): Integer {\n        return 1\n    }\n}\nclass X implements P {\n'
-    '    delegate var a: P\n\n    X(p: P) {\n        this.a = p\n    }\n\n'
-    '    func mutate(p: P) {\n        this.a = p\n    }\n}\nprint("EXECUTED-INVALID")\n',
+    (('interface P {\n'
+    '    method go(): Integer\n'
+    '}\n'
+    'class Impl implements P {\n'
+    '    Impl() {\n'
+    '    }\n'
+    '\n'
+    '    method go(): Integer {\n'
+    '        return 1\n'
+    '    }\n'
+    '}\n'
+    'class X implements P {\n'
+    '    delegate a: P\n'
+    '\n'
+    '    X(p: P) {\n'
+    '        this.a = p\n'
+    '    }\n'
+    '\n'
+    '    method mutate(p: P) {\n'
+    '        this.a = p\n'
+    '    }\n'
+    '}\n'
+    'print("EXECUTED-INVALID")\n'
+    '')),
     "The delegate is assigned by `mutate` after initialization, which the immutable `var` forbids.")
 BAD("SOL-TCK-0385", "abstract", "REQ-2706",
-    'abstract class Shape {\n    Shape() {\n    }\n}\nvar s = Shape()\nprint("EXECUTED-INVALID")\n',
+    (('class abstract Shape {\n'
+    '    Shape() {\n'
+    '    }\n'
+    '}\n'
+    'var s: Shape = Shape()\n'
+    'print("EXECUTED-INVALID")\n'
+    '')),
     "An abstract class is not constructible, so its constructor call is rejected.")
 BAD("SOL-TCK-0386", "enums", "REQ-2707",
     'enum E {\n    A(Integer)\n    B(String)\n}\nvar x: E = E.A("wrong")\n'
     'print("EXECUTED-INVALID")\n',
     "Variant A carries an Integer payload, so the String argument is not assignable.")
 OK("SOL-TCK-0387", "objects", "REQ-2708",
-   'mutable class A {\n    mutable func label(): String {\n        return "A"\n    }\n\n    A() {\n    }\n}\n'
-   'mutable class B extends A {\n    mutable override func label(): String {\n        return "B"\n    }\n\n'
-   '    B() {\n    }\n}\nclass C extends B {\n    override func label(): String {\n'
-   '        return super.label() .. "C"\n    }\n\n    C() {\n    }\n}\nvar c = C()\nprint(c.label())\n',
+   (('class mutable A {\n'
+    '    method mutable label(): String {\n'
+    '        return "A"\n'
+    '    }\n'
+    '\n'
+    '    A() {\n'
+    '    }\n'
+    '}\n'
+    'class mutable B extends A {\n'
+    '    method override mutable label(): String {\n'
+    '        return "B"\n'
+    '    }\n'
+    '\n'
+    '    B() {\n'
+    '    }\n'
+    '}\n'
+    'class C extends B {\n'
+    '    method override label(): String {\n'
+    '        return super.label() .. "C"\n'
+    '    }\n'
+    '\n'
+    '    C() {\n'
+    '    }\n'
+    '}\n'
+    'var c: C = C()\n'
+    'print(c.label())\n'
+    '')),
    "BC",
    "The most derived method concatenates its own text after `super.label()`, so the printed BC "
    "shows super reached the immediate parent B rather than the root A.")
@@ -225,7 +283,11 @@ BAD("SOL-TCK-0388", "types", "REQ-2709",
     'print("EXECUTED-INVALID")\n',
     "The write to x invalidates the is-refinement, so the later String read is rejected.")
 OK("SOL-TCK-0389", "control", "REQ-2710",
-   'func f(): Unit {\n    print("unitok")\n}\nf()\n',
+   (('func f() {\n'
+    '    print("unitok")\n'
+    '}\n'
+    'f()\n'
+    '')),
    "unitok",
    "The explicit `: Unit` spelling is accepted and the call runs the body's side effect.")
 

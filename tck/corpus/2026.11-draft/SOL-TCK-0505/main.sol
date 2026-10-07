@@ -4,7 +4,7 @@
 // Oracle quotations verified verbatim against docs/LANGUAGE_SPEC.md:
 //   - a binding is immutable unless `mutable` follows it
 //
-var x = 10
+var x: Integer = 10
 {
     x = 20
 }

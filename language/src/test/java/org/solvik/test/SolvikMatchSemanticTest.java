@@ -124,7 +124,7 @@ public final class SolvikMatchSemanticTest {
     @Test
     public void subtypeBindingNarrowsToTheSubtype() {
         CheckedProgram program = check("""
-                abstract class Shape {
+                class abstract Shape {
                 }
                 class Circle extends Shape {
                     var radius: Integer
@@ -139,6 +139,7 @@ public final class SolvikMatchSemanticTest {
                         _ => 0
                     }
                 }
+
                 """);
         BindingPatternNode circle = (BindingPatternNode) matchInReturn(program, "area", 0).branches().get(0).pattern();
         assertThat(program.patternBindingOf(circle).orElseThrow().type()).isSameAs(program.classSymbol("Circle").orElseThrow().type());
@@ -148,7 +149,7 @@ public final class SolvikMatchSemanticTest {
     @Test
     public void subtypeBranchesUnifyToTheAbstractSupertype() {
         CheckedProgram program = check("""
-                abstract class Shape {
+                class abstract Shape {
                 }
                 class Circle extends Shape {
                 }
@@ -161,6 +162,7 @@ public final class SolvikMatchSemanticTest {
                         _ => shape
                     }
                 }
+
                 """);
         assertThat(typeOfMatch(program, "pick", 0)).isSameAs(program.classSymbol("Shape").orElseThrow().type());
     }
@@ -225,7 +227,7 @@ public final class SolvikMatchSemanticTest {
     @Test
     public void matchOnANullableSealedTypeIsExhaustiveWithAWildcard() {
         CheckedProgram program = check("""
-                abstract class Shape {
+                class abstract Shape {
                 }
                 class Circle extends Shape {
                 }
@@ -235,6 +237,7 @@ public final class SolvikMatchSemanticTest {
                         _ => "none"
                     }
                 }
+
                 """);
         assertThat(typeOfMatch(program, "name", 0)).isSameAs(StringType.INSTANCE);
     }
@@ -258,7 +261,7 @@ public final class SolvikMatchSemanticTest {
     @Test
     public void aWildcardAfterATypedBindingOnANullableTypeIsReachable() {
         CheckedProgram program = check("""
-                abstract class Shape {
+                class abstract Shape {
                 }
                 class Circle extends Shape {
                 }
@@ -268,6 +271,7 @@ public final class SolvikMatchSemanticTest {
                         _ => "none"
                     }
                 }
+
                 """);
         assertThat(typeOfMatch(program, "name", 0)).isSameAs(StringType.INSTANCE);
     }

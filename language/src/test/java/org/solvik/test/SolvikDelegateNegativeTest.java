@@ -57,20 +57,21 @@ public final class SolvikDelegateNegativeTest {
     public void twoDelegatesSupplyingOneMemberAreAmbiguous() {
         Diagnostic diagnostic = first(checkFails("""
                 interface PrinterA {
-                    func print(): Unit
+                    method print()
                 }
                 interface PrinterB {
-                    func print(): Unit
+                    method print()
                 }
                 class X implements PrinterA, PrinterB {
-                    delegate var a: PrinterA
-                    delegate var b: PrinterB
+                    delegate  a: PrinterA
+                    delegate  b: PrinterB
 
                     X(a: PrinterA, b: PrinterB) {
                         this.a = a
                         this.b = b
                     }
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_AMBIGUOUS_DELEGATION);
     }
@@ -79,17 +80,18 @@ public final class SolvikDelegateNegativeTest {
     public void twoDelegatesOfTheSameInterfaceTypeAreAmbiguous() {
         Diagnostic diagnostic = first(checkFails("""
                 interface Printer {
-                    func print(): Unit
+                    method print()
                 }
                 class X implements Printer {
-                    delegate var a: Printer
-                    delegate var b: Printer
+                    delegate  a: Printer
+                    delegate  b: Printer
 
                     X(a: Printer, b: Printer) {
                         this.a = a
                         this.b = b
                     }
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_AMBIGUOUS_DELEGATION);
     }
@@ -100,8 +102,9 @@ public final class SolvikDelegateNegativeTest {
                 class MemoryRepository {
                 }
                 class Service {
-                    delegate var repository: MemoryRepository = MemoryRepository()
+                    delegate  repository: MemoryRepository = MemoryRepository()
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_INVALID_DELEGATE_TYPE);
     }
@@ -110,8 +113,9 @@ public final class SolvikDelegateNegativeTest {
     public void aBuiltinTypedDelegateIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 class Service {
-                    delegate var value: Integer = 1
+                    delegate  value: Integer = 1
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_INVALID_DELEGATE_TYPE);
     }
@@ -120,8 +124,9 @@ public final class SolvikDelegateNegativeTest {
     public void anUnknownDelegateTypeIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 class Service {
-                    delegate var repository: Missing
+                    delegate  repository: Missing
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_TYPE);
     }
@@ -130,11 +135,12 @@ public final class SolvikDelegateNegativeTest {
     public void aDelegateWithoutInitializerRequiresAConstructor() {
         Diagnostic diagnostic = first(checkFails("""
                 interface Named {
-                    func name(): String
+                    method name(): String
                 }
                 class Service implements Named {
-                    delegate var named: Named
+                    delegate  named: Named
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_CLASS_REQUIRES_INITIALIZER);
     }
@@ -143,14 +149,15 @@ public final class SolvikDelegateNegativeTest {
     public void aDelegateNotAssignedInConstructorIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 interface Named {
-                    func name(): String
+                    method name(): String
                 }
                 class Service implements Named {
-                    delegate var named: Named
+                    delegate  named: Named
 
                     Service() {
                     }
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_MISSING_PROPERTY_INITIALIZER);
     }
@@ -159,16 +166,17 @@ public final class SolvikDelegateNegativeTest {
     public void aDelegateAssignedTwiceInConstructorIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 interface Named {
-                    func name(): String
+                    method name(): String
                 }
                 class Service implements Named {
-                    delegate var named: Named
+                    delegate  named: Named
 
                     Service(named: Named) {
                         this.named = named
                         this.named = named
                     }
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_ASSIGN_TO_IMMUTABLE);
     }
@@ -177,19 +185,20 @@ public final class SolvikDelegateNegativeTest {
     public void aDelegateWrittenAfterConstructionIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 interface Named {
-                    func name(): String
+                    method name(): String
                 }
                 class Service implements Named {
-                    delegate var named: Named
+                    delegate  named: Named
 
                     Service(named: Named) {
                         this.named = named
                     }
 
-                    func replace(other: Named): Unit {
+                    method replace(other: Named) {
                         this.named = other
                     }
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_ASSIGN_TO_IMMUTABLE);
         assertThat(diagnostic.message().contains("named")).as(diagnostic.message()).isTrue();
@@ -199,18 +208,19 @@ public final class SolvikDelegateNegativeTest {
     public void aDelegateMemberWithWrongParameterTypesIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 interface Sink {
-                    func put(value: Integer): Unit
+                    method put(value: Integer)
                 }
                 interface StringSink {
-                    func put(value: String): Unit
+                    method put(value: String)
                 }
                 class Service implements Sink {
-                    delegate var sink: StringSink
+                    delegate  sink: StringSink
 
                     Service(sink: StringSink) {
                         this.sink = sink
                     }
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_DELEGATE_SIGNATURE);
     }
@@ -219,18 +229,19 @@ public final class SolvikDelegateNegativeTest {
     public void aDelegateMemberWithANonCovariantReturnIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 interface Producer {
-                    func get(): String
+                    method get(): String
                 }
                 interface AnyProducer {
-                    func get(): Any
+                    method get(): Any
                 }
                 class Service implements Producer {
-                    delegate var producer: AnyProducer
+                    delegate  producer: AnyProducer
 
                     Service(producer: AnyProducer) {
                         this.producer = producer
                     }
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_DELEGATE_SIGNATURE);
     }
@@ -239,17 +250,18 @@ public final class SolvikDelegateNegativeTest {
     public void aDelegateNameCollidingWithAPropertyIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 interface Named {
-                    func name(): String
+                    method name(): String
                 }
                 class Service implements Named {
                     var named: Integer = 1
-                    delegate var named: Named = Memory()
+                    delegate  named: Named = Memory()
                 }
                 class Memory implements Named {
-                    func name(): String {
+                    method name(): String {
                         return "x"
                     }
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_DUPLICATE_NAME);
     }
@@ -258,18 +270,19 @@ public final class SolvikDelegateNegativeTest {
     public void aDelegateNameCollidingWithAMethodIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 interface Named {
-                    func name(): String
+                    method name(): String
                 }
                 class Service implements Named {
-                    delegate var run: Named
+                    delegate  run: Named
 
                     Service(run: Named) {
                         this.run = run
                     }
 
-                    func run(): Unit {
+                    method run() {
                     }
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_DUPLICATE_NAME);
     }
@@ -278,11 +291,12 @@ public final class SolvikDelegateNegativeTest {
     public void aDelegateInitializerWithTheWrongTypeIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 interface Named {
-                    func name(): String
+                    method name(): String
                 }
                 class Service implements Named {
-                    delegate var named: Named = 1
+                    delegate  named: Named = 1
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
@@ -291,14 +305,14 @@ public final class SolvikDelegateNegativeTest {
     public void ambiguousDelegationSuppressesEveryDiagnosticResult() {
         DiagnosticBag bag = checkFails("""
                 interface PrinterA {
-                    func print(): Unit
+                    method print()
                 }
                 interface PrinterB {
-                    func print(): Unit
+                    method print()
                 }
                 class X implements PrinterA, PrinterB {
-                    delegate var a: PrinterA
-                    delegate var b: PrinterB
+                    delegate  a: PrinterA
+                    delegate  b: PrinterB
 
                     X(a: PrinterA, b: PrinterB) {
                         this.a = a
@@ -306,6 +320,7 @@ public final class SolvikDelegateNegativeTest {
                     }
                 }
                     println("unreachable")
+
                 """);
         assertThat(bag.all().stream().anyMatch(d -> d.code() == DiagnosticCode.SEM_AMBIGUOUS_DELEGATION)).isTrue();
     }

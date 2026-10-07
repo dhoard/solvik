@@ -90,11 +90,12 @@ public final class SolvikStaticMemberExecutionTest {
     public void aClassWithAStaticPropertyAndAnInstancePropertyStillConstructs() {
         assertThat(run("""
                 class Counter {
-                    static var limit: Integer = 10
+                    var static limit: Integer = 10
                     var id: Integer = 1
                 }
-                var first = Counter()
+                var first: Counter = Counter()
                 println(first.id)
+
                 """)).isEqualTo("1\n");
     }
 
@@ -104,11 +105,12 @@ public final class SolvikStaticMemberExecutionTest {
         // initializer" rule must not fire for it, and the instance property still initializes.
         assertThat(run("""
                 class Counter {
-                    static var limit: Integer
+                    var static limit: Integer
                     var id: Integer = 7
                 }
-                var first = Counter()
+                var first: Counter = Counter()
                 println(first.id)
+
                 """)).isEqualTo("7\n");
     }
 
@@ -118,7 +120,7 @@ public final class SolvikStaticMemberExecutionTest {
         // independent ids, which is what would break if a static joined the instance layout.
         assertThat(run("""
                 class Counter {
-                    static var limit: Integer = 10
+                    var static limit: Integer = 10
                     var id: Integer
                     Counter(id: Integer) {
                         this.id = id
@@ -127,6 +129,7 @@ public final class SolvikStaticMemberExecutionTest {
                 println(Counter(1).id)
                 println(Counter(2).id)
                 println(Counter(3).id)
+
                 """)).isEqualTo("1\n2\n3\n");
     }
 
@@ -134,18 +137,19 @@ public final class SolvikStaticMemberExecutionTest {
     public void anInstanceMethodStillDispatchesNormallyInAClassThatDeclaresStaticMembers() {
         assertThat(run("""
                 class Counter {
-                    static func helper(): Integer {
+                    method static helper(): Integer {
                         return 5
                     }
                     var base: Integer
                     Counter(base: Integer) {
                         this.base = base
                     }
-                    func doubled(): Integer {
+                    method doubled(): Integer {
                         return this.base * 2
                     }
                 }
                 println(Counter(21).doubled())
+
                 """)).isEqualTo("42\n");
     }
 
@@ -155,7 +159,7 @@ public final class SolvikStaticMemberExecutionTest {
         // active use, so the block runs then, and only once (docs/LANGUAGE_SPEC.md section 7).
         assertThat(run("""
                 class Counter {
-                    static var mutable seen: Integer = 0
+                    var static mutable seen: Integer = 0
                     static {
                         println("initializer ran")
                     }
@@ -163,6 +167,7 @@ public final class SolvikStaticMemberExecutionTest {
                 println("main")
                 println(Counter.seen)
                 println(Counter.seen)
+
                 """)).isEqualTo("main\ninitializer ran\n0\n0\n");
     }
 
@@ -199,7 +204,7 @@ public final class SolvikStaticMemberExecutionTest {
     public void aReturnExitsAClassInitializerEarly() {
         assertThat(run("""
                 class Counter {
-                    static var mutable log: Integer = 0
+                    var static mutable log: Integer = 0
                     static {
                         Counter.log = 1
                         if (true) {
@@ -209,25 +214,28 @@ public final class SolvikStaticMemberExecutionTest {
                     }
                 }
                 println(Counter.log)
+
                 """)).isEqualTo("1\n");
     }
 
     @Test
     public void aBaseClassInitializerRunsBeforeTheDerivedClassInitializer() {
         assertThat(run("""
-                mutable class Base {
-                    static var mutable trace: Integer = 0
+                class mutable Base {
+                    var static mutable trace: Integer = 0
                     static {
                         Base.trace = 10
                     }
                 }
                 class Derived extends Base {
-                    static var mutable derivedTrace: Integer = 0
+                    var static mutable derivedTrace: Integer = 0
                     static {
                         Derived.derivedTrace = Base.trace * 100
                     }
                 }
                 println(Derived.derivedTrace)
+
+
                 """)).isEqualTo("1000\n");
     }
 
@@ -238,18 +246,20 @@ public final class SolvikStaticMemberExecutionTest {
         // up before the derived initializer reads it (docs/LANGUAGE_SPEC.md section 7).
         assertThat(run("""
                 class Derived extends Base {
-                    static var mutable derivedTrace: Integer = 0
+                    var static mutable derivedTrace: Integer = 0
                     static {
                         Derived.derivedTrace = Base.trace * 100
                     }
                 }
-                mutable class Base {
-                    static var mutable trace: Integer = 0
+                class mutable Base {
+                    var static mutable trace: Integer = 0
                     static {
                         Base.trace = 10
                     }
                 }
                 println(Derived.derivedTrace)
+
+
                 """)).isEqualTo("1000\n");
     }
 
@@ -258,19 +268,19 @@ public final class SolvikStaticMemberExecutionTest {
         // Actively using the most-derived class C initializes the whole chain base-first, so the blocks
         // append in A, B, C order (docs/LANGUAGE_SPEC.md section 7).
         assertThat(run("""
-                mutable class A {
-                    static var mutable trace: String = ""
+                class mutable A {
+                    var static mutable trace: String = ""
                     static {
                         A.trace = A.trace .. "A"
                     }
                 }
-                mutable class B extends A {
+                class mutable B extends A {
                     static {
                         A.trace = A.trace .. "B"
                     }
                 }
                 class C extends B {
-                    static func report(): String {
+                    method static report(): String {
                         return A.trace
                     }
                     static {
@@ -278,6 +288,8 @@ public final class SolvikStaticMemberExecutionTest {
                     }
                 }
                 println(C.report())
+
+
                 """)).isEqualTo("ABC\n");
     }
 
@@ -285,13 +297,14 @@ public final class SolvikStaticMemberExecutionTest {
     public void eachStaticPropertyIsInitializedBeforeItsClassInitializerBlock() {
         assertThat(run("""
                 class Counter {
-                    static var mutable seed: Integer = 5
-                    static var mutable seen: Integer = 0
+                    var static mutable seed: Integer = 5
+                    var static mutable seen: Integer = 0
                     static {
                         Counter.seen = Counter.seed
                     }
                 }
                 println(Counter.seen)
+
                 """)).isEqualTo("5\n");
     }
 
@@ -303,21 +316,23 @@ public final class SolvikStaticMemberExecutionTest {
         // (docs/LANGUAGE_SPEC.md section 7).
         String forward = """
                 class B {
-                    static var mutable b: Integer = 5
+                    var static mutable b: Integer = 5
                 }
                 class A {
-                    static var mutable a: Integer = B.b + 1
+                    var static mutable a: Integer = B.b + 1
                 }
                 println(A.a)
+
                 """;
         String reversed = """
                 class A {
-                    static var mutable a: Integer = B.b + 1
+                    var static mutable a: Integer = B.b + 1
                 }
                 class B {
-                    static var mutable b: Integer = 5
+                    var static mutable b: Integer = 5
                 }
                 println(A.a)
+
                 """;
         assertThat(run(forward)).isEqualTo("6\n");
         assertThat(run(reversed)).isEqualTo("6\n");
@@ -330,7 +345,7 @@ public final class SolvikStaticMemberExecutionTest {
         // section 7).
         assertThat(run("""
                 class Thing {
-                    static var mutable base: Integer = 0
+                    var static mutable base: Integer = 0
                     static {
                         Thing.base = 10
                     }
@@ -340,6 +355,7 @@ public final class SolvikStaticMemberExecutionTest {
                     }
                 }
                 println(Thing().field)
+
                 """)).isEqualTo("10\n");
     }
 
@@ -348,13 +364,14 @@ public final class SolvikStaticMemberExecutionTest {
         // `is`/`as` type tests are not active uses, so a test against an otherwise untouched class does not
         // initialize it and its block never runs (docs/LANGUAGE_SPEC.md section 7).
         assertThat(run("""
-                mutable class Probe {
+                class mutable Probe {
                     static {
                         println("probe initialized")
                     }
                 }
                 var value: Any = 1
                 println(value is Probe)
+
                 """)).isEqualTo("false\n");
     }
 
@@ -362,17 +379,18 @@ public final class SolvikStaticMemberExecutionTest {
     public void aStaticMethodIsCallableFromAClassInitializerOfAnotherClass() {
         assertThat(run("""
                 class Helper {
-                    static func answer(): Integer {
+                    method static answer(): Integer {
                         return 42
                     }
                 }
                 class UsesHelper {
-                    static var mutable value: Integer = 0
+                    var static mutable value: Integer = 0
                     static {
                         UsesHelper.value = Helper.answer()
                     }
                 }
                 println(UsesHelper.value)
+
                 """)).isEqualTo("42\n");
     }
 
@@ -383,15 +401,15 @@ public final class SolvikStaticMemberExecutionTest {
         // for the object-represented types.
         assertThat(run("""
                 class Defaults {
-                    static var mutable i: Integer
-                    static var mutable l: Long
-                    static var mutable f: Float
-                    static var mutable d: Double
-                    static var mutable b: Boolean
-                    static var mutable by: Byte
-                    static var mutable sh: Short
-                    static var mutable c: Character
-                    static func report() {
+                    var static mutable i: Integer
+                    var static mutable l: Long
+                    var static mutable f: Float
+                    var static mutable d: Double
+                    var static mutable b: Boolean
+                    var static mutable by: Byte
+                    var static mutable sh: Short
+                    var static mutable c: Character
+                    method static report() {
                         println(Defaults.i == 0)
                         println(Defaults.l == Long(0))
                         println(Defaults.f == Float(0.0))
@@ -403,6 +421,7 @@ public final class SolvikStaticMemberExecutionTest {
                     }
                 }
                 Defaults.report()
+
                 """)).isEqualTo("true\ntrue\ntrue\ntrue\ntrue\ntrue\ntrue\ntrue\n");
     }
 
@@ -410,9 +429,10 @@ public final class SolvikStaticMemberExecutionTest {
     public void anInitializedStaticReferencePropertyDefaultsToNull() {
         assertThat(run("""
                 class Defaults {
-                    static var mutable name: String
+                    var static mutable name: String
                 }
                 println(Defaults.name)
+
                 """)).isEqualTo("null\n");
     }
 
@@ -420,36 +440,39 @@ public final class SolvikStaticMemberExecutionTest {
     public void aStaticCellIsSharedAcrossEveryReferenceIncludingFromInstanceMethods() {
         assertThat(run("""
                 class Counter {
-                    static var mutable count: Integer = 0
-                    static func bump(): Integer {
+                    var static mutable count: Integer = 0
+                    method static bump(): Integer {
                         Counter.count = Counter.count + 1
                         return Counter.count
                     }
-                    func bumpToo(): Integer {
+                    method bumpToo(): Integer {
                         return Counter.bump()
                     }
                 }
                 print(Counter.bump())
                 print(Counter().bumpToo())
                 print(Counter.count)
+
                 """)).isEqualTo("122");
     }
 
     @Test
     public void aSuperclassAndSubclassStaticPropertyOfTheSameNameAreIndependent() {
         assertThat(run("""
-                mutable class Base {
-                    static var mutable count: Integer = 1
+                class mutable Base {
+                    var static mutable count: Integer = 1
                 }
                 class Derived extends Base {
-                    static var mutable count: Integer = 2
-                    static func report(): String {
+                    var static mutable count: Integer = 2
+                    method static report(): String {
                         print(Base.count)
                         print(Derived.count)
                         return ""
                     }
                 }
                 Derived.report()
+
+
                 """)).isEqualTo("12");
     }
 
@@ -457,8 +480,8 @@ public final class SolvikStaticMemberExecutionTest {
     public void aQualifiedStaticMemberIsInitializedAndReachedThroughItsModulePrefix() throws IOException {
         Path dir = Files.createTempDirectory("solvik-static-modules");
         try {
-            write(dir, "math.sol", "module math\n\nclass Counter {\n    static var mutable count: Integer = 0\n    static var limit: Integer = 7\n    static func bump(): Integer {\n        Counter.count = Counter.count + 1\n        return Counter.count\n    }\n    static {\n        Counter.count = 100\n    }\n}\n");
-            Path root = write(dir, "root.sol", "include \"math.sol\" alias math\nprint(math::Counter.count)\nprint(math::Counter.limit)\nprint(math::Counter.bump())\nmath::Counter.count = 5\nprint(math::Counter.count)\n");
+            write(dir, "math.sol", "module math {\n    class Counter {\n        var static mutable count: Integer = 0\n        var static limit: Integer = 7\n        method static bump(): Integer {\n            Counter.count = Counter.count + 1\n            return Counter.count\n        }\n        static {\n            Counter.count = 100\n        }\n    }\n}\n");
+            Path root = write(dir, "root.sol", "include \"math.sol\"\nprint(math::Counter.count)\nprint(math::Counter.limit)\nprint(math::Counter.bump())\nmath::Counter.count = 5\nprint(math::Counter.count)\n");
             assertThat(evalFile(root)).isEqualTo("10071015");
         } finally {
             deleteRecursively(dir);

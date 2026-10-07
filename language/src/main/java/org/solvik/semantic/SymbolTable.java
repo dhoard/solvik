@@ -40,7 +40,7 @@ public final class SymbolTable {
     /**
      * Enters a scope that is a function boundary. Names inside it resolve only to that scope and its
      * descendants, never to anything declared in an enclosing function, which is what makes a
-     * non-capturing anonymous function see its own parameters and locals plus globals and nothing
+     * callable body see its own parameters and locals plus globals and nothing
      * between (docs/LANGUAGE_SPEC.md section 6, "Anonymous functions"). Globals live in the root and
      * module scopes reached by separate resolution, so a boundary does not hide them.
      */

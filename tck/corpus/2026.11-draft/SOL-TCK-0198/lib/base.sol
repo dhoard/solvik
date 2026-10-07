@@ -1,2 +1,2 @@
-abstract class Base {
+class abstract Base {
 }

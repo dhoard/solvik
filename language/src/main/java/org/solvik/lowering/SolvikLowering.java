@@ -35,7 +35,6 @@ import org.solvik.ast.declaration.FunctionDeclNode;
 import org.solvik.ast.declaration.PropertyDeclNode;
 import org.solvik.ast.declaration.TypeRef;
 import org.solvik.ast.declaration.TypeRefNode;
-import org.solvik.ast.expression.AnonymousFunctionExprNode;
 import org.solvik.ast.expression.BinaryExprNode;
 import org.solvik.ast.expression.BinaryOperator;
 import org.solvik.ast.expression.BlockExprNode;
@@ -87,7 +86,6 @@ import org.solvik.ast.statement.StatementNode;
 import org.solvik.ast.statement.SwitchCaseNode;
 import org.solvik.ast.statement.SwitchStmtNode;
 import org.solvik.ast.statement.WhileStmtNode;
-import org.solvik.semantic.CapturedValue;
 import org.solvik.semantic.CheckedProgram;
 import org.solvik.semantic.ClassSymbol;
 import org.solvik.semantic.EnumSymbol;
@@ -113,7 +111,6 @@ import org.solvik.truffle.nodes.SolvikBindingPatternNode;
 import org.solvik.truffle.nodes.SolvikBlockExprNode;
 import org.solvik.truffle.nodes.SolvikBlockNode;
 import org.solvik.truffle.nodes.SolvikBoolLiteralNode;
-import org.solvik.truffle.nodes.SolvikBoundMethodValueNode;
 import org.solvik.truffle.nodes.SolvikBreakNode;
 import org.solvik.truffle.nodes.SolvikCastNode;
 import org.solvik.truffle.nodes.SolvikCharacterLiteralNode;
@@ -130,12 +127,6 @@ import org.solvik.truffle.nodes.SolvikExitNode;
 import org.solvik.truffle.nodes.SolvikHashCodeNode;
 import org.solvik.truffle.nodes.SolvikExpressionNode;
 import org.solvik.truffle.nodes.SolvikFloatingLiteralNode;
-import org.solvik.truffle.nodes.SolvikAnonymousFunctionValueNode;
-import org.solvik.truffle.nodes.SolvikCapturingFunctionValueNode;
-import org.solvik.truffle.nodes.SolvikFunctionValueNode;
-import org.solvik.truffle.nodes.SolvikFunctionDispatchNode;
-import org.solvik.truffle.nodes.SolvikFunctionDispatchNodeGen;
-import org.solvik.truffle.nodes.SolvikIndirectCallNode;
 import org.solvik.truffle.nodes.SolvikForRangeNode;
 import org.solvik.truffle.nodes.SolvikGreaterOrEqualNodeGen;
 import org.solvik.truffle.nodes.SolvikGreaterThanNodeGen;
@@ -255,14 +246,6 @@ public final class SolvikLowering {
     private final Map<VariableSymbol, Integer> slots = new IdentityHashMap<>();
     private FrameDescriptor.Builder frameBuilder;
     private int thisSlot = -1;
-    /**
-     * The lowered call target of each anonymous function expression, built the first time the
-     * expression lowers. One target per expression: the expression creates a new value on every
-     * evaluation, but every value it creates invokes the same code, so the target is shared and only
-     * the value is fresh (docs/LANGUAGE_SPEC.md section 6, "Anonymous functions").
-     */
-    private final Map<AnonymousFunctionExprNode, RootCallTarget> anonymousTargets = new IdentityHashMap<>();
-
     private SolvikLowering(CheckedProgram program, Map<Integer, Source> sourcesById, SolvikLanguage language) {
         this.program = program;
         this.sourcesById = sourcesById;
@@ -286,12 +269,10 @@ public final class SolvikLowering {
         }
         for (FunctionSymbol function : program.functions().values()) {
             // A predeclared function gets a real call target here, before any body lowers, even though a
-            // direct call to it keeps lowering to its specialized effect node. Naming one as a value
-            // (`var output: func(Any?): Unit = println`) requires the same canonical value any other
-            // declared function has, and building that value reads the call target — so installing it
-            // later would make a program that references `println` inside a function body read a target
-            // that does not exist yet. A second representation for one callable would also put two
-            // definitions of a function's identity in the runtime.
+            // direct call to it keeps lowering to its specialized effect node. Other predeclared
+            // functions (and the runtime helpers that call them) reach that handle by name, and the
+            // reference-equality rules of the runtime use one handle per declaration, so installing it
+            // later would leave a reader holding a target that does not exist yet.
             SolvikFunction runtime = new SolvikFunction(function.name());
             String key = function.name();
             for (int i = 1; runtimeFunctions.containsKey(key); i++) {
@@ -534,12 +515,11 @@ public final class SolvikLowering {
     // ---------------------------------------------------------------------------------------------
 
     /**
-     * Gives a predeclared function the same lowered call target a written function has, so naming it as
-     * a value yields a canonical function value like any other (docs/LANGUAGE_SPEC.md section 6).
+     * Gives a predeclared function the same lowered call target a written function has, so every call of
+     * it runs one node over one {@code Frame} layout (docs/LANGUAGE_SPEC.md section 6).
      *
      * <p>The body is the effect node itself, reading its argument from the parameter slot exactly as a
-     * declared body would: a call through the value and a direct call therefore run the same node over
-     * the same {@code Frame} layout, and there is no second definition of what {@code println} does.
+     * declared body would, so there is no second definition of what {@code println} does.
      * A direct call keeps lowering straight to the effect node, so this root costs nothing unless a
      * program actually names the function as a value.
      *
@@ -592,65 +572,11 @@ public final class SolvikLowering {
     }
 
     /**
-     * Lowers an anonymous function expression's body into its own frame and returns the call target
-     * every value the expression creates will invoke (docs/LANGUAGE_SPEC.md section 6). The body may
-     * itself contain another anonymous function, so the enclosing body's frame-building state is saved
-     * and restored around this: the anonymous body gets a fresh {@link FrameDescriptor.Builder}, a fresh
-     * slot map, and no {@code this} slot, and on return the enclosing body continues with the frame it
-     * was building.
-     *
-     * <p>The target is memoized per expression so two evaluations of one expression share code while
-     * still producing two distinct values, and so a body that lowers the same nested expression twice
-     * does not lower it twice.
-     */
-    private RootCallTarget lowerAnonymousCallable(AnonymousFunctionExprNode expression) {
-        RootCallTarget existing = anonymousTargets.get(expression);
-        if (existing != null) {
-            return existing;
-        }
-        FunctionSymbol function = program.anonymousFunctionOf(expression)//
-                        .orElseThrow(() -> new IllegalStateException("an anonymous function expression was not resolved"));
-        FrameDescriptor.Builder outerFrame = frameBuilder;
-        int outerThisSlot = thisSlot;
-        Map<VariableSymbol, Integer> outerSlots = new IdentityHashMap<>(slots);
-        RootCallTarget target = lowerCallableBody(function, function.anonymousBody(), false, "<anonymous>", null, function.captures());
-        frameBuilder = outerFrame;
-        thisSlot = outerThisSlot;
-        slots.clear();
-        slots.putAll(outerSlots);
-        anonymousTargets.put(expression, target);
-        return target;
-    }
-
-    /**
-     * Builds one callable's frame and root node and installs the resulting target into {@code host}
-     * when there is one. An anonymous function has no {@link SolvikFunction} host to install into, so
-     * it returns the target for the caller to carry; every other callable installs into its handle and
-     * the return value is unused. Saving and restoring the frame-building state is the caller's job,
-     * because only the caller knows whether an enclosing frame is in progress.
+     * Builds one callable's frame and root node and installs the resulting target into {@code host}.
+     * The receiver, when the callable has one, leads the declared parameters, and a root node copies
+     * frame arguments into slots positionally.
      */
     private RootCallTarget lowerCallableBody(FunctionSymbol function, BlockNode body, boolean hasReceiver, String rootName, SolvikFunction host) {
-        return lowerCallableBody(function, body, hasReceiver, rootName, host, List.of());
-    }
-
-    /**
-     * Builds one callable's frame and root node, optionally placing captured values ahead of the declared
-     * parameters.
-     *
-     * <p>Captures follow the receiver and lead the declared parameters because that is the order the
-     * value supplies them when it is invoked
-     * ({@link org.solvik.truffle.object.SolvikFunctionValue#withCapturedState}), and a root
-     * node copies frame arguments into slots positionally. Both halves of that agreement live here: the
-     * capture slots are appended to {@code parameterSlots} in the same order the value stores its captured
-     * array in. A closure never passes {@code hasReceiver}, because a `[this]` capture is stored among the
-     * captured values rather than as the value's receiver — a closure body has no receiver, so `this` in
-     * one is a captured value like any other.
-     *
-     * @param captures captured values to give frame slots after the receiver and before the parameters, in
-     *                 the order the value supplies them; empty for every callable that is not a capturing
-     *                 closure
-     */
-    private RootCallTarget lowerCallableBody(FunctionSymbol function, BlockNode body, boolean hasReceiver, String rootName, SolvikFunction host, List<CapturedValue> captures) {
         slots.clear();
         thisSlot = -1;
         frameBuilder = FrameDescriptor.newBuilder();
@@ -662,21 +588,6 @@ public final class SolvikLowering {
             parameterSlots.add(slot);
             parameterKinds.add(FrameSlotKind.Object);
         }
-        for (CapturedValue captured : captures) {
-            VariableSymbol binding = captured.source();
-            FrameSlotKind kind = kindOf(binding.type());
-            int slot = frameBuilder.addSlot(kind, binding.name(), null);
-            slots.put(binding, slot);
-            parameterSlots.add(slot);
-            parameterKinds.add(kind);
-            // A captured `this` is the closure body's receiver: the body has no receiver of its own, so the
-            // synthetic binding a `[this]` item carries becomes the slot `lowerThis` reads. Set only when
-            // there is no real receiver slot, so a method's own `this` always wins and a closure that
-            // captured none keeps `thisSlot` at -1, where analysis already rejected `this`.
-            if (captured.isThis() && thisSlot < 0) {
-                thisSlot = slot;
-            }
-        }
         for (VariableSymbol parameter : function.parameters()) {
             FrameSlotKind kind = kindOf(parameter.type());
             int slot = frameBuilder.addSlot(kind, parameter.name(), null);
@@ -686,7 +597,7 @@ public final class SolvikLowering {
         }
         SolvikStatementNode loweredBody = lowerBlock(body);
         FrameDescriptor descriptor = frameBuilder.build();
-        boolean returnsValue = function.isReturnTypeKnown() && function.returnType() != UnitType.INSTANCE;
+        boolean returnsValue = function.returnsValue();
         SourceSpan span = function.declaration() != null ? function.declaration().span() : function.declarationSpan();
         SolvikRootNode root = new SolvikRootNode(language, descriptor, loweredBody, rootName, returnsValue, //
                         toIntArray(parameterSlots), toKindArray(parameterKinds), sourceFor(span), span.startOffset(), span.length());
@@ -755,7 +666,7 @@ public final class SolvikLowering {
             arguments[i] = SolvikReadLocalVariableNodeGen.create(slots.get(function.parameters().get(i)));
         }
         SolvikExpressionNode call = new SolvikInvokeMethodNode(function.forwardedDelegate().name(), delegateReceiver, arguments);
-        boolean returnsValue = function.isReturnTypeKnown() && function.returnType() != UnitType.INSTANCE;
+        boolean returnsValue = function.returnsValue();
         SolvikStatementNode body = returnsValue ? new SolvikReturnNode(call) : call;
         SourceSpan span = function.declarationSpan();
         body.setSourceSection(sourceFor(span), span.startOffset(), span.length());
@@ -1036,30 +947,6 @@ public final class SolvikLowering {
             // set a second source section on it.
             return lowerExpression(paren.inner());
         }
-        // A function reference is handled before the kind switch because it is written two ways — a bare
-        // name and a module-qualified name — that resolve to one declaration and must yield one
-        // canonical value (docs/LANGUAGE_SPEC.md section 6). Handling it per kind would either duplicate
-        // the rule or make qualification a second identity.
-        Optional<FunctionSymbol> referenced = program.functionReferenceOf(expression);
-        if (referenced.isPresent()) {
-            SolvikFunction runtime = runtimeFunctionBySymbol.get(referenced.get());
-            if (runtime == null) {
-                throw new IllegalStateException("no lowered function for the referenced '" + referenced.get().name() + "'");
-            }
-            // Located explicitly: this branch returns before the shared setSource at the end of the
-            // method, and a node with no source section would make a stack frame name a function that
-            // cannot be traced to the code that referenced it.
-            return setSource(new SolvikFunctionValueNode(runtime.functionValue()), expression);
-        }
-        // A bound method reference is handled beside it for the same reason: the read is the reference,
-        // and routing it through MEMBER_ACCESS_EXPR would reach the property-read path, which has no
-        // method to read (docs/LANGUAGE_SPEC.md section 6, "Bound method references").
-        if (expression instanceof MemberAccessExprNode boundMember) {
-            Optional<ResolvedMethod> bound = program.methodReferenceOf(boundMember);
-            if (bound.isPresent()) {
-                return setSource(lowerBoundMethodReference(boundMember, bound.get()), expression);
-            }
-        }
         SolvikExpressionNode node = switch (expression.kind()) {
             case INTEGER_LITERAL -> new SolvikIntegerLiteralNode(Integer.parseInt(((IntegerLiteralNode) expression).lexeme()));
             case LONG_LITERAL -> lowerLongLiteral((LongLiteralNode) expression);
@@ -1078,9 +965,8 @@ public final class SolvikLowering {
             case CALL_EXPR -> lowerCall((CallExprNode) expression);
             case PROPAGATION_EXPR -> lowerPropagation((PropagationExprNode) expression);
             case MEMBER_ACCESS_EXPR -> lowerMemberRead((MemberAccessExprNode) expression);
-            case NAMESPACE_ACCESS_EXPR -> throw new IllegalStateException("a module-qualified name is lowered as a function reference or not at all");
+            case NAMESPACE_ACCESS_EXPR -> throw new IllegalStateException("a module-qualified name is lowered as a qualified call or not at all");
             case MATCH_EXPR -> lowerMatch((MatchExprNode) expression);
-            case ANONYMOUS_FUNCTION_EXPR -> lowerAnonymousFunction((AnonymousFunctionExprNode) expression);
             case BLOCK_EXPR -> lowerBlockExpr((BlockExprNode) expression);
             case IF_EXPR -> lowerIfExpr((IfExprNode) expression);
             case SWITCH_EXPR -> lowerSwitchExpr((SwitchExprNode) expression);
@@ -1158,22 +1044,6 @@ public final class SolvikLowering {
         }
         SolvikExpressionNode receiver = member.receiver() instanceof SuperExprNode ? thisReceiver() : lowerExpression(member.receiver());
         return new SolvikReadPropertyNode(receiver, propertyKey(property), member.isSafe());
-    }
-
-    /**
-     * Lowers a bound method reference (docs/LANGUAGE_SPEC.md section 6, "Bound method references"). The
-     * receiver is lowered from the recorded read itself, so {@code super.method} supplies the enclosing
-     * {@code this} slot exactly as an immediate {@code super} read does, and a {@code super} reference
-     * carries its fixed implementation to bypass virtual redispatch. Any other reference carries only the
-     * method name, and the node resolves it in the receiver's runtime class table when the value is
-     * created — the same entry an immediate call would select.
-     */
-    private SolvikExpressionNode lowerBoundMethodReference(MemberAccessExprNode member, ResolvedMethod resolved) {
-        SolvikExpressionNode receiver = member.receiver() instanceof SuperExprNode ? thisReceiver() : lowerExpression(member.receiver());
-        if (resolved.isSuperCall()) {
-            return new SolvikBoundMethodValueNode(runtimeHandle(resolved.method()), receiver);
-        }
-        return new SolvikBoundMethodValueNode(resolved.method().name(), receiver, member.isSafe());
     }
 
     /**
@@ -1373,14 +1243,6 @@ public final class SolvikLowering {
     }
 
     private SolvikExpressionNode lowerCall(CallExprNode expression) {
-        // Checked first: an indirect call's callee can be any expression kind, including a plain name that
-        // resolves to a variable, and every branch below assumes a call on a statically resolved
-        // declaration. Static analysis records the shape of the callee's function type, which is the
-        // only fact lowering needs beyond the arguments.
-        if (program.indirectCallOf(expression).isPresent()) {
-            SolvikExpressionNode callee = lowerExpression(expression.callee());
-            return new SolvikIndirectCallNode(callee, lowerArguments(expression.arguments()), SolvikFunctionDispatchNodeGen.create());
-        }
         if (program.variantOf(expression).isPresent()) {
             return lowerEnumConstruction(expression);
         }
@@ -1657,39 +1519,6 @@ public final class SolvikLowering {
     // ---------------------------------------------------------------------------------------------
     // Exhaustive match
     // ---------------------------------------------------------------------------------------------
-
-    /**
-     * Lowers an anonymous function expression: a node that allocates a fresh function value for the
-     * expression's one call target on every evaluation (docs/LANGUAGE_SPEC.md section 6). The target is
-     * built here, which lowers the body and therefore recursively handles nested anonymous functions.
-     */
-    private SolvikExpressionNode lowerAnonymousFunction(AnonymousFunctionExprNode expression) {
-        RootCallTarget target = lowerAnonymousCallable(expression);
-        FunctionSymbol function = program.anonymousFunctionOf(expression)//
-                        .orElseThrow(() -> new IllegalStateException("an anonymous function expression was not resolved"));
-        List<CapturedValue> captures = function.captures();
-        if (captures.isEmpty()) {
-            return new SolvikAnonymousFunctionValueNode(target, "<anonymous>");
-        }
-        // Each captured value is read from the frame this expression is written in, so a captured binding
-        // reaches the closure as a value copied at this moment: a later write to the enclosing binding is
-        // invisible through the closure, which is what an immutable capture means. `this` is read from the
-        // enclosing receiver slot, and inside another closure that slot is itself a capture slot, which is
-        // how one receiver threads through arbitrarily many intervening closures.
-        SolvikExpressionNode[] reads = new SolvikExpressionNode[captures.size()];
-        for (int i = 0; i < reads.length; i++) {
-            CapturedValue captured = captures.get(i);
-            if (captured.isThis()) {
-                if (thisSlot < 0) {
-                    throw new IllegalStateException("a 'this' capture was lowered with no enclosing receiver");
-                }
-                reads[i] = SolvikReadLocalVariableNodeGen.create(thisSlot);
-            } else {
-                reads[i] = SolvikReadLocalVariableNodeGen.create(allocateSlot(captured.source()));
-            }
-        }
-        return new SolvikCapturingFunctionValueNode(target, reads, "<anonymous>");
-    }
 
     /** Lowers a match expression to a scrutinee evaluation plus ordered pattern/result clauses. */
     private SolvikExpressionNode lowerMatch(MatchExprNode expression) {

@@ -89,29 +89,30 @@ public final class SolvikToStringExecutionTest {
                         this.cents = cents
                     }
 
-                    override func toString(): String {
+                    method override toString(): String {
                         return "$" .. this.cents
                     }
                 }
 
-                var price = Money(1250)
+                var price: Money = Money(1250)
                 println(price)
                 println(price.toString())
                 println("price=" .. price)
+
                 """)).isEqualTo("$1250\n$1250\nprice=$1250\n");
     }
 
     @Test
     public void overrideDispatchesThroughAnyAndInheritance() {
         assertThat(run("""
-                mutable class Base {
-                    mutable override func toString(): String {
+                class mutable Base {
+                    method override mutable toString(): String {
                         return "base"
                     }
                 }
 
                 class Child extends Base {
-                    override func toString(): String {
+                    method override toString(): String {
                         return "child"
                     }
                 }
@@ -121,6 +122,8 @@ public final class SolvikToStringExecutionTest {
                 println(b)
                 println(c)
                 println(Child())
+
+
                 """)).isEqualTo("base\nchild\nchild\n");
     }
 

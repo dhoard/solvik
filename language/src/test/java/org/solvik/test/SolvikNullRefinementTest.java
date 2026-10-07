@@ -203,13 +203,14 @@ public final class SolvikNullRefinementTest {
     public void identityNarrowingIsInvalidatedByAWrite() {
         CompilationUnitNode unit = parseOk("refine.sol", PRELUDE + """
                 func f(b: Box?): Integer {
-                    var mutable current = b
+                    var mutable current: Box? = b
                     if (current !== null) {
                         current = null
                         return current.value
                     }
                     return 0
                 }
+
                 """);
         SemanticResult result = SolvikSemanticAnalyzer.analyze(unit);
         assertThat(result.isSuccess()).as("a write must invalidate identity narrowing").isFalse();

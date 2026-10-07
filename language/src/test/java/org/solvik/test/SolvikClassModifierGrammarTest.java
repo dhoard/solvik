@@ -93,14 +93,14 @@ public final class SolvikClassModifierGrammarTest {
 
     @Test
     public void aMutableClassIsMarkedMutableAndNotAbstract() {
-        ClassDeclNode decl = classOf("mutable.sol", "mutable class Widget {\n}\n");
+        ClassDeclNode decl = classOf("mutable.sol", "class mutable Widget {\n}\n");
         assertThat(decl.isMutable()).isTrue();
         assertThat(decl.isAbstract()).isFalse();
     }
 
     @Test
     public void anAbstractClassIsMarkedAbstractAndNotMutable() {
-        ClassDeclNode decl = classOf("abstract.sol", "abstract class Widget {\n}\n");
+        ClassDeclNode decl = classOf("abstract.sol", "class abstract Widget {\n}\n");
         assertThat(decl.isAbstract()).isTrue();
         assertThat(decl.isMutable()).isFalse();
     }
@@ -117,8 +117,8 @@ public final class SolvikClassModifierGrammarTest {
      */
     @Test
     public void theTwoClassModifiersCannotBeCombinedInEitherOrder() {
-        parseFails("both.sol", "abstract mutable class Widget {\n}\n");
-        parseFails("both.sol", "mutable abstract class Widget {\n}\n");
+        parseFails("both.sol", "class abstract mutable Widget {\n}\n");
+        parseFails("both.sol", "class mutable abstract Widget {\n}\n");
     }
 
     /**
@@ -138,7 +138,7 @@ public final class SolvikClassModifierGrammarTest {
     @Test
     public void aMutableMethodIsMarkedMutable() {
         ClassDeclNode decl = classOf("m.sol",
-                "class Widget {\n    mutable func unlocked(): Integer {\n        return 1\n    }\n}\n");
+                "class Widget {\n    method mutable unlocked(): Integer {\n        return 1\n    }\n}\n");
         assertThat(decl.methods()).hasSize(1);
         assertThat(decl.methods().get(0).isMutable()).isTrue();
     }
@@ -146,7 +146,7 @@ public final class SolvikClassModifierGrammarTest {
     @Test
     public void anUnmarkedMethodIsNotMutable() {
         ClassDeclNode decl = classOf("m.sol",
-                "class Widget {\n    func locked(): Integer {\n        return 1\n    }\n}\n");
+                "class Widget {\n    method locked(): Integer {\n        return 1\n    }\n}\n");
         assertThat(decl.methods().get(0).isMutable()).isFalse();
     }
 
@@ -159,18 +159,18 @@ public final class SolvikClassModifierGrammarTest {
      */
     @Test
     public void anOverrideIsNotItselfMutableButAnOverrideMarkedMutableIs() {
-        String base = "mutable class Base {\n    mutable func name(): Integer {\n        return 1\n    }\n}\n";
+        String base = "class mutable Base {\n    method mutable name(): Integer {\n        return 1\n    }\n}\n";
         // An override only exists below a mutable supertype, so the subclass is the *second*
         // declaration of a two-declaration program and `onlyClass` cannot be used to read it.
         ClassDeclNode closedChild = (ClassDeclNode) parseOk("closed.sol", base
-                + "class Child extends Base {\n    override func name(): Integer {\n        return 2\n    }\n}\n")
+                + "class Child extends Base {\n    method override name(): Integer {\n        return 2\n    }\n}\n")
                 .declarations().get(1);
         FunctionDeclNode closed = closedChild.methods().get(0);
         assertThat(closed.isOverride()).isTrue();
         assertThat(closed.isMutable()).isFalse();
 
         ClassDeclNode reopening = (ClassDeclNode) parseOk("open.sol", base
-                + "class Child extends Base {\n    override mutable func name(): Integer {\n        return 2\n    }\n}\n")
+                + "class Child extends Base {\n    method override mutable name(): Integer {\n        return 2\n    }\n}\n")
                 .declarations().get(1);
         FunctionDeclNode reopened = reopening.methods().get(0);
         assertThat(reopened.isOverride()).isTrue();
@@ -186,14 +186,14 @@ public final class SolvikClassModifierGrammarTest {
      */
     @Test
     public void aDelegateMayNotBeDeclaredMutable() {
-        parseFails("d.sol", "interface Named {\n}\nclass Widget {\n    delegate var mutable shared: Named\n}\n");
+        parseFails("d.sol", "interface Named {\n}\nclass Widget {\n    delegate  mutable shared: Named\n}\n");
     }
 
     /** A delegate is a declaration of its own, with no binding marker to read. */
     @Test
     public void aDelegateDeclaresNoBindingMarkerOfItsOwn() {
         CompilationUnitNode unit = parseOk("d.sol",
-                "interface Named {\n}\nclass Widget {\n    delegate var shared: Named\n}\n");
+                "interface Named {\n}\nclass Widget {\n    delegate  shared: Named\n}\n");
         ClassDeclNode decl = (ClassDeclNode) unit.declarations().get(1);
         List<DelegateDeclNode> delegates = decl.delegates();
         assertThat(delegates).hasSize(1);
@@ -203,7 +203,7 @@ public final class SolvikClassModifierGrammarTest {
     /** A {@code static var mutable} property carries both markers through to the AST. */
     @Test
     public void aStaticMutablePropertyIsDeliveredAsBothStaticAndMutable() {
-        ClassDeclNode decl = classOf("s.sol", "class Widget {\n    static var mutable count: Integer = 1\n}\n");
+        ClassDeclNode decl = classOf("s.sol", "class Widget {\n    var static mutable count: Integer = 1\n}\n");
         List<PropertyDeclNode> statics = decl.staticProperties();
         assertThat(statics).hasSize(1);
         assertThat(statics.get(0).bindingKind()).isEqualTo(BindingKind.MUTABLE);
@@ -235,7 +235,8 @@ public final class SolvikClassModifierGrammarTest {
     @Test
     public void theNewKeywordsLexAsKeywordsAndTheirPrefixesStayIdentifiers() {
         assertThat(names("var mutable x: Integer = 1\n")).startsWith("VAR", "MUTABLE");
-        assertThat(names("abstract class Widget {\n}\n")).startsWith("ABSTRACT", "CLASS");
+        // The declaration keyword comes first and the modifier follows it.
+        assertThat(names("class abstract Widget {\n}\n")).startsWith("CLASS", "ABSTRACT");
         assertThat(names("var mutableval: Integer = 1\n")).startsWith("VAR", "Identifier");
         assertThat(names("var abstractly: Integer = 1\n")).startsWith("VAR", "Identifier");
     }
@@ -273,7 +274,7 @@ public final class SolvikClassModifierGrammarTest {
     @Test
     public void aDeclarationWhoseModifierEndsALineIsStillOneDeclaration() {
         ClassDeclNode decl = classOf("nl.sol",
-                "class Widget {\n    mutable\n    func f(): Integer {\n        return 1\n    }\n}\n");
+                "class Widget {\n    method mutable f(): Integer {\n        return 1\n    }\n}\n");
         assertThat(decl.methods()).hasSize(1);
         assertThat(decl.methods().get(0).isMutable()).isTrue();
     }

@@ -69,9 +69,10 @@ public final class SolvikCollectionsTest {
                 nums.add(1)
                 nums.add(2)
                 nums.add(3)
-                var mutable removed = nums.removeAt(1)
+                var mutable removed: Integer = nums.removeAt(1)
                 println(nums.size)
                 println(removed)
+
                 """)).isEqualTo("2\n2\n");
     }
 
@@ -103,9 +104,10 @@ public final class SolvikCollectionsTest {
                 var mutable s: Set<String> = Set<String>()
                 s.add("x")
                 s.add("y")
-                var mutable present = s.remove("y")
+                var mutable present: Boolean = s.remove("y")
                 println(present)
                 println(s.size)
+
                 """)).isEqualTo("true\n1\n");
     }
 
@@ -138,9 +140,10 @@ public final class SolvikCollectionsTest {
                 var mutable m: Map<Integer, String> = Map<Integer, String>()
                 m.put(1, "one")
                 m.put(2, "two")
-                var mutable present = m.remove(1)
+                var mutable present: Boolean = m.remove(1)
                 println(present)
                 println(m.size)
+
                 """)).isEqualTo("true\n1\n");
     }
 
@@ -204,9 +207,10 @@ public final class SolvikCollectionsTest {
     @Test
     public void listConstructorWithExplicitTypeArgumentsTakesInitialElements() {
         assertThat(runMain("""
-                var mutable nums = List<Integer>(1, 2, 3)
+                var mutable nums: List<Integer> = List<Integer>(1, 2, 3)
                 nums.add(4)
                 println(nums.size)
+
                 """)).isEqualTo("4\n");
     }
 
@@ -241,8 +245,9 @@ public final class SolvikCollectionsTest {
     @Test
     public void mapConstructorWithExplicitTypeArgumentsTakesEntries() {
         assertThat(runMain("""
-                var mutable m = Map<String, Integer>("one": 1)
+                var mutable m: Map<String, Integer> = Map<String, Integer>("one": 1)
                 println(m.size)
+
                 """)).isEqualTo("1\n");
     }
 
@@ -278,72 +283,80 @@ public final class SolvikCollectionsTest {
     @Test
     public void listElementWithTheWrongTypeIsRejected() {
         assertThat(firstFails("""
-                func f(): Unit {
+                func f() {
                     var mutable nums: List<Integer> = List(1, "two")
                 }
+
                 """)).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
 
     @Test
     public void mapKeyWithTheWrongTypeIsRejected() {
         assertThat(firstFails("""
-                func f(): Unit {
+                func f() {
                     var mutable m: Map<Integer, String> = Map("one": "one")
                 }
+
                 """)).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
 
     @Test
     public void mapValueWithTheWrongTypeIsRejected() {
         assertThat(firstFails("""
-                func f(): Unit {
+                func f() {
                     var mutable m: Map<Integer, String> = Map(1: 2)
                 }
+
                 """)).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
 
     @Test
     public void mapPositionalValueIsRejected() {
         assertThat(firstFails("""
-                func f(): Unit {
+                func f() {
                     var mutable m: Map<Integer, String> = Map(1, "one")
                 }
+
                 """)).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
 
     @Test
     public void keyValueEntryOutsideAMapConstructionIsRejected() {
         assertThat(firstFails("""
-                func f(): Unit {
+                func f() {
                     var mutable nums: List<Integer> = List(1: 2)
                 }
+
                 """)).isEqualTo(DiagnosticCode.SEM_MAP_ENTRY);
     }
 
     @Test
     public void constructionWithoutLhsOrExplicitTypeArgumentsIsRejected() {
         assertThat(firstFails("""
-                func f(): Unit {
-                    var mutable nums = List(1, 2)
+                func f() {
+                    var mutable nums: Any = List(1, 2)
                 }
+
                 """)).isEqualTo(DiagnosticCode.TYPE_CANNOT_INFER);
     }
 
     @Test
     public void mapConstructionWithoutLhsOrExplicitTypeArgumentsIsRejected() {
         assertThat(firstFails("""
-                func f(): Unit {
-                    var mutable m = Map(1: "one")
+                func f() {
+                    var mutable m: Any = Map(1: "one")
                 }
+
                 """)).isEqualTo(DiagnosticCode.TYPE_CANNOT_INFER);
     }
 
     @Test
     public void listAddWithWrongArityIsRejected() {
         assertThat(firstFails("""
-                func f(values: List<Integer>): Unit {
+                func f(values: List<Integer>) {
                     values.add()
                 }
+
                 """)).isEqualTo(DiagnosticCode.TYPE_ARITY_MISMATCH);
     }
 
@@ -368,9 +381,10 @@ public final class SolvikCollectionsTest {
     @Test
     public void setSizeIsImmutable() {
         assertThat(firstFails("""
-                func f(values: List<Integer>): Unit {
+                func f(values: List<Integer>) {
                     values.size = 5
                 }
+
                 """)).isEqualTo(DiagnosticCode.TYPE_ASSIGN_TO_IMMUTABLE);
     }
 
@@ -397,8 +411,9 @@ public final class SolvikCollectionsTest {
     public void valueLessCollectionConstructionIsRejected() {
         CompilationUnitNode unit = parseOk("ccol.sol", """
                 func f() {
-                    var mutable l = List()
+                    var mutable l: Any = List()
                 }
+
                 """);
         SemanticResult result = SolvikSemanticAnalyzer.analyze(unit);
         assertThat(result.isSuccess()).as("analysis must fail: value-less construction has no evidence for the element type").isFalse();

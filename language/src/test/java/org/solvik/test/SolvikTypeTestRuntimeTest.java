@@ -51,34 +51,31 @@ public final class SolvikTypeTestRuntimeTest {
     @Test
     public void anyTestCoversCollectionsEnumsRegexAndUserInstances() {
         assertThat(run("""
-                    interface Named {
-                        func name(): String
-                    }
-                    class User implements Named {
-                        func name(): String {
-                            return "doug"
+                        interface Named {
+                            method name(): String
                         }
-                    }
-                    enum Color {
-                        Red
-                    }
-                    func noop() {
-                    }
-                    var values: Any = List<Integer>(1, 2)
-                    var pattern: Any = Regex("a")
-                    var found: Any? = Regex("a").find("a")
-                    var color: Any = Color.Red
-                    var user: Any = User()
-                    var unit: Any = noop()
-                    println(values is Any)
-                    println(pattern is Any)
-                    if (found != null) {
-                        println(found is Any)
-                    }
-                    println(color is Any)
-                    println(user is Any)
-                    println(unit is Any)
-                """)).isEqualTo("true\ntrue\ntrue\ntrue\ntrue\ntrue\n");
+                        class User implements Named {
+                            method name(): String {
+                                return "doug"
+                            }
+                        }
+                        enum Color {
+                            Red
+                        }
+                        var values: Any = List<Integer>(1, 2)
+                        var pattern: Any = Regex("a")
+                        var found: Any? = Regex("a").find("a")
+                        var color: Any = Color.Red
+                        var user: Any = User()
+                        println(values is Any)
+                        println(pattern is Any)
+                        if (found != null) {
+                            println(found is Any)
+                        }
+                        println(color is Any)
+                        println(user is Any)
+
+                """)).isEqualTo("true\ntrue\ntrue\ntrue\ntrue\n");
     }
 
     @Test
@@ -176,71 +173,69 @@ public final class SolvikTypeTestRuntimeTest {
     }
 
     @Test
-    public void unitRegexAndRegexMatchTypeTestsExecute() {
+    public void regexAndRegexMatchTypeTestsExecute() {
         assertThat(run("""
-                    func noop() {
-                    }
+                        var pattern: Any = Regex(r"a")
+                        println(pattern is Regex)
+                        println(pattern is String)
+                        var found: RegexMatch? = Regex(r"a").find("a")
+                        if (found != null) {
+                            println(found is RegexMatch)
+                        }
 
-                    var unit: Any = noop()
-                    println(unit is Unit)
-                    var pattern: Any = Regex(r"a")
-                    println(pattern is Regex)
-                    println(pattern is String)
-                    var found = Regex(r"a").find("a")
-                    if (found != null) {
-                        println(found is RegexMatch)
-                    }
-                """)).isEqualTo("true\ntrue\nfalse\ntrue\n");
+                """)).isEqualTo("true\nfalse\ntrue\n");
     }
 
     @Test
     public void classInterfaceAndEnumTypeTestsExecute() {
         assertThat(run("""
-                    interface Named {
-                        func name(): String
-                    }
-
-                    mutable class Animal {
-                    }
-
-                    class Dog extends Animal implements Named {
-                        func name(): String {
-                            return "dog"
+                        interface Named {
+                            method name(): String
                         }
-                    }
 
-                    enum Color {
-                        Red
-                        Green
-                    }
+                        class mutable Animal {
+                        }
 
-                    var dog: Animal = Dog()
-                    println(dog is Dog)
-                    println(dog is Animal)
-                    println(dog is Named)
-                    println(dog is Any)
-                    var color: Any = Color.Red
-                    println(color is Color)
-                    println(color is Animal)
+                        class Dog extends Animal implements Named {
+                            method name(): String {
+                                return "dog"
+                            }
+                        }
+
+                        enum Color {
+                            Red
+                            Green
+                        }
+
+                        var dog: Animal = Dog()
+                        println(dog is Dog)
+                        println(dog is Animal)
+                        println(dog is Named)
+                        println(dog is Any)
+                        var color: Any = Color.Red
+                        println(color is Color)
+                        println(color is Animal)
+
                 """)).isEqualTo("true\ntrue\ntrue\ntrue\ntrue\nfalse\n");
     }
 
     @Test
     public void typeTestsWalkAMultiLevelInheritanceChain() {
         assertThat(run("""
-                    mutable class A {
-                    }
+                        class mutable A {
+                        }
 
-                    mutable class B extends A {
-                    }
+                        class mutable B extends A {
+                        }
 
-                    class C extends B {
-                    }
+                        class C extends B {
+                        }
 
-                    var value: A = C()
-                    println(value is A)
-                    println(value is B)
-                    println(value is C)
+                        var value: A = C()
+                        println(value is A)
+                        println(value is B)
+                        println(value is C)
+
                 """)).isEqualTo("true\ntrue\ntrue\n");
     }
 
@@ -261,19 +256,20 @@ public final class SolvikTypeTestRuntimeTest {
         // Confirms the SolvikConvertNode/`as` path for an interface target: the runtime value is
         // preserved and the check verifies the receiver implements the interface.
         assertThat(run("""
-                    interface Named {
-                        func name(): String
-                    }
-
-                    class User implements Named {
-                        func name(): String {
-                            return "doug"
+                        interface Named {
+                            method name(): String
                         }
-                    }
 
-                    var obj: Any = User()
-                    var named = obj as Named
-                    println(named.name())
+                        class User implements Named {
+                            method name(): String {
+                                return "doug"
+                            }
+                        }
+
+                        var obj: Any = User()
+                        var named: Named = obj as Named
+                        println(named.name())
+
                 """)).isEqualTo("doug\n");
     }
 

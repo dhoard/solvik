@@ -75,7 +75,7 @@ public final class SolvikLexerDiagnosticSpanTest {
 
     @Test
     public void lineFeedSourceLocatesTheOffendingCharacter() {
-        String text = "func f(): Unit {\n    @\n}\n";
+        String text = "func f() {\n    @\n}\n";
         List<Diagnostic> diagnostics = lexicalDiagnostics(text);
         assertThat(diagnostics).hasSize(1);
         int at = text.indexOf(BAD_CHARACTER);
@@ -84,7 +84,7 @@ public final class SolvikLexerDiagnosticSpanTest {
 
     @Test
     public void carriageReturnLineFeedSourceLocatesTheOffendingCharacter() {
-        String text = "func f(): Unit {\r\n    @\r\n}\r\n";
+        String text = "func f() {\r\n    @\r\n}\r\n";
         List<Diagnostic> diagnostics = lexicalDiagnostics(text);
         assertThat(diagnostics).hasSize(1);
         int at = text.indexOf(BAD_CHARACTER);
@@ -95,7 +95,7 @@ public final class SolvikLexerDiagnosticSpanTest {
     public void loneCarriageReturnSourceLocatesTheOffendingCharacter() {
         // The case ANTLR's own line/column cannot express: its counter never leaves line 1, so the
         // span must come from the lexer's reported failing offset instead.
-        String text = "func f(): Unit {\r    @\r}\r";
+        String text = "func f() {\r    @\r}\r";
         List<Diagnostic> diagnostics = lexicalDiagnostics(text);
         assertThat(diagnostics).hasSize(1);
         int at = text.indexOf(BAD_CHARACTER);
@@ -104,7 +104,7 @@ public final class SolvikLexerDiagnosticSpanTest {
 
     @Test
     public void allThreeTerminatorStylesAgreeOnOffsetAndDisplayPosition() {
-        String lf = "func f(): Unit {\n    @\n}\n";
+        String lf = "func f() {\n    @\n}\n";
         String crlf = lf.replace("\n", "\r\n");
         String cr = lf.replace("\n", "\r");
         String body = lf;
@@ -262,7 +262,7 @@ public final class SolvikLexerDiagnosticSpanTest {
     public void everyLexicalDiagnosticSpanSelectsASingleOffendingCharacter() {
         // A one-character span is the invariant these diagnostics rely on for a caret-style display,
         // regardless of which reporting path produced the span.
-        String[] inputs = {"@", "@@@", "a@b", "func f(): Unit {\n @\n}\n", "func f(): Unit {\r @\r}\r", "\"abc", "'AB'", "\uFEFFvar x = 1\n"};
+        String[] inputs = {"@", "@@@", "a@b", "func f() {\n @\n}\n", "func f() {\r @\r}\r", "\"abc", "'AB'", "\uFEFFvar x = 1\n"};
         for (String text : inputs) {
             for (Diagnostic d : lexicalDiagnostics(text)) {
                 assertThat(d.span().length()).as("span length for input " + style(text) + " in " + text.replace("\n", "\\n").replace("\r", "\\r")).isEqualTo(1);
@@ -276,7 +276,7 @@ public final class SolvikLexerDiagnosticSpanTest {
         // the parser reports nothing. SOLV-LEX-003 is raised against the whole literal by the
         // semantic layer (see SolvikExecutionNegativeTest), which is why the one-character
         // lexical-span rule above does not apply to it.
-        String text = "func f(): Unit {\n    var s = \"bad\\q\"\n}\n";
+        String text = "func f() {\n    var s: String = \"bad\\q\"\n}\n";
         SolvikParseResult result = SolvikParser.parse(source(text));
         assertThat(result.isSuccess()).isTrue();
         assertThat(result.diagnostics().all()).isEmpty();

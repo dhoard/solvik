@@ -1,4 +1,4 @@
-var c = false
+var c: Boolean = false
 if (c) {
     print("y")
 }

@@ -7,7 +7,7 @@ class Point {
         this.y = y
     }
 }
-var a = Point(1, 2)
+var a: Point = Point(1, 2)
 print(a === null)
 
 print("EXECUTED-INVALID")

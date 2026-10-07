@@ -4,12 +4,12 @@
 // Oracle quotations verified verbatim against docs/LANGUAGE_SPEC.md:
 //   - A static member has no receiver. `this` and every `super` form are rejected inside a static method body and inside a class initializer block: `this` is `SOLV-RESOL-005` and `super` is `SOLV-RESOL-006`.
 //
-mutable class A {
+class mutable A {
     A() {
     }
 }
 class C extends A {
-    static func f(): Integer {
+    method static f(): Integer {
         return super.hashCode()
     }
 

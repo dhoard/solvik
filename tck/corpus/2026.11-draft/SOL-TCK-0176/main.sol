@@ -1,2 +1,2 @@
-var a = 2147483648
+var a: Integer = 2147483648
 print("EXECUTED-INVALID")

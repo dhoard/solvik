@@ -41,7 +41,7 @@ public final class SolvikExpressionOrientedFlowTest {
     public void valueBlockWithEveryStatementFormBeforeItsTail() {
         check("""
                 func run(flag: Boolean, n: Integer): Integer {
-                    var x = {
+                    var x: Integer = {
                         if (flag) {
                             print("a")
                         }
@@ -79,6 +79,7 @@ public final class SolvikExpressionOrientedFlowTest {
                     }
                     return x
                 }
+
                 """);
     }
 
@@ -86,7 +87,7 @@ public final class SolvikExpressionOrientedFlowTest {
     public void statementIfWithElseIfChainBeforeItsTail() {
         check("""
                 func run(a: Boolean, b: Boolean): Integer {
-                    var x = {
+                    var x: Integer = {
                         if (a) {
                             print("a")
                         }
@@ -100,6 +101,7 @@ public final class SolvikExpressionOrientedFlowTest {
                     }
                     return x
                 }
+
                 """);
     }
 
@@ -107,7 +109,7 @@ public final class SolvikExpressionOrientedFlowTest {
     public void statementSwitchWithoutDefaultBeforeItsTail() {
         check("""
                 func run(n: Integer): Integer {
-                    var x = {
+                    var x: Integer = {
                         switch (n) {
                             case 1 {
                                 print("one")
@@ -117,6 +119,7 @@ public final class SolvikExpressionOrientedFlowTest {
                     }
                     return x
                 }
+
                 """);
     }
 
@@ -124,7 +127,7 @@ public final class SolvikExpressionOrientedFlowTest {
     public void aTailIfWithElseIfChainIsConvertedToAnExpression() {
         check("""
                 func run(a: Boolean, b: Boolean): Integer {
-                    var x = {
+                    var x: Integer = {
                         if (a) {
                             1
                         }
@@ -137,6 +140,7 @@ public final class SolvikExpressionOrientedFlowTest {
                     }
                     return x
                 }
+
                 """);
     }
 
@@ -144,7 +148,7 @@ public final class SolvikExpressionOrientedFlowTest {
     public void aTailSwitchIsConvertedToAnExpression() {
         check("""
                 func run(n: Integer): String {
-                    var x = {
+                    var x: String = {
                         switch (n) {
                             case 1 {
                                 "one"
@@ -156,6 +160,7 @@ public final class SolvikExpressionOrientedFlowTest {
                     }
                     return x
                 }
+
                 """);
     }
 
@@ -163,7 +168,7 @@ public final class SolvikExpressionOrientedFlowTest {
     public void anUnreachableTailAfterAnAlwaysAbruptStatementIsIgnored() {
         check("""
                 func run(flag: Boolean): Integer {
-                    var x = {
+                    var x: Nothing = {
                         if (flag) {
                             return 1
                         }
@@ -175,6 +180,7 @@ public final class SolvikExpressionOrientedFlowTest {
                     }
                     return x
                 }
+
                 """);
     }
 }

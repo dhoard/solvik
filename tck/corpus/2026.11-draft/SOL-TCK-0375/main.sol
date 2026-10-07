@@ -5,10 +5,10 @@
 //   - A delegate is an immutable, explicitly typed property that must be initialized under the normal constructor rules.
 //
 interface P {
-    func go(): Integer
+    method go(): Integer
 }
 class X implements P {
-    delegate var a
+    delegate a
 
     X() {
     }

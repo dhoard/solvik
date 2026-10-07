@@ -72,7 +72,7 @@ public final class SolvikRangeSemanticTest {
 
     @Test
     public void loopVariableIsAnImmutableInteger() {
-        CheckedProgram program = check("func f(): Unit {\n    for (i in 0...2) {\n        var copy: Integer = i\n    }\n}\n");
+        CheckedProgram program = check("func f() {\n    for (i in 0...2) {\n        var copy: Integer = i\n    }\n}\n");
         VariableSymbol variable = program.forInBindingOf(firstLoop(program)).orElseThrow();
         assertThat(variable.type()).isEqualTo(IntegerType.INSTANCE);
         assertThat(variable.isMutable()).as("the loop variable is immutable").isFalse();
@@ -80,37 +80,37 @@ public final class SolvikRangeSemanticTest {
 
     @Test
     public void arbitraryIntegerBoundsAreAccepted() {
-        check("func bound(): Integer {\n    return 3\n}\nfunc f(): Unit {\n    var start = 1\n    for (i in start...bound()) {\n    }\n}\n");
+        check("func bound(): Integer {\n    return 3\n}\nfunc f() {\n    var start: Integer = 1\n    for (i in start...bound()) {\n    }\n}\n");
     }
 
     @Test
     public void emptyAndReversedRangesAreNotErrors() {
-        check("func f(): Unit {\n    for (i in 0..<0) {\n    }\n    for (j in 5...1) {\n    }\n    for (k in 0..>0) {\n    }\n}\n");
+        check("func f() {\n    for (i in 0..<0) {\n    }\n    for (j in 5...1) {\n    }\n    for (k in 0..>0) {\n    }\n}\n");
     }
 
     @Test
     public void breakAndContinueAreValidInsideTheLoop() {
-        check("func f(): Unit {\n    for (i in 0...2) {\n        if (i == 1) {\n            continue\n        }\n        break\n    }\n}\n");
+        check("func f() {\n    for (i in 0...2) {\n        if (i == 1) {\n            continue\n        }\n        break\n    }\n}\n");
     }
 
     @Test
     public void loopVariableShadowsAnOuterBinding() {
-        check("func f(): Integer {\n    var mutable i = 99\n    for (i in 0...1) {\n    }\n    return i\n}\n");
+        check("func f(): Integer {\n    var mutable i: Integer = 99\n    for (i in 0...1) {\n    }\n    return i\n}\n");
     }
 
     @Test
     public void nonIntegerStartBoundIsRejected() {
-        assertThat(first(checkFails("func f(): Unit {\n    for (i in 0.5...2) {\n    }\n}\n")).code()).isEqualTo(DiagnosticCode.SEM_INVALID_RANGE_BOUND);
+        assertThat(first(checkFails("func f() {\n    for (i in 0.5...2) {\n    }\n}\n")).code()).isEqualTo(DiagnosticCode.SEM_INVALID_RANGE_BOUND);
     }
 
     @Test
     public void nonIntegerEndBoundIsRejected() {
-        assertThat(first(checkFails("func f(): Unit {\n    for (i in 0...true) {\n    }\n}\n")).code()).isEqualTo(DiagnosticCode.SEM_INVALID_RANGE_BOUND);
+        assertThat(first(checkFails("func f() {\n    for (i in 0...true) {\n    }\n}\n")).code()).isEqualTo(DiagnosticCode.SEM_INVALID_RANGE_BOUND);
     }
 
     @Test
     public void assigningToTheLoopVariableIsRejected() {
-        assertThat(first(checkFails("func f(): Unit {\n    for (i in 0...2) {\n        i = 3\n    }\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_ASSIGN_TO_IMMUTABLE);
+        assertThat(first(checkFails("func f() {\n    for (i in 0...2) {\n        i = 3\n    }\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_ASSIGN_TO_IMMUTABLE);
     }
 
     @Test

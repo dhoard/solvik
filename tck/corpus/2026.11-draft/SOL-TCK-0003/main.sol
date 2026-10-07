@@ -13,7 +13,7 @@ class Point {
         this.x = x
     }
 
-    override func equals(other: Any?): Boolean {
+    method override equals(other: Any?): Boolean {
         if (other is Point) {
             return this.x == other.x
         }

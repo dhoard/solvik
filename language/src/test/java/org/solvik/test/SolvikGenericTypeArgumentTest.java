@@ -50,7 +50,7 @@ public final class SolvikGenericTypeArgumentTest {
                     this.value = value
                 }
 
-                func replaceWith<U>(value: U): U {
+                method replaceWith<U>(value: U): U {
                     return value
                 }
             }
@@ -62,6 +62,7 @@ public final class SolvikGenericTypeArgumentTest {
             func plain(x: Integer): Integer {
                 return x
             }
+
             """;
 
     private static DiagnosticBag checkFails(String text) {
@@ -86,12 +87,12 @@ public final class SolvikGenericTypeArgumentTest {
 
     @Test
     public void explicitTypeArgumentOnAConstructionExecutes() {
-        assertThat(run(PRELUDE + "    var box = Box<Integer>(5)\n    println(box.value)\n")).isEqualTo("5\n");
+        assertThat(run(PRELUDE + "    var box: Box<Integer> = Box<Integer>(5)\n    println(box.value)\n")).isEqualTo("5\n");
     }
 
     @Test
     public void explicitTypeArgumentOnAMethodExecutes() {
-        assertThat(run(PRELUDE + "    var box = Box(5)\n    println(box.replaceWith<String>(\"x\"))\n")).isEqualTo("x\n");
+        assertThat(run(PRELUDE + "    var box: Box<Integer> = Box<Integer>(5)\n    println(box.replaceWith<String>(\"x\"))\n")).isEqualTo("x\n");
     }
 
     @Test
@@ -128,7 +129,7 @@ public final class SolvikGenericTypeArgumentTest {
 
     @Test
     public void constructionExplicitTypeArgumentMismatchIsRejected() {
-        assertThat(first(checkFails(PRELUDE + "func use() {\n    var box = Box<Integer>(\"x\")\n}\n")).code())
+        assertThat(first(checkFails(PRELUDE + "func use() {\n    var box: Any = Box<Integer>(\"x\")\n}\n")).code())
                 .isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
 

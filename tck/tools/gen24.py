@@ -37,14 +37,12 @@ SPEC_N = norm(SPEC)
 
 REQS_SPEC = {
     "REQ-2200": dict(
-        section="6. Functions",
-        summary="Parameter types must be explicit in the initial implementation, so a parameter "
-                "written without a type is a compile-time error",
-        kind="syntax",
-        quotes=["Parameter types must be explicit in the initial implementation."],
-        note="A parameter written without a type is the negated clause. The specification names no "
-             "code for the rule, so the rejection is bare; the program would print a sentinel if it "
-             "executed."),
+  section='6. Functions',
+  summary='Parameter types must be explicit in the initial implementation, so a parameter written without a type is a compile-time error',
+  kind='syntax',
+  quotes=['Parameter types must be explicit.'],
+  tests=['SOL-TCK-0322'],
+  note='A parameter written without a type is the negated clause. The specification names no code for the rule, so the rejection is bare; the program would print a sentinel if it executed.'),
     "REQ-2201": dict(
         section="6. Functions",
         summary="Declaring a function named `main` explicitly is a compile-time error, because the "
@@ -258,7 +256,12 @@ BAD("SOL-TCK-0324", "names", "REQ-2202",
     'print(f(1))\n' + NEG, {},
     "Two same-named functions with different parameter types are an overload pair.")
 BAD("SOL-TCK-0325", "names", "REQ-2203",
-    'var x = 1\nvar x = 2\nprint(x)\n' + NEG, {},
+    ('var x: Integer = 1\n'
+    'var x: Integer = 2\n'
+    'print(x)\n'
+    '\n'
+    'print("EXECUTED-INVALID")\n'
+    ''), {},
     "A second top-level binding of the same name is a same-scope redeclaration.")
 BAD("SOL-TCK-0326", "evaluation", "REQ-2204",
     '1 + 1\nprint("EXECUTED-INVALID")\n', {},
@@ -266,73 +269,218 @@ BAD("SOL-TCK-0326", "evaluation", "REQ-2204",
 
 # --- section 7.
 BAD("SOL-TCK-0327", "objects", "REQ-2205",
-    'class User {\n    var User: Integer = 1\n}\nvar u = User()\nprint(u.User)\n' + NEG, {},
+    ('class User {\n'
+    '    var User: Integer = 1\n'
+    '}\n'
+    'var u: User = User()\n'
+    'print(u.User)\n'
+    '\n'
+    'print("EXECUTED-INVALID")\n'
+    ''), {},
     "The property name equals the class name.")
 BAD("SOL-TCK-0328", "objects", "REQ-2206",
-    'class User {\n    User() {\n    }\n\n    User(x: Integer) {\n    }\n}\n'
-    'var u = User()\nprint("EXECUTED-INVALID")\n', {},
+    (('class User {\n'
+    '    User() {\n'
+    '    }\n'
+    '\n'
+    '    User(x: Integer) {\n'
+    '    }\n'
+    '}\n'
+    'var u: User = User()\n'
+    'print("EXECUTED-INVALID")\n'
+    '')), {},
     "A second constructor declaration is the negated at-most-one rule.")
 BAD("SOL-TCK-0329", "objects", "REQ-2207",
-    'class User {\n    User() {\n        this.User()\n    }\n}\nvar u = User()\n'
-    'print("EXECUTED-INVALID")\n', {},
+    (('class User {\n'
+    '    User() {\n'
+    '        this.User()\n'
+    '    }\n'
+    '}\n'
+    'var u: User = User()\n'
+    'print("EXECUTED-INVALID")\n'
+    '')), {},
     "The constructor invokes itself as `this.User()`.")
 BAD("SOL-TCK-0330", "objects", "REQ-2208",
-    'class User {\n    var mutable name: String\n}\nvar u = User()\nprint("EXECUTED-INVALID")\n', {},
+    (('class User {\n'
+    '    var mutable name: String\n'
+    '}\n'
+    'var u: User = User()\n'
+    'print("EXECUTED-INVALID")\n'
+    '')), {},
     "An uninitialized property without an explicit constructor removes the implicit zero-arg "
     "initializer.")
 BAD("SOL-TCK-0331", "objects", "REQ-2209",
-    'mutable class A {\n    A(x: Integer) {\n    }\n}\nclass B extends A {\n    B() {\n    }\n}\n'
-    'var b = B()\nprint("EXECUTED-INVALID")\n', {},
+    (('class mutable A {\n'
+    '    A(x: Integer) {\n'
+    '    }\n'
+    '}\n'
+    'class B extends A {\n'
+    '    B() {\n'
+    '    }\n'
+    '}\n'
+    'var b: B = B()\n'
+    'print("EXECUTED-INVALID")\n'
+    '')), {},
     "The subclass constructor omits the required `super(...)` call.")
 BAD("SOL-TCK-0332", "objects", "REQ-2210",
-    'class A {\n    A() {\n    }\n\n    func toString(): String {\n        return "a"\n    }\n}\n'
-    'var a = A()\nprint(a.toString())\n' + NEG, {},
+    ('class A {\n'
+    '    A() {\n'
+    '    }\n'
+    '\n'
+    '    method toString(): String {\n'
+    '        return "a"\n'
+    '    }\n'
+    '}\n'
+    'var a: A = A()\n'
+    'print(a.toString())\n'
+    '\n'
+    'print("EXECUTED-INVALID")\n'
+    ''), {},
     "`toString` is declared without `override`.")
 BAD("SOL-TCK-0333", "objects", "REQ-2211",
-    'class U {\n    var name: String\n\n    U(c: Boolean) {\n        if (c) {\n'
-    '            this.name = "a"\n        }\n    }\n}\nvar u = U(true)\n'
-    'print("EXECUTED-INVALID")\n', {},
+    (('class U {\n'
+    '    var name: String\n'
+    '\n'
+    '    U(c: Boolean) {\n'
+    '        if (c) {\n'
+    '            this.name = "a"\n'
+    '        }\n'
+    '    }\n'
+    '}\n'
+    'var u: U = U(true)\n'
+    'print("EXECUTED-INVALID")\n'
+    '')), {},
     "The property is assigned only on the true branch, so a false-path instance is not definitely "
     "initialized.")
 OK("SOL-TCK-0334", "objects", "REQ-2211",
-   'class U {\n    var name: String\n\n    U(c: Boolean) {\n        if (c) {\n'
-   '            this.name = "a"\n        }\n        else {\n            this.name = "b"\n'
-   '        }\n    }\n}\nvar u = U(true)\nprint("def" .. u.name)\n',
+   (('class U {\n'
+    '    var name: String\n'
+    '\n'
+    '    U(c: Boolean) {\n'
+    '        if (c) {\n'
+    '            this.name = "a"\n'
+    '        }\n'
+    '        else {\n'
+    '            this.name = "b"\n'
+    '        }\n'
+    '    }\n'
+    '}\n'
+    'var u: U = U(true)\n'
+    'print("def" .. u.name)\n'
+    '')),
    "defa",
    "Assigning on both branches satisfies definite initialization and the read observes the taken "
    "branch; the arm differs from the rejection only by the else-assignment.")
 OK("SOL-TCK-0335", "objects", "REQ-2212",
-   'class C {\n    static var mutable i: Integer\n    static var mutable b: Boolean\n    static var mutable d: Double\n'
-   '    static var mutable s: String\n\n    C() {\n    }\n}\n'
-   'print(C.i)\nprint(C.b)\nprint(C.d)\nprint(C.s)\n',
+   (('class C {\n'
+    '    var static mutable i: Integer\n'
+    '    var static mutable b: Boolean\n'
+    '    var static mutable d: Double\n'
+    '    var static mutable s: String\n'
+    '\n'
+    '    C() {\n'
+    '    }\n'
+    '}\n'
+    'print(C.i)\n'
+    'print(C.b)\n'
+    'print(C.d)\n'
+    'print(C.s)\n'
+    '')),
    "0false0.0null",
    "Each uninitialized static cell reads its declared type's zero value from the specification's "
    "list.")
 BAD("SOL-TCK-0336", "objects", "REQ-2213",
-    'class C {\n    static {\n        print("a")\n    }\n\n    static {\n        print("b")\n'
-    '    }\n\n    C() {\n    }\n}\nvar c = C()\nprint("EXECUTED-INVALID")\n',
+    (('class C {\n'
+    '    static {\n'
+    '        print("a")\n'
+    '    }\n'
+    '\n'
+    '    static {\n'
+    '        print("b")\n'
+    '    }\n'
+    '\n'
+    '    C() {\n'
+    '    }\n'
+    '}\n'
+    'var c: C = C()\n'
+    'print("EXECUTED-INVALID")\n'
+    '')),
     {"family": "SEM", "code": "SOLV-SEM-046"},
     "A second class initializer block pins the specification-named SOLV-SEM-046.")
 BAD("SOL-TCK-0337", "objects", "REQ-2214",
-    'class C<T> {\n    static func f(x: T): T {\n        return x\n    }\n\n    C() {\n    }\n}\n'
-    'print("EXECUTED-INVALID")\n',
+    (('class C<T> {\n'
+    '    method static f(x: T): T {\n'
+    '        return x\n'
+    '    }\n'
+    '\n'
+    '    C() {\n'
+    '    }\n'
+    '}\n'
+    'print("EXECUTED-INVALID")\n'
+    '')),
     {"family": "SEM", "code": "SOLV-SEM-048"},
     "A static member mentioning the class type parameter pins the specification-named SOLV-SEM-048.")
 BAD("SOL-TCK-0338", "objects", "REQ-2215",
-    'mutable class A {\n    static var mutable n: Integer = 5\n}\nclass B extends A {\n    B() {\n    }\n}\n'
-    'print(B.n)\n' + NEG, {},
+    ('class mutable A {\n'
+    '    var static mutable n: Integer = 5\n'
+    '}\n'
+    'class B extends A {\n'
+    '    B() {\n'
+    '    }\n'
+    '}\n'
+    'print(B.n)\n'
+    '\n'
+    'print("EXECUTED-INVALID")\n'
+    ''), {},
     "The subclass name must not expose the superclass's static member.")
 OK("SOL-TCK-0339", "objects", "REQ-2216",
-   'class A {\n    static {\n        print("initA")\n    }\n\n    static var mutable n: Integer = 5\n\n'
-   '    A() {\n    }\n}\nclass B {\n    static {\n        print("initB")\n    }\n\n'
-   '    B() {\n    }\n}\nprint("start")\nprint(A.n)\nprint("mid")\nprint("done")\n',
+   (('class A {\n'
+    '    static {\n'
+    '        print("initA")\n'
+    '    }\n'
+    '\n'
+    '    var static mutable n: Integer = 5\n'
+    '\n'
+    '    A() {\n'
+    '    }\n'
+    '}\n'
+    'class B {\n'
+    '    static {\n'
+    '        print("initB")\n'
+    '    }\n'
+    '\n'
+    '    B() {\n'
+    '    }\n'
+    '}\n'
+    'print("start")\n'
+    'print(A.n)\n'
+    'print("mid")\n'
+    'print("done")\n'
+    '')),
    "startinitA5middone",
    "The unused class B's initializer block does not run, and A's runs exactly once at the first "
    "read of its static property.")
 OK("SOL-TCK-0340", "objects", "REQ-2217",
-   'mutable class A {\n    static {\n        print("A")\n    }\n\n    A() {\n    }\n}\n'
-   'class B extends A {\n    static {\n        print("B")\n    }\n\n    B() {\n    }\n}\n'
-   'print("start")\nvar b = B()\nprint("end")\n',
+   (('class mutable A {\n'
+    '    static {\n'
+    '        print("A")\n'
+    '    }\n'
+    '\n'
+    '    A() {\n'
+    '    }\n'
+    '}\n'
+    'class B extends A {\n'
+    '    static {\n'
+    '        print("B")\n'
+    '    }\n'
+    '\n'
+    '    B() {\n'
+    '    }\n'
+    '}\n'
+    'print("start")\n'
+    'var b: B = B()\n'
+    'print("end")\n'
+    '')),
    "startABend",
    "Constructing B triggers B's initialization, which initializes the direct superclass A first; "
    "the expected order is `A` then `B`, then the post-construction `end`.")

@@ -9,9 +9,10 @@
     "REQ-1200"
   ],
   "entryPoint": "main.sol",
-  "outcome": "SUCCESS",
+  "outcome": "COMPILE_ERROR",
   "expectation": {
-    "languageExit": 0,
-    "stdoutBase64": "ZDQy"
+    "diagnostic": {
+      "family": "TYPE"
+    }
   }
 }

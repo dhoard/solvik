@@ -2,9 +2,9 @@
 // override and a constant `switch`, then exercise `==`, `===`, `Set`, `Map`, and `switch`.
 include "EqualityIncludeLibrary.sol"
 
-var a = Coordinate(1, 2)
-var b = Coordinate(1, 2)
-var c = a
+var a: Coordinate = Coordinate(1, 2)
+var b: Coordinate = Coordinate(1, 2)
+var c: Coordinate = a
 
 // `==` and an explicit `equals` call dispatch the override; `===` ignores it.
 println(a == b)

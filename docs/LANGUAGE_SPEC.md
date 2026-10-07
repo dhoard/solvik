@@ -33,13 +33,12 @@ keywords are not reused as identifiers: a program that writes `val`, `open`, or 
 `SOLV-PARS-006` naming its replacement. See `KEYWORD_CHANGES.md` for the migration and the retired
 `SOLV-SEM-039`.
 
-Revision `2026.10-draft` adds first-class function values: function types, named function
-references, anonymous functions, explicit immutable closure capture, contextually instantiated
-generic function values, and bound method references (section 6). It supersedes the `2026.09-draft`
-statement that first-class function values do not exist, and it retires the `2026.09-draft`
-requirement that a bare callable member read is `SOLV-TYPE-014`. Until this baseline is declared stable
-(`>= 1.0`), full-language conformance reports must state that certification is withheld against a
-pre-1.0 specification.
+Revision `2026.11-draft` declares that a callable is a declaration rather than a value: there are no
+function types, no function values, no anonymous functions, no closure capture lists, and no bound
+method references (section 6). It supersedes the `2026.10-draft` first-class function values, and it
+makes `func` a module-scope declaration while `method` declares class and interface members
+(sections 6, 7, 8, and 9). Until this baseline is declared stable (`>= 1.0`), full-language
+conformance reports must state that certification is withheld against a pre-1.0 specification.
 
 `must` and `must not` define required behavior. Features explicitly marked `deferred` are not part of the language until this document defines them. An implementation must not invent semantics for a deferred or unspecified feature.
 
@@ -85,14 +84,13 @@ A character literal uses single quotes and contains exactly one Unicode scalar v
 
 ```solvik
 var name: String = "Doug"
-var count = 1
 var count: Integer = 1
 ```
 
 Reassignment is illegal:
 
 ```solvik
-var count = 1
+var count: Integer = 1
 count = 2 // compile error
 ```
 
@@ -101,21 +99,20 @@ count = 2 // compile error
 ```solvik
 var mutable count: Integer = 0
 count = count + 1
-var mutable total = 1
 ```
 
 No other marker declares a binding, and `var` is the only binding keyword: a binding is immutable
 unless `mutable` follows it. `mutable` is a modifier on the declaration, never a binding kind of its
 own, so `var mutable` is the complete form and a bare `mutable` is a compile-time error. The canonical
-forms are `var name = expression`, `var name: Type = expression`, `var mutable name = expression`,
-and `var mutable name: Type = expression`: the declaration keyword comes first and a modifier that
-permits reassignment follows it.
+forms are `var name: Type = expression` and `var mutable name: Type = expression`: the declaration
+keyword comes first and the modifier that permits reassignment follows it. Every local declaration
+writes an initializer and its type, and no type is ever inferred from the initializer.
 
 Reassignment uses ordinary `=` assignment on an existing binding and is legal only when the binding
 was declared `mutable`:
 
 ```solvik
-var mutable count = 0
+var mutable count: Integer = 0
 count = 1
 count = count + 1
 ```
@@ -133,7 +130,7 @@ class User {
     }
 }
 
-var user = User("Doug")
+var user: User = User("Doug")
 user.name = "Douglas" // valid
 user = User("Other")  // compile error
 ```
@@ -212,7 +209,7 @@ call `equals` explicitly.
 Every non-null value has the built-in member:
 
 ```solvik
-mutable func equals(other: Any?): Boolean
+method mutable equals(other: Any?): Boolean
 ```
 
 It is a language-defined universal member, not operator overloading, and its explicit call and `==`
@@ -226,7 +223,7 @@ value == other
 A user class may declare exactly:
 
 ```solvik
-override func equals(other: Any?): Boolean
+method override equals(other: Any?): Boolean
 ```
 
 The compiler requires `override`, exactly one explicit parameter typed exactly `Any?`, and return
@@ -234,7 +231,7 @@ type exactly `Boolean`. The inherited root member is mutable, and an override fo
 `mutable`/final rules for further subclasses. An interface cannot redeclare `equals`, and a property
 or delegate cannot use the reserved name `equals`. A direct call on a nullable receiver follows
 ordinary nullable-member rules: `value?.equals(other)` is safe and has result `Boolean?`, while
-`value.equals(other)` is an error when `value` may be null. Built-in scalar, `Unit`, enum, and
+`value.equals(other)` is an error when `value` may be null. Built-in scalar, enum, and
 reference-backed built-in implementations are fixed and cannot be overridden. A bare `value.equals`
 member read is invalid, exactly like a bare `value.toString` read.
 
@@ -244,7 +241,7 @@ After both operands have been evaluated, `left == right` performs these steps in
 
 1. if both values are `null`, the result is `true`;
 2. if exactly one value is `null`, the result is `false` and no user code runs;
-3. else, if the left value is a built-in scalar or `Unit`, its fixed rule below applies;
+3. else, if the left value is a built-in scalar, its fixed rule below applies;
 4. else, if the left value is an enum value, recursive enum equality applies;
 5. else, if the left value is a user-defined class instance, its effective `equals(other)` override
 dispatches dynamically; when no class in its hierarchy overrides `equals`, the root default is
@@ -266,7 +263,6 @@ The fixed built-in rules are:
 | `Boolean` | Boolean value |
 | `Character` | character value |
 | `String` | character-sequence content |
-| `Unit` | always equal to `Unit` |
 | `List`, `Set`, `Map`, `Stack` | reference identity |
 | Function value | reference identity |
 | `Regex` | exact pattern source text |
@@ -296,12 +292,12 @@ repair these properties.
 `Any` declares:
 
 ```solvik
-mutable func hashCode(): Integer
+method mutable hashCode(): Integer
 ```
 
 It is the hash companion of `equals` and follows the same structural rules: a language-defined
 universal member available on every non-null value, declared by a user class only as exactly
-`override func hashCode(): Integer`, requiring `override`, no parameters, and return type exactly
+`method override hashCode(): Integer`, requiring `override`, no parameters, and return type exactly
 `Integer`. An interface cannot redeclare `hashCode`, and a property or delegate cannot use the
 reserved name `hashCode`. A bare `value.hashCode` member read is invalid, exactly like a bare
 `value.equals` or `value.toString` read, and a call on a possibly-null receiver must use `?.`,
@@ -309,9 +305,9 @@ producing `Integer?`.
 
 #### The equals/hashCode pairing rule
 
-A class that declares `override func equals` must also declare `override func hashCode` in the same
-class declaration, and a class that declares `override func hashCode` must also declare
-`override func equals`. Each violation is a compile-time error reported on the single unpaired
+A class that declares `method override equals` must also declare `method override hashCode` in the same
+class declaration, and a class that declares `method override hashCode` must also declare
+`method override equals`. Each violation is a compile-time error reported on the single unpaired
 member, so a class missing one of the two produces one diagnostic.
 
 The rule is checked per declaration and is never satisfied by inheritance. An inherited `hashCode`
@@ -329,7 +325,7 @@ class that overrides both members needs no override of its own.
 drift from equality:
 
 1. if the value is `null`, the result is `0`;
-2. else, if the value is a built-in scalar or `Unit`, its fixed rule below applies;
+2. else, if the value is a built-in scalar, its fixed rule below applies;
 3. else, if the value is an enum value, the variant identity is combined with the semantic hash of
 each payload, left to right;
 4. else, if the value is a user-defined class instance, its effective `hashCode()` override
@@ -349,7 +345,6 @@ The fixed built-in rules read exactly the fields the equality table reads:
 | `Boolean` | a fixed value per `true`/`false` |
 | `Character` | hash of the character value |
 | `String` | hash of the character-sequence content |
-| `Unit` | a single fixed value, since all `Unit` are equal |
 | `List`, `Set`, `Map`, `Stack` | reference identity hash |
 | Function value | reference identity hash |
 | `Regex` | hash of the pattern source text |
@@ -374,14 +369,13 @@ The identity-bearing static types are exactly:
 - user-defined class types, including abstract classes and parameterized class applications;
 - interface types, including parameterized interface applications;
 - `List<T>`, `Set<T>`, `Map<K, V>`, and `Stack<T>`;
-- function types (section 6);
 - nullable forms of the preceding types.
 
 The following types are not identity-bearing: `Byte`, `Short`, `Integer`, `Long`, `Float`, `Double`,
-`Boolean`, `Character`, `String`, and `Unit`; enum types; `Regex` and `RegexMatch`; `Any`;
+`Boolean`, `Character`, and `String`; enum types; `Regex` and `RegexMatch`; `Any`;
 unbounded type parameters; `Nothing` and a bare null literal. A value held in `Any` must
 first be narrowed or checked-cast to an identity-bearing type, which prevents a JVM representation
-choice from becoming observable when the runtime value is a scalar, string, enum, regex, or `Unit`.
+choice from becoming observable when the runtime value is a scalar, string, enum, or regex.
 
 Identity operands must also satisfy the ordinary equality comparability rule: one operand type must
 be assignable to the other. After removing nullability, at least one operand must establish an
@@ -391,9 +385,9 @@ assignability uses the ordinary invalid-operand diagnostic; a compatible pair wi
 operand uses `SOLV-TYPE-039`.
 
 ```solvik
-var a = Point(1, 2)
-var b = Point(1, 2)
-var c = a
+var a: Point = Point(1, 2)
+var b: Point = Point(1, 2)
+var c: Point = a
 
 a == b   // false without an override; true when Point.equals compares fields
 a === b  // false
@@ -425,7 +419,6 @@ Any
 ├── Boolean
 ├── Character
 ├── String
-├── Unit
 ├── Regex
 ├── RegexMatch
 ├── List<T>
@@ -453,9 +446,11 @@ Integral arithmetic is checked and raises a Solvik runtime arithmetic error on o
 
 `Any` is the sole top type for every non-null Solvik value, including every class, interface, and enum value. `Nothing` is a subtype of every type.
 
-`Any` declares the universal members `func toString(): String`, `mutable func equals(other: Any?): Boolean`, and `mutable func hashCode(): Integer` (section 3). They are available on every non-null value. Built-in scalars provide fixed, non-overridable implementations: `Integer`, `Long`, `Byte`, and `Short` render in decimal, `Float` and `Double` use Java-style floating-point text, `Boolean` renders `true` or `false`, `Character` renders its character, `String` renders its contents, and `Unit` renders `Unit`. A built-in scalar cannot be extended and its `toString` cannot be overridden. A user-defined class inherits the default representation (its class name) and may declare `override func toString(): String` for a class-specific representation (section 7).
+`Any` declares the universal members `method toString(): String`, `method mutable equals(other: Any?): Boolean`, and `method mutable hashCode(): Integer` (section 3). They are available on every non-null value. Built-in scalars provide fixed, non-overridable implementations: `Integer`, `Long`, `Byte`, and `Short` render in decimal, `Float` and `Double` use Java-style floating-point text, `Boolean` renders `true` or `false`, `Character` renders its character, and `String` renders its contents. A built-in scalar cannot be extended and its `toString` cannot be overridden. A user-defined class inherits the default representation (its class name) and may declare `method override toString(): String` for a class-specific representation (section 7).
 
-`Unit` has one value and is the result of a function that returns normally without a value. `Nothing` is the bottom type and has no values.
+A callable that completes without producing a value has no value to represent: its result is not a
+type in this hierarchy, has no members, and is not a subtype or supertype of anything. `Nothing` is
+the bottom type and has no values.
 
 Guest exceptions form a nominal reference hierarchy rooted at `Exception`:
 
@@ -497,7 +492,7 @@ var rendered: String? = name?.toString()
 Null coalescing:
 
 ```solvik
-var display = name ?? "Unknown"
+var display: String = name ?? "Unknown"
 ```
 
 For `receiver?.member`, the member is evaluated only when the receiver is non-null and the result type is the member type made nullable. For `left ?? right`, `left` must be nullable; the result is the common type of non-null `left` and `right`.
@@ -524,9 +519,11 @@ func add(a: Integer, b: Integer): Integer {
 }
 ```
 
-Parameter types must be explicit in the initial implementation. A function's return type is written only when the function returns a value; a declaration that omits the return type returns no value and has type `Unit`. Writing `: Unit` explicitly is permitted but redundant. Local variables may infer their type from an initializer.
+Parameter types must be explicit. A callable's return type is written only when the callable produces a value: a declaration that writes no `: Type` produces no value at all, and no source type names that result. There is no `Unit` type in the language, and a written `: Unit` is an unknown type (`SOLV-RESOL-003`). A local declaration always writes its type as well; nothing is inferred from an initializer.
 
-A function that returns normally without a value has return type `Unit`, whether that type is omitted or written explicitly. `Nothing` remains the bottom type for computations that never complete normally.
+A callable that completes normally without a value produces no value, and that result has no source spelling: it cannot be bound, passed, returned, printed, compared, or joined into a type. `Nothing` remains the bottom type for computations that never complete normally.
+
+A callable is a declaration, never a value. There are no function types, no function values, no anonymous functions, no capture lists, and no bound method references; a callable cannot be assigned, stored in a property or collection, passed as an argument, returned, compared, or displayed. The only way to run a callable is to call it, and the callee of a call names the declaration rather than denoting a value.
 
 The program scope contains declarations and executable statements, which may be interleaved freely. When the root source uses compile-time inclusion (section 20), the declarations and statements of every expanded file participate in this one program; a file that declares a `module` places its top-level declarations in that module's namespace, and an included module may be referenced through a namespace prefix (section 20). The top-level statements, in include-expansion order, form the body of an implicit `func main()`; a top-level `var`, whether or not it is `mutable`, is therefore a local of the implicit main, not a global. Declaration lookup remains order-independent within a module, so a declaration may be referenced from a physically earlier file or statement. The entry point is always implicit: declaring a function named `main` explicitly, in the root or in any included file, is a compile-time error. A program with no executable top-level statements has no entry point and does nothing. A call may be used as a statement. Other value-producing expressions cannot stand alone as statements. `return;` is valid only in a function declared without a return type; `return value` requires the value to be assignable to the declared return type.
 
@@ -552,7 +549,7 @@ A brace-delimited block may stand alone as a statement. A scope block introduces
 
 A scope block is neither a loop nor a function boundary: `break`, `continue`, and `return` inside it apply to the enclosing loop or function. A block nested inside another block may still shadow an outer declaration, exactly like the body of an `if`, `while`, or `for`.
 
-The initial predeclared I/O functions are `print(value: Any?)` and `println(value: Any?)`. Both accept every value including `null`; `null` displays as `null`. A value displays as its `toString()` representation (section 4): strings and characters as their contents, numbers in decimal or Java-style floating-point text, Boolean values as `true` or `false`, `Unit` as `Unit`, and an ordinary object as its class name unless the class overrides `toString`. Because display is defined by `toString`, a class override is honored by `print`, `println`, and `..`. `println` appends the platform line separator. The predeclared `exit(code: Integer)` function runs no further Solvik code: it terminates the program with `code` as the process exit status and returns no value. Input APIs are deferred.
+The initial predeclared I/O functions are `print(value: Any?)` and `println(value: Any?)`. Both accept every value including `null`; `null` displays as `null`. A value displays as its `toString()` representation (section 4): strings and characters as their contents, numbers in decimal or Java-style floating-point text, Boolean values as `true` or `false`, and an ordinary object as its class name unless the class overrides `toString`. Because display is defined by `toString`, a class override is honored by `print`, `println`, and `..`. `println` appends the platform line separator. The predeclared `exit(code: Integer)` function runs no further Solvik code: it terminates the program with `code` as the process exit status and returns no value. Input APIs are deferred.
 
 ### Callable arity
 
@@ -576,445 +573,112 @@ a parse error while `add()` is the ordinary empty argument list. Only call argum
 trailing comma; parameter lists, type-argument lists, enum variant value lists, match pattern lists,
 and switch case labels do not.
 
-The receiver of an instance method is not an explicit argument and does not contribute to source-level arity. In `user.setName("Doug")`, a method declared as `func setName(name: String)` has source-level arity `1`. Constructors, interface methods, and built-in functions follow the same rule. The predeclared `print`, `println`, and `exit` functions each declare exactly one parameter, so a call that supplies a different number of arguments is a compile-time error; built-ins participate in the ordinary resolved-callable model rather than receiving separate arity rules.
+The receiver of an instance method is not an explicit argument and does not contribute to source-level arity. In `user.setName("Doug")`, a method declared as `method setName(name: String)` has source-level arity `1`. Constructors, interface methods, and built-in functions follow the same rule. The predeclared `print`, `println`, and `exit` functions each declare exactly one parameter, so a call that supplies a different number of arguments is a compile-time error; built-ins participate in the ordinary resolved-callable model rather than receiving separate arity rules.
 
 A statically resolved call's arity is verified before its argument types and before generic type-argument inference. A call with the wrong number of arguments therefore reports an arity error rather than a misleading argument type error, and the incorrect count suppresses the argument type checks and inference for that call.
 
-The initial language has no default parameters and no variadic parameters, so every statically
-resolved callable has exactly one permitted argument count. Function values are monomorphic and
-carry one fixed arity, so a call through a function value likewise has exactly one permitted
-argument count. A runtime arity check remains only as an internal invariant: source programs cannot
-reach it because an invalid count is rejected during semantic analysis. For a call through a
-function value the same ordering holds: arity is verified before the argument types.
+The initial language has no default parameters and no variadic parameters, so every callable has
+exactly one permitted argument count. A runtime arity check remains only as an internal invariant:
+source programs cannot reach it because an invalid count is rejected during semantic analysis.
 
-### Function values
+### Callable declarations: `func` and `method`
 
-A function value is an immutable, non-null reference value that can be stored, passed, returned,
-compared, displayed, and invoked. Function values are not a nominal class or interface family: they
-inhabit the language-defined structural function-type family defined below. Solvik has exactly one
-execution backend, and a function value is a reference to a callable already produced by that
-backend, never a source-level alias for an implementation detail such as a Java lambda or a
-reflection handle.
-
-Deferred and therefore not part of the language: mutable local capture; polymorphic or higher-rank
-function values; anonymous generic function declarations; local named function declarations;
-partial application and currying; default and variadic parameters; function overloading;
-constructors, enum variants, and static methods as values; a bare read of a fixed language-defined
-member (`toString`, `equals`, and `hashCode`) or of a synthesized `Result` operation; an unbound
-instance-method form such as `Type.method`; trailing-lambda syntax; receiver function types;
-serialization of function values; operator overloading for function values; reflective inspection
-of a function value's parameter or result types; and `is` tests or `as` casts whose target is a
-function type.
-
-#### Function type syntax
-
-A function type is written with `func`, a parenthesized comma-separated list of parameter types, and
-an optional return type:
+A callable declaration writes its keyword, an optional modifier sequence, its name, an optional type
+parameter list, its parameter list, an optional `: Type` return type, and its body.
 
 ```solvik
-func()
-func(Integer): String
-func(Integer, String): Boolean
-func(): Unit
-```
-
-Omitting the return type means `Unit`, exactly as it does for a function declaration, so `func()`
-and `func(): Unit` name the same type. Parameter names do not appear in a function type: parameter
-names belong to declarations and have no role in function-type identity or assignability.
-
-A function type may appear wherever another non-deferred type may appear, including as the type of a
-local, parameter, return, property, or static property, as a generic type argument, as the inner
-type of a nullable type, and in the parameter or return position of another function type:
-
-```solvik
-var formatter: func(Integer): String = format
-var optional: (func(Integer): String)? = null
-var factory: func(): func(Integer): String = makeFormatter
-var callbacks: List<func(String): Unit> = List()
-```
-
-Parentheses are required when nullability applies to the function value itself:
-
-```solvik
-(func(Integer): String)?  // nullable function value
-func(Integer): String?    // non-null function returning String?
-```
-
-The grouping is part of the written type, not a property a compiler may recover from source text.
-
-#### Structural identity and assignability
-
-Function types are structural. Two function types are identical when they have the same number of
-parameters, corresponding parameter types are identical, and their return types are identical. The
-declarations that produced values of those types do not affect type identity. Structural comparison
-is confined to function types: two unrelated classes with identical members remain
-assignment-incompatible (section 3).
-
-Function-type assignability is contravariant in parameters and covariant in the result. Given source
-type `func(S1, ..., Sn): SR` and target type `func(T1, ..., Tn): TR`, the source is assignable to
-the target exactly when:
-
-1. both types have the same arity;
-2. for every parameter position `i`, `Ti` is assignable to `Si`; and
-3. `SR` is assignable to `TR`.
-
-Given `mutable class Animal` and `class Dog extends Animal`, a value of type `func(Animal): Dog` is
-assignable to `func(Dog): Animal`, and a value of type `func(Dog): Animal` is not assignable to
-`func(Animal): Dog`.
-
-Numeric widening is not a subtype relation (section 4) and is never applied inside function-type
-assignability: a function accepting `Long` is not assignable to a function type accepting `Integer`
-merely because an `Integer` argument may widen at an ordinary conversion site. Arguments supplied
-when a function value is invoked still receive the ordinary call-site widening rules.
-
-`Nothing` follows the ordinary bottom-type rule and `T`/`T?` follow the section 5 nullability rules.
-Every non-null function type has `Any` as its top supertype, and a nullable function type relates to
-another under those same rules. The shared type join understands function types: for two same-arity
-function types each joined parameter takes the more specific of the two when one is assignable to
-the other, and the joined result is their nearest common result type. That joined function type is
-the least common function supertype allowed by contravariant parameters and covariant results. When
-a parameter pair is unrelated or the results have no unique join, no function-type join exists and
-the ordinary join may still select a shared nominal supertype such as `Any`; a join never introduces
-`Nothing`, a union, or an intersection in order to manufacture a function supertype. Generic type
-arguments remain invariant, so `List<func(Dog): Animal>` and `List<func(Animal): Dog>` are unrelated
-applications even though the function types inside them are comparable.
-
-#### Function values and invocation
-
-A call expression may invoke any expression whose non-null static type is a function type:
-
-```solvik
-var operation: func(Integer): Integer = double
-var result = operation(21)
-```
-
-The callee expression is evaluated exactly once before any argument. Arguments are then evaluated
-exactly once from left to right. Arity is checked before argument-type compatibility, matching the
-resolved-callable ordering above. A nullable function value cannot be invoked without prior
-refinement or another existing non-null mechanism. Explicit type arguments are not permitted on an
-already-instantiated function value, because a function value is monomorphic, so `operation<Integer>(1)`
-is `SOLV-TYPE-029`. An invocation whose callee is not a function type is `SOLV-TYPE-002`, and a call
-with the wrong number of arguments is `SOLV-TYPE-003`.
-
-Invocation returns the declared result and propagates guest exceptions without wrapping or
-translation. `return` inside a function body returns from that function body and never from the
-function that created a closure. `break` and `continue` cannot cross a function boundary.
-
-#### Named functions as values
-
-A bare reference to a visible, non-generic top-level function produces a function value:
-
-```solvik
-func format(value: Integer): String {
-    return value.toString()
+func add(a: Integer, b: Integer): Integer {
+    return a + b
 }
 
-var formatter: func(Integer): String = format
-println(formatter(42))
-```
-
-Parentheses continue to distinguish invocation, so `format` is a function value and `format(42)` is a
-direct invocation. The same rule applies to module-qualified functions and to the predeclared
-functions:
-
-```solvik
-var render: func(Integer): String = text::render
-var output: func(Any?): Unit = println
-```
-
-Name resolution keeps the existing lexical precedence: a visible local or parameter with the same
-name shadows a top-level function, and a call through such a variable invokes the variable when its
-type is a function type and is `SOLV-TYPE-002` otherwise. Because functions are not overloaded, a
-resolved top-level name identifies at most one function declaration.
-
-Every reference evaluation to the same declared top-level function produces the same canonical
-function-value identity, and module qualification does not create a second identity for the same
-declaration. Contextual instantiations of one generic declaration at different function types also
-share that declaration's canonical runtime identity: instantiation changes static typing, not the
-underlying executable value. Canonical identity is never shared between Solvik contexts.
-
-#### Anonymous functions
-
-An anonymous function is an expression written with `func`, an optional capture list, a
-parenthesized parameter list, an optional return type, and a body:
-
-```solvik
-func(value: Integer): Integer {
-    return value * 2
+func log(message: String) {
+    print(message)
 }
 ```
 
-Its parameters must have explicit types. Its return type follows the same rule as a named function:
-omitting it declares `Unit`; a value-returning anonymous function must write its return type and must
-return a compatible value on every normally completing path. Function bodies never acquire an
-implicit tail result, and the ordinary return diagnostics apply inside an anonymous function exactly
-as they do in a declaration.
+`func` declares a free function, and a free function is declared at module scope: directly in a file
+or directly inside a `module Name { ... }` block. A `func` inside a class or interface body is
+rejected (`SOLV-PARS-013`), and the diagnostic names `method` as the replacement.
 
-```solvik
-var double: func(Integer): Integer = func(value: Integer): Integer {
-    return value * 2
-}
-
-var consume: func(String) = func(value: String) {
-    println(value)
-}
-```
-
-An anonymous function creates a new function value every time evaluation reaches the expression, and
-two evaluations are distinct even when the expression captures no values. Re-reading a local that
-holds an anonymous function value preserves its identity. An anonymous function introduces a
-function boundary and a lexical scope containing its parameters and body locals; its parameters
-follow the existing immutable-parameter rule, and a declaration inside its body may shadow an outer
-binding under the ordinary lexical-scope rules.
-
-A bare anonymous function or function reference used as an expression statement remains invalid,
-because creating and discarding a function value is not a call.
-
-#### Explicit immutable closure capture
-
-An anonymous function has no implicit access to local values from an enclosing function. Every such
-dependency must appear in an explicit capture list between `func` and the parameter list:
-
-```solvik
-var factor = 3
-var scale = func [factor](value: Integer): Integer {
-    return value * factor
-}
-```
-
-The capture list is part of the anonymous-function expression but not part of its function type: the
-example above has type `func(Integer): Integer`, because callers supply `value` while the
-declaration visibly binds `factor` into the function value.
-
-A capture item is an identifier or `this`. It must resolve at the closure-creation site to one of: a
-`var` local declared in an enclosing function scope; an immutable parameter of an enclosing
-function; another function value held by an immutable binding; or `this` in an enclosing instance
-method or constructor. The capture list uses source order as environment order. A duplicate capture
-item, and a capture item with the same name as one of the anonymous function's parameters, is
-`SOLV-RESOL-002`. Capture aliases and arbitrary capture expressions are not supported. An empty
-capture list is a parse error, because a non-capturing anonymous function is written `func(...)`.
-
-Each listed binding's value is captured when evaluation reaches the anonymous-function expression.
-Capturing an object copies the reference, not the reachable object graph, so later mutation of that
-object's `var mutable` properties remains observable through the captured reference.
-
-An outer local or parameter referenced by the body but omitted from the capture list is
-`SEM_UNLISTED_CAPTURE` (`SOLV-SEM-058`), reported on the body reference. This applies to `this` as
-well: a closure body may use `this` only when `[this]` is written. An unknown name in a capture list
-remains `SOLV-RESOL-001`, and `this` where no instance receiver exists remains `SOLV-RESOL-005`.
-Top-level and module-qualified function declarations are globally resolved declarations rather than
-local state and need no capture entry; there are no globals to capture.
-
-A closure must not list or otherwise capture a `var mutable` local. Naming a `var mutable` in a capture
-list is `SEM_MUTABLE_CAPTURE` (`SOLV-SEM-057`), reported on that capture item, and a read or write of
-that captured name in the body is reported with the same code. Referencing the same outer
-`var mutable` without listing it remains `SEM_UNLISTED_CAPTURE` at the body reference; the compiler
-never silently converts it into a capture. A capture item that resolves to something other than an
-eligible immutable local, parameter, or `this` is `SEM_INVALID_CAPTURE` (`SOLV-SEM-059`), reported on
-the capture item.
-
-```solvik
-var mutable total = 0
-var add = func [total](value: Integer) {
-    total = total + value // rejected at [total]: SEM_MUTABLE_CAPTURE
-}
-```
-
-Mutable state may be shared explicitly through a captured immutable object reference:
+`method` declares a class or interface member (sections 7 and 8). A `method` outside a class or
+interface body is rejected (`SOLV-PARS-001`): a module-scope member is written `func`.
 
 ```solvik
 class Counter {
     var mutable value: Integer = 0
 
-    func increment() {
-        this.value = this.value + 1
+    method bump(by: Integer) {
+        this.value = this.value + by
     }
 }
-
-var counter = Counter()
-var increment = func [counter]() {
-    counter.increment()
-}
 ```
 
-Capture is transitive only through explicit values. A closure that captures another closure lists
-that function-valued binding and stores the function value; it does not duplicate or flatten the
-captured closure's environment. In nested closures, a name used in an inner capture list counts as a
-use by the enclosing closure, so every intervening closure must list and forward that value
-explicitly.
+Neither keyword declares a nested callable: a callable declaration is never a statement, so a
+declaration inside a callable body is a parse error.
 
-Anonymous self-recursion through the binding being initialized is not supported: listing that
-binding in the capture list is an ordinary read-before-initialization error (`SOLV-TYPE-008`),
-because the value does not exist when its initializer is evaluated. Recursion through named
-top-level functions needs no capture.
-
-#### Generic function values
-
-A generic function declaration does not itself produce a first-class polymorphic value. It must be
-instantiated to one monomorphic function type at each value-reference site, and that instantiation
-is contextual:
+A callable declaration whose body produces no value writes no `: Type`. No other spelling exists, and
+no expression has that result as its type, so the result cannot be used as a value:
 
 ```solvik
-func identity<T>(value: T): T {
-    return value
+func log(message: String) {
+    print(message)
 }
 
-var integerIdentity: func(Integer): Integer = identity
-var stringIdentity: func(String): String = identity
+log("a")                    // valid: a call in statement position
+var x: Integer = log("a")   // compile error: the call produces no value
 ```
 
-The expected function type supplies constraints for every declared type parameter. The compiler
-determines one complete substitution, applies it to the function's declared parameter and result
-types, and then checks ordinary function-type assignability. Inference first unifies occurrences in
-the declared parameter types with the expected parameter types; result positions may confirm or
-complete a unique substitution but never choose arbitrarily among several valid types. All type
-parameters must be resolved, and the decision is made before lowering: a function value performs no
-runtime type dispatch.
+### Return statements
 
-A generic function reference with no expected function type is `SOLV-TYPE-030`:
+`return` with no value is valid only in a callable that writes no `: Type`; `return value` requires
+the value to be assignable to the declared return type. A callable that writes no `: Type` and falls
+off the end of its body completes normally and produces no value.
 
-```solvik
-var ambiguous = identity // SOLV-TYPE-030: the type parameters cannot be inferred
-```
+A `return` with a value in a callable that writes no return type is `SOLV-TYPE-011`, and a bare
+`return` in a value-returning callable is `SOLV-TYPE-010`, reported on the return statement. A
+value-returning callable whose control flow can reach its end without returning is `SOLV-TYPE-010`
+as well, reported on the callable.
 
-An expected `Any`, an unbounded type parameter, or any other type that does not expose a complete
-function signature is insufficient. No source syntax for a polymorphic function type is introduced,
-and no new `name<Type>` expression form is introduced, because it would be ambiguous with
-relational expressions. Explicit type arguments remain available on direct calls, so
-`identity<Integer>(1)` keeps working.
+### Equality, identity, hashing, and display
 
-#### Bound method references
+A callable declaration has no value, so no callable can be compared, hashed, or displayed. The
+built-in scalars, enum values, `Regex` and `RegexMatch` values, and class instances keep the
+equality, identity, hashing, and display rules of sections 3 and 4 unchanged.
 
-Reading an instance method without calling it produces a bound method value:
+### Type tests, casts, and other constructs
 
-```solvik
-class Formatter {
-    func format(value: Integer): String {
-        return value.toString()
-    }
-}
-
-var formatter = Formatter()
-var operation: func(Integer): String = formatter.format
-println(operation(42))
-```
-
-The receiver expression is evaluated exactly once when the bound method value is created, and the
-receiver is retained strongly by that value. The method's implicit receiver does not appear in the
-function type.
-
-Ordinary virtual dispatch is preserved. A reference obtained through a class or interface type
-invokes the implementation selected by the captured receiver's runtime class. Overrides, interface
-defaults, delegated implementations, and inherited instance methods behave the same through a bound
-reference as through an immediate method call. `this.method` is a bound reference to the current
-receiver. An unqualified method name remains legal only as an immediate call under the existing
-implicit-`this` rule, so using a method as a value requires `this.method` and a bare unqualified
-method name in a value position is `SOLV-RESOL-001`. `super.method` creates a value bound to `this`
-that invokes the immediate superclass implementation without virtual redispatch, matching an
-immediate `super.method(...)` call.
-
-A generic method reference is instantiated contextually under the same monomorphic rules as a
-generic top-level function reference, so `var operation: func(Integer): Integer = object.identity`
-is accepted and an unconstrained reference is `SOLV-TYPE-030`.
-
-A normal member reference on a nullable receiver is illegal. Safe member access produces a nullable
-function value and evaluates the receiver once:
-
-```solvik
-var operation: (func(Integer): String)? = formatter?.format
-```
-
-If the receiver is null the result is null and no bound function is created; if it is non-null the
-result is the corresponding bound method. When the receiver's static type is non-null, `?.` retains
-the non-null function type, matching existing safe-access behavior.
-
-Each successful evaluation of a bound method-reference expression creates a distinct function-value
-identity, even for the same receiver and method. Copying that value through bindings preserves its
-identity.
-
-A property may itself have a function type. Because a class member namespace cannot hold a property
-and a method with the same name, member resolution decides statically whether `receiver.member`
-reads a stored function value or creates a bound method value.
-
-Only a declared callable binds. The fixed language-defined universal members `toString`, `equals`,
-and `hashCode`, and the synthesized `Result` operations, are not bindable: a bare read of one of
-them stays the compile-time error that section 3 and section 23.4 already require, and the same
-holds for a static method, a constructor, and an enum variant.
-
-#### Equality, identity, hashing, and display
-
-A function value is identity-bearing, so a concrete function type and its nullable form are valid
-operands of `===` and `!==` when the ordinary compatibility rule also holds. `Any` remains invalid
-for identity operations without refinement, as it is for every other identity-bearing runtime value.
-
-Semantic equality for function values is reference identity, and `hashCode()` is the matching
-reference-identity hash. These operations are fixed and cannot be overridden. Therefore:
-
-```solvik
-format === format // true: canonical named function value
-
-var first = func() {
-}
-var second = func() {
-}
-first === second // false
-first === first  // true
-
-formatter.format === formatter.format // false: two bound-value creations
-```
-
-`toString()` for every function value returns the exact string `func`. It must not expose a Java
-class name, memory address, node name, module path, captured values, or implementation details, so
-`print`, `println`, and `..` render every function value as `func`.
-
-#### Type tests, casts, and other constructs
-
-Function types are not reifiable. A function type used as the target of `is` or `as` is
-`SOLV-TYPE-025`. A null check may still refine a nullable function type.
-
-A function value may be assigned to `Any`, stored in a collection, returned in an enum payload, or
-passed through another generic type. Recovering a statically callable function type from `Any`
-requires a checked-cast design that is deferred. Function types participate in ordinary
-nullability, flow analysis, generic substitution, and definite initialization. They are not constant
-expressions for `switch` labels, and no function-specific `match` pattern exists.
-
-At the interoperation boundary a non-null function value reports itself as executable. Host
-execution enforces the function's arity as an internal runtime invariant and invokes the same call
-target as guest execution; guest source never relies on that runtime check, because semantic
-analysis rejects a bad arity before execution. Function parameter and return type metadata need not
-be reflectively exposed to hosts.
-
-A direct call whose target is statically known keeps its existing statically resolved path.
-Function values add an indirect call path; they do not replace direct calls, and a call such as
-`sum(1, 2)` is never lowered into constructing a function value and then invoking it.
+A type test or cast cannot name a callable: `x is f` and `x as f` are rejected when `f` is a
+function, and a method name can never be written in a type position.
 
 ### Required diagnostics
 
 | Code name | Stable code | Trigger and primary span |
 |---|---|---|
-| `SEM_MUTABLE_CAPTURE` | `SOLV-SEM-057` | an anonymous function lists or otherwise reads or writes a captured `var mutable` local; the captured name reference |
-| `SEM_UNLISTED_CAPTURE` | `SOLV-SEM-058` | an anonymous-function body uses an eligible outer local, parameter, or `this` that its capture list omits; the body reference |
-| `SEM_INVALID_CAPTURE` | `SOLV-SEM-059` | a capture item resolves to something other than an eligible immutable local, parameter, or `this`; the capture item |
+| `PARSER_REMOVED_DECLARATION` | `SOLV-PARS-013` | a declaration shape the revision retired (a `func` written as a class or interface member, a local declaration without a type, `delegate var`, a file-level `module` header, an `include ... alias ...` suffix, a modifier written before its construct keyword, or a modifier sequence in a non-canonical order); the retired shape |
+| `PARSER_REMOVED_FUNCTION_VALUE` | `SOLV-PARS-014` | function-value syntax (a function type reference, or an anonymous function expression with or without a capture list); the retired expression or type |
+| `TYPE_FUNCTION_AS_VALUE` | `SOLV-TYPE-014` | a callable name is used as a value (a bare reference to a function or method, or a callable written in an initializer, argument, return, comparison, or display position); the reference |
 
-A generic function or generic method used as a value without a complete expected function type is
-the existing `TYPE_CANNOT_INFER` (`SOLV-TYPE-030`), reported on the function or method reference; no
-second inference diagnostic exists. An unknown identifier written in a capture list remains
-`SOLV-RESOL-001`, `this` where no instance receiver exists remains `SOLV-RESOL-005`, and duplicate
-items and capture/parameter collisions are `SOLV-RESOL-002`. After an invalid capture item is
-reported, body checking must not cascade the same root cause into an unlisted-capture or
-unknown-name diagnostic.
-
-`TYPE_FUNCTION_AS_VALUE` (`SOLV-TYPE-014`) reports a callable that this revision keeps explicitly
-deferred used as a value: a static method reference, a constructor, an enum variant, and a bare read
-of a fixed language-defined member or a synthesized `Result` operation. It never reports a top-level
-function reference or a bound reference to a declared instance method, because this revision accepts
-both. Section 3 and section 23.4 retain their existing bare-member-read rejections unchanged.
+A generic function or generic method name used as a value is `TYPE_FUNCTION_AS_VALUE`
+(`SOLV-TYPE-014`) as well: a declaration denotes no value, so there is nothing to instantiate.
+Section 3 and section 23.4 retain their existing bare-member-read rejections unchanged.
 
 ## 7. Classes
 
 Classes are final by default. A class that is not declared `mutable` or `abstract` cannot be extended,
 and a method that is not declared `mutable` cannot be overridden: `mutable` unlocks, and no marker
 means locked.
+
+A class modifier follows the `class` keyword, and a class declares at most one of them: `class mutable
+Name` opens the class for extension, `class abstract Name` makes it abstract, and `class Name` is
+final. A modifier written before the keyword, or both modifiers together, is rejected
+(`SOLV-PARS-013`).
+
+A class and interface member is declared with `method`, and a member modifier follows that keyword in
+one canonical order: `method static name(...)`, `method override name(...)`, `method mutable
+name(...)`, and `method override mutable name(...)`. A property writes `var static name: Type` or
+`var static mutable name: Type`, and the class initializer block keeps the spelling `static { ... }`.
+A member modifier written before its construct keyword, or a modifier sequence in any other order, is
+rejected (`SOLV-PARS-013`) rather than reordered silently.
 
 ```solvik
 class User {
@@ -1037,8 +701,8 @@ inherited ones, and a local may shadow a property name without either reference 
 A class must explicitly opt into inheritance. `mutable` opens a class for extension by anyone:
 
 ```solvik
-mutable class Animal {
-    mutable func speak(): String {
+class mutable Animal {
+    method mutable speak(): String {
         return "..."
     }
 }
@@ -1048,7 +712,7 @@ An `abstract` class (section 12) is also extendable, and is the other way a subc
 superclass:
 
 ```solvik
-abstract class Shape {
+class abstract Shape {
     Shape() {
     }
 }
@@ -1063,7 +727,7 @@ Single inheritance only:
 
 ```solvik
 class Dog extends Animal {
-    override func speak(): String {
+    method override speak(): String {
         return "woof"
     }
 }
@@ -1101,7 +765,7 @@ A class with no explicit constructor has an implicit zero-argument initializer o
 
 An overriding method must have exactly the inherited parameter types and may return a subtype of the inherited return type. A `mutable` member may be overridden; all other members are final. An override of a `mutable` member is itself final unless it is declared `mutable` as well, which is how an override re-opens the chain for one more level.
 
-The inherited `Any.toString()` is a mutable member, so a class may declare `override func toString(): String` for a class-specific string representation. Because the built-in member is always inherited, declaring `toString` without `override`, changing its parameter list, or returning a type other than `String` is a compile-time error, and a stored member may not reuse the reserved name `toString`.
+The inherited `Any.toString()` is a mutable member, so a class may declare `method override toString(): String` for a class-specific string representation. Because the built-in member is always inherited, declaring `toString` without `override`, changing its parameter list, or returning a type other than `String` is a compile-time error, and a stored member may not reuse the reserved name `toString`.
 
 ### Static members and class initialization
 
@@ -1113,10 +777,10 @@ enum are parse errors rather than semantic ones.
 
 ```solvik
 class Counter {
-    static var limit: Integer = 10
-    static var mutable attempts: Integer = 0
+    var static limit: Integer = 10
+    var static mutable attempts: Integer = 0
 
-    static func reset() {
+    method static reset() {
         Counter.attempts = 0
     }
 
@@ -1131,7 +795,7 @@ class Counter {
 A static member is referenced through the class name: `Counter.limit`, `Counter.attempts = 5`, and
 `Counter.reset()`. The class name in that position is a receiver, not a value: it is legal only as the
 root of a static member reference, and a class name used anywhere else remains `SOLV-TYPE-016`. In
-particular `var c = Counter` and a read through an instance such as `instance.limit` are rejected. A
+particular `var c: Counter = Counter` and a read through an instance such as `instance.limit` are rejected. A
 module-qualified class reaches the same members, as in `math::Counter.reset()`.
 
 The class name is required even inside the class's own static members: a static property is read and
@@ -1162,9 +826,9 @@ its class.
 The `toString`/`equals`/`hashCode` reserved-name rules apply to **instance** members only, so a static
 member may use those names. Those names are reserved to protect the universal `Any` members, which are
 instance members reached through virtual dispatch; a static member never enters the dispatch table, so a
-`static func toString()` cannot replace `Any.toString()` any more than an instance method of another name
+`method static toString()` cannot replace `Any.toString()` any more than an instance method of another name
 can, and `instance.toString()` keeps reaching the universal member. Both spellings are reachable at once:
-for a class declaring `static var toString: Integer` and inheriting the default `Any.toString()`, the
+for a class declaring `var static toString: Integer` and inheriting the default `Any.toString()`, the
 expression `C.toString` reads the static cell and `instance` formatting still calls `Any.toString()`.
 
 A class declares **at most one** class initializer block. A second block is `SOLV-SEM-046`, reported on
@@ -1216,9 +880,9 @@ Interfaces define nominal contracts and may have default method implementations.
 
 ```solvik
 interface Named {
-    func name(): String
+    method name(): String
 
-    func greeting(): String {
+    method greeting(): String {
         return "Hello " .. name()
     }
 }
@@ -1238,17 +902,20 @@ Interfaces contain methods, not stored properties. An implementing method must u
 
 Composition is a primary language design mechanism.
 
-Delegation removes forwarding boilerplate.
+Delegation removes forwarding boilerplate. A delegate is declared with the `delegate` keyword, a
+name, and an interface type: `delegate name: InterfaceType`. The `delegate` keyword is followed
+directly by the name, so the retired `delegate var name: Type` spelling is rejected
+(`SOLV-PARS-013`) rather than read as a property.
 
 ```solvik
 interface UserRepository {
-    func find(id: Long): User?
+    method find(id: Long): User?
 
-    func save(value: User)
+    method save(value: User)
 }
 
 class UserService implements UserRepository {
-    delegate var repository: UserRepository
+    delegate repository: UserRepository
 
     UserService(repository: UserRepository) {
         this.repository = repository
@@ -1264,8 +931,8 @@ Ambiguous delegation must be a compile-time error.
 
 ```solvik
 class X implements Printable {
-    delegate var a: PrinterA
-    delegate var b: PrinterB
+    delegate a: PrinterA
+    delegate b: PrinterB
 
     // compile error if both supply print() and X does not explicitly resolve it
 }
@@ -1312,16 +979,16 @@ assignable to the element type; `Set` keeps only the first of equal elements. `M
 keeps its position and takes the latest value. A `key: value` entry is meaningful only in a `Map`
 construction, and a positional value is not valid in a `Map` construction.
 
-* `List<T>`: `var isEmpty: Boolean`, `var size: Integer`, `func add(element: T)`, `func get(index: Integer): T`,
-  `func removeAt(index: Integer): T`, `func set(index: Integer, element: T)`, `func clear()`. An invalid index
+* `List<T>`: `var isEmpty: Boolean`, `var size: Integer`, `method add(element: T)`, `method get(index: Integer): T`,
+  `method removeAt(index: Integer): T`, `method set(index: Integer, element: T)`, `method clear()`. An invalid index
   raises a Solvik runtime bounds error.
-* `Set<T>`: `var isEmpty: Boolean`, `var size: Integer`, `func add(element: T): Boolean`,
-  `func contains(element: T): Boolean`, `func remove(element: T): Boolean`, `func clear()`.
-* `Map<K, V>`: `var isEmpty: Boolean`, `var size: Integer`, `func put(key: K, value: V)`,
-  `func get(key: K): V`, `func containsKey(key: K): Boolean`, `func remove(key: K): Boolean`,
-  `func clear()`. `get` for a missing key raises a Solvik collection error.
-* `Stack<T>`: `var isEmpty: Boolean`, `var size: Integer`, `func push(element: T)`, `func peek(): T`,
-  `func pop(): T`, `func clear()`. `peek` and `pop` on an empty stack raise a Solvik collection error.
+* `Set<T>`: `var isEmpty: Boolean`, `var size: Integer`, `method add(element: T): Boolean`,
+  `method contains(element: T): Boolean`, `method remove(element: T): Boolean`, `method clear()`.
+* `Map<K, V>`: `var isEmpty: Boolean`, `var size: Integer`, `method put(key: K, value: V)`,
+  `method get(key: K): V`, `method containsKey(key: K): Boolean`, `method remove(key: K): Boolean`,
+  `method clear()`. `get` for a missing key raises a Solvik collection error.
+* `Stack<T>`: `var isEmpty: Boolean`, `var size: Integer`, `method push(element: T)`, `method peek(): T`,
+  `method pop(): T`, `method clear()`. `peek` and `pop` on an empty stack raise a Solvik collection error.
 
 Collection literals beyond a constructor call, iteration protocols, and collection variance remain
 deferred.
@@ -1351,7 +1018,7 @@ branch result is an expression; because a block is an expression (section 21), a
 brace-delimited block for multiple statements followed by a tail result.
 
 ```solvik
-var message = match result {
+var message: String = match result {
     Ok(value) => "value=" .. value
     Err(error) => "error=" .. error
 }
@@ -1364,7 +1031,7 @@ Missing a known enum variant is a compile-time error unless a wildcard pattern h
 An `abstract class` is not constructible: naming it as a constructor is `SOLV-SEM-028`, and a program
 must construct one of its subtypes instead. It may declare a constructor, which a subclass reaches
 through `super(...)`. `abstract` grants extension, so `mutable` has no bit left to flip on it and
-`mutable abstract class` and `abstract mutable class` are both parse errors rather than semantic ones.
+`class abstract mutable` and `class mutable abstract` are both parse errors rather than semantic ones.
 An `abstract` class may be extended from any file, including a file brought in by `include`.
 
 A closed variant set is known only for `enum` and `error` types. A class type — `abstract`, `mutable`,
@@ -1429,10 +1096,10 @@ Minimum conceptual API:
 
 ```solvik
 class Regex extends Any {
-    func matches(value: String): Boolean
-    func find(value: String): RegexMatch?
-    func findAll(value: String): List<RegexMatch>
-    func replace(value: String, replacement: String): String
+    method matches(value: String): Boolean
+    method find(value: String): RegexMatch?
+    method findAll(value: String): List<RegexMatch>
+    method replace(value: String, replacement: String): String
 }
 ```
 
@@ -1440,12 +1107,12 @@ The initial portable pattern syntax supports literals, `.`, `^`, `$`, character 
 
 `matches` requires the complete input to match. `find` returns the first non-overlapping match and `findAll` returns all non-overlapping matches from left to right. `replace` replaces all non-overlapping matches and treats the replacement as literal text; capture substitution is deferred.
 
-`RegexMatch` exposes immutable `value: String`, `start: Integer`, `end: Integer`, `groupCount: Integer`, and `func group(index: Integer): String?`. Offsets are zero-based character offsets and `end` is exclusive. Group zero is the complete match.
+`RegexMatch` exposes immutable `value: String`, `start: Integer`, `end: Integer`, `groupCount: Integer`, and `method group(index: Integer): String?`. Offsets are zero-based character offsets and `end` is exclusive. Group zero is the complete match.
 
 Regex construction accepts raw strings:
 
 ```solvik
-var number = Regex(r#"^\d+$"#)
+var number: Regex = Regex(r#"^\d+$"#)
 ```
 
 Regex patterns may be used in `switch` cases:
@@ -1477,7 +1144,7 @@ Regex match/capture binding in `switch` is deferred.
 Normal strings cannot contain an unescaped physical newline. They support exactly `\\`, `\"`, `\n`, `\r`, `\t`, `\0`, and `N` (`\N`). Any other escape is a lexical error.
 
 ```solvik
-var message = "hello\nworld"
+var message: String = "hello\nworld"
 ```
 
 String interpolation is deferred. A `$` has no interpolation meaning in the initial implementation.
@@ -1506,13 +1173,13 @@ correct native line separator when executed on another.
 Examples:
 
 ```solvik
-var onlyNative = "\N"
-var leading = "\Nindented"
-var trailing = "end\N"
-var multiple = "a\Nb\Nc"
-var explicitLf = "\n"
-var explicitCrlf = "\r\n"
-var escapedBackslashN = "\\N"  // literal backslash followed by 'N'
+var onlyNative: String = "\N"
+var leading: String = "\Nindented"
+var trailing: String = "end\N"
+var multiple: String = "a\Nb\Nc"
+var explicitLf: String = "\n"
+var explicitCrlf: String = "\r\n"
+var escapedBackslashN: String = "\\N"  // literal backslash followed by 'N'
 ```
 
 Raw strings do not process `\N`; the two characters remain literal inside a raw string.
@@ -1553,9 +1220,9 @@ An unterminated raw string is a lexical error at its opening delimiter. The diag
 Examples:
 
 ```solvik
-var regex = r#"\d+\s+"#
-var json = r#"{"name":"Doug","path":"C:\temp"}"#
-var sql = r#"
+var regex: Regex = r#"\d+\s+"#
+var json: String = r#"{"name":"Doug","path":"C:\temp"}"#
+var sql: String = r#"
 SELECT *
 FROM users
 WHERE name = 'Doug'
@@ -1568,15 +1235,15 @@ Solvik is a physical-line language. A physical newline ends the statement, decla
 that precedes it, and the grammar requires a separator between every two constructs.
 
 ```solvik
-var x = 1
-var y = 2
+var x: Integer = 1
+var y: Integer = 2
 ```
 
 The semicolon is a separator, not a terminator. It may separate two constructs written on the same
 physical line:
 
 ```solvik
-var a = 1; var b = 2; print(a + b)
+var a: Integer = 1; var b: Integer = 2; print(a + b)
 ```
 
 It never ends a line. A `;` that is followed by another physical line, by end of file, or by a
@@ -1584,7 +1251,7 @@ stand-alone closing brace did not separate two constructs on its line and is rej
 `SOLV-PARS-012` (`SEMI_ENDS_LINE`) at the semicolon. So all of these are errors:
 
 ```solvik
-var x = 1;
+var x: Integer = 1;
 ```
 
 ```solvik
@@ -1596,12 +1263,12 @@ foo(); bar();
 ```
 
 ```solvik
-var value = {
+var value: Integer = {
     42;
 }
 ```
 
-and `foo(); var a = 1; var b = 2` is the correct spelling of three statements on one line. A
+and `foo(); var a: Integer = 1; var b: Integer = 2` is the correct spelling of three statements on one line. A
 construct followed by nothing but comment to the end of its line is complete at the boundary;
 comment cannot make a `;` into a separator.
 
@@ -1611,7 +1278,7 @@ newline inside a comment, because it is still a physical newline), and the stage
 parser-visible boundary token per line boundary whose last token ends a line: an identifier, a
 literal, `break`, `continue`, `return`, `)`, `]`, `}`, an explicit `;`, a completed `?` propagation,
 or `this`, `super`, and `null`, end a line; keywords that open a construct (`var`, `else`, `mutable`,
-`class`, `func`, `try`, `throw`, `static`, `case`, `default`, `enum`, `module`, `abstract`, `match`),
+`class`, `func`, `method`, `try`, `throw`, `static`, `case`, `default`, `enum`, `module`, `abstract`, `match`),
 an operator, and a comma do not. Blank lines and comment lines never
 add a second boundary, and the final physical line of a file is terminated by end of file, to which
 the same rule applies without a following token. Indentation has no syntactic meaning.
@@ -1625,7 +1292,7 @@ delimiter. There is no lookahead exception table and no heuristic join: a line b
 does not admit is an error at the break.
 
 ```solvik
-var total = price +
+var total: Integer = price +
     tax +
     shipping
 ```
@@ -1639,7 +1306,7 @@ statement, and the grammar never joins the following line.
 Solvik supports TypeScript/Kotlin-style leading-dot chains:
 
 ```solvik
-var result = service
+var result: Result<String, String> = service
     .load()
     .transform()
 ```
@@ -1743,7 +1410,7 @@ The compiler must narrow the type where the checked value is stable and no inter
 Checked cast syntax:
 
 ```solvik
-var user = value as User
+var user: User = value as User
 ```
 
 An unsuccessful `as` cast raises a Solvik runtime type error. Safe-cast syntax is deferred.
@@ -1777,18 +1444,15 @@ not a statement and cannot appear in a function, method, constructor, block, loo
 `match` branch. The path is a normal or raw string literal, and the directive ends where its
 physical line ends, like any construct (section 16).
 
-An include may bind a file-local namespace prefix with an optional `alias` suffix:
+An `include` includes source and binds no name. There is no alias clause, and an `include` that
+writes one is rejected (`SOLV-PARS-013`) rather than reinterpreted: a module is referenced through
+the name its own `module` block declares.
+
+Included declarations are reached through that name with the `::` namespace separator:
 
 ```solvik
 include "lib/math.sol"
-include "lib/math.sol" alias math
-```
 
-`alias` is a reserved keyword. The alias name is written after the path on the same line. There is
-no export or selective-import form. The included declarations
-are reached through the prefix with the `::` namespace separator:
-
-```solvik
 math::add(1, 2)
 var point: math::Point = math::Point(1)
 var result: math::Result = math::Result.Ok(1)
@@ -1796,14 +1460,15 @@ var result: math::Result = math::Result.Ok(1)
 
 ### Modules and namespaces
 
-A physical file may name its namespace with an optional `module` declaration, which must be the first
-item in the file:
+A `module` declaration is a block that contains declarations, and it is an item of a physical file
+rather than a file header:
 
 ```solvik
-module com_example_util
+module com_example_util {
 
-func add(a: Integer, b: Integer): Integer {
-    return a + b
+    func add(a: Integer, b: Integer): Integer {
+        return a + b
+    }
 }
 ```
 
@@ -1811,29 +1476,28 @@ func add(a: Integer, b: Integer): Integer {
 digits with parts joined by exactly one underscore, each part starting with a letter
 (`[a-z][a-z0-9]*(_[a-z0-9]+)*`), and it is not a reserved word. Underscores replace Java package
 dots, so `com.example.util` is written `com_example_util`. Module names never contain dots. A file
-without a `module` declaration belongs to the implicit default module.
+without a `module` block belongs to the implicit default module.
 
-- A file's top-level `func`, `class`, `interface`, and `enum` declarations belong to its module.
+- A file's top-level `func`, `class`, `interface`, `enum`, and `error` declarations belong to the
+  module that contains them, and a module block contains only declarations: an `include` and a
+  statement are not module items. A module block is never nested inside another one.
+- A file may declare several module blocks, and it may hold default-module declarations and
+  executable statements in addition.
 - Two files that declare the same module name are one module and their declarations merge; a
   duplicate declaration within the merged module is `SOLV-RESOL-002`.
-- Including a file that declares a module makes that module's name a visible prefix in the including
-  file. `include P alias p` binds the prefix `p` to the included file's module instead. An alias
-  name follows the same naming rule as a module name.
-- Prefixes are file-local and non-transitive: a file does not inherit the prefixes or aliases of the
-  files it includes; it must include a file itself to reference it.
-- `alias` naming a file in the default module is `SOLV-RESOL-014`, because the default module has no
-  name to bind.
-- Binding one prefix twice in a file, including a collision with a prefix an unaliased include
-  already made visible, is `SOLV-RESOL-013`.
+- A module declaration contributes its name to the whole program: after expansion, `Name::member`
+  names the declaration of a `module Name { ... }` block from any file of the program.
+- A prefix that no module declaration of the program declares is unknown and is reported as
+  `SOLV-RESOL-015` at the prefix.
 - `::` is the namespace separator. A qualified declaration reference is written `p::Name`, where the
-  prefix `p` must be a visible module or alias; a qualified type is `p::Type`, a qualified call is
-  `p::function(...)`, and a qualified enum variant is `p::Enum.Variant`. The `.` operator remains
-  ordinary member access, so a qualified reference is never confused with member access and there is
-  no name-collision rule between declarations and prefixes.
+  prefix `p` must be a module name declared anywhere in the program; a qualified type is `p::Type`, a
+  qualified call is `p::function(...)`, and a qualified enum variant is `p::Enum.Variant`. The `.`
+  operator remains ordinary member access, so a qualified reference is never confused with member
+  access and there is no name-collision rule between declarations and prefixes.  no name-collision rule between declarations and prefixes.
 
 Unqualified name resolution within a file is, innermost first: lexical locals and parameters, the
 file's own module, the implicit default module, and the built-in prelude. Built-in types and
-functions are always visible unqualified and cannot be shadowed by a module or alias name.
+functions are always visible unqualified and cannot be shadowed by a module name.
 
 Top-level `var` declarations, mutable or not, and executable statements are not part of any module namespace:
 they remain locals and statements of the single implicit `main` (section 6) and are not reachable as
@@ -1910,9 +1574,7 @@ code.
 | `RESOL_INCLUDE_NOT_FILE` | `SOLV-RESOL-009` | include directive |
 | `RESOL_INCLUDE_IO` | `SOLV-RESOL-010` | include directive |
 | `RESOL_INCLUDE_CYCLE` | `SOLV-RESOL-011` | include directive that closes the cycle |
-| `RESOL_MODULE_INVALID_NAME` | `SOLV-RESOL-012` | module declaration or include directive |
-| `RESOL_ALIAS_DUPLICATE` | `SOLV-RESOL-013` | include directive |
-| `RESOL_ALIAS_DEFAULT_MODULE` | `SOLV-RESOL-014` | include directive |
+| `RESOL_MODULE_INVALID_NAME` | `SOLV-RESOL-012` | module declaration |
 | `RESOL_UNKNOWN_MODULE` | `SOLV-RESOL-015` | qualified reference |
 
 Messages for path failures include the written path and, when one exists, the resolved candidate.
@@ -1924,7 +1586,7 @@ A block, an `if`, and a `switch` may be used as values. The feature is additive:
 statements, a function still requires an explicit `return` for a value, and there is no implicit
 function result. These rules are compiled before lowering: a construct
 with an error never produces an executable call target, and no runtime node repairs an invalid
-construct with `null`, `Unit`, zero, `false`, an empty string, or a host sentinel.
+construct with `null`, zero, `false`, an empty string, or a host sentinel.
 
 ### 21.1 Terms
 
@@ -1935,40 +1597,37 @@ scope and may contain zero or more statements followed by an optional **tail exp
 A path **completes abruptly** when it executes `return`, or a valid enclosing-loop `break` or
 `continue`, before reaching the construct's result. Abrupt completion carries no value and does not
 participate in result joining. A path **completes normally without a result** when it reaches the end
-of a value-required body without evaluating a tail expression; that is a compile-time error. It is
-distinct from evaluating a tail expression whose type is `Unit`, because `Unit` is a real type with
-one value.
+of a value-required body without evaluating a tail expression; that is a compile-time error. A body
+whose tail expression produces no value completes normally without a result as well, because "no
+value" is not a type that could be bound.
 
 ### 21.2 Block expressions
 
 ```solvik
-var answer = {
-    var base = 20
+var answer: Integer = {
+    var base: Integer = 20
     base + 22
-}
-
-var logged: Unit = {
-    println("done")
 }
 ```
 
-The first block has type `Integer` and value `42`; the second has type `Unit`. A block expression
+The block has type `Integer` and value `42`. A block expression
 introduces one lexical scope. Earlier statements execute in source order, and a local declared
 inside the block is visible to later items in that block and nowhere outside it.
 
-Every normally completing path through a value-required block must reach its tail expression. An
-empty block, a block ending in a local declaration, and a block ending in an assignment are invalid
-in expression position and do not acquire an implicit `Unit` result:
+Every normally completing path through a value-required block must reach a tail expression that
+produces a value. An empty block, a block ending in a local declaration, a block ending in an
+assignment, and a block whose tail expression produces no value are invalid in expression position,
+because none of them produces a value:
 
 ```solvik
-var invalid = {
-    var local = 1
+var invalid: Integer = {
+    var local: Integer = 1
 }
 ```
 
-To produce `Unit`, use a tail expression whose type is `Unit`. A standalone scope block remains a
-statement block, and the existing rule that an unused value-producing non-call expression cannot
-stand alone still applies.
+A block whose tail produces no value may still be written as a statement; a standalone scope block
+remains a statement block, and the existing rule that an unused value-producing non-call expression
+cannot stand alone still applies.
 
 A value-required block whose every path completes abruptly has type `Nothing` and never evaluates a
 tail expression.
@@ -1981,11 +1640,11 @@ never changes meaning: no separator token carries a value, and the last item of 
 block is its tail expression wherever it sits:
 
 ```solvik
-var a = {
+var a: Integer = {
     42
 }
 
-var b = {
+var b: Integer = {
     1; 42
 }
 ```
@@ -2001,7 +1660,7 @@ tail expression.
 An `if` may be used in expression position:
 
 ```solvik
-var description = if (value < 0) {
+var description: String = if (value < 0) {
     "negative"
 }
 else if (value == 0) {
@@ -2039,7 +1698,7 @@ The `switch` statement remains valid and unchanged. In expression position the s
 produces a value:
 
 ```solvik
-var message = switch (code) {
+var message: String = switch (code) {
     case 200 {
         "ready"
     }
@@ -2067,7 +1726,7 @@ assignability, multiple labels, regex labels, duplicate and default placement, a
 a case continue to apply. Regex expression cases keep the same spelling and matching behavior:
 
 ```solvik
-var kind = switch (input) {
+var kind: String = switch (input) {
     case regex r#"^\d+$"# {
         "number"
     }
@@ -2107,11 +1766,10 @@ conversion site, never a join rule. An `if`/`else` expression whose branches yie
 `Long` is written with each brace on its own line, and its join is `Number`, not `Long`. If
 exactly one branch can complete normally, its
 result type is the construct's result type. If no branch can complete normally, the construct has
-type `Nothing`, and no runtime value is invented for it. `Unit` participates in the join as any other
-non-null value type.
+type `Nothing`, and no runtime value is invented for it.
 
 ```solvik
-var both = if (flag) {
+var both: Any = if (flag) {
     1
 }
 else {
@@ -2139,7 +1797,7 @@ else {
     0
 }
 
-var mode = if (debug) {
+var mode: String = if (debug) {
     "debug"
 }
 else {
@@ -2226,7 +1884,7 @@ private by construction: it is never a readable member, so `e.message` is not a 
 class and is reported as `SOLV-RESOL-004`. The value is observed only through the synthesized accessor:
 
 ```solvik
-func getMessage(): String?   // synthesized on every guest exception type
+method getMessage(): String?   // synthesized on every guest exception type
 ```
 
 - A construction with no message argument stores no message; `getMessage()` then returns `null`.
@@ -2432,7 +2090,7 @@ error payload type `E` come from the receiver's declared type arguments.
 
 ```solvik
 func f(): Result<Integer, String> {
-    var r = compute()
+    var r: Result<Integer, String> = compute()
     if (r.isOk()) {
         return Result.Ok(r.unwrap())
     }
@@ -2448,7 +2106,7 @@ func f(): Result<Integer, String> {
 | `unwrap` | `unwrap(): T` | the success payload; faults on the error variant |
 | `unwrapErr` | `unwrapErr(): E` | the error payload; faults on the success variant |
 | `expect` | `expect(message: String): T` | the success payload; faults with `message` on the error variant |
-| `ignore` | `ignore(): Unit` | consumes the value and yields `Unit` |
+| `ignore` | `ignore()` | consumes the value and produces no value |
 
 - `isOk` and `isErr` are complementary tests over the variant. They never fault.
 - `unwrap` returns the success payload of an `Ok`. On an `Err` it raises a runtime fault (section 23.1).
@@ -2456,8 +2114,8 @@ func f(): Result<Integer, String> {
 - `expect(message)` returns the success payload of an `Ok`, ignoring the message. On an `Err` it raises
   a runtime fault reporting `message` together with the carried error (section 23.1). The message must
   be assignable to `String` and is evaluated exactly once whenever the call runs, on either variant.
-- `ignore` evaluates its receiver exactly once, discards the value, and yields `Unit`. Because it
-  yields `Unit` rather than a `Result`, `result.ignore()` is a well-formed standalone statement and
+- `ignore` evaluates its receiver exactly once, discards the value, and produces no value. Because it
+  produces no value rather than a `Result`, `result.ignore()` is a well-formed standalone statement and
   satisfies the must-consume rule (section 23.2).
 
 These operations read a variant payload directly; they are not a `match`, so they do not narrow a
@@ -2493,7 +2151,7 @@ statement (a call expression whose result type is a `Result`) is the compile-tim
   with the final read being a non-`Result` operation such as `unwrap`, `isErr`, or `ignore`;
 - propagating it with the postfix `?` operator inside a function declared to return a `Result`
   (section 23.3); or
-- calling `ignore()` to discard it deliberately, since `ignore()` yields `Unit`.
+- calling `ignore()` to discard it deliberately, since `ignore()` produces no value.
 
 A standalone `Result` call such as `compute()` therefore requires one of these consumptions;
 `compute().ignore()` is accepted and `compute()` alone is rejected.
@@ -2517,7 +2175,7 @@ required.
 func readConfig(): Result<Config, IoError> { ... }
 
 func loadApp(): Result<App, IoError> {
-    var config = readConfig()?   // config: Config, or return Err(IoError) from loadApp
+    var config: Config = readConfig()?   // or return Err(IoError) from loadApp
     return Result.Ok(App(config))
 }
 ```

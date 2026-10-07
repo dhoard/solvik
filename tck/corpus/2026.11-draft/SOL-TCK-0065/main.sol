@@ -8,15 +8,15 @@
 // example writes the default body with `+`, which is the separately reported `+`-on-String
 // conflict and is deliberately avoided here so this test depends on nothing disputed.
 interface Named {
-    func name(): String
+    method name(): String
 
-    func shout(): String {
+    method shout(): String {
         return this.name() .. "!"
     }
 }
 
 class Person implements Named {
-    func name(): String {
+    method name(): String {
         return "doug"
     }
 }

@@ -462,7 +462,7 @@ public final class SolvikLexerTest {
     @Test
     public void lineCommentAfterCodeDoesNotLeakIntoTokens() {
         // A line comment consumes to end of line; the next token must be the code after the newline.
-        SolvikLexer lexer = new SolvikLexer(CharStreams.fromString("var x = 1 // trailing\nvar y = 2"));
+        SolvikLexer lexer = new SolvikLexer(CharStreams.fromString("var x: Integer = 1 // trailing\nvar y: Integer = 2"));
         lexer.removeErrorListeners();
         List<String> defaults = new ArrayList<>();
         Token t;
@@ -471,7 +471,8 @@ public final class SolvikLexerTest {
                 defaults.add(SolvikLexer.VOCABULARY.getSymbolicName(t.getType()));
             }
         }
-        assertThat(defaults).containsExactly("VAR", "Identifier", "ASSIGN", "INTEGER_LITERAL", "VAR", "Identifier", "ASSIGN", "INTEGER_LITERAL");
+        assertThat(defaults).containsExactly("VAR", "Identifier", "COLON", "Identifier", "ASSIGN", "INTEGER_LITERAL", //
+                "VAR", "Identifier", "COLON", "Identifier", "ASSIGN", "INTEGER_LITERAL");
     }
 
     @Test

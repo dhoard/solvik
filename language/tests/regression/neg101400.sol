@@ -9,7 +9,7 @@ func identity<T>(value: T): T {
     return value
 }
 
-func use(): Unit {
+func use() {
     takesOnly(identity)
 }
 use()

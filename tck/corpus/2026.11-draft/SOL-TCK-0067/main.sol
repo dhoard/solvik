@@ -7,23 +7,23 @@
 // difference between them is the explicit method, and the expected value changes exactly
 // when that method is added.
 interface Greeter {
-    func greet(): String
+    method greet(): String
 }
 
 class English implements Greeter {
-    func greet(): String {
+    method greet(): String {
         return "hello"
     }
 }
 
 class Host implements Greeter {
-    delegate var impl: Greeter
+    delegate impl: Greeter
 
     Host(impl: Greeter) {
         this.impl = impl
     }
 
-    func greet(): String {
+    method greet(): String {
         return "explicit"
     }
 }

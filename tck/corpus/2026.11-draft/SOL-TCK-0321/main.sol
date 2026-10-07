@@ -15,10 +15,10 @@ func get(ok: Boolean): Result<Integer, String> {
     return Result.Err("bad")
 }
 func use(ok: Boolean): Result<Integer, String> {
-    var v = get(ok)? + 1
+    var v: Integer = get(ok)? + 1
     return Result.Ok(v)
 }
-var a = use(true)
+var a: Result<Integer, String> = use(true)
 print("a=" .. a.isOk() .. "," .. a.unwrap())
-var b = use(false)
+var b: Result<Integer, String> = use(false)
 print(" b=" .. b.isErr() .. "," .. b.unwrapErr())

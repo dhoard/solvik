@@ -5,7 +5,7 @@ class A {
         this.v = n
     }
 
-    func get(): Integer {
+    method get(): Integer {
         return this.v
     }
 }
@@ -17,10 +17,10 @@ class B {
         this.v = n
     }
 
-    func get(): Integer {
+    method get(): Integer {
         return this.v
     }
 }
-var a = A(1)
-var b = B(1)
+var a: A = A(1)
+var b: B = B(1)
 print("exp" .. a.equals(b))

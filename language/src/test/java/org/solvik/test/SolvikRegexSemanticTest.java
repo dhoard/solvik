@@ -84,7 +84,8 @@ public final class SolvikRegexSemanticTest {
     @Test
     public void regexConstructionHasTheRegexType() {
         CheckedProgram program = check("""
-                    var re = Regex("a")
+                        var re: Regex = Regex("a")
+
                 """);
         assertThat(typeOfLocal(program, "main", 0)).isSameAs(RegexType.INSTANCE);
         assertThat(RegexType.INSTANCE.isSubtypeOf(AnyType.INSTANCE)).isTrue();
@@ -179,8 +180,9 @@ public final class SolvikRegexSemanticTest {
     @Test
     public void constantPatternsAreCompiledOnceDuringAnalysis() {
         CheckedProgram program = check("""
-                    var re = Regex(r#"^\\d+$"#)
-                    var other = Regex("a\\\\d")
+                        var re: Regex = Regex(r#"^\\d+$"#)
+                        var other: Regex = Regex("a\\\\d")
+
                 """);
         ExpressionNode raw = localInitializer(program, "main", 0);
         RegexPattern rawPattern = program.regexConstantOf(raw).orElseThrow();
@@ -199,7 +201,8 @@ public final class SolvikRegexSemanticTest {
                     return "a"
                 }
 
-                    var re = Regex(make())
+                    var re: Regex = Regex(make())
+
                 """);
         assertThat(program.regexConstantOf(localInitializer(program, "main", 0)).isEmpty()).isTrue();
     }
@@ -207,8 +210,9 @@ public final class SolvikRegexSemanticTest {
     @Test
     public void constantPatternsAreCompiledForEveryConstantPosition() {
         CheckedProgram program = check("""
-                    var a = Regex("(a)")
-                    var b = Regex((r#"\\d"#))
+                        var a: Regex = Regex("(a)")
+                        var b: Regex = Regex((r#"\\d"#))
+
                 """);
         assertThat(program.regexConstantOf(localInitializer(program, "main", 0)).isPresent()).isTrue();
         assertThat(program.regexConstantOf(localInitializer(program, "main", 1)).isPresent()).isTrue();

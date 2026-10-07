@@ -8,5 +8,5 @@
 // by `-`, i.e. the bytes `1-2`. The `..` rendering used for the join is
 // separately owned by REQ-0001; here it is only the observation vehicle. A
 // line-final `;` is a different rule and a rejection, asserted by SOL-TCK-0496.
-var x = 1; var y = 2
+var x: Integer = 1; var y: Integer = 2
 print(x .. "-" .. y)

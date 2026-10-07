@@ -116,7 +116,7 @@ public final class SolvikMatchExecutionTest {
     @Test
     public void subtypeBindingsAccessSubtypeMembers() {
         assertThat(run("""
-                abstract class Shape {
+                class abstract Shape {
                 }
 
                 class Circle extends Shape {
@@ -145,6 +145,7 @@ public final class SolvikMatchExecutionTest {
 
                     println(area(Circle(3)))
                     println(area(Square(4)))
+
                 """)).isEqualTo("9\n16\n");
     }
 
@@ -201,31 +202,32 @@ public final class SolvikMatchExecutionTest {
                 }
 
                     var color: Color = Color.Blue
-                    var label = match color {
+                    var label: String = match color {
                         Red => "primary"
                         Blue => "other"
                     }
                     println(label)
+
                 """)).isEqualTo("other\n");
     }
 
     @Test
     public void matchResultFlowsThroughAnAbstractSupertype() {
         assertThat(run("""
-                abstract class Shape {
-                    mutable func name(): String {
+                class abstract Shape {
+                    method mutable name(): String {
                         return "shape"
                     }
                 }
 
                 class Circle extends Shape {
-                    override func name(): String {
+                    method override name(): String {
                         return "circle"
                     }
                 }
 
                 class Square extends Shape {
-                    override func name(): String {
+                    method override name(): String {
                         return "square"
                     }
                 }
@@ -240,6 +242,8 @@ public final class SolvikMatchExecutionTest {
 
                     println(pick(Circle()).name())
                     println(pick(Square()).name())
+
+
                 """)).isEqualTo("circle\nsquare\n");
     }
 

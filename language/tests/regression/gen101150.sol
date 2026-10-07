@@ -3,7 +3,7 @@ class C1 {
     C1(f2: String) {
         this.f2 = f2
     }
-    func get(): String {
+    method get(): String {
         return this.f2
     }
 }

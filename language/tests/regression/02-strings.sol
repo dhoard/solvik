@@ -1,4 +1,4 @@
-var name = "Solvik"
+var name: String = "Solvik"
 println("Hello, " .. name .. "!")
 println("tab\tnewline\nquote\"end")
 println('A')

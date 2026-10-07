@@ -65,12 +65,12 @@ public final class SolvikNullSafetyNegativeTest {
 
     @Test
     public void nullAssignedToANonNullTypeIsRejected() {
-        assertThat(first(checkFails("func f(): Unit {\n    var x: String = null\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
+        assertThat(first(checkFails("func f() {\n    var x: String = null\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
 
     @Test
     public void nullArgumentToANonNullParameterIsRejected() {
-        assertThat(first(checkFails("func g(s: String): Unit {\n}\nfunc f(): Unit {\n    g(null)\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
+        assertThat(first(checkFails("func g(s: String) {\n}\nfunc f() {\n    g(null)\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
 
     @Test
@@ -80,7 +80,7 @@ public final class SolvikNullSafetyNegativeTest {
 
     @Test
     public void nullableToNonNullAssignmentIsRejected() {
-        assertThat(first(checkFails("func f(s: String?): Unit {\n    var t: String = s\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
+        assertThat(first(checkFails("func f(s: String?) {\n    var t: String = s\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
 
     @Test
@@ -97,13 +97,14 @@ public final class SolvikNullSafetyNegativeTest {
     public void nullableMethodCallWithoutACheckIsRejected() {
         String text = """
                 class Box {
-                    func size(): Integer {
+                    method size(): Integer {
                         return 1
                     }
                 }
                 func f(box: Box?): Integer {
                     return box.size()
                 }
+
                 """;
         assertThat(first(checkFails(text)).code()).isEqualTo(DiagnosticCode.TYPE_NULLABLE_DEREFERENCE);
     }
@@ -118,9 +119,10 @@ public final class SolvikNullSafetyNegativeTest {
                         this.value = value
                     }
                 }
-                func f(box: Box?): Unit {
+                func f(box: Box?) {
                     box.value = 1
                 }
+
                 """;
         assertThat(first(checkFails(text)).code()).isEqualTo(DiagnosticCode.TYPE_NULLABLE_DEREFERENCE);
     }
@@ -135,16 +137,17 @@ public final class SolvikNullSafetyNegativeTest {
                         this.value = value
                     }
                 }
-                func f(box: Box?): Unit {
+                func f(box: Box?) {
                     box?.value = 1
                 }
+
                 """;
         assertThat(first(checkFails(text)).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_ASSIGNMENT_TARGET);
     }
 
     @Test
     public void coalescingANonNullableLeftIsRejected() {
-        assertThat(first(checkFails("func f(): Unit {\n    var s: String = \"x\"\n    var y = s ?? \"z\"\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_NULLABLE_REQUIRED);
+        assertThat(first(checkFails("func f() {\n    var s: String = \"x\"\n    var y: String = s ?? \"z\"\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_NULLABLE_REQUIRED);
     }
 
     @Test
@@ -159,7 +162,7 @@ public final class SolvikNullSafetyNegativeTest {
 
     @Test
     public void nullableCastOperandIsRejected() {
-        assertThat(first(checkFails("func f(v: Any): Unit {\n    var x = v as String?\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_TYPE_OPERAND);
+        assertThat(first(checkFails("func f(v: Any) {\n    var x: String? = v as String?\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_TYPE_OPERAND);
     }
 
     @Test
@@ -239,7 +242,7 @@ public final class SolvikNullSafetyNegativeTest {
 
     @Test
     public void unknownTypeInANullableAnnotationIsRejected() {
-        assertThat(first(checkFails("func f(): Unit {\n    var x: Nope? = null\n}\n")).code()).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_TYPE);
+        assertThat(first(checkFails("func f() {\n    var x: Nope? = null\n}\n")).code()).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_TYPE);
     }
 
     @Test

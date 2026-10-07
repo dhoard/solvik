@@ -1,6 +1,6 @@
-mutable class ParseError extends RuntimeException {
+class mutable ParseError extends RuntimeException {
 }
-mutable class OtherError extends RuntimeException {
+class mutable OtherError extends RuntimeException {
 }
 func guard() {
     try {

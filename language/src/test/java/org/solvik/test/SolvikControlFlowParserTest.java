@@ -49,7 +49,7 @@ public final class SolvikControlFlowParserTest {
 
     @Test
     public void assignmentStatementShapeAndSpan() {
-        String src = "func f(): Integer {\n    var mutable x = 1\n    x = x + 1\n    return x\n}\n";
+        String src = "func f(): Integer {\n    var mutable x: Integer = 1\n    x = x + 1\n    return x\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("assign.sol", src));
         AssignStmtNode assign = (AssignStmtNode) body(fn).statements().get(1);
         assertNode(assign, AstKind.ASSIGN_STMT, src, "x = x + 1");
@@ -59,7 +59,7 @@ public final class SolvikControlFlowParserTest {
 
     @Test
     public void whileLoopShapeAndBody() {
-        String src = "func f(c: Boolean): Unit {\n    while (c) {\n        break\n    }\n}\n";
+        String src = "func f(c: Boolean) {\n    while (c) {\n        break\n    }\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("while.sol", src));
         WhileStmtNode loop = (WhileStmtNode) body(fn).statements().get(0);
         assertNode(loop, AstKind.WHILE_STMT, src, "while (c) {\n        break\n    }");
@@ -69,7 +69,7 @@ public final class SolvikControlFlowParserTest {
 
     @Test
     public void threeClauseForIsRejectedWithItsOwnDiagnostic() {
-        String src = "func f(limit: Integer): Integer {\n    var mutable total = 0\n    for (var mutable i = 0; i < limit; i = i + 1) {\n        total = total + i\n    }\n    return total\n}\n";
+        String src = "func f(limit: Integer): Integer {\n    var mutable total: Integer = 0\n    for (var mutable i = 0; i < limit; i = i + 1) {\n        total = total + i\n    }\n    return total\n}\n";
         DiagnosticBag bag = parseFails("removedfor.sol", src);
         assertThat(bag.hasErrors()).isTrue();
         assertThat(bag.all().get(0).code()).isEqualTo(DiagnosticCode.PARSER_REMOVED_THREE_CLAUSE_FOR);
@@ -79,22 +79,22 @@ public final class SolvikControlFlowParserTest {
 
     @Test
     public void emptyClauseThreeClauseForIsAlsoRejected() {
-        DiagnosticBag bag = parseFails("removedforempty.sol", "func f(): Unit {\n    for (;;) {\n        break\n    }\n}\n");
+        DiagnosticBag bag = parseFails("removedforempty.sol", "func f() {\n    for (;;) {\n        break\n    }\n}\n");
         assertThat(bag.all().get(0).code()).isEqualTo(DiagnosticCode.PARSER_REMOVED_THREE_CLAUSE_FOR);
     }
 
     @Test
     public void theDocumentedWhileReplacementParses() {
-        String src = "func f(limit: Integer): Integer {\n    var mutable total = 0\n    {\n        var mutable i = 0\n        while (i < limit) {\n            total = total + i\n            i = i + 1\n        }\n    }\n    return total\n}\n";
+        String src = "func f(limit: Integer): Integer {\n    var mutable total: Integer = 0\n    {\n        var mutable i: Integer = 0\n        while (i < limit) {\n            total = total + i\n            i = i + 1\n        }\n    }\n    return total\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("whileidiom.sol", src));
         BlockNode scope = (BlockNode) body(fn).statements().get(1);
-        assertNode(scope, AstKind.BLOCK, src, "{\n        var mutable i = 0\n        while (i < limit) {\n            total = total + i\n            i = i + 1\n        }\n    }");
+        assertNode(scope, AstKind.BLOCK, src, "{\n        var mutable i: Integer = 0\n        while (i < limit) {\n            total = total + i\n            i = i + 1\n        }\n    }");
         assertNode(scope.statements().get(1), AstKind.WHILE_STMT, src, "while (i < limit) {\n            total = total + i\n            i = i + 1\n        }");
     }
 
     @Test
     public void breakAndContinueStatementsStandAlone() {
-        String src = "func f(c: Boolean): Unit {\n    while (c) {\n        if (c) {\n            break\n        }\n        continue\n    }\n}\n";
+        String src = "func f(c: Boolean) {\n    while (c) {\n        if (c) {\n            break\n        }\n        continue\n    }\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("loopctl.sol", src));
         WhileStmtNode loop = (WhileStmtNode) body(fn).statements().get(0);
         BreakStmtNode brk = (BreakStmtNode) loop.body().statements().get(0).children().get(1).children().get(0);
@@ -141,27 +141,27 @@ public final class SolvikControlFlowParserTest {
 
     @Test
     public void statementListKeepsDeclarationsLoopsAssignmentsAndReturnsOrdered() {
-        String src = "func f(n: Integer): Integer {\n    var mutable total = 0\n    while (n > 0) {\n        total = total + n\n        n = n - 1\n    }\n    return total\n}\n";
+        String src = "func f(n: Integer): Integer {\n    var mutable total: Integer = 0\n    while (n > 0) {\n        total = total + n\n        n = n - 1\n    }\n    return total\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("mixed.sol", src));
         assertThat(body(fn).statements().size()).isEqualTo(3);
         assertThat(body(fn).statements().get(0).kind()).isEqualTo(AstKind.LOCAL_DECL);
         assertThat(body(fn).statements().get(1).kind()).isEqualTo(AstKind.WHILE_STMT);
         assertThat(body(fn).statements().get(2).kind()).isEqualTo(AstKind.RETURN_STMT);
-        assertNode(local(fn, 0), AstKind.LOCAL_DECL, src, "var mutable total = 0");
+        assertNode(local(fn, 0), AstKind.LOCAL_DECL, src, "var mutable total: Integer = 0");
     }
 
     @Test
     public void scopeBlockIsAStandaloneStatement() {
-        String src = "func f(): Unit {\n    {\n        var x = 1\n    }\n}\n";
+        String src = "func f() {\n    {\n        var x: Integer = 1\n    }\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("scope.sol", src));
         BlockNode block = (BlockNode) body(fn).statements().get(0);
-        assertNode(block, AstKind.BLOCK, src, "{\n        var x = 1\n    }");
-        assertNode(block.statements().get(0), AstKind.LOCAL_DECL, src, "var x = 1");
+        assertNode(block, AstKind.BLOCK, src, "{\n        var x: Integer = 1\n    }");
+        assertNode(block.statements().get(0), AstKind.LOCAL_DECL, src, "var x: Integer = 1");
     }
 
     @Test
     public void siblingScopeBlocksAreSeparateStatements() {
-        String src = "func f(): Unit {\n    {\n        var x = 1\n    }\n    {\n        var x = 2\n    }\n}\n";
+        String src = "func f() {\n    {\n        var x: Integer = 1\n    }\n    {\n        var x: Integer = 2\n    }\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("siblings.sol", src));
         assertThat(body(fn).statements().size()).isEqualTo(2);
         assertThat(body(fn).statements().get(0).kind()).isEqualTo(AstKind.BLOCK);

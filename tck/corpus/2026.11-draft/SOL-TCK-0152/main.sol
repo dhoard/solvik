@@ -1,5 +1,5 @@
 class Bad extends RuntimeException {
-    func getMessage(): String {
+    method getMessage(): String {
         return "mine"
     }
 }

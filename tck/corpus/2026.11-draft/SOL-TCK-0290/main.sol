@@ -1,4 +1,4 @@
-var v = 1
+var v: Integer = 1
     + 2
 print("v" .. v)
 

@@ -18,14 +18,14 @@ package org.solvik.parser;
 import java.util.regex.Pattern;
 
 /**
- * The lexical rule for module and alias names (docs/LANGUAGE_SPEC.md section 20): a single
- * identifier that starts with a lowercase letter, contains lowercase letters and digits, and joins
- * parts with exactly one underscore, each part starting with a letter. Examples: {@code com_example_util},
- * {@code utf8}, {@code foo_bar}. Dotted module names are deliberately rejected so a qualified
- * reference is always exactly {@code prefix.Name} and can never be confused with member access.
+ * The lexical rule for module names (docs/LANGUAGE_SPEC.md section 20): a single identifier that
+ * starts with a lowercase letter, contains lowercase letters and digits, and joins parts with exactly
+ * one underscore, each part starting with a letter. Examples: {@code math_util}, {@code utf8},
+ * {@code foo_bar}. A dotted name is deliberately rejected so a qualified reference is always exactly
+ * {@code module_name::Name} and can never be confused with member access.
  *
  * <p>The rule is a strict subset of the Solvik identifier grammar, so it cannot be enforced by the
- * lexer; it is validated where a module or alias name appears.
+ * lexer; it is validated where a {@code module Name { ... }} block is declared.
  */
 public final class ModuleNames {
 
@@ -34,16 +34,16 @@ public final class ModuleNames {
     private ModuleNames() {
     }
 
-    /** Whether {@code name} is a valid module or alias name. */
+    /** Whether {@code name} is a valid module name. */
     public static boolean isValid(String name) {
         return name != null && NAME.matcher(name).matches();
     }
 
     /**
-     * The canonical {@code SOLV-RESOL-012} message for a rejected name. {@code kind} is {@code module}
-     * or {@code alias}. It is centralized here so every declaration site reports one wording.
+     * The canonical {@code SOLV-RESOL-012} message for a rejected module name. It is centralized here
+     * so every declaration site reports one wording.
      */
-    public static String invalidNameMessage(String kind, String name) {
-        return "invalid " + kind + " name '" + name + "'; expected lowercase letters and digits joined by single underscores";
+    public static String invalidNameMessage(String name) {
+        return "invalid module name '" + name + "'; expected lowercase letters and digits joined by single underscores";
     }
 }

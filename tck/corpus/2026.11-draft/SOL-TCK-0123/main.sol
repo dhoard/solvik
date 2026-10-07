@@ -6,6 +6,6 @@
 // (SOLV-SEM-041) is the required diagnostic. This test shares that expectation with its
 // siblings on purpose: the expectation is one specification rule exercised on three
 // distinct shapes, not three independently derived byte streams.
-var invalid = {
+var invalid: Nothing = {
 }
 print("EXECUTED-INVALID")

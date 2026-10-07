@@ -58,15 +58,16 @@ public final class SolvikImplicitMainExecutionTest {
     @Test
     public void topLevelLocalsAndLoopsRun() {
         assertThat(run("""
-                var mutable total = 0
+                var mutable total: Integer = 0
                 {
-                    var mutable i = 1
+                    var mutable i: Integer = 1
                     while (i <= 3) {
                         total = total + i
                         i = i + 1
                     }
                 }
                 println(total)
+
                 """)).isEqualTo("6\n");
     }
 
@@ -84,10 +85,11 @@ public final class SolvikImplicitMainExecutionTest {
     public void declarationsAndStatementsRunInSourceOrder() {
         assertThat(run("""
                 println("a")
-                func f(): Unit {
+                func f() {
                     println("b")
                 }
                 f()
+
                 """)).isEqualTo("a\nb\n");
     }
 
@@ -105,13 +107,14 @@ public final class SolvikImplicitMainExecutionTest {
     public void siblingScopeBlocksRunInOrderWithIndependentLocals() {
         assertThat(run("""
                 {
-                    var result = "header"
+                    var result: String = "header"
                     println(result)
                 }
                 {
-                    var result = "body"
+                    var result: String = "body"
                     println(result)
                 }
+
                 """)).isEqualTo("header\nbody\n");
     }
 

@@ -116,20 +116,22 @@ public final class SolvikEnumNegativeTest {
     @Test
     public void anEnumNameCannotBeUsedAsAValue() {
         assertThat(first(checkFails(RESULT + """
-                func f(): Unit {
+                func f() {
                     var r: Result = Result
                 }
+
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_ENUM_AS_VALUE);
     }
 
     @Test
     public void aSealedClassCannotBeConstructed() {
         assertThat(first(checkFails("""
-                abstract class Shape {
+                class abstract Shape {
                 }
                 func f(): Shape {
                     return Shape()
                 }
+
                 """)).code()).isEqualTo(DiagnosticCode.SEM_CANNOT_CONSTRUCT_ABSTRACT);
     }
 
@@ -176,8 +178,9 @@ public final class SolvikEnumNegativeTest {
                 enum Option<T> {
                     Some(T)
                 }
-                func f(o: Option): Unit {
+                func f(o: Option) {
                 }
+
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_RAW_GENERIC_TYPE);
     }
 
@@ -188,9 +191,10 @@ public final class SolvikEnumNegativeTest {
                     Some(T)
                     None
                 }
-                func f(): Unit {
-                    var none = Option.None
+                func f() {
+                    var none: Option<Any> = Option.None
                 }
+
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_CANNOT_INFER);
     }
 

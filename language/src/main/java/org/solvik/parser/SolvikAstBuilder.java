@@ -29,11 +29,10 @@ import org.solvik.ast.declaration.DelegateDeclNode;
 import org.solvik.ast.declaration.EnumDeclNode;
 import org.solvik.ast.declaration.EnumVariantNode;
 import org.solvik.ast.declaration.FunctionDeclNode;
-import org.solvik.ast.declaration.FunctionTypeRefNode;
 import org.solvik.ast.declaration.ConstructorDeclNode;
 import org.solvik.ast.declaration.IncludeDeclNode;
 import org.solvik.ast.declaration.InterfaceDeclNode;
-import org.solvik.ast.declaration.ModuleDeclNode;
+import org.solvik.ast.declaration.ModuleBlockNode;
 import org.solvik.ast.declaration.ParameterNode;
 import org.solvik.ast.declaration.PropertyDeclNode;
 import org.solvik.ast.declaration.StaticBlockNode;
@@ -41,11 +40,9 @@ import org.solvik.ast.declaration.SignatureDeclNode;
 import org.solvik.ast.declaration.TypeParameterNode;
 import org.solvik.ast.declaration.TypeRef;
 import org.solvik.ast.declaration.TypeRefNode;
-import org.solvik.ast.expression.AnonymousFunctionExprNode;
 import org.solvik.ast.expression.BinaryExprNode;
 import org.solvik.ast.expression.BinaryOperator;
 import org.solvik.ast.expression.BlockExprNode;
-import org.solvik.ast.expression.CaptureItem;
 import org.solvik.ast.expression.BoolLiteralNode;
 import org.solvik.ast.expression.CallExprNode;
 import org.solvik.ast.expression.CastExprNode;
@@ -100,12 +97,9 @@ import org.solvik.ast.statement.SwitchStmtNode;
 import org.solvik.ast.statement.WhileStmtNode;
 import org.solvik.parser.generated.SolvikParser.AdditiveContext;
 import org.solvik.parser.generated.SolvikParser.ArgumentListContext;
-import org.solvik.parser.generated.SolvikParser.AnonymousFunctionExprContext;
 import org.solvik.parser.generated.SolvikParser.AssignableContext;
 import org.solvik.parser.generated.SolvikParser.BlockContext;
 import org.solvik.parser.generated.SolvikParser.BlockExprContext;
-import org.solvik.parser.generated.SolvikParser.CaptureItemContext;
-import org.solvik.parser.generated.SolvikParser.CaptureItemListContext;
 import org.solvik.parser.generated.SolvikParser.BoolLiteralContext;
 import org.solvik.parser.generated.SolvikParser.BreakStmtContext;
 import org.solvik.parser.generated.SolvikParser.CallArgumentContext;
@@ -151,8 +145,7 @@ import org.solvik.parser.generated.SolvikParser.MatchExprContext;
 import org.solvik.parser.generated.SolvikParser.MemberSuffixContext;
 import org.solvik.parser.generated.SolvikParser.NamespaceSuffixContext;
 import org.solvik.parser.generated.SolvikParser.MethodDeclContext;
-import org.solvik.parser.generated.SolvikParser.ModuleDeclContext;
-import org.solvik.parser.generated.SolvikParser.MethodModifierContext;
+import org.solvik.parser.generated.SolvikParser.ModuleBlockContext;
 import org.solvik.parser.generated.SolvikParser.MultiplicativeContext;
 import org.solvik.parser.generated.SolvikParser.NameContext;
 import org.solvik.parser.generated.SolvikParser.NullCoalescingContext;
@@ -175,7 +168,7 @@ import org.solvik.parser.generated.SolvikParser.SignatureDeclContext;
 import org.solvik.parser.generated.SolvikParser.StatementCoreContext;
 import org.solvik.parser.generated.SolvikParser.StatementContext;
 import org.solvik.parser.generated.SolvikParser.StaticBlockContext;
-import org.solvik.parser.generated.SolvikParser.StaticMemberContext;
+import org.solvik.parser.generated.SolvikParser.ModuleMemberContext;
 import org.solvik.parser.generated.SolvikParser.StringLiteralContext;
 import org.solvik.parser.generated.SolvikParser.SuffixContext;
 import org.solvik.parser.generated.SolvikParser.SuperExprContext;
@@ -183,7 +176,6 @@ import org.solvik.parser.generated.SolvikParser.SwitchCaseContext;
 import org.solvik.parser.generated.SolvikParser.SwitchExprContext;
 import org.solvik.parser.generated.SolvikParser.SwitchStmtContext;
 import org.solvik.parser.generated.SolvikParser.ThisExprContext;
-import org.solvik.parser.generated.SolvikParser.FunctionTypeRefContext;
 import org.solvik.parser.generated.SolvikParser.TypeArgumentsContext;
 import org.solvik.parser.generated.SolvikParser.TypeParameterListContext;
 import org.solvik.parser.generated.SolvikParser.TypeRefContext;
@@ -221,7 +213,6 @@ final class SolvikAstBuilder {
 
     CompilationUnitNode build(CompilationUnitContext ctx) {
         List<AstNode> items = new ArrayList<>();
-        ModuleDeclNode moduleDeclaration = null;
         for (int i = 0; i < ctx.getChildCount(); i++) {
             Object child = ctx.getChild(i);
             if (child instanceof FunctionDeclContext fn) {
@@ -230,8 +221,8 @@ final class SolvikAstBuilder {
                 items.add(buildClass(cls));
             } else if (child instanceof IncludeDeclContext include) {
                 items.add(buildInclude(include));
-            } else if (child instanceof ModuleDeclContext module) {
-                moduleDeclaration = buildModule(module);
+            } else if (child instanceof ModuleBlockContext module) {
+                items.add(buildModuleBlock(module));
             } else if (child instanceof InterfaceDeclContext iface) {
                 items.add(buildInterface(iface));
             } else if (child instanceof EnumDeclContext enumDecl) {
@@ -242,11 +233,30 @@ final class SolvikAstBuilder {
                 items.add(buildStatement(statement));
             }
         }
-        return new CompilationUnitNode(items, moduleDeclaration, span(ctx.getStart(), lastMeaningfulStop(ctx)));
+        return new CompilationUnitNode(items, span(ctx.getStart(), lastMeaningfulStop(ctx)));
     }
 
-    private ModuleDeclNode buildModule(ModuleDeclContext ctx) {
-        return new ModuleDeclNode(ctx.Identifier().getText(), span(ctx.getStart(), ctx.getStop()));
+    /**
+     * Builds a named-module block. Its members are the declarations the grammar admits inside one
+     * ({@code func}, {@code class}, {@code interface}, {@code enum}, {@code error}); every other
+     * declaration kind is not a module member, so a statement or a nested module never reaches here.
+     */
+    private ModuleBlockNode buildModuleBlock(ModuleBlockContext ctx) {
+        List<DeclarationNode> members = new ArrayList<>();
+        for (ModuleMemberContext member : ctx.moduleMember()) {
+            if (member.functionDecl() != null) {
+                members.add(buildFunction(member.functionDecl()));
+            } else if (member.classDecl() != null) {
+                members.add(buildClass(member.classDecl()));
+            } else if (member.interfaceDecl() != null) {
+                members.add(buildInterface(member.interfaceDecl()));
+            } else if (member.enumDecl() != null) {
+                members.add(buildEnum(member.enumDecl()));
+            } else {
+                members.add(buildError(member.errorDecl()));
+            }
+        }
+        return new ModuleBlockNode(ctx.Identifier().getText(), members, span(ctx.getStart(), ctx.getStop()));
     }
 
     private IncludeDeclNode buildInclude(IncludeDeclContext ctx) {
@@ -258,8 +268,7 @@ final class SolvikAstBuilder {
             StringLiteralContext literal = ctx.stringLiteral();
             path = new StringLiteralNode(literal.STRING_LITERAL().getText(), span(literal.getStart(), literal.getStop()));
         }
-        String alias = ctx.Identifier() == null ? null : ctx.Identifier().getText();
-        return new IncludeDeclNode(path, alias, span(ctx.getStart(), ctx.getStop()));
+        return new IncludeDeclNode(path, span(ctx.getStart(), ctx.getStop()));
     }
 
     private ClassDeclNode buildClass(ClassDeclContext ctx) {
@@ -280,11 +289,9 @@ final class SolvikAstBuilder {
                 members.add(buildDelegate(member.delegateDecl()));
             } else if (member.constructorDecl() != null) {
                 members.add(buildConstructor(member.constructorDecl()));
-            } else if (member.staticMember() != null) {
-                members.add(buildStaticMember(member.staticMember()));
             } else if (member.staticBlock() != null) {
                 members.add(buildStaticBlock(member.staticBlock()));
-            } else {
+            } else if (member.methodDecl() != null) {
                 members.add(buildMethod(member.methodDecl()));
             }
         }
@@ -351,7 +358,7 @@ final class SolvikAstBuilder {
 
     private SignatureDeclNode buildSignature(SignatureDeclContext ctx) {
         SourceSpan span = span(ctx.getStart(), ctx.getStop());
-        TypeRef returnType = ctx.typeRef() == null ? implicitUnitReturnType(span) : buildTypeRef(ctx.typeRef());
+        TypeRef returnType = ctx.typeRef() == null ? null : buildTypeRef(ctx.typeRef());
         return new SignatureDeclNode(ctx.Identifier().getText(), buildTypeParameters(ctx.typeParameterList()), buildParameters(ctx.parameterList()), returnType, span);
     }
 
@@ -361,28 +368,13 @@ final class SolvikAstBuilder {
         return buildFunction(false, false, ctx.Identifier().getText(), ctx.typeParameterList(), ctx.parameterList(), ctx.typeRef(), ctx.block(), span(ctx.getStart(), ctx.getStop()));
     }
 
+    /** A property: `var [static] [mutable] name: Type [= initializer]`. */
     private PropertyDeclNode buildProperty(PropertyDeclContext ctx) {
-        return buildProperty(ctx, false, span(ctx.getStart(), ctx.getStop()));
-    }
-
-    private PropertyDeclNode buildProperty(PropertyDeclContext ctx, boolean isStatic, SourceSpan span) {
-        BindingKind kind = BindingKind.fromMutable(ctx.bindingKind().MUTABLE() != null);
-        TypeRef declaredType = ctx.typeRef() == null ? null : buildTypeRef(ctx.typeRef());
+        BindingKind kind = BindingKind.fromMutable(ctx.MUTABLE() != null);
+        boolean isStatic = ctx.STATIC() != null;
+        TypeRef declaredType = buildTypeRef(ctx.typeRef());
         ExpressionNode initializer = ctx.expression() == null ? null : buildExpression(ctx.expression());
-        return new PropertyDeclNode(kind, ctx.Identifier().getText(), declaredType, initializer, isStatic, span);
-    }
-
-    /**
-     * A `static` property or method member; the grammar admits only these two forms. The span is
-     * taken from the enclosing `staticMember` so it begins at the `static` keyword, matching how
-     * `methodModifier` is already inside a method declaration's span.
-     */
-    private AstNode buildStaticMember(StaticMemberContext ctx) {
-        SourceSpan span = span(ctx.getStart(), ctx.getStop());
-        if (ctx.propertyDecl() != null) {
-            return buildProperty(ctx.propertyDecl(), true, span);
-        }
-        return buildMethod(ctx.methodDecl(), true, span);
+        return new PropertyDeclNode(kind, ctx.Identifier().getText(), declaredType, initializer, isStatic, span(ctx.getStart(), ctx.getStop()));
     }
 
     /** The class initializer `static { ... }`. */
@@ -424,21 +416,12 @@ final class SolvikAstBuilder {
         return parameters;
     }
 
+    /** A method: `method [static] [override] [mutable] name(...)`. */
     private FunctionDeclNode buildMethod(MethodDeclContext ctx) {
-        return buildMethod(ctx, false, span(ctx.getStart(), ctx.getStop()));
-    }
-
-    private FunctionDeclNode buildMethod(MethodDeclContext ctx, boolean isStatic, SourceSpan span) {
-        boolean mutable = false;
-        boolean override = false;
-        for (MethodModifierContext modifier : ctx.methodModifier()) {
-            if (modifier.MUTABLE() != null) {
-                mutable = true;
-            } else if (modifier.OVERRIDE() != null) {
-                override = true;
-            }
-        }
-        return buildFunction(mutable, override, isStatic, ctx.Identifier().getText(), ctx.typeParameterList(), ctx.parameterList(), ctx.typeRef(), ctx.block(), span);
+        boolean isStatic = ctx.STATIC() != null;
+        boolean override = ctx.OVERRIDE() != null;
+        boolean mutable = ctx.MUTABLE() != null;
+        return buildFunction(mutable, override, isStatic, ctx.Identifier().getText(), ctx.typeParameterList(), ctx.parameterList(), ctx.typeRef(), ctx.block(), span(ctx.getStart(), ctx.getStop()));
     }
 
     private FunctionDeclNode buildFunction(boolean mutable, boolean override, String name, TypeParameterListContext typeParameterList, org.solvik.parser.generated.SolvikParser.ParameterListContext parameterList, TypeRefContext returnTypeCtx,
@@ -450,39 +433,14 @@ final class SolvikAstBuilder {
                     BlockContext bodyCtx, SourceSpan span) {
         List<TypeParameterNode> typeParameters = buildTypeParameters(typeParameterList);
         List<ParameterNode> parameters = buildParameters(parameterList);
-        TypeRef returnType = returnTypeCtx == null ? implicitUnitReturnType(span) : buildTypeRef(returnTypeCtx);
+        // A callable that writes no `: Type` produces no value (docs/LANGUAGE_SPEC.md section 6);
+        // there is no source-level `Unit` type to synthesize and none is invented here.
+        TypeRef returnType = returnTypeCtx == null ? null : buildTypeRef(returnTypeCtx);
         BlockNode body = buildBlock(bodyCtx);
         return new FunctionDeclNode(mutable, override, isStatic, name, typeParameters, parameters, returnType, body, span);
     }
 
-    /**
-     * The return type of a callable that declares none: {@code Unit} (docs/LANGUAGE_SPEC.md
-     * section 6). Synthesizing the reference here keeps every callable's return type non-null, so
-     * neither the semantic layer nor lowering needs a special case for an omitted return type. The
-     * reference is attributed to the declaration because it has no written location of its own.
-     */
-    private static TypeRef implicitUnitReturnType(SourceSpan span) {
-        return new TypeRefNode("Unit", List.of(), false, span);
-    }
-
     private TypeRef buildTypeRef(TypeRefContext ctx) {
-        // A function type reference: `func(...)` ungrouped, or `(func(...): R)?` grouped when the
-        // trailing `?` applies to the function value itself. The grouped form is the only form that
-        // makes the whole value nullable; the ungrouped form can only null its result.
-        FunctionTypeRefContext functionRef = ctx.functionTypeRef();
-        if (functionRef != null) {
-            List<TypeRef> parameters = new ArrayList<>();
-            TypeRefListContext parameterList = functionRef.typeRefList();
-            if (parameterList != null) {
-                for (TypeRefContext parameter : parameterList.typeRef()) {
-                    parameters.add(buildTypeRef(parameter));
-                }
-            }
-            TypeRefContext returnContext = functionRef.typeRef();
-            TypeRef returnType = returnContext == null ? implicitUnitReturnType(span(ctx.getStart(), ctx.getStop())) : buildTypeRef(returnContext);
-            boolean nullable = ctx.QUESTION() != null;
-            return new FunctionTypeRefNode(parameters, returnType, nullable, span(ctx.getStart(), ctx.getStop()));
-        }
         List<TypeRef> arguments = new ArrayList<>();
         TypeArgumentsContext argumentsCtx = ctx.typeArguments();
         if (argumentsCtx != null) {
@@ -572,13 +530,8 @@ final class SolvikAstBuilder {
     }
 
     private LocalDeclNode buildLocalDecl(LocalDeclContext ctx) {
-        return buildLocalDecl(ctx.bindingKind(), ctx.Identifier(), ctx.typeRef(), ctx.expression(), span(ctx.getStart(), ctx.getStop()));
-    }
-
-    private LocalDeclNode buildLocalDecl(org.solvik.parser.generated.SolvikParser.BindingKindContext kindCtx, TerminalNode identifier, TypeRefContext typeRefCtx, ExpressionContext initCtx, SourceSpan span) {
-        BindingKind kind = BindingKind.fromMutable(kindCtx.MUTABLE() != null);
-        TypeRef declaredType = typeRefCtx == null ? null : buildTypeRef(typeRefCtx);
-        return new LocalDeclNode(kind, identifier.getText(), declaredType, buildExpression(initCtx), span);
+        BindingKind kind = BindingKind.fromMutable(ctx.MUTABLE() != null);
+        return new LocalDeclNode(kind, ctx.Identifier().getText(), buildTypeRef(ctx.typeRef()), buildExpression(ctx.expression()), span(ctx.getStart(), ctx.getStop()));
     }
 
     private IfStmtNode buildIf(IfStmtContext ctx) {
@@ -728,12 +681,25 @@ final class SolvikAstBuilder {
         return fold(operands, ctx);
     }
 
-    /** Children alternate: operand (operator operand)*. Operators are terminals at odd indices. */
+    /**
+     * Folds {@code operand (operator operand)*} left to right. The operator terminals are taken from
+     * the context rather than from fixed child positions, because a rule that permits a line break
+     * around its operator contributes NEWLINE terminals between the operands; a positional walk would
+     * read one of those as the operator. Terminals that name no operator are skipped, and a chain that
+     * error recovery left incomplete folds only the pairs it has, so a syntax error stays a reported
+     * diagnostic instead of becoming a builder failure.
+     */
     private ExpressionNode fold(List<ExpressionNode> operands, ParserRuleContext ctx) {
         ExpressionNode result = operands.get(0);
         int operand = 1;
-        for (int i = 1; i < ctx.getChildCount(); i += 2) {
-            BinaryOperator op = BinaryOperator.fromSpelling(operatorText(ctx, i));
+        for (int i = 1; i < ctx.getChildCount() && operand < operands.size(); i++) {
+            if (!(ctx.getChild(i) instanceof TerminalNode terminal)) {
+                continue;
+            }
+            BinaryOperator op = BinaryOperator.fromSpelling(terminal.getText());
+            if (op == null) {
+                continue;
+            }
             ExpressionNode rhs = operands.get(operand++);
             result = new BinaryExprNode(op, result, rhs, sourceSpan(result.span().startOffset(), rhs.span().endOffset()));
         }
@@ -896,8 +862,10 @@ final class SolvikAstBuilder {
         } else if (ctx.blockExpr() != null) {
             BlockExprContext blockExpr = ctx.blockExpr();
             expr = new BlockExprNode(buildValueBlock(blockExpr.valueBlock()), span(blockExpr.getStart(), blockExpr.getStop()));
-        } else if (ctx.anonymousFunctionExpr() != null) {
-            expr = buildAnonymousFunction(ctx.anonymousFunctionExpr());
+        } else if (ctx.removedAnonymousFunctionExpr() != null) {
+            // Unreachable by construction: SolvikParser reports SOLV-PARS-014 for every retired
+            // function-value expression before the builder runs, so no node is ever produced for one.
+            throw new IllegalStateException("retired anonymous-function syntax reached the AST builder");
         } else {
             NameContext n = ctx.name();
             expr = new NameRefExprNode(n.Identifier().getText(), span(n.getStart(), n.getStop()));
@@ -923,35 +891,6 @@ final class SolvikAstBuilder {
             }
         }
         return new IfExprNode(condition, thenBlock, elseValue, span(ctx.getStart(), ctx.getStop()));
-    }
-
-    /**
-     * Builds an anonymous function expression (docs/LANGUAGE_SPEC.md section 6). Its return type
-     * follows the same omitted-means-{@code Unit} rule as a declaration, and its body is a statement
-     * block rather than a value-required block: function bodies never acquire an implicit tail result,
-     * so a value-returning anonymous function must write an explicit {@code return}.
-     *
-     * <p>A written capture list is carried as one {@link CaptureItem} per item in source order, which is
-     * the order the specification uses as environment order. No capture list parses to an empty list
-     * under any other shape, because the grammar requires a non-empty list when brackets are written.
-     */
-    private AnonymousFunctionExprNode buildAnonymousFunction(AnonymousFunctionExprContext ctx) {
-        List<CaptureItem> captures = buildCaptureItems(ctx.captureItemList());
-        List<ParameterNode> parameters = buildParameters(ctx.parameterList());
-        TypeRef returnType = ctx.typeRef() == null ? implicitUnitReturnType(span(ctx.getStart(), ctx.getStop())) : buildTypeRef(ctx.typeRef());
-        BlockNode body = buildBlock(ctx.block());
-        return new AnonymousFunctionExprNode(captures, parameters, returnType, body, span(ctx.getStart(), ctx.getStop()));
-    }
-
-    /** Builds the written capture items of one anonymous function, empty when no capture list was written. */
-    private List<CaptureItem> buildCaptureItems(CaptureItemListContext ctx) {
-        List<CaptureItem> items = new ArrayList<>();
-        if (ctx != null) {
-            for (CaptureItemContext item : ctx.captureItem()) {
-                items.add(new CaptureItem(item.getText(), span(item.getStart(), item.getStop())));
-            }
-        }
-        return items;
     }
 
     /** Builds a value-required block from a braced body, honoring an explicit terminal expression. */

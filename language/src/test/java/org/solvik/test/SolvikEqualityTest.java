@@ -97,66 +97,70 @@ public final class SolvikEqualityTest {
     @Test
     public void anyOperandsCompareByIdentityAndValue() {
         assertThat(run("""
-                    class Box {
-                    }
+                        class Box {
+                        }
 
-                    func cmp(a: Any, b: Any): Boolean {
-                        return a == b
-                    }
+                        func cmp(a: Any, b: Any): Boolean {
+                            return a == b
+                        }
 
-                    var first = Box()
-                    var second = Box()
-                    println(cmp(first, first))
-                    println(cmp(first, second))
-                    println(cmp(1, 1))
-                    println(cmp("x", "x"))
+                        var first: Box = Box()
+                        var second: Box = Box()
+                        println(cmp(first, first))
+                        println(cmp(first, second))
+                        println(cmp(1, 1))
+                        println(cmp("x", "x"))
+
                 """)).isEqualTo("true\nfalse\ntrue\ntrue\n");
     }
 
     @Test
     public void ordinaryClassInstancesCompareByIdentity() {
         assertThat(run("""
-                    class Box {
-                    }
+                        class Box {
+                        }
 
-                    var a = Box()
-                    var b = Box()
-                    println(a == a)
-                    println(a == b)
-                    println(a != b)
+                        var a: Box = Box()
+                        var b: Box = Box()
+                        println(a == a)
+                        println(a == b)
+                        println(a != b)
+
                 """)).isEqualTo("true\nfalse\ntrue\n");
     }
 
     @Test
     public void enumValuesCompareByValue() {
         assertThat(run("""
-                    enum Color {
-                        Red
-                        Green
-                    }
+                        enum Color {
+                            Red
+                            Green
+                        }
 
-                    var red = Color.Red
-                    var otherRed = Color.Red
-                    var green = Color.Green
-                    println(red == otherRed)
-                    println(red == green)
-                    println(red != green)
+                        var red: Color = Color.Red
+                        var otherRed: Color = Color.Red
+                        var green: Color = Color.Green
+                        println(red == otherRed)
+                        println(red == green)
+                        println(red != green)
+
                 """)).isEqualTo("true\nfalse\ntrue\n");
     }
 
     @Test
     public void enumValueWithPayloadComparesByValue() {
         assertThat(run("""
-                    enum Result {
-                        Ok(Integer)
-                        Error(String)
-                    }
+                        enum Result {
+                            Ok(Integer)
+                            Error(String)
+                        }
 
-                    var first = Result.Ok(1)
-                    var same = Result.Ok(1)
-                    var different = Result.Ok(2)
-                    println(first == same)
-                    println(first == different)
+                        var first: Result = Result.Ok(1)
+                        var same: Result = Result.Ok(1)
+                        var different: Result = Result.Ok(2)
+                        println(first == same)
+                        println(first == different)
+
                 """)).isEqualTo("true\nfalse\n");
     }
 
@@ -223,246 +227,258 @@ public final class SolvikEqualityTest {
     @Test
     public void userEqualsOverrideDispatchesFromOperatorAndExplicitCall() {
         assertThat(run("""
-                    class Point {
-                        var x: Integer
+                        class Point {
+                            var x: Integer
 
-                        Point(x: Integer) {
-                            this.x = x
-                        }
-
-                        override func equals(other: Any?): Boolean {
-                            if (other is Point) {
-                                return this.x == other.x
+                            Point(x: Integer) {
+                                this.x = x
                             }
-                            return false
-                        }
-                        override func hashCode(): Integer {
-                            return this.x
-                        }
-                    }
 
-                    var a = Point(1)
-                    var b = Point(1)
-                    var c = Point(2)
-                    println(a == b)
-                    println(a.equals(b))
-                    println(a != c)
-                    println(a.equals(c))
-                    println(a === b)
+                            method override equals(other: Any?): Boolean {
+                                if (other is Point) {
+                                    return this.x == other.x
+                                }
+                                return false
+                            }
+                            method override hashCode(): Integer {
+                                return this.x
+                            }
+                        }
+
+                        var a: Point = Point(1)
+                        var b: Point = Point(1)
+                        var c: Point = Point(2)
+                        println(a == b)
+                        println(a.equals(b))
+                        println(a != c)
+                        println(a.equals(c))
+                        println(a === b)
+
                 """)).isEqualTo("true\ntrue\ntrue\nfalse\nfalse\n");
     }
 
     @Test
     public void inheritedEqualsOverrideRemainsEffective() {
         assertThat(run("""
-                    mutable class Tagged {
-                        override func equals(other: Any?): Boolean {
-                            return other is Tagged
-                        }
-                        override func hashCode(): Integer {
-                            return 1
-                        }
-                    }
+                                class mutable Tagged {
+                                    method override equals(other: Any?): Boolean {
+                                        return other is Tagged
+                                    }
+                                    method override hashCode(): Integer {
+                                        return 1
+                                    }
+                                }
 
-                    class Item extends Tagged {
-                    }
+                                class Item extends Tagged {
+                                }
 
-                    var a = Item()
-                    var b = Item()
-                    println(a == b)
-                    println(a.equals(b))
+                                var a: Item = Item()
+                                var b: Item = Item()
+                                println(a == b)
+                                println(a.equals(b))
+
+
                 """)).isEqualTo("true\ntrue\n");
     }
 
     @Test
     public void nullComparisonNeverInvokesTheOverride() {
         assertThat(run("""
-                    class Point {
-                        override func equals(other: Any?): Boolean {
-                            println("equals called")
-                            return true
+                        class Point {
+                            method override equals(other: Any?): Boolean {
+                                println("equals called")
+                                return true
+                            }
+                            method override hashCode(): Integer {
+                                return 1
+                            }
                         }
-                        override func hashCode(): Integer {
-                            return 1
-                        }
-                    }
 
-                    var p = Point()
-                    var maybe: Point? = p
-                    println(maybe == null)
-                    println(null == maybe)
-                    println(maybe != null)
-                    println(p.equals(null))
+                        var p: Point = Point()
+                        var maybe: Point? = p
+                        println(maybe == null)
+                        println(null == maybe)
+                        println(maybe != null)
+                        println(p.equals(null))
+
                 """)).isEqualTo("false\nfalse\ntrue\nfalse\n");
     }
 
     @Test
     public void safeExplicitEqualsOnANullableReceiver() {
         assertThat(run("""
-                    class Point {
-                        override func equals(other: Any?): Boolean {
-                            return true
+                        class Point {
+                            method override equals(other: Any?): Boolean {
+                                return true
+                            }
+                            method override hashCode(): Integer {
+                                return 1
+                            }
                         }
-                        override func hashCode(): Integer {
-                            return 1
-                        }
-                    }
 
-                    var missing: Point? = null
-                    var present: Point? = Point()
-                    println(missing?.equals(Point()))
-                    println(present?.equals(Point()))
+                        var missing: Point? = null
+                        var present: Point? = Point()
+                        println(missing?.equals(Point()))
+                        println(present?.equals(Point()))
+
                 """)).isEqualTo("null\ntrue\n");
     }
 
     @Test
     public void collectionMembershipUsesTheUserOverride() {
         assertThat(run("""
-                    class Point {
-                        var x: Integer
+                        class Point {
+                            var x: Integer
 
-                        Point(x: Integer) {
-                            this.x = x
-                        }
-
-                        override func equals(other: Any?): Boolean {
-                            if (other is Point) {
-                                return this.x == other.x
+                            Point(x: Integer) {
+                                this.x = x
                             }
-                            return false
-                        }
-                        override func hashCode(): Integer {
-                            return this.x
-                        }
-                    }
 
-                    var mutable points: Set<Point> = Set(Point(1))
-                    println(points.contains(Point(1)))
-                    println(points.contains(Point(2)))
-                    var mutable byPoint: Map<Point, String> = Map(Point(1): "one")
-                    println(byPoint.get(Point(1)))
+                            method override equals(other: Any?): Boolean {
+                                if (other is Point) {
+                                    return this.x == other.x
+                                }
+                                return false
+                            }
+                            method override hashCode(): Integer {
+                                return this.x
+                            }
+                        }
+
+                        var mutable points: Set<Point> = Set(Point(1))
+                        println(points.contains(Point(1)))
+                        println(points.contains(Point(2)))
+                        var mutable byPoint: Map<Point, String> = Map(Point(1): "one")
+                        println(byPoint.get(Point(1)))
+
                 """)).isEqualTo("true\nfalse\none\n");
     }
 
     @Test
     public void superEqualsReachesTheSuperclassOverride() {
         assertThat(run("""
-                    mutable class Base {
-                        var id: Integer
+                                class mutable Base {
+                                    var id: Integer
 
-                        Base(id: Integer) {
-                            this.id = id
-                        }
+                                    Base(id: Integer) {
+                                        this.id = id
+                                    }
 
-                        mutable override func equals(other: Any?): Boolean {
-                            if (other is Base) {
-                                return this.id == other.id
-                            }
-                            return false
-                        }
-                        mutable override func hashCode(): Integer {
-                            return this.id
-                        }
-                    }
+                                    method override mutable equals(other: Any?): Boolean {
+                                        if (other is Base) {
+                                            return this.id == other.id
+                                        }
+                                        return false
+                                    }
+                                    method override mutable hashCode(): Integer {
+                                        return this.id
+                                    }
+                                }
 
-                    class Derived extends Base {
-                        var extra: Integer
+                                class Derived extends Base {
+                                    var extra: Integer
 
-                        Derived(id: Integer, extra: Integer) {
-                            super(id)
-                            this.extra = extra
-                        }
+                                    Derived(id: Integer, extra: Integer) {
+                                        super(id)
+                                        this.extra = extra
+                                    }
 
-                        override func equals(other: Any?): Boolean {
-                            if (other is Derived) {
-                                return super.equals(other) && this.extra == other.extra
-                            }
-                            return false
-                        }
-                        override func hashCode(): Integer {
-                            return 31 * super.hashCode() + this.extra
-                        }
-                    }
+                                    method override equals(other: Any?): Boolean {
+                                        if (other is Derived) {
+                                            return super.equals(other) && this.extra == other.extra
+                                        }
+                                        return false
+                                    }
+                                    method override hashCode(): Integer {
+                                        return 31 * super.hashCode() + this.extra
+                                    }
+                                }
 
-                    println(Derived(1, 2) == Derived(1, 2))
-                    println(Derived(1, 2) == Derived(1, 3))
-                    println(Derived(1, 2) == Derived(9, 2))
+                                println(Derived(1, 2) == Derived(1, 2))
+                                println(Derived(1, 2) == Derived(1, 3))
+                                println(Derived(1, 2) == Derived(9, 2))
+
+
                 """)).isEqualTo("true\nfalse\nfalse\n");
     }
 
     @Test
     public void superEqualsReachesTheRootIdentityDefault() {
         assertThat(run("""
-                    mutable class Base {
-                    }
-
-                    class Derived extends Base {
-                        override func equals(other: Any?): Boolean {
-                            return super.equals(other)
+                        class mutable Base {
                         }
-                        override func hashCode(): Integer {
-                            return super.hashCode()
-                        }
-                    }
 
-                    var a = Derived()
-                    var b = Derived()
-                    println(a == a)
-                    println(a == b)
+                        class Derived extends Base {
+                            method override equals(other: Any?): Boolean {
+                                return super.equals(other)
+                            }
+                            method override hashCode(): Integer {
+                                return super.hashCode()
+                            }
+                        }
+
+                        var a: Derived = Derived()
+                        var b: Derived = Derived()
+                        println(a == a)
+                        println(a == b)
+
                 """)).isEqualTo("true\nfalse\n");
     }
 
     @Test
     public void regexValuesCompareBySourceTextNotCaching() {
         assertThat(run("""
-                    var constant = Regex("a+")
-                    var dynamic = Regex("a" .. "+")
-                    var other = Regex("b+")
-                    println(constant == dynamic)
-                    println(constant.equals(dynamic))
-                    println(constant == other)
+                        var constant: Regex = Regex("a+")
+                        var dynamic: Regex = Regex("a" .. "+")
+                        var other: Regex = Regex("b+")
+                        println(constant == dynamic)
+                        println(constant.equals(dynamic))
+                        println(constant == other)
+
                 """)).isEqualTo("true\ntrue\nfalse\n");
     }
 
     @Test
     public void regexMatchComparesItsImmutableSnapshot() {
         assertThat(run("""
-                    var pattern = Regex("(a)(b)?")
-                    var first = pattern.find("a")
-                    var second = pattern.find("a")
-                    var third = pattern.find("ab")
-                    println(first == second)
-                    println(first == third)
+                        var pattern: Regex = Regex("(a)(b)?")
+                        var first: RegexMatch? = pattern.find("a")
+                        var second: RegexMatch? = pattern.find("a")
+                        var third: RegexMatch? = pattern.find("ab")
+                        println(first == second)
+                        println(first == third)
+
                 """)).isEqualTo("true\nfalse\n");
     }
 
     @Test
     public void enumPayloadRecursesThroughAUserOverride() {
         assertThat(run("""
-                    class Point {
-                        var x: Integer
+                        class Point {
+                            var x: Integer
 
-                        Point(x: Integer) {
-                            this.x = x
-                        }
-
-                        override func equals(other: Any?): Boolean {
-                            if (other is Point) {
-                                return this.x == other.x
+                            Point(x: Integer) {
+                                this.x = x
                             }
-                            return false
-                        }
-                        override func hashCode(): Integer {
-                            return this.x
-                        }
-                    }
 
-                    enum Wrapper {
-                        Wrap(Point)
-                    }
+                            method override equals(other: Any?): Boolean {
+                                if (other is Point) {
+                                    return this.x == other.x
+                                }
+                                return false
+                            }
+                            method override hashCode(): Integer {
+                                return this.x
+                            }
+                        }
 
-                    println(Wrapper.Wrap(Point(1)) == Wrapper.Wrap(Point(1)))
-                    println(Wrapper.Wrap(Point(1)) == Wrapper.Wrap(Point(2)))
+                        enum Wrapper {
+                            Wrap(Point)
+                        }
+
+                        println(Wrapper.Wrap(Point(1)) == Wrapper.Wrap(Point(1)))
+                        println(Wrapper.Wrap(Point(1)) == Wrapper.Wrap(Point(2)))
+
                 """)).isEqualTo("true\nfalse\n");
     }
 
@@ -489,34 +505,36 @@ public final class SolvikEqualityTest {
         // The override has an observable side effect, so a same-reference payload must still call it:
         // there is no identity shortcut before user dispatch.
         assertThat(run("""
-                    class Point {
-                        override func equals(other: Any?): Boolean {
-                            println("equals called")
-                            return true
+                        class Point {
+                            method override equals(other: Any?): Boolean {
+                                println("equals called")
+                                return true
+                            }
+                            method override hashCode(): Integer {
+                                return 1
+                            }
                         }
-                        override func hashCode(): Integer {
-                            return 1
+
+                        enum Wrapper {
+                            Wrap(Point)
                         }
-                    }
 
-                    enum Wrapper {
-                        Wrap(Point)
-                    }
+                        var p: Point = Point()
+                        println(Wrapper.Wrap(p) == Wrapper.Wrap(p))
 
-                    var p = Point()
-                    println(Wrapper.Wrap(p) == Wrapper.Wrap(p))
                 """)).isEqualTo("equals called\ntrue\n");
     }
 
     @Test
     public void floatingEqualityPreservesIeeeBehaviour() {
         assertThat(run("""
-                    var nan = 0.0 / 0.0
-                    println(nan == nan)
-                    println(nan != nan)
-                    println(0.0 == -0.0)
-                    println(1.0 / 0.0 == 1.0 / 0.0)
-                    println(1.0 / 0.0 != -1.0 / 0.0)
+                        var nan: Double = 0.0 / 0.0
+                        println(nan == nan)
+                        println(nan != nan)
+                        println(0.0 == -0.0)
+                        println(1.0 / 0.0 == 1.0 / 0.0)
+                        println(1.0 / 0.0 != -1.0 / 0.0)
+
                 """)).isEqualTo("false\ntrue\ntrue\ntrue\ntrue\n");
     }
 
@@ -569,78 +587,81 @@ public final class SolvikEqualityTest {
     @Test
     public void enumPayloadComparisonStopsAtTheFirstDifference() {
         assertThat(run("""
-                    class Noisy {
-                        override func equals(other: Any?): Boolean {
-                            println("noisy called")
-                            return true
+                        class Noisy {
+                            method override equals(other: Any?): Boolean {
+                                println("noisy called")
+                                return true
+                            }
+                            method override hashCode(): Integer {
+                                return 1
+                            }
                         }
-                        override func hashCode(): Integer {
-                            return 1
+
+                        enum Pair {
+                            P(Integer, Noisy)
                         }
-                    }
 
-                    enum Pair {
-                        P(Integer, Noisy)
-                    }
+                        var n: Noisy = Noisy()
+                        println(Pair.P(1, n) == Pair.P(2, n))
 
-                    var n = Noisy()
-                    println(Pair.P(1, n) == Pair.P(2, n))
                 """)).isEqualTo("false\n");
     }
 
     @Test
     public void regexMatchSnapshotsCompareByStartEndAndGroups() {
         assertThat(run("""
-                    var optional = Regex("(a)(b)?")
-                    var a0 = optional.find("a")
-                    var a1 = optional.find("a")
-                    var ab = optional.find("ab")
-                    println(a0 == a1)
-                    println(a0 == ab)
-                    println(a0 != ab)
-                    var atStart = Regex("a").find("a")
-                    var later = Regex("a").find("ba")
-                    println(atStart == later)
-                    println(Regex("a+").find("a") == Regex("a+").find("aa"))
-                    println(Regex("a").find("a") == Regex("(a)").find("a"))
+                        var optional: Regex = Regex("(a)(b)?")
+                        var a0: RegexMatch? = optional.find("a")
+                        var a1: RegexMatch? = optional.find("a")
+                        var ab: RegexMatch? = optional.find("ab")
+                        println(a0 == a1)
+                        println(a0 == ab)
+                        println(a0 != ab)
+                        var atStart: RegexMatch? = Regex("a").find("a")
+                        var later: RegexMatch? = Regex("a").find("ba")
+                        println(atStart == later)
+                        println(Regex("a+").find("a") == Regex("a+").find("aa"))
+                        println(Regex("a").find("a") == Regex("(a)").find("a"))
+
                 """)).isEqualTo("true\nfalse\ntrue\nfalse\nfalse\nfalse\n");
     }
 
     @Test
     public void collectionsUseTheUserOverrideForAddRemoveAndPut() {
         assertThat(run("""
-                    class Point {
-                        var x: Integer
+                        class Point {
+                            var x: Integer
 
-                        Point(x: Integer) {
-                            this.x = x
-                        }
-
-                        override func equals(other: Any?): Boolean {
-                            if (other is Point) {
-                                return this.x == other.x
+                            Point(x: Integer) {
+                                this.x = x
                             }
-                            return false
-                        }
-                        override func hashCode(): Integer {
-                            return this.x
-                        }
-                    }
 
-                    var mutable s: Set<Point> = Set()
-                    println(s.add(Point(1)))
-                    println(s.add(Point(1)))
-                    println(s.size)
-                    println(s.remove(Point(1)))
-                    println(s.size)
+                            method override equals(other: Any?): Boolean {
+                                if (other is Point) {
+                                    return this.x == other.x
+                                }
+                                return false
+                            }
+                            method override hashCode(): Integer {
+                                return this.x
+                            }
+                        }
 
-                    var mutable m: Map<Point, String> = Map()
-                    m.put(Point(1), "one")
-                    m.put(Point(1), "uno")
-                    println(m.size)
-                    println(m.get(Point(1)))
-                    println(m.remove(Point(1)))
-                    println(m.size)
+                        var mutable s: Set<Point> = Set()
+                        println(s.add(Point(1)))
+                        println(s.add(Point(1)))
+                        println(s.size)
+                        println(s.remove(Point(1)))
+                        println(s.size)
+
+                        var mutable m: Map<Point, String> = Map()
+                        m.put(Point(1), "one")
+                        m.put(Point(1), "uno")
+                        println(m.size)
+                        println(m.get(Point(1)))
+                        println(m.remove(Point(1)))
+                        println(m.size)
+
                 """)).isEqualTo("true\nfalse\n1\ntrue\n0\n1\nuno\ntrue\n0\n");
     }
 
@@ -658,89 +679,92 @@ public final class SolvikEqualityTest {
     @Test
     public void equalsDispatchesVirtuallyThroughBroadStaticTypes() {
         assertThat(run("""
-                    interface Tag {
-                        func tag(): Integer
-                    }
-
-                    class Item implements Tag {
-                        var id: Integer
-
-                        Item(id: Integer) {
-                            this.id = id
+                        interface Tag {
+                            method tag(): Integer
                         }
 
-                        func tag(): Integer {
-                            return this.id
-                        }
+                        class Item implements Tag {
+                            var id: Integer
 
-                        override func equals(other: Any?): Boolean {
-                            if (other is Item) {
-                                return this.id == other.id
+                            Item(id: Integer) {
+                                this.id = id
                             }
-                            return false
-                        }
-                        override func hashCode(): Integer {
-                            return this.id
-                        }
-                    }
 
-                    var viaInterface: Tag = Item(1)
-                    var viaAny: Any = Item(1)
-                    println(viaInterface == Item(1))
-                    println(viaAny == Item(1))
+                            method tag(): Integer {
+                                return this.id
+                            }
+
+                            method override equals(other: Any?): Boolean {
+                                if (other is Item) {
+                                    return this.id == other.id
+                                }
+                                return false
+                            }
+                            method override hashCode(): Integer {
+                                return this.id
+                            }
+                        }
+
+                        var viaInterface: Tag = Item(1)
+                        var viaAny: Any = Item(1)
+                        println(viaInterface == Item(1))
+                        println(viaAny == Item(1))
+
                 """)).isEqualTo("true\ntrue\n");
     }
 
     @Test
     public void notEqualsInvokesTheOverrideExactlyOnceAndNegates() {
         assertThat(run("""
-                    class Counter {
-                        var mutable calls: Integer
+                        class Counter {
+                            var mutable calls: Integer
 
-                        Counter() {
-                            this.calls = 0
-                        }
-                    }
-
-                    class Item {
-                        var counter: Counter
-
-                        Item(counter: Counter) {
-                            this.counter = counter
+                            Counter() {
+                                this.calls = 0
+                            }
                         }
 
-                        override func equals(other: Any?): Boolean {
-                            this.counter.calls = this.counter.calls + 1
-                            return false
-                        }
-                        override func hashCode(): Integer {
-                            return 1
-                        }
-                    }
+                        class Item {
+                            var counter: Counter
 
-                    var counter = Counter()
-                    var a = Item(counter)
-                    var b = Item(counter)
-                    println(a != b)
-                    println(counter.calls)
+                            Item(counter: Counter) {
+                                this.counter = counter
+                            }
+
+                            method override equals(other: Any?): Boolean {
+                                this.counter.calls = this.counter.calls + 1
+                                return false
+                            }
+                            method override hashCode(): Integer {
+                                return 1
+                            }
+                        }
+
+                        var counter: Counter = Counter()
+                        var a: Item = Item(counter)
+                        var b: Item = Item(counter)
+                        println(a != b)
+                        println(counter.calls)
+
                 """)).isEqualTo("true\n1\n");
     }
 
     @Test
     public void arithmeticFailureFromEqualsPropagates() {
         Throwable thrown = catchThrowable(() -> run("""
-                    class Bad {
-                        override func equals(other: Any?): Boolean {
-                            return 1 / 0 == 0
+                        class Bad {
+                            method override equals(other: Any?): Boolean {
+                                return 1 / 0 == 0
+                            }
+                            method override hashCode(): Integer {
+                                return 1
+                            }
                         }
-                        override func hashCode(): Integer {
-                            return 1
-                        }
-                    }
 
-                    var a = Bad()
-                    var b = Bad()
-                    println(a == b)
+                        var a: Bad = Bad()
+                        var b: Bad = Bad()
+                        println(a == b)
+
                 """));
         assertThat(thrown).isNotNull();
     }
@@ -748,99 +772,101 @@ public final class SolvikEqualityTest {
     @Test
     public void anOpenEqualsOverrideCanBeOverriddenAgain() {
         assertThat(run("""
-                    mutable class Base {
-                        mutable override func equals(other: Any?): Boolean {
-                            return true
-                        }
-                        mutable override func hashCode(): Integer {
-                            return 1
-                        }
-                    }
+                                class mutable Base {
+                                    method override mutable equals(other: Any?): Boolean {
+                                        return true
+                                    }
+                                    method override mutable hashCode(): Integer {
+                                        return 1
+                                    }
+                                }
 
-                    class Derived extends Base {
-                        override func equals(other: Any?): Boolean {
-                            return false
-                        }
-                        override func hashCode(): Integer {
-                            return 1
-                        }
-                    }
+                                class Derived extends Base {
+                                    method override equals(other: Any?): Boolean {
+                                        return false
+                                    }
+                                    method override hashCode(): Integer {
+                                        return 1
+                                    }
+                                }
 
-                    println(Base() == Base())
-                    println(Derived() == Derived())
+                                println(Base() == Base())
+                                println(Derived() == Derived())
+
+
                 """)).isEqualTo("true\nfalse\n");
     }
 
     @Test
     public void regexMatchPropertiesExposeTheSnapshot() {
         assertThat(run("""
-                    var m = Regex("(a)(b)?").find("ab")
-                    if (m != null) {
-                        println(m.value)
-                        println(m.start)
-                        println(m.end)
-                        println(m.groupCount)
-                        println(m.group(1))
-                        println(m.group(2))
-                    }
+                        var m: RegexMatch? = Regex("(a)(b)?").find("ab")
+                        if (m != null) {
+                            println(m.value)
+                            println(m.start)
+                            println(m.end)
+                            println(m.groupCount)
+                            println(m.group(1))
+                            println(m.group(2))
+                        }
+
                 """)).isEqualTo("ab\n0\n2\n2\na\nb\n");
     }
 
     @Test
     public void anyOperandsOfDifferentScalarKindsAreNeverEqual() {
         assertThat(run("""
-                    func cmp(a: Any, b: Any): Boolean {
-                        return a == b
-                    }
+                        func cmp(a: Any, b: Any): Boolean {
+                            return a == b
+                        }
 
-                    func nothing(): Unit {
-                    }
-
-                    var s = "sentinel"
-                    println(cmp(1, s))
-                    println(cmp(1L, s))
-                    println(cmp(Byte(1), s))
-                    println(cmp(Short(1), s))
-                    println(cmp(1.5f, s))
-                    println(cmp(1.5, s))
-                    println(cmp(true, s))
-                    println(cmp('a', s))
-                    println(cmp(s, 1))
-                    println(cmp(s, 'a'))
-                    println(cmp(nothing(), s))
-                    println(cmp(s, nothing()))
-                """)).isEqualTo("false\nfalse\nfalse\nfalse\nfalse\nfalse\nfalse\nfalse\nfalse\nfalse\nfalse\nfalse\n");
+                        var s: String = "sentinel"
+                        println(cmp(1, s))
+                        println(cmp(1L, s))
+                        println(cmp(Byte(1), s))
+                        println(cmp(Short(1), s))
+                        println(cmp(1.5f, s))
+                        println(cmp(1.5, s))
+                        println(cmp(true, s))
+                        println(cmp('a', s))
+                        println(cmp(s, 1))
+                        println(cmp(s, 'a'))
+                        // A call that produces no value is not an operand, so the pair with `nothing()` is
+                        // rejected by the type checker rather than compared.
+                """)).isEqualTo("false\nfalse\nfalse\nfalse\nfalse\nfalse\nfalse\nfalse\nfalse\nfalse\n");
     }
 
     @Test
     public void anyOperandsOfDifferentBuiltinKindsAreNeverEqual() {
         assertThat(run("""
-                    func cmp(a: Any, b: Any): Boolean {
-                        return a == b
-                    }
+                        func cmp(a: Any, b: Any): Boolean {
+                            return a == b
+                        }
 
-                    println(cmp(Regex("a"), "x"))
-                    println(cmp(Regex("a"), 1))
-                    println(cmp(Regex("a"), List<Integer>(1)))
+                        println(cmp(Regex("a"), "x"))
+                        println(cmp(Regex("a"), 1))
+                        println(cmp(Regex("a"), List<Integer>(1)))
 
-                    var m = Regex("a").find("a")
-                    if (m != null) {
-                        println(cmp(m, "x"))
-                        println(cmp(m, Regex("a")))
-                    }
+                        var m: RegexMatch? = Regex("a").find("a")
+                        if (m != null) {
+                            println(cmp(m, "x"))
+                            println(cmp(m, Regex("a")))
+                        }
+
                 """)).isEqualTo("false\nfalse\nfalse\nfalse\nfalse\n");
     }
 
     @Test
     public void regexMatchIntegerPropertiesAreUsableAsIntegers() {
         assertThat(run("""
-                    var m = Regex("(a)(b)?").find("ab")
-                    if (m != null) {
-                        var span: Integer = m.end - m.start
-                        var groups: Integer = m.groupCount + 1
-                        println(span)
-                        println(groups)
-                    }
+                        var m: RegexMatch? = Regex("(a)(b)?").find("ab")
+                        if (m != null) {
+                            var span: Integer = m.end - m.start
+                            var groups: Integer = m.groupCount + 1
+                            println(span)
+                            println(groups)
+                        }
+
                 """)).isEqualTo("2\n3\n");
     }
 
@@ -880,45 +906,47 @@ public final class SolvikEqualityTest {
     @Test
     public void enumKeysWithUserPayloadsUseTheOverride() {
         assertThat(run("""
-                    class Point {
-                        var x: Integer
+                        class Point {
+                            var x: Integer
 
-                        Point(x: Integer) {
-                            this.x = x
-                        }
-
-                        override func equals(other: Any?): Boolean {
-                            if (other is Point) {
-                                return this.x == other.x
+                            Point(x: Integer) {
+                                this.x = x
                             }
-                            return false
-                        }
-                        override func hashCode(): Integer {
-                            return this.x
-                        }
-                    }
 
-                    enum Key {
-                        K(Point)
-                    }
+                            method override equals(other: Any?): Boolean {
+                                if (other is Point) {
+                                    return this.x == other.x
+                                }
+                                return false
+                            }
+                            method override hashCode(): Integer {
+                                return this.x
+                            }
+                        }
 
-                    var mutable m: Map<Key, String> = Map()
-                    m.put(Key.K(Point(1)), "one")
-                    println(m.get(Key.K(Point(1))))
-                    println(m.containsKey(Key.K(Point(2))))
+                        enum Key {
+                            K(Point)
+                        }
+
+                        var mutable m: Map<Key, String> = Map()
+                        m.put(Key.K(Point(1)), "one")
+                        println(m.get(Key.K(Point(1))))
+                        println(m.containsKey(Key.K(Point(2))))
+
                 """)).isEqualTo("one\nfalse\n");
     }
 
     @Test
     public void repeatedRegexEvaluationDoesNotChangeEquality() {
         assertThat(run("""
-                    var mutable i = 0
-                    while (i < 3) {
-                        var constant = Regex("a+")
-                        var dynamic = Regex("a" .. "+")
-                        println(constant == dynamic)
-                        i = i + 1
-                    }
+                        var mutable i: Integer = 0
+                        while (i < 3) {
+                            var constant: Regex = Regex("a+")
+                            var dynamic: Regex = Regex("a" .. "+")
+                            println(constant == dynamic)
+                            i = i + 1
+                        }
+
                 """)).isEqualTo("true\ntrue\ntrue\n");
     }
 

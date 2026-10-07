@@ -154,13 +154,14 @@ public final class SolvikAritySemanticTest {
                 class Counter {
                     var mutable value: Integer = 0
 
-                    func bump(by: Integer): Unit {
+                    method bump(by: Integer) {
                         this.value = this.value + by
                     }
                 }
-                var counter = Counter()
+                var counter: Counter = Counter()
                 counter.bump(2)
                 println(counter.value)
+
                 """)).isEqualTo("2\n");
     }
 
@@ -170,13 +171,14 @@ public final class SolvikAritySemanticTest {
                 class Counter {
                     var mutable value: Integer = 0
 
-                    func bump(by: Integer): Unit {
+                    method bump(by: Integer) {
                         this.value = this.value + by
                     }
                 }
-                func f(counter: Counter): Unit {
+                func f(counter: Counter) {
                     counter.bump()
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_ARITY_MISMATCH);
         assertThat(diagnostic.message()).isEqualTo("'Counter.bump' expects 1 argument but 0 were provided");
@@ -188,13 +190,14 @@ public final class SolvikAritySemanticTest {
                 class Counter {
                     var mutable value: Integer = 0
 
-                    func bump(by: Integer): Unit {
+                    method bump(by: Integer) {
                         this.value = this.value + by
                     }
                 }
-                func f(counter: Counter): Unit {
+                func f(counter: Counter) {
                     counter.bump(1, 2)
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_ARITY_MISMATCH);
         assertThat(diagnostic.message()).isEqualTo("'Counter.bump' expects 1 argument but 2 were provided");
@@ -206,14 +209,15 @@ public final class SolvikAritySemanticTest {
                 class Counter {
                     var mutable value: Integer = 0
 
-                    func bump(by: Integer): Unit {
+                    method bump(by: Integer) {
                         this.value = this.value + by
                     }
 
-                    func broken(): Unit {
+                    method broken() {
                         this.bump(1, 2)
                     }
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_ARITY_MISMATCH);
         assertThat(diagnostic.message()).isEqualTo("'Counter.bump' expects 1 argument but 2 were provided");
@@ -222,16 +226,18 @@ public final class SolvikAritySemanticTest {
     @Test
     public void superMethodCallWithWrongArityIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
-                mutable class Base {
-                    mutable func scale(by: Integer): Integer {
+                class mutable Base {
+                    method mutable scale(by: Integer): Integer {
                         return by
                     }
                 }
                 class Derived extends Base {
-                    override func scale(by: Integer): Integer {
+                    method override scale(by: Integer): Integer {
                         return super.scale()
                     }
                 }
+
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_ARITY_MISMATCH);
         assertThat(diagnostic.message()).isEqualTo("'Base.scale' expects 1 argument but 0 were provided");
@@ -249,8 +255,9 @@ public final class SolvikAritySemanticTest {
                         this.name = name
                     }
                 }
-                var user = User("Doug")
+                var user: User = User("Doug")
                 println(user.name)
+
                 """)).isEqualTo("Doug\n");
     }
 
@@ -302,41 +309,46 @@ public final class SolvikAritySemanticTest {
     @Test
     public void builtinPrintlnWithNoArgumentsIsRejected() {
         assertThat(first(checkFails("""
-                func f(): Unit {
+                func f() {
                     println()
                 }
+
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_ARITY_MISMATCH);
     }
 
     @Test
     public void builtinPrintlnWithTwoArgumentsIsRejected() {
         assertThat(first(checkFails("""
-                func f(): Unit {
+                func f() {
                     println("a", "b")
                 }
+
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_ARITY_MISMATCH);
     }
 
     @Test
     public void builtinExitCorrectArityIsAccepted() {
         assertThat(analyze("""
-                func f(): Unit {
+                func f() {
                     exit(0)
                 }
+
                 """).isSuccess()).isTrue();
     }
 
     @Test
     public void builtinExitWithWrongArityIsRejected() {
         assertThat(first(checkFails("""
-                func f(): Unit {
+                func f() {
                     exit()
                 }
+
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_ARITY_MISMATCH);
         assertThat(first(checkFails("""
-                func f(): Unit {
+                func f() {
                     exit(0, 1)
                 }
+
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_ARITY_MISMATCH);
     }
 
@@ -355,10 +367,10 @@ public final class SolvikAritySemanticTest {
     public void interfaceMethodCorrectArityExecutes() {
         assertThat(runMain("""
                 interface Greeter {
-                    func greet(name: String): String
+                    method greet(name: String): String
                 }
                 class Friendly implements Greeter {
-                    func greet(name: String): String {
+                    method greet(name: String): String {
                         return "hi " .. name
                     }
                 }
@@ -366,6 +378,7 @@ public final class SolvikAritySemanticTest {
                     return greeter.greet("Doug")
                 }
                 println(use(Friendly()))
+
                 """)).isEqualTo("hi Doug\n");
     }
 
@@ -373,11 +386,12 @@ public final class SolvikAritySemanticTest {
     public void interfaceMethodWithWrongArityIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 interface Greeter {
-                    func greet(name: String): String
+                    method greet(name: String): String
                 }
                 func use(greeter: Greeter): String {
                     return greeter.greet()
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_ARITY_MISMATCH);
         assertThat(diagnostic.message()).isEqualTo("'Greeter.greet' expects 1 argument but 0 were provided");
@@ -480,14 +494,15 @@ public final class SolvikAritySemanticTest {
     public void parserAcceptsAnyArgumentCount() {
         // The parser must not inspect the declaration of foo: every syntactic call is legal.
         parseOk("arity.sol", """
-                func foo(a: Integer, b: Integer): Unit {
+                func foo(a: Integer, b: Integer) {
                 }
-                func f(): Unit {
+                func f() {
                     foo()
                     foo(1)
                     foo(1, 2)
                     foo(1, 2, 3)
                 }
+
                 """);
     }
 

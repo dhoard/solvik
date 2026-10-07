@@ -59,10 +59,11 @@ public final class SolvikClassParserTest {
                         this.name = name
                     }
 
-                    func describe(): String {
+                    method describe(): String {
                         return this.name
                     }
                 }
+
                 """;
         ClassDeclNode user = onlyClass(parseOk("user.sol", src));
         assertNode(user, AstKind.CLASS_DECL, src, src.substring(src.indexOf("class"), src.lastIndexOf('}') + 1));
@@ -100,7 +101,7 @@ public final class SolvikClassParserTest {
         assertThat(user.methods().size()).isEqualTo(1);
         FunctionDeclNode describe = user.methods().get(0);
         assertThat(describe.name()).isEqualTo("describe");
-        assertThat(describe.returnType().name()).isEqualTo("String");
+        assertThat(describe.declaredReturnType().orElseThrow().name()).isEqualTo("String");
         ReturnStmtNode ret = (ReturnStmtNode) describe.body().statements().get(0);
         MemberAccessExprNode value = (MemberAccessExprNode) ret.value().orElseThrow();
         assertThat(value.memberName()).isEqualTo("name");
@@ -119,7 +120,7 @@ public final class SolvikClassParserTest {
 
     @Test
     public void thisMethodCallBuildsACallOnThis() {
-        String src = "class C {\n    func f(): Integer {\n        return this.g()\n    }\n}\n";
+        String src = "class C {\n    method f(): Integer {\n        return this.g()\n    }\n}\n";
         ClassDeclNode c = onlyClass(parseOk("c.sol", src));
         ReturnStmtNode ret = (ReturnStmtNode) c.methods().get(0).body().statements().get(0);
         var call = SolvikTestSupport.call(ret.value().orElseThrow());
@@ -130,7 +131,7 @@ public final class SolvikClassParserTest {
 
     @Test
     public void unqualifiedMethodCallWithinAClassParses() {
-        String src = "class C {\n    func f(): Integer {\n        return g()\n    }\n}\n";
+        String src = "class C {\n    method f(): Integer {\n        return g()\n    }\n}\n";
         ClassDeclNode c = onlyClass(parseOk("c.sol", src));
         ReturnStmtNode ret = (ReturnStmtNode) c.methods().get(0).body().statements().get(0);
         var call = SolvikTestSupport.call(ret.value().orElseThrow());
@@ -149,11 +150,12 @@ public final class SolvikClassParserTest {
                         this.value = value
                     }
 
-                    func get(): Integer {
+                    method get(): Integer {
                         return this.value
                     }
                 }
                     println(C(1).get())
+
                 """;
         CompilationUnitNode cu = parseOk("inserted.sol", src);
         assertThat(cu.declarations().size()).isEqualTo(1);
@@ -172,10 +174,11 @@ public final class SolvikClassParserTest {
                     C(v: Integer) {
                         this.v = v
                     }
-                    func value(): Integer {
+                    method value(): Integer {
                         return this.v
                     }
                 }
+
                 """;
         List<DeclarationNode> declarations = parseOk("order.sol", src).declarations();
         assertThat(declarations.size()).isEqualTo(2);
@@ -187,10 +190,11 @@ public final class SolvikClassParserTest {
     public void thisAtEndOfLineTerminatesTheStatement() {
         String src = """
                 class C {
-                    func self(): C {
+                    method self(): C {
                         return this
                     }
                 }
+
                 """;
         ClassDeclNode c = onlyClass(parseOk("self.sol", src));
         ReturnStmtNode ret = (ReturnStmtNode) c.methods().get(0).body().statements().get(0);
@@ -203,13 +207,14 @@ public final class SolvikClassParserTest {
                 class C {
                     var a: Integer = 1
                     var b: Integer = 2
-                    func first(): Integer {
+                    method first(): Integer {
                         return this.a
                     }
-                    func second(): Integer {
+                    method second(): Integer {
                         return this.b
                     }
                 }
+
                 """;
         ClassDeclNode c = onlyClass(parseOk("order2.sol", src));
         assertThat(c.properties().stream().map(PropertyDeclNode::name).toList()).isEqualTo(List.of("a", "b"));

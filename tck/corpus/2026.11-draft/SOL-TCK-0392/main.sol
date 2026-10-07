@@ -5,10 +5,10 @@
 //   - A scope block introduces a new lexical scope for the statements it contains; sibling blocks are independent scopes, so the same local name may be declared in each without any shadowing between them.
 //
 {
-    var result = 1
+    var result: Integer = 1
     print("s" .. result)
 }
 {
-    var result = 2
+    var result: Integer = 2
     print("s" .. result)
 }

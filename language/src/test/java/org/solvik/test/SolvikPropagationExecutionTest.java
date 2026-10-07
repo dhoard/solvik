@@ -75,11 +75,12 @@ public final class SolvikPropagationExecutionTest {
                     return Result.Ok(source + 1)
                 }
 
-                    var message = match addOne() {
+                    var message: String = match addOne() {
                         Ok(value) => "ok " .. value
                         Err(code) => "err " .. code
                     }
                     println(message)
+
                 """)).isEqualTo("ok 5\n");
     }
 
@@ -98,11 +99,12 @@ public final class SolvikPropagationExecutionTest {
                     return Result.Ok(source)
                 }
 
-                    var message = match propagate() {
+                    var message: String = match propagate() {
                         Ok(value) => "ok " .. value
                         Err(messageText) => "err " .. messageText
                     }
                     println(message)
+
                 """)).isEqualTo("err boom\n");
     }
 
@@ -125,11 +127,12 @@ public final class SolvikPropagationExecutionTest {
                     return Result.Ok(source + 1)
                 }
 
-                    var message = match top() {
+                    var message: String = match top() {
                         Ok(value) => "ok " .. value
                         Err(code) => "err " .. code
                     }
                     println(message)
+
                 """)).isEqualTo("err 42\n");
     }
 
@@ -149,11 +152,12 @@ public final class SolvikPropagationExecutionTest {
                     return Result.Ok(source)
                 }
 
-                    var message = match propagate() {
+                    var message: String = match propagate() {
                         Ok(value) => "ok " .. value
                         Err(messageText) => "err " .. messageText
                     }
                     println(message)
+
                 """)).isEqualTo("err missing file\n");
     }
 
@@ -174,11 +178,12 @@ public final class SolvikPropagationExecutionTest {
                     return Result.Ok(source + 100)
                 }
 
-                    var message = match work() {
+                    var message: String = match work() {
                         Ok(value) => "ok " .. value
                         Err(code) => "err " .. code
                     }
                     println(message)
+
                 """)).isEqualTo("err 1\n");
     }
 }

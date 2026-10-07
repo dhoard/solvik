@@ -113,7 +113,7 @@ public final class SolvikMatchParserTest {
     @Test
     public void sealedSubtypeBindingPatternRecordsItsWrittenType() {
         CompilationUnitNode unit = parseOk("m.sol", """
-                abstract class Shape {
+                class abstract Shape {
                 }
                 class Circle extends Shape {
                 }
@@ -122,6 +122,7 @@ public final class SolvikMatchParserTest {
                         circle: Circle => "circle"
                     }
                 }
+
                 """);
         MatchExprNode match = matchInReturn(unit, "describe");
         BindingPatternNode circle = (BindingPatternNode) match.branches().get(0).pattern();
@@ -176,11 +177,12 @@ public final class SolvikMatchParserTest {
                 enum Color {
                     Red
                 }
-                func run(color: Color): Unit {
-                    var label = match color {
+                func run(color: Color) {
+                    var label: String = match color {
                         Red => "red"
                     }
                 }
+
                 """);
         FunctionDeclNode run = (FunctionDeclNode) unit.declarations().get(1);
         LocalDeclNode declaration = (LocalDeclNode) run.body().statements().get(0);

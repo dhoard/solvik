@@ -59,12 +59,13 @@ public final class SolvikExpressionOrientedParserTest {
     public void blockExpressionInitializerBuildsBlockExprNodeWithTail() {
         CompilationUnitNode unit = parseOk("b.sol", """
                 func f(): Integer {
-                    var x = {
-                        var base = 20
+                    var x: Integer = {
+                        var base: Integer = 20
                         base + 22
                     }
                     return x
                 }
+
                 """);
         assertThat(initializer(unit, "f").kind()).isEqualTo(AstKind.BLOCK_EXPR);
         BlockExprNode block = (BlockExprNode) initializer(unit, "f");
@@ -75,12 +76,13 @@ public final class SolvikExpressionOrientedParserTest {
     @Test
     public void standaloneScopeBlockRemainsAStatementBlock() {
         CompilationUnitNode unit = parseOk("b.sol", """
-                func f(): Unit {
+                func f() {
                     {
-                        var local = 1
+                        var local: Integer = 1
                         print(local)
                     }
                 }
+
                 """);
         BlockNode block = (BlockNode) ((FunctionDeclNode) unit.declarations().get(0)).body().statements().get(0);
         assertThat(block.kind()).isEqualTo(AstKind.BLOCK);
@@ -91,27 +93,30 @@ public final class SolvikExpressionOrientedParserTest {
     public void explicitSynthesizedAndAbsentTailSemicolonsAgree() {
         String inlineFunction = """
                 func f(): Integer {
-                    var x = {
+                    var x: Integer = {
                         42
                     }
                     return x
                 }
+
                 """;
         String explicitFunction = """
                 func f(): Integer {
-                    var x = {
+                    var x: Integer = {
                         42
                     }
                     return x
                 }
+
                 """;
         String newlineFunction = """
                 func f(): Integer {
-                    var x = {
+                    var x: Integer = {
                         42
                     }
                     return x
                 }
+
                 """;
         BlockNode inline = ((BlockExprNode) initializer(parseOk("a.sol", inlineFunction), "f")).body();
         BlockNode explicit = ((BlockExprNode) initializer(parseOk("b.sol", explicitFunction), "f")).body();
@@ -128,7 +133,7 @@ public final class SolvikExpressionOrientedParserTest {
     public void ifExpressionAndStatementHaveDistinctKinds() {
         CompilationUnitNode expression = parseOk("e.sol", """
                 func f(flag: Boolean): Integer {
-                    var x = if (flag) {
+                    var x: Integer = if (flag) {
                         1
                     }
                     else {
@@ -136,10 +141,11 @@ public final class SolvikExpressionOrientedParserTest {
                     }
                     return x
                 }
+
                 """);
         assertThat(initializer(expression, "f").kind()).isEqualTo(AstKind.IF_EXPR);
         CompilationUnitNode statement = parseOk("s.sol", """
-                func f(flag: Boolean): Unit {
+                func f(flag: Boolean) {
                     if (flag) {
                         print("yes")
                     }
@@ -147,6 +153,7 @@ public final class SolvikExpressionOrientedParserTest {
                         print("no")
                     }
                 }
+
                 """);
         assertThat(((FunctionDeclNode) statement.declarations().get(0)).body().statements().get(0).kind())
                 .isEqualTo(AstKind.IF_STMT);
@@ -156,7 +163,7 @@ public final class SolvikExpressionOrientedParserTest {
     public void elseIfChainIsNestedExpression() {
         CompilationUnitNode unit = parseOk("e.sol", """
                 func f(value: Integer): String {
-                    var label = if (value < 0) {
+                    var label: String = if (value < 0) {
                         "negative"
                     }
                     else if (value == 0) {
@@ -167,6 +174,7 @@ public final class SolvikExpressionOrientedParserTest {
                     }
                     return label
                 }
+
                 """);
         IfExprNode outer = (IfExprNode) initializer(unit, "f");
         IfExprNode chained = (IfExprNode) outer.elseValue().orElseThrow();
@@ -178,7 +186,7 @@ public final class SolvikExpressionOrientedParserTest {
     public void switchExpressionAndStatementHaveDistinctKinds() {
         CompilationUnitNode expression = parseOk("e.sol", """
                 func f(value: Integer): String {
-                    var label = switch (value) {
+                    var label: String = switch (value) {
                         case 1 {
                             "one"
                         }
@@ -188,11 +196,12 @@ public final class SolvikExpressionOrientedParserTest {
                     }
                     return label
                 }
+
                 """);
         assertThat(initializer(expression, "f").kind()).isEqualTo(AstKind.SWITCH_EXPR);
         assertThat(((SwitchExprNode) initializer(expression, "f")).cases().size()).isEqualTo(2);
         CompilationUnitNode statement = parseOk("s.sol", """
-                func f(value: Integer): Unit {
+                func f(value: Integer) {
                     switch (value) {
                         case 1 {
                             print("one")
@@ -202,6 +211,7 @@ public final class SolvikExpressionOrientedParserTest {
                         }
                     }
                 }
+
                 """);
         assertThat(((FunctionDeclNode) statement.declarations().get(0)).body().statements().get(0).kind())
                 .isEqualTo(AstKind.SWITCH_STMT);
@@ -235,15 +245,16 @@ public final class SolvikExpressionOrientedParserTest {
     public void blockExpressionCarriesCompleteSpan() {
         String source = """
                 func f(): Integer {
-                    var x = {
+                    var x: Integer = {
                         42
                     }
                     return x
                 }
+
                 """;
         CompilationUnitNode unit = parseOk("span.sol", source);
         BlockExprNode block = (BlockExprNode) initializer(unit, "f");
-        int open = source.indexOf("var x = {") + "var x = ".length();
+        int open = source.indexOf("var x: Integer = {") + "var x: Integer = ".length();
         int close = source.indexOf('}', open);
         assertThat(source.substring(block.span().startOffset(), block.span().endOffset()))
                 .isEqualTo(source.substring(open, close + 1));
@@ -279,19 +290,19 @@ public final class SolvikExpressionOrientedParserTest {
     public void newNodesExposeStructuralChildren() {
         CompilationUnitNode unit = parseOk("children.sol", """
                 func f(flag: Boolean): Integer {
-                    var a = {
+                    var a: Integer = {
                         1
                     }
-                    var b = if (flag) {
+                    var b: Integer = if (flag) {
                         1
                     }
                     else {
                         2
                     }
-                    var c = if (flag) {
+                    var c: Integer = if (flag) {
                         1
                     }
-                    var d = switch (1) {
+                    var d: Integer = switch (1) {
                         case 1 {
                             1
                         }
@@ -301,6 +312,7 @@ public final class SolvikExpressionOrientedParserTest {
                     }
                     return 0
                 }
+
                 """);
         FunctionDeclNode function = (FunctionDeclNode) unit.declarations().get(0);
         BlockExprNode a = (BlockExprNode) ((LocalDeclNode) function.body().statements().get(0)).initializer();

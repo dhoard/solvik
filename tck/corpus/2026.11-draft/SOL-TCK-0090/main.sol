@@ -19,8 +19,8 @@
 // pair isolates the single difference between them, the declared type argument.
 // Executed as top-level statements (section 20). Uses print, so no platform line separator
 // can enter the expected bytes.
-mutable class Base {
-    func label(): String {
+class mutable Base {
+    method label(): String {
         return "base"
     }
 }
@@ -28,5 +28,5 @@ mutable class Base {
 class Derived extends Base {
 }
 
-var items = List<Base>(Derived())
+var items: List<Base> = List<Base>(Derived())
 print("base=" .. items.size)

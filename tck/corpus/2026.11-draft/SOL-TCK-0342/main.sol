@@ -5,13 +5,13 @@
 //   - An implementing method must use the same parameter types and a covariant return type.
 //
 interface Named {
-    func greet(who: String): String
+    method greet(who: String): String
 }
 class U implements Named {
     U() {
     }
 
-    func greet(who: Integer): String {
+    method greet(who: Integer): String {
         return "hi"
     }
 }

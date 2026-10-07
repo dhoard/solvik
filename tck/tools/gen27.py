@@ -38,14 +38,12 @@ BUILTIN_TOSTRING = ("Built-in scalars provide fixed, non-overridable implementat
 
 REQS_SPEC = {
     "REQ-2500": dict(
-        section="4. Root Type Hierarchy",
-        summary="Built-in scalars have fixed, non-overridable `toString` implementations: integers "
-                "render in decimal, floating types in Java-style text, Boolean as the words, "
-                "Character as its character, and String as its contents",
-        kind="runtime",
-        quotes=[BUILTIN_TOSTRING],
-        note="One value of each named built-in is printed through `toString`; each expected token "
-             "comes from the sentence's own list rather than from a captured trace."),
+  section='4. Root Type Hierarchy',
+  summary='Built-in scalars have fixed, non-overridable `toString` implementations: integers render in decimal, floating types in Java-style text, Boolean as the words, Character as its character, and String as its contents',
+  kind='runtime',
+  quotes=['Built-in scalars provide fixed, non-overridable implementations: `Integer`, `Long`, `Byte`, and `Short` render in decimal, `Float` and `Double` use Java-style floating-point text, `Boolean` renders `true` or `false`, `Character` renders its character, and `String` renders its contents.'],
+  tests=['SOL-TCK-0362'],
+  note="One value of each named built-in is printed through `toString`; each expected token comes from the sentence's own list rather than from a captured trace."),
     "REQ-2501": dict(
         section="4. Root Type Hierarchy",
         summary="A built-in scalar cannot be extended, so a class whose superclass is a built-in "
@@ -55,32 +53,19 @@ REQS_SPEC = {
         note="A class declares `extends Integer`. The section names no code for this restriction, "
              "so the rejection is bare; the sentinel proves non-execution."),
     "REQ-2502": dict(
-        section="7. Static members and class initialization",
-        summary="A class name is a receiver, not a value, so using it anywhere but as the root of a "
-                "static member reference is `SOLV-TYPE-016`",
-        kind="compile-time",
-        quotes=["The class name in that position is a receiver, not a value: it is legal only as the "
-                "root of a static member reference, and a class name used anywhere else remains "
-                "`SOLV-TYPE-016`.",
-                "In particular `var c = Counter` and a read through an instance such as "
-                "`instance.limit` are rejected."],
-        note="The program binds the class name to a local, which is exactly the `var c = Counter` "
-             "form the section rejects. The section names `SOLV-TYPE-016`, so the oracle pins it.",
-        diagnosticCode="SOLV-TYPE-016",
-        diagnosticNormative=True,
-    ),
+  section='7. Static members and class initialization',
+  summary='A class name is a receiver, not a value, so using it anywhere but as the root of a static member reference is `SOLV-TYPE-016`',
+  kind='compile-time',
+  quotes=['In particular `var c: Counter = Counter` and a read through an instance such as `instance.limit` are rejected.'],
+  tests=['SOL-TCK-0364'],
+  note='The program binds the class name to a local, which is exactly the `var c = Counter` form the section rejects. The section names `SOLV-TYPE-016`, so the oracle pins it.'),
     "REQ-2503": dict(
-        section="7. Static members and class initialization",
-        summary="A static member is reached only through the class name, so reading it through an "
-                "instance is a compile-time error",
-        kind="compile-time",
-        quotes=["The class name in that position is a receiver, not a value: it is legal only as the "
-                "root of a static member reference, and a class name used anywhere else remains "
-                "`SOLV-TYPE-016`.",
-                "In particular `var c = Counter` and a read through an instance such as "
-                "`instance.limit` are rejected."],
-        note="The program reads the static property through an instance, the second rejected form "
-             "the section names. No code is named for the instance form, so the rejection is bare."),
+  section='7. Static members and class initialization',
+  summary='A static member is reached only through the class name, so reading it through an instance is a compile-time error',
+  kind='compile-time',
+  quotes=['In particular `var c: Counter = Counter` and a read through an instance such as `instance.limit` are rejected.'],
+  tests=['SOL-TCK-0365'],
+  note='The program reads the static property through an instance, the second rejected form the section names. No code is named for the instance form, so the rejection is bare.'),
     "REQ-2504": dict(
         section="7. Static members and class initialization",
         summary="A static member shares the class's member namespace, so a static and an instance "
@@ -166,31 +151,89 @@ BAD("SOL-TCK-0363", "objects", "REQ-2501",
     'class MyInt extends Integer {\n    MyInt() {\n    }\n}\nprint("EXECUTED-INVALID")\n', {},
     "A class extending the built-in Integer is the forbidden extension.")
 BAD("SOL-TCK-0364", "objects", "REQ-2502",
-    'class Counter {\n    static var mutable n: Integer = 0\n\n    Counter() {\n    }\n}\n'
-    'var c = Counter\nprint("EXECUTED-INVALID")\n',
+    (('class Counter {\n'
+    '    var static mutable n: Integer = 0\n'
+    '\n'
+    '    Counter() {\n'
+    '    }\n'
+    '}\n'
+    'var c: Any = Counter\n'
+    'print("EXECUTED-INVALID")\n'
+    '')),
     {"family": "TYPE", "code": "SOLV-TYPE-016"},
     "Binding the class name to a local uses it as a value, which pins SOLV-TYPE-016.")
 BAD("SOL-TCK-0365", "objects", "REQ-2503",
-    'class Counter {\n    static var mutable n: Integer = 0\n\n    Counter() {\n    }\n}\n'
-    'var c = Counter()\nprint(c.n)\n' + NEG, {},
+    ('class Counter {\n'
+    '    var static mutable n: Integer = 0\n'
+    '\n'
+    '    Counter() {\n'
+    '    }\n'
+    '}\n'
+    'var c: Counter = Counter()\n'
+    'print(c.n)\n'
+    '\n'
+    'print("EXECUTED-INVALID")\n'
+    ''), {},
     "Reading a static member through an instance is the second rejected form.")
 BAD("SOL-TCK-0366", "objects", "REQ-2504",
-    'class C {\n    static var mutable x: Integer = 1\n    var x: Integer\n\n    C() {\n'
-    '        this.x = 2\n    }\n}\nvar c = C()\nprint("EXECUTED-INVALID")\n', {},
+    (('class C {\n'
+    '    var static mutable x: Integer = 1\n'
+    '    var x: Integer\n'
+    '\n'
+    '    C() {\n'
+    '        this.x = 2\n'
+    '    }\n'
+    '}\n'
+    'var c: C = C()\n'
+    'print("EXECUTED-INVALID")\n'
+    '')), {},
     "A static and an instance member share the name x, which the shared namespace forbids.")
 BAD("SOL-TCK-0367", "objects", "REQ-2505",
-    'class C {\n    static var mutable n: Integer = 1\n\n    static func f(): Integer {\n'
-    '        return this.n\n    }\n\n    C() {\n    }\n}\nprint(C.f())\n' + NEG,
+    ('class C {\n'
+    '    var static mutable n: Integer = 1\n'
+    '\n'
+    '    method static f(): Integer {\n'
+    '        return this.n\n'
+    '    }\n'
+    '\n'
+    '    C() {\n'
+    '    }\n'
+    '}\n'
+    'print(C.f())\n'
+    '\n'
+    'print("EXECUTED-INVALID")\n'
+    ''),
     {"family": "RESOL", "code": "SOLV-RESOL-005"},
     "`this` inside a static method pins the specification-named SOLV-RESOL-005.")
 BAD("SOL-TCK-0368", "objects", "REQ-2506",
-    'mutable class A {\n    A() {\n    }\n}\nclass C extends A {\n    static func f(): Integer {\n'
-    '        return super.hashCode()\n    }\n\n    C() {\n        super()\n    }\n}\n'
-    'print(C.f())\n' + NEG,
+    ('class mutable A {\n'
+    '    A() {\n'
+    '    }\n'
+    '}\n'
+    'class C extends A {\n'
+    '    method static f(): Integer {\n'
+    '        return super.hashCode()\n'
+    '    }\n'
+    '\n'
+    '    C() {\n'
+    '        super()\n'
+    '    }\n'
+    '}\n'
+    'print(C.f())\n'
+    '\n'
+    'print("EXECUTED-INVALID")\n'
+    ''),
     {"family": "RESOL", "code": "SOLV-RESOL-006"},
     "`super` inside a static method pins the specification-named SOLV-RESOL-006.")
 OK("SOL-TCK-0369", "objects", "REQ-2507",
-   'class C {\n    static var toString: Integer = 7\n\n    C() {\n    }\n}\nprint(C.toString)\n',
+   (('class C {\n'
+    '    var static toString: Integer = 7\n'
+    '\n'
+    '    C() {\n'
+    '    }\n'
+    '}\n'
+    'print(C.toString)\n'
+    '')),
    "7",
    "The static member may use the reserved instance name and the class-name read observes its "
    "value.")

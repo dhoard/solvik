@@ -127,9 +127,9 @@ public final class SolvikConversionRuntimeTest {
 
     @ParameterizedTest(name = "{1} out of range")
     @CsvSource({
-            "var mutable x = 300, Byte(x)",
-            "var mutable x = 32768, Short(x)",
-            "var mutable x = 2147483648L, Integer(x)",
+            "var mutable x: Integer = 300, Byte(x)",
+            "var mutable x: Integer = 32768, Short(x)",
+            "var mutable x: Long = 2147483648L, Integer(x)",
     })
     public void outOfRangeConversionOfAValueIsARuntimeError(String declaration, String expression) {
         PolyglotException failure = failureOf("    " + declaration + "\n    println(" + expression + ")\n");
@@ -139,9 +139,9 @@ public final class SolvikConversionRuntimeTest {
 
     @Test
     public void nanAndInfinityCannotConvertToAnIntegralType() {
-        assertThat(failureOf("    var mutable d = 0.0 / 0.0\n    println(Integer(d))\n").getMessage()).contains("out of range");
-        assertThat(failureOf("    var mutable d = 1.0 / 0.0\n    println(Long(d))\n").getMessage()).contains("out of range");
-        assertThat(failureOf("    var mutable f = 1.0f / 0.0f\n    println(Byte(f))\n").getMessage()).contains("out of range");
+        assertThat(failureOf("    var mutable d: Double = 0.0 / 0.0\n    println(Integer(d))\n").getMessage()).contains("out of range");
+        assertThat(failureOf("    var mutable d: Double = 1.0 / 0.0\n    println(Long(d))\n").getMessage()).contains("out of range");
+        assertThat(failureOf("    var mutable f: Float = 1.0f / 0.0f\n    println(Byte(f))\n").getMessage()).contains("out of range");
     }
 
     @ParameterizedTest
@@ -151,7 +151,9 @@ public final class SolvikConversionRuntimeTest {
             "-9223372036854777856.0", "-9223373136366403584.0f",
     })
     public void floatingLongOutOfRangeValuesAreRejectedAtRuntime(String literal) {
-        PolyglotException failure = failureOf("var mutable value = " + literal + "\nprintln(Long(value))\n");
+        // A local declaration writes its type, so the literal's own representation picks it.
+        String type = literal.endsWith("f") ? "Float" : "Double";
+        PolyglotException failure = failureOf("var mutable value: " + type + " = " + literal + "\nprintln(Long(value))\n");
         assertThat(failure.isSyntaxError()).as(failure.getMessage()).isFalse();
         assertThat(failure.isGuestException()).isTrue();
         assertThat(failure.getMessage()).contains("arithmetic error:", "out of range");
@@ -167,7 +169,9 @@ public final class SolvikConversionRuntimeTest {
             "-9223371487098961920.0f, -9223371487098961920",
     })
     public void floatingLongRepresentableBoundariesAreAccepted(String literal, String expected) {
-        assertThat(run("var mutable value = " + literal + "\nprintln(Long(value))\n")).isEqualTo(expected + "\n");
+        String type = literal.endsWith("f") ? "Float" : "Double";
+        assertThat(run("var mutable value: " + type + " = " + literal + "\nprintln(Long(value))\n"))
+                .isEqualTo(expected + "\n");
     }
 
     @Test

@@ -62,15 +62,16 @@ public final class SolvikClassExecutionTest {
                         this.name = name
                     }
 
-                    func describe(): String {
+                    method describe(): String {
                         return this.name
                     }
                 }
 
-                    var user = User(7, "Doug")
+                    var user: User = User(7, "Doug")
                     println(user.id)
                     println(user.name)
                     println(user.describe())
+
                 """)).isEqualTo("7\nDoug\nDoug\n");
     }
 
@@ -81,20 +82,21 @@ public final class SolvikClassExecutionTest {
                     var mutable count: Integer = 0
                     var label: String = "c"
 
-                    func increment(): Unit {
+                    method increment() {
                         this.count = this.count + 1
                     }
 
-                    func value(): Integer {
+                    method value(): Integer {
                         return this.count
                     }
                 }
 
-                    var counter = Counter()
+                    var counter: Counter = Counter()
                     counter.increment()
                     counter.increment()
                     println(counter.value())
                     println(counter.label)
+
                 """)).isEqualTo("2\nc\n");
     }
 
@@ -109,9 +111,10 @@ public final class SolvikClassExecutionTest {
                     }
                 }
 
-                    var box = Box(1)
+                    var box: Box = Box(1)
                     box.value = box.value + 41
                     println(box.value)
+
                 """)).isEqualTo("42\n");
     }
 
@@ -125,16 +128,17 @@ public final class SolvikClassExecutionTest {
                         this.name = name
                     }
 
-                    func greeting(): String {
+                    method greeting(): String {
                         return "Hello " .. displayName()
                     }
 
-                    func displayName(): String {
+                    method displayName(): String {
                         return this.name
                     }
                 }
 
                     println(Greeter("Doug").greeting())
+
                 """)).isEqualTo("Hello Doug\n");
     }
 
@@ -150,12 +154,13 @@ public final class SolvikClassExecutionTest {
                         this.y = y
                     }
 
-                    func sum(): Integer {
+                    method sum(): Integer {
                         return this.x + this.y
                     }
                 }
 
                     println(Point(2, 3).sum())
+
                 """)).isEqualTo("5\n");
     }
 
@@ -180,11 +185,12 @@ public final class SolvikClassExecutionTest {
                     }
                 }
 
-                    var a = Marker(1)
-                    var b = a
-                    var c = Marker(1)
+                    var a: Marker = Marker(1)
+                    var b: Marker = a
+                    var c: Marker = Marker(1)
                     println(a == b)
                     println(a == c)
+
                 """)).isEqualTo("true\nfalse\n");
     }
 
@@ -198,15 +204,15 @@ public final class SolvikClassExecutionTest {
                         this.value = init
                     }
 
-                    func bump(): Integer {
-                        var init = 5
+                    method bump(): Integer {
+                        var init: Integer = 5
                         this.value = this.value + init
                         return this.value
                     }
                 }
 
                 class Timer {
-                    func init(): Integer {
+                    method init(): Integer {
                         return 7
                     }
                 }
@@ -218,6 +224,7 @@ public final class SolvikClassExecutionTest {
                     println(Engine(10).bump())
                     println(Timer().init())
                     println(Slot().init)
+
                 """)).isEqualTo("15\n7\n3\n");
     }
 
@@ -231,13 +238,13 @@ public final class SolvikClassExecutionTest {
                 class Counter {
                     var mutable total: Integer = 0
 
-                    func add(amount: Integer): Integer {
-                        var total = amount * 2
+                    method add(amount: Integer): Integer {
+                        var total: Integer = amount * 2
                         this.total = this.total + amount
                         return total
                     }
 
-                    func sum(): Integer {
+                    method sum(): Integer {
                         return this.total
                     }
                 }
@@ -247,6 +254,7 @@ public final class SolvikClassExecutionTest {
                 println(counter.sum())
                 println(counter.add(1))
                 println(counter.sum())
+
                 """)).isEqualTo("8\n4\n2\n5\n");
     }
 
@@ -259,11 +267,11 @@ public final class SolvikClassExecutionTest {
                     var items: Set<Integer> = Set<Integer>()
                     var counts: Map<String, Integer> = Map<String, Integer>()
 
-                    func add(value: Integer): Unit {
+                    method add(value: Integer) {
                         this.items.add(value)
                     }
 
-                    func hit(key: String): Integer {
+                    method hit(key: String): Integer {
                         var mutable next: Integer = 1
                         if (this.counts.containsKey(key)) {
                             next = this.counts.get(key) + 1
@@ -272,7 +280,7 @@ public final class SolvikClassExecutionTest {
                         return next
                     }
 
-                    func size(): Integer {
+                    method size(): Integer {
                         return this.items.size
                     }
                 }
@@ -285,25 +293,27 @@ public final class SolvikClassExecutionTest {
                 println(bag.hit("x"))
                 println(bag.hit("x"))
                 println(bag.hit("y"))
+
                 """)).isEqualTo("2\n1\n2\n1\n");
     }
 
     @Test
     public void inheritedPropertiesAreReachableThroughThisInASubclass() {
         assertThat(run("""
-                mutable class Base {
+                class mutable Base {
                     var id: Integer = 5
                 }
 
                 class Derived extends Base {
                     var mutable extra: Integer = 2
 
-                    func show(): Integer {
+                    method show(): Integer {
                         return this.id + this.extra
                     }
                 }
 
                 println(Derived().show())
+
                 """)).isEqualTo("7\n");
     }
 
@@ -313,12 +323,13 @@ public final class SolvikClassExecutionTest {
         // `var x = 1` then `x = 2` must produce 2, exercising the lowering-time slot reuse.
         assertThat(run("""
                 func tally(): Integer {
-                    var mutable counter = 5
+                    var mutable counter: Integer = 5
                     counter = counter + 1
                     counter = counter * 7
                     return counter
                 }
                 println(tally())
+
                 """)).isEqualTo("42\n");
     }
 

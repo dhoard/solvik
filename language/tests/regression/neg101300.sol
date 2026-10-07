@@ -5,7 +5,7 @@ func pick<T>(first: T, second: T): T {
     return first
 }
 
-func use(): Unit {
+func use() {
     var wrong: func(Integer): Integer = pick
 }
 use()

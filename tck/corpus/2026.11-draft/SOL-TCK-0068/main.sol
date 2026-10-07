@@ -6,28 +6,28 @@
 // asserted (the codes the current implementation emits occur nowhere in the
 // specification).
 interface SpeakerA {
-    func say(): String
+    method say(): String
 }
 
 interface SpeakerB {
-    func say(): String
+    method say(): String
 }
 
 class A implements SpeakerA {
-    func say(): String {
+    method say(): String {
         return "a"
     }
 }
 
 class B implements SpeakerB {
-    func say(): String {
+    method say(): String {
         return "b"
     }
 }
 
 class Hub implements SpeakerA {
-    delegate var x: SpeakerA
-    delegate var y: SpeakerB
+    delegate x: SpeakerA
+    delegate y: SpeakerB
 
     Hub(x: SpeakerA, y: SpeakerB) {
         this.x = x

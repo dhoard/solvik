@@ -70,11 +70,6 @@ all=(
     map-build-4x
     map-lookup
     call-direct
-    call-named
-    call-anonymous
-    call-closure
-    call-bound
-    call-polymorphic
 )
 
 if [[ $# -gt 0 ]]; then

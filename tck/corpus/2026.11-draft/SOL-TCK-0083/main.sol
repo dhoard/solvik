@@ -16,5 +16,5 @@
 // collection error, so the manifest asserts the protocol runtime category (protocol.md
 // section 4.1) and records no process exit status. The print cannot complete, so the
 // expected stdout stream is empty. Sentinel per TCK.md section 10.
-var frames = Stack<Integer>()
+var frames: Stack<Integer> = Stack<Integer>()
 print(frames.peek())

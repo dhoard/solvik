@@ -2,16 +2,16 @@ class S {
     S() {
     }
 
-    func load(): S {
+    method load(): S {
         return this
     }
 
-    func value(): Integer {
+    method value(): Integer {
         return 42
     }
 }
-var s = S()
-var r = s
+var s: S = S()
+var r: Integer = s
     .load()
     .value()
 print("r" .. r)

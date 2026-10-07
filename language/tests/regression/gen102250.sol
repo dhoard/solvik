@@ -11,7 +11,7 @@ class Box2<T> {
     Box2(value: T) {
         this.value = value
     }
-    func get(): T {
+    method get(): T {
         return this.value
     }
 }

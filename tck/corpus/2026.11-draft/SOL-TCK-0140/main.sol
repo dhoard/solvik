@@ -5,8 +5,8 @@
 // names the block-local `inner` outside the block, where nothing is visible. Section 4's
 // reference rule names the diagnostic: a bare name that resolves to no local, parameter,
 // function, or top-level declaration "is `SOLV-RESOL-001`".
-var v = {
-    var inner = 1
+var v: Integer = {
+    var inner: Integer = 1
     inner
 }
 print(inner)

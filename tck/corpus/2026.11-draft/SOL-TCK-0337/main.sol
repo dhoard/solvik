@@ -6,7 +6,7 @@
 //   - | `SEM_TYPE_PARAMETER_IN_STATIC_MEMBER` | `SOLV-SEM-048` | a static member mentions a type parameter of its class |
 //
 class C<T> {
-    static func f(x: T): T {
+    method static f(x: T): T {
         return x
     }
 

@@ -6,13 +6,13 @@ println(xs1.size)
 
 println(xs1.get(0))
 
-var mutable total = 0
+var mutable total: Integer = 0
 
 for (i in 2...4) {
     total = total + i
 }
 
-var mutable n = 0
+var mutable n: Integer = 0
 
 while (n < 3) {
     n = n + 1

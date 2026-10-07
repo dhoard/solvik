@@ -187,7 +187,7 @@ public final class PhysicalLineRules {
      * cannot end a statement, so a line break before their body brace is always the wrong spelling.
      *
      * <p>A header's `)` is deliberately absent. A scope block statement is legal on the line after any
-     * statement, including one that ends in `)`, and the token stream cannot tell `func f(): Unit`
+     * statement, including one that ends in `)`, and the token stream cannot tell `func f()`
      * followed by its brace from a call followed by a block - only the parse tree can, by asking
      * whether the brace opened the construct's body or a statement of its own. Reporting on `)` here
      * would reject legal programs, which is the worse failure, so that case is left to the parse

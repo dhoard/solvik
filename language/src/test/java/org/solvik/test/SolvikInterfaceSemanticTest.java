@@ -53,12 +53,13 @@ public final class SolvikInterfaceSemanticTest {
     public void interfaceDescriptorRecordsSignaturesAndDefaults() {
         CheckedProgram program = check("""
                 interface Named {
-                    func name(): String
+                    method name(): String
 
-                    func greeting(): String {
+                    method greeting(): String {
                         return "Hello " .. name()
                     }
                 }
+
                 """);
         InterfaceSymbol named = program.interfaceSymbol("Named").orElseThrow();
         assertThat(named.name()).isEqualTo("Named");
@@ -80,13 +81,14 @@ public final class SolvikInterfaceSemanticTest {
     public void oneInterfaceIsSatisfiedByAnImplementingMethod() {
         CheckedProgram program = check("""
                 interface Named {
-                    func name(): String
+                    method name(): String
                 }
                 class User implements Named {
-                    func name(): String {
+                    method name(): String {
                         return "Doug"
                     }
                 }
+
                 """);
         ClassSymbol user = program.classSymbol("User").orElseThrow();
         assertThat(user.interfaces().stream().map(InterfaceSymbol::name).collect(Collectors.toList())).isEqualTo(List.of("Named"));
@@ -98,20 +100,21 @@ public final class SolvikInterfaceSemanticTest {
     public void multipleInterfacesAreConformancedIndependently() {
         CheckedProgram program = check("""
                 interface Named {
-                    func name(): String
+                    method name(): String
                 }
                 interface Aged {
-                    func age(): Integer
+                    method age(): Integer
                 }
                 class User implements Named, Aged {
-                    func name(): String {
+                    method name(): String {
                         return "Doug"
                     }
 
-                    func age(): Integer {
+                    method age(): Integer {
                         return 42
                     }
                 }
+
                 """);
         ClassSymbol user = program.classSymbol("User").orElseThrow();
         assertThat(user.interfaces().stream().map(InterfaceSymbol::name).collect(Collectors.toList())).isEqualTo(List.of("Named", "Aged"));
@@ -124,17 +127,18 @@ public final class SolvikInterfaceSemanticTest {
     public void aDefaultMethodSatisfiesItsOwnInterfaceRequirement() {
         CheckedProgram program = check("""
                 interface Named {
-                    func name(): String
+                    method name(): String
 
-                    func greeting(): String {
+                    method greeting(): String {
                         return "Hello " .. name()
                     }
                 }
                 class User implements Named {
-                    func name(): String {
+                    method name(): String {
                         return "Doug"
                     }
                 }
+
                 """);
         ClassSymbol user = program.classSymbol("User").orElseThrow();
         InterfaceSymbol named = program.interfaceSymbol("Named").orElseThrow();
@@ -147,22 +151,24 @@ public final class SolvikInterfaceSemanticTest {
     public void defaultMethodIsInstalledInTheClassDispatchTable() {
         CheckedProgram program = check("""
                 interface Named {
-                    func name(): String
+                    method name(): String
 
-                    func greeting(): String {
+                    method greeting(): String {
                         return "Hello " .. name()
                     }
                 }
                 class User implements Named {
-                    func name(): String {
+                    method name(): String {
                         return "Doug"
                     }
                 }
-                mutable class Manager implements Named {
-                    func name(): String {
+                class mutable Manager implements Named {
+                    method name(): String {
                         return "Manager"
                     }
                 }
+
+
                 """);
         for (String className : List.of("User", "Manager")) {
             ClassSymbol klass = program.classSymbol(className).orElseThrow();
@@ -178,12 +184,13 @@ public final class SolvikInterfaceSemanticTest {
     public void aDefaultMethodBodyCallsSiblingRequirementsThroughThis() {
         CheckedProgram program = check("""
                 interface Named {
-                    func name(): String
+                    method name(): String
 
-                    func shoutName(): String {
+                    method shoutName(): String {
                         return "! " .. name()
                     }
                 }
+
                 """);
         InterfaceSymbol named = program.interfaceSymbol("Named").orElseThrow();
         FunctionSymbol shout = named.member("shoutName").orElseThrow();
@@ -198,25 +205,26 @@ public final class SolvikInterfaceSemanticTest {
     public void interfaceExtensionInheritsRequirementsAndDefaults() {
         CheckedProgram program = check("""
                 interface Readable {
-                    func read(): String
+                    method read(): String
 
-                    func readTwice(): String {
+                    method readTwice(): String {
                         return read() .. read()
                     }
                 }
                 interface Writable {
-                    func write(value: String): Unit
+                    method write(value: String)
                 }
                 interface Stream extends Readable, Writable {
                 }
                 class Buffer implements Stream {
-                    func read(): String {
+                    method read(): String {
                         return "x"
                     }
 
-                    func write(value: String): Unit {
+                    method write(value: String) {
                     }
                 }
+
                 """);
         InterfaceSymbol stream = program.interfaceSymbol("Stream").orElseThrow();
         assertThat(stream.superInterfaces().stream().map(InterfaceSymbol::name).collect(Collectors.toList())).isEqualTo(List.of("Readable", "Writable"));
@@ -232,15 +240,17 @@ public final class SolvikInterfaceSemanticTest {
     public void classInheritsConformanceFromItsSuperclass() {
         CheckedProgram program = check("""
                 interface Named {
-                    func name(): String
+                    method name(): String
                 }
-                mutable class Base implements Named {
-                    func name(): String {
+                class mutable Base implements Named {
+                    method name(): String {
                         return "base"
                     }
                 }
                 class Derived extends Base {
                 }
+
+
                 """);
         ClassSymbol derived = program.classSymbol("Derived").orElseThrow();
         assertThat(derived.allInterfaces().stream().map(InterfaceSymbol::name).collect(Collectors.toList())).isEqualTo(List.of("Named"));
@@ -251,21 +261,22 @@ public final class SolvikInterfaceSemanticTest {
     public void aClassMethodTakesPrecedenceOverAnInterfaceDefault() {
         CheckedProgram program = check("""
                 interface Named {
-                    func name(): String
+                    method name(): String
 
-                    func greeting(): String {
+                    method greeting(): String {
                         return "Hello " .. name()
                     }
                 }
                 class User implements Named {
-                    func name(): String {
+                    method name(): String {
                         return "Doug"
                     }
 
-                    func greeting(): String {
+                    method greeting(): String {
                         return "Hi " .. name()
                     }
                 }
+
                 """);
         ClassSymbol user = program.classSymbol("User").orElseThrow();
         // The class's own method wins over the default, and needs no `override` modifier.
@@ -278,22 +289,24 @@ public final class SolvikInterfaceSemanticTest {
     public void aSuperclassMethodTakesPrecedenceOverAnInterfaceDefault() {
         CheckedProgram program = check("""
                 interface Named {
-                    func name(): String
+                    method name(): String
 
-                    func greeting(): String {
+                    method greeting(): String {
                         return "Hello " .. name()
                     }
                 }
-                mutable class Base {
-                    func greeting(): String {
+                class mutable Base {
+                    method greeting(): String {
                         return "Hello base"
                     }
                 }
                 class Derived extends Base implements Named {
-                    func name(): String {
+                    method name(): String {
                         return "derived"
                     }
                 }
+
+
                 """);
         ClassSymbol derived = program.classSymbol("Derived").orElseThrow();
         assertThat(derived.interfaceImplementation("greeting").orElseThrow()).isEqualTo(program.classSymbol("Base").orElseThrow().declaredMethods().get(0));
@@ -302,19 +315,21 @@ public final class SolvikInterfaceSemanticTest {
     @Test
     public void aCovariantImplementationOfARequirementIsAccepted() {
         CheckedProgram program = check("""
-                mutable class Name {
-                    func text(): String {
+                class mutable Name {
+                    method text(): String {
                         return "n"
                     }
                 }
                 interface Named {
-                    func name(): Name
+                    method name(): Name
                 }
                 class User implements Named {
-                    func name(): Name {
+                    method name(): Name {
                         return Name()
                     }
                 }
+
+
                 """);
         ClassSymbol user = program.classSymbol("User").orElseThrow();
         assertThat(user.interfaceSignatureConflicts().isEmpty()).isTrue();
@@ -325,19 +340,20 @@ public final class SolvikInterfaceSemanticTest {
     public void interfaceTypeReceivesImplementingClassValues() {
         CheckedProgram program = check("""
                 interface Named {
-                    func name(): String
+                    method name(): String
                 }
                 class User implements Named {
-                    func name(): String {
+                    method name(): String {
                         return "Doug"
                     }
                 }
                 func use(named: Named): String {
                     return named.name()
                 }
-                    var user = User()
+                    var user: User = User()
                     var named: Named = user
                     print(use(named))
+
                 """);
         Type named = program.interfaceSymbol("Named").orElseThrow().type();
         Type userType = program.classSymbol("User").orElseThrow().type();
@@ -350,16 +366,17 @@ public final class SolvikInterfaceSemanticTest {
     public void callThroughAnInterfaceTypedReceiverIsRecorded() {
         CheckedProgram program = check("""
                 interface Named {
-                    func name(): String
+                    method name(): String
                 }
                 class User implements Named {
-                    func name(): String {
+                    method name(): String {
                         return "Doug"
                     }
                 }
                 func use(named: Named): String {
                     return named.name()
                 }
+
                 """);
         InterfaceSymbol named = program.interfaceSymbol("Named").orElseThrow();
         org.solvik.ast.declaration.FunctionDeclNode use = program.function("use").orElseThrow().declaration();
@@ -374,13 +391,14 @@ public final class SolvikInterfaceSemanticTest {
     public void interfaceRequirementAcceptsABooleanReturnTypeAndArgumentTyping() {
         CheckedProgram program = check("""
                 interface Filter {
-                    func accepts(value: Integer): Boolean
+                    method accepts(value: Integer): Boolean
                 }
                 class Even implements Filter {
-                    func accepts(value: Integer): Boolean {
+                    method accepts(value: Integer): Boolean {
                         return value == 0
                     }
                 }
+
                 """);
         InterfaceSymbol filter = program.interfaceSymbol("Filter").orElseThrow();
         FunctionSymbol accepts = filter.member("accepts").orElseThrow();
@@ -394,16 +412,17 @@ public final class SolvikInterfaceSemanticTest {
     public void aRedeclaredInterfaceMemberHidesTheInheritedOne() {
         CheckedProgram program = check("""
                 interface Base {
-                    func label(): String
+                    method label(): String
                 }
                 interface Derived extends Base {
-                    func label(): String
+                    method label(): String
                 }
                 class C implements Derived {
-                    func label(): String {
+                    method label(): String {
                         return "c"
                     }
                 }
+
                 """);
         InterfaceSymbol derived = program.interfaceSymbol("Derived").orElseThrow();
         // The redeclaration replaces the extended signature, so it is not a conflict for C.
@@ -415,7 +434,7 @@ public final class SolvikInterfaceSemanticTest {
     public void diamondExtensionSharesOneDefaultWithoutConflict() {
         CheckedProgram program = check("""
                 interface Root {
-                    func greet(): String {
+                    method greet(): String {
                         return "hi"
                     }
                 }
@@ -425,6 +444,7 @@ public final class SolvikInterfaceSemanticTest {
                 }
                 class C implements Left, Right {
                 }
+
                 """);
         ClassSymbol c = program.classSymbol("C").orElseThrow();
         // The same default symbol is reached along both paths, which is not two conflicting defaults.
@@ -436,12 +456,13 @@ public final class SolvikInterfaceSemanticTest {
     public void aDefaultMethodBodyCanReadItsOwnMembersThroughThis() {
         CheckedProgram program = check("""
                 interface Named {
-                    func name(): String
+                    method name(): String
 
-                    func greeting(): String {
+                    method greeting(): String {
                         return "Hello " .. this.name()
                     }
                 }
+
                 """);
         InterfaceSymbol named = program.interfaceSymbol("Named").orElseThrow();
         FunctionSymbol greeting = named.member("greeting").orElseThrow();
@@ -458,10 +479,10 @@ public final class SolvikInterfaceSemanticTest {
     public void aClassPropertyMayHoldAnInterfaceType() {
         CheckedProgram program = check("""
                 interface Named {
-                    func name(): String
+                    method name(): String
                 }
                 class User implements Named {
-                    func name(): String {
+                    method name(): String {
                         return "Doug"
                     }
                 }
@@ -472,10 +493,11 @@ public final class SolvikInterfaceSemanticTest {
                         this.face = face
                     }
 
-                    func use(): String {
+                    method use(): String {
                         return this.face.name()
                     }
                 }
+
                 """);
         InterfaceSymbol namedFace = program.interfaceSymbol("Named").orElseThrow();
         Type named = namedFace.type();
@@ -497,11 +519,12 @@ public final class SolvikInterfaceSemanticTest {
     public void anInterfaceTypeIsANominalInterfaceType() {
         CheckedProgram program = check("""
                 interface A {
-                    func a(): Integer
+                    method a(): Integer
                 }
                 interface B {
-                    func b(): Integer
+                    method b(): Integer
                 }
+
                 """);
         InterfaceType a = (InterfaceType) program.interfaceSymbol("A").orElseThrow().type();
         InterfaceType b = (InterfaceType) program.interfaceSymbol("B").orElseThrow().type();

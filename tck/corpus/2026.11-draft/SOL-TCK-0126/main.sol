@@ -1,7 +1,9 @@
 // Positive conformance test. Oracle derived by hand from LANGUAGE_SPEC section 21.2:
-// "A standalone scope block remains a statement block". In statement position a brace
-// block is therefore not a value: it contributes nothing, and its only effect is running
-// its statements in source order.
+// "A block whose tail produces no value may still be written as a statement; a standalone
+// scope block remains a statement block, and the existing rule that an unused
+// value-producing non-call expression cannot stand alone still applies." In statement
+// position a brace block is therefore not a value: it contributes nothing, and its only
+// effect is running its statements in source order.
 // `x` starts at 10; the block declares a local `d` and assigns x = x - d = 10 - 7 = 3, so
 // the expected stdout is exactly "[3]". The brackets are the test's own contribution, not
 // a specification claim: another test in this corpus already derives the bare bytes "3"
@@ -9,9 +11,9 @@
 // about ordering, so bracketing both marks this stream and keeps the two derivations
 // independently checkable. If the block were treated as an expression its value
 // would be required, and section 21.2 makes that a compile-time error instead.
-var mutable x = 10
+var mutable x: Integer = 10
 {
-    var d = 7
+    var d: Integer = 7
     x = x - d
 }
 print("[")

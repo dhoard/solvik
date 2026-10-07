@@ -13,7 +13,7 @@ func get(): Result<String, String> {
     return Result.Ok("s")
 }
 func use(): Result<Integer, String> {
-    var v = get()?
+    var v: String = get()?
     return Result.Ok(v)
 }
 

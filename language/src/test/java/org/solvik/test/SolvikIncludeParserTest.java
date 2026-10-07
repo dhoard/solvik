@@ -121,7 +121,7 @@ public final class SolvikIncludeParserTest {
 
     @Test
     public void includeInsideBlockFails() {
-        parseFails("func f(): Unit {\n    include \"a.sol\"\n}\n");
+        parseFails("func f() {\n    include \"a.sol\"\n}\n");
     }
 
     @Test

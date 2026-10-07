@@ -7,7 +7,7 @@ class Point {
         this.y = y
     }
 }
-var p = Point(1, 2)
+var p: Point = Point(1, 2)
 var q: Any = p
 var r: Any = p
 print(q === r)

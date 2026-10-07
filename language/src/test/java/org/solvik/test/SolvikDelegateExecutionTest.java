@@ -55,15 +55,15 @@ public final class SolvikDelegateExecutionTest {
     public void delegatedMethodSatisfiesAnInterfaceRequirement() {
         String output = run("""
                 interface Repository {
-                    func find(id: Integer): String
+                    method find(id: Integer): String
                 }
                 class MemoryRepository implements Repository {
-                    func find(id: Integer): String {
+                    method find(id: Integer): String {
                         return "found"
                     }
                 }
                 class UserService implements Repository {
-                    delegate var repository: Repository
+                    delegate  repository: Repository
 
                     UserService(repository: Repository) {
                         this.repository = repository
@@ -72,8 +72,9 @@ public final class SolvikDelegateExecutionTest {
                 func viaInterface(repository: Repository): String {
                     return repository.find(7)
                 }
-                    var service = UserService(MemoryRepository())
+                    var service: UserService = UserService(MemoryRepository())
                     println(viaInterface(service))
+
                 """);
         assertThat(output.strip()).isEqualTo("found");
     }
@@ -82,10 +83,10 @@ public final class SolvikDelegateExecutionTest {
     public void delegatedCallThroughAClassTypedReceiverRuns() {
         String output = run("""
                 interface Greeter {
-                    func greet(): String
+                    method greet(): String
                 }
                 class Service implements Greeter {
-                    delegate var greeter: Greeter
+                    delegate  greeter: Greeter
 
                     Service(greeter: Greeter) {
                         this.greeter = greeter
@@ -93,10 +94,11 @@ public final class SolvikDelegateExecutionTest {
                 }
                     println(Service(Hola()).greet())
                 class Hola implements Greeter {
-                    func greet(): String {
+                    method greet(): String {
                         return "hola"
                     }
                 }
+
                 """);
         assertThat(output.strip()).isEqualTo("hola");
     }
@@ -105,21 +107,21 @@ public final class SolvikDelegateExecutionTest {
     public void explicitMethodOverridesADelegate() {
         String output = run("""
                 interface Greeter {
-                    func greet(): String
+                    method greet(): String
                 }
                 class Hola implements Greeter {
-                    func greet(): String {
+                    method greet(): String {
                         return "hola"
                     }
                 }
                 class Service implements Greeter {
-                    delegate var greeter: Greeter
+                    delegate  greeter: Greeter
 
                     Service(greeter: Greeter) {
                         this.greeter = greeter
                     }
 
-                    func greet(): String {
+                    method greet(): String {
                         return "explicit"
                     }
                 }
@@ -127,6 +129,7 @@ public final class SolvikDelegateExecutionTest {
                     return greeter.greet()
                 }
                     println(viaInterface(Service(Hola())))
+
                 """);
         assertThat(output.strip()).isEqualTo("explicit");
     }
@@ -135,20 +138,20 @@ public final class SolvikDelegateExecutionTest {
     public void inheritedMethodOverridesADelegate() {
         String output = run("""
                 interface Greeter {
-                    func greet(): String
+                    method greet(): String
                 }
                 class Hola implements Greeter {
-                    func greet(): String {
+                    method greet(): String {
                         return "hola"
                     }
                 }
-                mutable class Base {
-                    func greet(): String {
+                class mutable Base {
+                    method greet(): String {
                         return "inherited"
                     }
                 }
                 class Service extends Base implements Greeter {
-                    delegate var greeter: Greeter
+                    delegate  greeter: Greeter
 
                     Service(greeter: Greeter) {
                         this.greeter = greeter
@@ -158,6 +161,8 @@ public final class SolvikDelegateExecutionTest {
                     return greeter.greet()
                 }
                     println(viaInterface(Service(Hola())))
+
+
                 """);
         assertThat(output.strip()).isEqualTo("inherited");
     }
@@ -166,23 +171,24 @@ public final class SolvikDelegateExecutionTest {
     public void delegateOverridesAnInterfaceDefault() {
         String output = run("""
                 interface Greeter {
-                    func greet(): String {
+                    method greet(): String {
                         return "default"
                     }
                 }
                 class Hola implements Greeter {
-                    func greet(): String {
+                    method greet(): String {
                         return "hola"
                     }
                 }
                 class Service implements Greeter {
-                    delegate var greeter: Greeter
+                    delegate  greeter: Greeter
 
                     Service(greeter: Greeter) {
                         this.greeter = greeter
                     }
                 }
                     println(Service(Hola()).greet())
+
                 """);
         assertThat(output.strip()).isEqualTo("hola");
     }
@@ -191,27 +197,28 @@ public final class SolvikDelegateExecutionTest {
     public void anInterfaceDefaultCanCallADelegatedRequirement() {
         String output = run("""
                 interface Repository {
-                    func find(id: Integer): String
+                    method find(id: Integer): String
 
-                    func describe(id: Integer): String {
+                    method describe(id: Integer): String {
                         return "repo " .. find(id)
                     }
                 }
                 class MemoryRepository implements Repository {
-                    func find(id: Integer): String {
+                    method find(id: Integer): String {
                         return "found"
                     }
                 }
                 class UserService implements Repository {
-                    delegate var repository: Repository
+                    delegate  repository: Repository
 
                     UserService(repository: Repository) {
                         this.repository = repository
                     }
                 }
-                    var service = UserService(MemoryRepository())
+                    var service: UserService = UserService(MemoryRepository())
                     var repository: Repository = service
                     println(repository.describe(1))
+
                 """);
         assertThat(output.strip()).isEqualTo("repo found");
     }
@@ -220,20 +227,20 @@ public final class SolvikDelegateExecutionTest {
     public void forwardingDispatchesToTheActualDelegateAtRuntime() {
         String output = run("""
                 interface Greeter {
-                    func greet(): String
+                    method greet(): String
                 }
                 class Hola implements Greeter {
-                    func greet(): String {
+                    method greet(): String {
                         return "hola"
                     }
                 }
                 class Ciao implements Greeter {
-                    func greet(): String {
+                    method greet(): String {
                         return "ciao"
                     }
                 }
                 class Service implements Greeter {
-                    delegate var greeter: Greeter
+                    delegate  greeter: Greeter
 
                     Service(greeter: Greeter) {
                         this.greeter = greeter
@@ -244,6 +251,7 @@ public final class SolvikDelegateExecutionTest {
                 }
                     println(viaInterface(Service(Hola())))
                     println(viaInterface(Service(Ciao())))
+
                 """);
         assertThat(output.split("\n")[0].strip()).isEqualTo("hola");
         assertThat(output.split("\n")[1].strip()).isEqualTo("ciao");
@@ -253,33 +261,34 @@ public final class SolvikDelegateExecutionTest {
     public void twoDelegatesDispatchIndependentMembers() {
         String output = run("""
                 interface Reader {
-                    func read(): String
+                    method read(): String
                 }
                 interface Writer {
-                    func write(value: String): String
+                    method write(value: String): String
                 }
                 class FileReader implements Reader {
-                    func read(): String {
+                    method read(): String {
                         return "data"
                     }
                 }
                 class FileWriter implements Writer {
-                    func write(value: String): String {
+                    method write(value: String): String {
                         return "wrote " .. value
                     }
                 }
                 class Both implements Reader, Writer {
-                    delegate var reader: Reader
-                    delegate var writer: Writer
+                    delegate  reader: Reader
+                    delegate  writer: Writer
 
                     Both(reader: Reader, writer: Writer) {
                         this.reader = reader
                         this.writer = writer
                     }
                 }
-                    var both = Both(FileReader(), FileWriter())
+                    var both: Both = Both(FileReader(), FileWriter())
                     println(both.read())
                     println(both.write("x"))
+
                 """);
         assertThat(output.split("\n")[0].strip()).isEqualTo("data");
         assertThat(output.split("\n")[1].strip()).isEqualTo("wrote x");
@@ -289,15 +298,15 @@ public final class SolvikDelegateExecutionTest {
     public void aUnitReturningDelegatedMemberRunsForItsEffect() {
         String output = run("""
                 interface Sink {
-                    func put(value: String): Unit
+                    method put(value: String)
                 }
                 class ConsoleSink implements Sink {
-                    func put(value: String): Unit {
+                    method put(value: String) {
                         println("sink " .. value)
                     }
                 }
                 class Service implements Sink {
-                    delegate var sink: Sink
+                    delegate  sink: Sink
 
                     Service(sink: Sink) {
                         this.sink = sink
@@ -305,6 +314,7 @@ public final class SolvikDelegateExecutionTest {
                 }
                     var service: Sink = Service(ConsoleSink())
                     service.put("x")
+
                 """);
         assertThat(output.strip()).isEqualTo("sink x");
     }
@@ -313,15 +323,15 @@ public final class SolvikDelegateExecutionTest {
     public void aSubclassInheritsAndReusesTheForwardingImplementation() {
         String output = run("""
                 interface Greeter {
-                    func greet(): String
+                    method greet(): String
                 }
                 class Hola implements Greeter {
-                    func greet(): String {
+                    method greet(): String {
                         return "hola"
                     }
                 }
-                mutable class Service implements Greeter {
-                    delegate var greeter: Greeter
+                class mutable Service implements Greeter {
+                    delegate  greeter: Greeter
 
                     Service(greeter: Greeter) {
                         this.greeter = greeter
@@ -334,6 +344,7 @@ public final class SolvikDelegateExecutionTest {
                 }
                     var greeter: Greeter = Audited()
                     println(greeter.greet())
+
                 """);
         assertThat(output.strip()).isEqualTo("hola");
     }
@@ -342,17 +353,18 @@ public final class SolvikDelegateExecutionTest {
     public void delegateWithADeclarationInitializerRuns() {
         String output = run("""
                 interface Greeter {
-                    func greet(): String
+                    method greet(): String
                 }
                 class Hola implements Greeter {
-                    func greet(): String {
+                    method greet(): String {
                         return "hola"
                     }
                 }
                 class Service implements Greeter {
-                    delegate var greeter: Greeter = Hola()
+                    delegate  greeter: Greeter = Hola()
                 }
                     println(Service().greet())
+
                 """);
         assertThat(output.strip()).isEqualTo("hola");
     }
@@ -361,25 +373,26 @@ public final class SolvikDelegateExecutionTest {
     public void anInterfaceTypedDelegatePropertyCanBeReadAndForwarded() {
         String output = run("""
                 interface Greeter {
-                    func greet(): String
+                    method greet(): String
                 }
                 class Hola implements Greeter {
-                    func greet(): String {
+                    method greet(): String {
                         return "hola"
                     }
                 }
                 class Service implements Greeter {
-                    delegate var greeter: Greeter
+                    delegate  greeter: Greeter
 
                     Service(greeter: Greeter) {
                         this.greeter = greeter
                     }
 
-                    func other(): String {
+                    method other(): String {
                         return this.greeter.greet()
                     }
                 }
                     println(Service(Hola()).other())
+
                 """);
         assertThat(output.strip()).isEqualTo("hola");
     }
@@ -388,14 +401,14 @@ public final class SolvikDelegateExecutionTest {
     public void ambiguousDelegationIsACompileErrorWithNoOutput() {
         String program = """
                 interface PrinterA {
-                    func print(): Unit
+                    method print()
                 }
                 interface PrinterB {
-                    func print(): Unit
+                    method print()
                 }
                 class X implements PrinterA, PrinterB {
-                    delegate var a: PrinterA
-                    delegate var b: PrinterB
+                    delegate  a: PrinterA
+                    delegate  b: PrinterB
 
                     X(a: PrinterA, b: PrinterB) {
                         this.a = a
@@ -403,6 +416,7 @@ public final class SolvikDelegateExecutionTest {
                     }
                 }
                     println("unreachable")
+
                 """;
         PolyglotException failure = expectThrows(PolyglotException.class, () -> run(program));
         assertThat(failure.getMessage().contains("SOLV-SEM-026")).as(failure.getMessage()).isTrue();
@@ -412,19 +426,20 @@ public final class SolvikDelegateExecutionTest {
     public void delegateSignatureConflictIsACompileErrorWithNoOutput() {
         String program = """
                 interface Sink {
-                    func put(value: Integer): Unit
+                    method put(value: Integer)
                 }
                 interface StringSink {
-                    func put(value: String): Unit
+                    method put(value: String)
                 }
                 class Service implements Sink {
-                    delegate var sink: StringSink
+                    delegate  sink: StringSink
 
                     Service(sink: StringSink) {
                         this.sink = sink
                     }
                 }
                     println("unreachable")
+
                 """;
         PolyglotException failure = expectThrows(PolyglotException.class, () -> run(program));
         assertThat(failure.getMessage().contains("SOLV-SEM-027")).as(failure.getMessage()).isTrue();
@@ -443,17 +458,17 @@ public final class SolvikDelegateExecutionTest {
     public void superCallReachesADelegatedRequirementInASuperclass() {
         assertThat(run("""
                 interface Repo {
-                    func find(id: Integer): String
+                    method find(id: Integer): String
                 }
 
                 class MemRepo implements Repo {
-                    func find(id: Integer): String {
+                    method find(id: Integer): String {
                         return "row-" .. id
                     }
                 }
 
-                mutable class Service implements Repo {
-                    delegate var repo: Repo
+                class mutable Service implements Repo {
+                    delegate  repo: Repo
 
                     Service(repo: Repo) {
                         this.repo = repo
@@ -464,12 +479,13 @@ public final class SolvikDelegateExecutionTest {
                     Sub(repo: Repo) {
                         super(repo)
                     }
-                    func viaSuper(): String {
+                    method viaSuper(): String {
                         return super.find(7)
                     }
                 }
 
                 print(Sub(MemRepo()).viaSuper())
+
                 """)).isEqualTo("row-7");
     }
 }

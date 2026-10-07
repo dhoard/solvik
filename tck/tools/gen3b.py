@@ -82,13 +82,14 @@ REQS = {
   notes="Expected values are taken from the worked example the specification itself gives for exactly this rule: two separately constructed equal-shaped instances are `===` false, an alias is `===` true, and `!==` against that alias is false. The negation is asserted over both a non-null and a null pair so that `!==` is shown to be the negation of `===` rather than an independently implemented test. A separate test pairs a class whose `equals` returns true with `===`, which stays false, so the guarantee that identity does not delegate to equality is observed and not merely asserted by the shape of the program.",
   quotes=["`===` answers whether two values are the same Solvik allocation. It never invokes `equals`, another guest method, or Java `Object.equals`. `!==` is its exact logical negation."]),
  "REQ-1701": dict(
-  section="3. Equality and reference identity",
-  summary="The identity-bearing static types are exactly user class types, interface types, the four collection types, function types, and nullable forms of those, so `===` on a scalar, enum, or Regex pair is a compile-time error reported with SOLV-TYPE-039",
-  kind="compile-time",
-  notes="Five different non-identity operand pairs are rejected with the one code section 3 names for a compatible pair with no identity-bearing operand, covering the two named scalar cases a real implementation is most likely to allow through (a numeric scalar and a String) plus a Boolean, an enum value and a Regex, so the rejection cannot be a per-type special case. The accepted arms cover the two positive cases most likely to be omitted by an implementation that only recognises plain user classes, namely a collection and an interface-typed value. Section 3 is unusually explicit here, listing the bearing and non-bearing types and naming the code, so the codes are pinned rather than left bare. `2026.11-draft` added function types to the bearing list; this requirement's own tests are unchanged because none of them mentions a function type, and the new positive arm is recorded separately as REQ-3307, which is untested until the language can produce a function value.",
-  quotes=["The identity-bearing static types are exactly:",
-          "The following types are not identity-bearing: `Byte`, `Short`, `Integer`, `Long`, `Float`, `Double`, `Boolean`, `Character`, `String`, and `Unit`; enum types; `Regex` and `RegexMatch`; `Any`; unbounded type parameters; `Nothing` and a bare null literal.",
-          "a compatible pair with no identity-bearing operand uses `SOLV-TYPE-039`."]),
+  section='3. Equality and reference identity',
+  summary='The identity-bearing static types are exactly user class types, interface types, the four collection types, function types, and nullable forms of those, so `===` on a scalar, enum, or Regex pair is a compile-time error reported with SOLV-TYPE-039',
+  kind='compile-time',
+  quotes=[(
+      'The following types are not identity-bearing: `Byte`, `Short`, `Integer`, `Long`, `Float`, `Double`,\n'
+      '`Boolean`, `Character`, and `String`; enum types; `Regex` and `RegexMatch`; `Any`;')],
+  tests=['SOL-TCK-0240', 'SOL-TCK-0241', 'SOL-TCK-0242', 'SOL-TCK-0243', 'SOL-TCK-0244', 'SOL-TCK-0245', 'SOL-TCK-0246', 'SOL-TCK-0247'],
+  notes="Five different non-identity operand pairs are rejected with the one code section 3 names for a compatible pair with no identity-bearing operand, covering the two named scalar cases a real implementation is most likely to allow through (a numeric scalar and a String) plus a Boolean, an enum value and a Regex, so the rejection cannot be a per-type special case. The accepted arms cover the two positive cases most likely to be omitted by an implementation that only recognises plain user classes, namely a collection and an interface-typed value. Section 3 is unusually explicit here, listing the bearing and non-bearing types and naming the code, so the codes are pinned rather than left bare. `2026.10-draft` added function types to the bearing list; this requirement's own tests are unchanged because none of them mentions a function type, and the new positive arm is recorded separately as REQ-3307, which stays untested until the language can produce a function value."),
  "REQ-1702": dict(
   section="3. Equality and reference identity",
   summary="Identity operands must also satisfy ordinary comparability and a null literal is permitted only against a nullable identity-bearing operand, so `null === null` and an identity test against a non-nullable operand are compile-time errors",
@@ -104,11 +105,12 @@ REQS = {
   notes="Both directions are asserted as accepted programs that read a member of the narrowed value inside the branch, because narrowing is only observable by a member access the declaration type would not permit. The `=== null` case places the member read in the else branch, so an implementation that narrowed on the wrong path would reject the program.",
   quotes=["Stable nullable identity tests participate in flow analysis: `x !== null` narrows `x` to its non-null reference type on the true path, and `x === null` narrows it on the false path, under the same write-invalidation rules as `== null` and `!= null`."]),
  "REQ-1704": dict(
-  section="3. Equality and reference identity",
-  summary="A value held in Any must first be narrowed or checked-cast to an identity-bearing type before an identity test, so identity is rejected on Any operands and accepted after a checked cast",
-  kind="compile-time",
-  notes="The rejection is pinned to the code section 3 names, and the accepted arm is the same identity test on the identical runtime value after casting to the class type. Without the accepted arm the rejection would be satisfied by an implementation that rejects every identity test. The specification states the reason for the restriction, that a JVM representation choice must not become observable, which is why Any rather than the underlying class is the operand under test.",
-  quotes=["A value held in `Any` must first be narrowed or checked-cast to an identity-bearing type, which prevents a JVM representation choice from becoming observable when the runtime value is a scalar, string, enum, regex, or `Unit`."]),
+  section='3. Equality and reference identity',
+  summary='A value held in Any must first be narrowed or checked-cast to an identity-bearing type before an identity test, so identity is rejected on Any operands and accepted after a checked cast',
+  kind='compile-time',
+  quotes=['A value held in `Any` must first be narrowed or checked-cast to an identity-bearing type, which prevents a JVM representation choice from becoming observable when the runtime value is a scalar, string, enum, or regex.'],
+  tests=['SOL-TCK-0253', 'SOL-TCK-0254'],
+  notes='The rejection is pinned to the code section 3 names, and the accepted arm is the same identity test on the identical runtime value after casting to the class type. Without the accepted arm the rejection would be satisfied by an implementation that rejects every identity test. The specification states the reason for the restriction, that a JVM representation choice must not become observable, which is why Any rather than the underlying class is the operand under test.'),
  "REQ-1705": dict(
   section="3. Equality and reference identity",
   summary="The semantic equality algorithm returns true when both values are null and false when exactly one is null with no user code running",
@@ -178,52 +180,120 @@ PT = ('class Point {\n'
       '}\n')
 # A class whose equals override prints, so that "no user code ran" is observable.
 LoudEQ = ('class Loud {\n    Loud() {\n    }\n\n'
-          '    override func equals(other: Any?): Boolean {\n        print("u")\n        return RET\n    }\n\n'
-          '    override func hashCode(): Integer {\n        return 4\n    }\n}\n')
+          '    method override equals(other: Any?): Boolean {\n        print("u")\n        return RET\n    }\n\n'
+          '    method override hashCode(): Integer {\n        return 4\n    }\n}\n')
 
 # --- REQ-1700 `===` semantics and negation.
 add("SOL-TCK-0237", "REQ-1700", "equality",
-    PT + 'var a = Point(1, 2)\nvar b = Point(1, 2)\nvar c = a\n'
-         'print("i" .. (a === b) .. (a === c) .. (a !== c))\n',
+    ('class Point {\n'
+    '    var x: Integer\n'
+    '    var y: Integer\n'
+    '\n'
+    '    Point(x: Integer, y: Integer) {\n'
+    '        this.x = x\n'
+    '        this.y = y\n'
+    '    }\n'
+    '}\n'
+    'var a: Point = Point(1, 2)\n'
+    'var b: Point = Point(1, 2)\n'
+    'var c: Point = a\n'
+    'print("i" .. (a === b) .. (a === c) .. (a !== c))\n'
+    ''),
     "SUCCESS", stdout="ifalsetruefalse")
 add("SOL-TCK-0238", "REQ-1700", "equality",
     PT + 'var a: Point? = Point(1, 2)\nvar b: Point? = null\n'
          'print("n" .. (a !== b) .. (a === b) .. (b !== b) .. (b === b))\n',
     "SUCCESS", stdout="ntruefalsefalsetrue")
 add("SOL-TCK-0239", "REQ-1700", "equality",
-    LoudEQ.replace("RET", "true") + 'var p = Loud()\nvar q = Loud()\nprint("id" .. (p === q))\n',
+    ('class Loud {\n'
+    '    Loud() {\n'
+    '    }\n'
+    '\n'
+    '    method override equals(other: Any?): Boolean {\n'
+    '        print("u")\n'
+    '        return true\n'
+    '    }\n'
+    '\n'
+    '    method override hashCode(): Integer {\n'
+    '        return 4\n'
+    '    }\n'
+    '}\n'
+    'var p: Loud = Loud()\n'
+    'var q: Loud = Loud()\n'
+    'print("id" .. (p === q))\n'
+    ''),
     # equals returns true for every pair, yet identity is still false: `===` does not delegate.
     "SUCCESS", stdout="idfalse")
 
 # --- REQ-1701 identity-bearing type set.
 add("SOL-TCK-0240", "REQ-1701", "equality",
-    PT + 'var a = Point(1, 2)\nvar b = Point(1, 2)\nprint("cls" .. (a === b))\n',
+    ('class Point {\n'
+    '    var x: Integer\n'
+    '    var y: Integer\n'
+    '\n'
+    '    Point(x: Integer, y: Integer) {\n'
+    '        this.x = x\n'
+    '        this.y = y\n'
+    '    }\n'
+    '}\n'
+    'var a: Point = Point(1, 2)\n'
+    'var b: Point = Point(1, 2)\n'
+    'print("cls" .. (a === b))\n'
+    ''),
     "SUCCESS", stdout="clsfalse")
 add("SOL-TCK-0241", "REQ-1701", "equality",
-    'var l = List<Integer>(1, 2)\nvar m = List<Integer>(1, 2)\nvar n = l\n'
-    'print("col" .. (l === m) .. (l === n))\n',
+    (('var l: List<Integer> = List<Integer>(1, 2)\n'
+    'var m: List<Integer> = List<Integer>(1, 2)\n'
+    'var n: List<Integer> = l\n'
+    'print("col" .. (l === m) .. (l === n))\n'
+    '')),
     "SUCCESS", stdout="colfalsetrue")
 add("SOL-TCK-0242", "REQ-1701", "equality",
-    'interface Shape {\n    func sides(): Integer\n}\n'
-    'class Sq implements Shape {\n    Sq() {\n    }\n\n    func sides(): Integer {\n        return 4\n    }\n}\n'
-    'var a: Shape = Sq()\nvar b: Shape = Sq()\nvar c: Shape = a\n'
-    'print("if" .. (a === b) .. (a === c))\n',
+    (('interface Shape {\n'
+    '    method sides(): Integer\n'
+    '}\n'
+    'class Sq implements Shape {\n'
+    '    Sq() {\n'
+    '    }\n'
+    '\n'
+    '    method sides(): Integer {\n'
+    '        return 4\n'
+    '    }\n'
+    '}\n'
+    'var a: Shape = Sq()\n'
+    'var b: Shape = Sq()\n'
+    'var c: Shape = a\n'
+    'print("if" .. (a === b) .. (a === c))\n'
+    '')),
     "SUCCESS", stdout="iffalsetrue")
 add("SOL-TCK-0243", "REQ-1701", "equality",
     'var n: Integer = 1\nprint(n === n)\n' + NEG, "COMPILE_ERROR",
     diag={"family": "TYPE", "code": "SOLV-TYPE-039"})
 add("SOL-TCK-0244", "REQ-1701", "equality",
-    'var s = "ab"\nprint(s === s)\n' + NEG, "COMPILE_ERROR",
+    ('var s: String = "ab"\n'
+    'print(s === s)\n'
+    '\n'
+    'print("EXECUTED-INVALID")\n'
+    ''), "COMPILE_ERROR",
     diag={"family": "TYPE", "code": "SOLV-TYPE-039"})
 add("SOL-TCK-0245", "REQ-1701", "equality",
-    'var b = true\nprint(b === b)\n' + NEG, "COMPILE_ERROR",
+    ('var b: Boolean = true\n'
+    'print(b === b)\n'
+    '\n'
+    'print("EXECUTED-INVALID")\n'
+    ''), "COMPILE_ERROR",
     diag={"family": "TYPE", "code": "SOLV-TYPE-039"})
 add("SOL-TCK-0246", "REQ-1701", "equality",
     'enum Opt {\n    Some(Integer)\n    None\n}\nvar a: Opt = Opt.Some(1)\nvar b: Opt = Opt.Some(1)\n'
     'print(a === b)\n' + NEG, "COMPILE_ERROR",
     diag={"family": "TYPE", "code": "SOLV-TYPE-039"})
 add("SOL-TCK-0247", "REQ-1701", "equality",
-    'var r = Regex("a")\nvar s = Regex("a")\nprint(r === s)\n' + NEG, "COMPILE_ERROR",
+    ('var r: Regex = Regex("a")\n'
+    'var s: Regex = Regex("a")\n'
+    'print(r === s)\n'
+    '\n'
+    'print("EXECUTED-INVALID")\n'
+    ''), "COMPILE_ERROR",
     diag={"family": "TYPE", "code": "SOLV-TYPE-039"})
 
 # --- REQ-1702 comparability and the null literal.
@@ -231,7 +301,20 @@ add("SOL-TCK-0248", "REQ-1702", "equality",
     "print(null === null)\n" + NEG, "COMPILE_ERROR",
     diag={"family": "TYPE", "code": "SOLV-TYPE-039"})
 add("SOL-TCK-0249", "REQ-1702", "equality",
-    PT + 'var a = Point(1, 2)\nprint(a === null)\n' + NEG, "COMPILE_ERROR", diag={})
+    ('class Point {\n'
+    '    var x: Integer\n'
+    '    var y: Integer\n'
+    '\n'
+    '    Point(x: Integer, y: Integer) {\n'
+    '        this.x = x\n'
+    '        this.y = y\n'
+    '    }\n'
+    '}\n'
+    'var a: Point = Point(1, 2)\n'
+    'print(a === null)\n'
+    '\n'
+    'print("EXECUTED-INVALID")\n'
+    ''), "COMPILE_ERROR", diag={})
 add("SOL-TCK-0250", "REQ-1702", "equality",
     PT + 'var a: Point? = Point(1, 2)\nprint("ok" .. (a === null))\n',
     "SUCCESS", stdout="okfalse")
@@ -246,7 +329,22 @@ add("SOL-TCK-0252", "REQ-1703", "equality",
 
 # --- REQ-1704 Any must be narrowed first.
 add("SOL-TCK-0253", "REQ-1704", "equality",
-    PT + 'var p = Point(1, 2)\nvar q: Any = p\nvar r: Any = p\nprint(q === r)\n' + NEG,
+    ('class Point {\n'
+    '    var x: Integer\n'
+    '    var y: Integer\n'
+    '\n'
+    '    Point(x: Integer, y: Integer) {\n'
+    '        this.x = x\n'
+    '        this.y = y\n'
+    '    }\n'
+    '}\n'
+    'var p: Point = Point(1, 2)\n'
+    'var q: Any = p\n'
+    'var r: Any = p\n'
+    'print(q === r)\n'
+    '\n'
+    'print("EXECUTED-INVALID")\n'
+    ''),
     "COMPILE_ERROR", diag={"family": "TYPE", "code": "SOLV-TYPE-039"})
 add("SOL-TCK-0254", "REQ-1704", "equality",
     PT + 'var q: Any = Point(1, 2)\nvar a: Point = q as Point\nvar b: Point = a\nprint("nw" .. (a === b))\n',
@@ -254,19 +352,80 @@ add("SOL-TCK-0254", "REQ-1704", "equality",
 
 # --- REQ-1705 the null steps of the equality algorithm.
 add("SOL-TCK-0255", "REQ-1705", "equality",
-    LoudEQ.replace("RET", "true") + 'var p: Loud? = Loud()\nprint("one" .. (p == null))\n',
+    ('class Loud {\n'
+    '    Loud() {\n'
+    '    }\n'
+    '\n'
+    '    method override equals(other: Any?): Boolean {\n'
+    '        print("u")\n'
+    '        return true\n'
+    '    }\n'
+    '\n'
+    '    method override hashCode(): Integer {\n'
+    '        return 4\n'
+    '    }\n'
+    '}\n'
+    'var p: Loud? = Loud()\n'
+    'print("one" .. (p == null))\n'
+    ''),
     # exactly one null: false, and the override must not run, so no "u" may appear.
     "SUCCESS", stdout="onefalse")
 add("SOL-TCK-0256", "REQ-1705", "equality",
-    LoudEQ.replace("RET", "true") + 'var p: Loud? = null\nprint("both" .. (p == null))\n',
+    ('class Loud {\n'
+    '    Loud() {\n'
+    '    }\n'
+    '\n'
+    '    method override equals(other: Any?): Boolean {\n'
+    '        print("u")\n'
+    '        return true\n'
+    '    }\n'
+    '\n'
+    '    method override hashCode(): Integer {\n'
+    '        return 4\n'
+    '    }\n'
+    '}\n'
+    'var p: Loud? = null\n'
+    'print("both" .. (p == null))\n'
+    ''),
     "SUCCESS", stdout="bothtrue")
 add("SOL-TCK-0257", "REQ-1705", "equality",
-    LoudEQ.replace("RET", "true") + 'var p: Loud? = Loud()\nvar q: Loud? = null\nprint("rev" .. (q == p))\n',
+    ('class Loud {\n'
+    '    Loud() {\n'
+    '    }\n'
+    '\n'
+    '    method override equals(other: Any?): Boolean {\n'
+    '        print("u")\n'
+    '        return true\n'
+    '    }\n'
+    '\n'
+    '    method override hashCode(): Integer {\n'
+    '        return 4\n'
+    '    }\n'
+    '}\n'
+    'var p: Loud? = Loud()\n'
+    'var q: Loud? = null\n'
+    'print("rev" .. (q == p))\n'
+    ''),
     "SUCCESS", stdout="revfalse")
 
 # --- REQ-1706 no identity shortcut before user dispatch.
 add("SOL-TCK-0258", "REQ-1706", "equality",
-    LoudEQ.replace("RET", "false") + 'var p = Loud()\nprint("sc" .. (p == p) .. p.equals(p))\n',
+    ('class Loud {\n'
+    '    Loud() {\n'
+    '    }\n'
+    '\n'
+    '    method override equals(other: Any?): Boolean {\n'
+    '        print("u")\n'
+    '        return false\n'
+    '    }\n'
+    '\n'
+    '    method override hashCode(): Integer {\n'
+    '        return 4\n'
+    '    }\n'
+    '}\n'
+    'var p: Loud = Loud()\n'
+    'print("sc" .. (p == p) .. p.equals(p))\n'
+    ''),
     # The override prints "u" and returns false. Section 3 forbids an identity shortcut
     # before user dispatch, so `p == p` must dispatch (one "u") and yield false, and the
     # explicit call must dispatch too (second "u") and yield the same false. An
@@ -276,19 +435,55 @@ add("SOL-TCK-0258", "REQ-1706", "equality",
 
 # --- REQ-1707 the right operand never receives a fallback call.
 add("SOL-TCK-0259", "REQ-1707", "equality",
-    'class L {\n    L() {\n    }\n\n'
-    '    override func equals(other: Any?): Boolean {\n        print("L")\n        return false\n    }\n\n'
-    '    override func hashCode(): Integer {\n        return 1\n    }\n}\n'
-    'class R {\n    R() {\n    }\n\n'
-    '    override func equals(other: Any?): Boolean {\n        print("R")\n        return false\n    }\n\n'
-    '    override func hashCode(): Integer {\n        return 2\n    }\n}\n'
-    'var l = L()\nvar r = R()\nvar q: Any = l\nprint(q == r)\n',
+    (('class L {\n'
+    '    L() {\n'
+    '    }\n'
+    '\n'
+    '    method override equals(other: Any?): Boolean {\n'
+    '        print("L")\n'
+    '        return false\n'
+    '    }\n'
+    '\n'
+    '    method override hashCode(): Integer {\n'
+    '        return 1\n'
+    '    }\n'
+    '}\n'
+    'class R {\n'
+    '    R() {\n'
+    '    }\n'
+    '\n'
+    '    method override equals(other: Any?): Boolean {\n'
+    '        print("R")\n'
+    '        return false\n'
+    '    }\n'
+    '\n'
+    '    method override hashCode(): Integer {\n'
+    '        return 2\n'
+    '    }\n'
+    '}\n'
+    'var l: L = L()\n'
+    'var r: R = R()\n'
+    'var q: Any = l\n'
+    'print(q == r)\n'
+    '')),
     "SUCCESS", stdout="Lfalse")
 
 # --- REQ-1708 default equality is reference identity.
 add("SOL-TCK-0260", "REQ-1708", "equality",
-    PT + 'var a = Point(1, 2)\nvar b = Point(1, 2)\nvar c = a\n'
-         'print("df" .. (a == b) .. (a == c) .. (a.equals(b)))\n',
+    ('class Point {\n'
+    '    var x: Integer\n'
+    '    var y: Integer\n'
+    '\n'
+    '    Point(x: Integer, y: Integer) {\n'
+    '        this.x = x\n'
+    '        this.y = y\n'
+    '    }\n'
+    '}\n'
+    'var a: Point = Point(1, 2)\n'
+    'var b: Point = Point(1, 2)\n'
+    'var c: Point = a\n'
+    'print("df" .. (a == b) .. (a == c) .. (a.equals(b)))\n'
+    ''),
     "SUCCESS", stdout="dffalsetruefalse")
 
 # --- REQ-1709 the hash/equality invariant, including negative zero.
@@ -296,13 +491,19 @@ add("SOL-TCK-0261", "REQ-1709", "hashing",
     'print("fz" .. (0.0 == -0.0) .. (0.0.hashCode() == (-0.0).hashCode()))\n',
     "SUCCESS", stdout="fztruetrue")
 add("SOL-TCK-0262", "REQ-1709", "hashing",
-    'var a = "ab"\nvar b = "ab"\nprint("sh" .. (a == b) .. (a.hashCode() == b.hashCode()))\n',
+    (('var a: String = "ab"\n'
+    'var b: String = "ab"\n'
+    'print("sh" .. (a == b) .. (a.hashCode() == b.hashCode()))\n'
+    '')),
     "SUCCESS", stdout="shtruetrue")
 
 # --- REQ-1710 collections compare by reference identity.
 add("SOL-TCK-0263", "REQ-1710", "hashing",
-    'var a = List<Integer>(1, 2)\nvar b = List<Integer>(1, 2)\nvar c = a\n'
-    'print("ce" .. (a == b) .. (a == c) .. (a.hashCode() == a.hashCode()))\n',
+    (('var a: List<Integer> = List<Integer>(1, 2)\n'
+    'var b: List<Integer> = List<Integer>(1, 2)\n'
+    'var c: List<Integer> = a\n'
+    'print("ce" .. (a == b) .. (a == c) .. (a.hashCode() == a.hashCode()))\n'
+    '')),
     "SUCCESS", stdout="cefalsetruetrue")
 
 # --- REQ-1711 enum equality over type, variant, and payloads.

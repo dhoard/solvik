@@ -2,13 +2,13 @@ class Exact {
     Exact() {
     }
 
-    override func equals(other: Any?): Boolean {
+    method override equals(other: Any?): Boolean {
         return true
     }
 
-    override func hashCode(): Integer {
+    method override hashCode(): Integer {
         return 7
     }
 }
-var p = Exact()
+var p: Exact = Exact()
 print("hash" .. p.hashCode())

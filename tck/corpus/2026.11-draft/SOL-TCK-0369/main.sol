@@ -5,7 +5,7 @@
 //   - The `toString`/`equals`/`hashCode` reserved-name rules apply to **instance** members only, so a static member may use those names.
 //
 class C {
-    static var toString: Integer = 7
+    var static toString: Integer = 7
 
     C() {
     }

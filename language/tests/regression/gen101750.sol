@@ -6,7 +6,7 @@ class H1 {
 }
 
 func show2(h: H1): String {
-    var n = h.n
+    var n: String? = h.n
     if (n == null) {
         return "none"
     }
@@ -41,7 +41,7 @@ class Box4<T> {
     Box4(value: T) {
         this.value = value
     }
-    func get(): T {
+    method get(): T {
         return this.value
     }
 }

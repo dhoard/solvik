@@ -158,7 +158,9 @@ BAD("SOL-TCK-0372", "files", "REQ-2601",
     "The canonical target is a directory, so it is not a regular file and pins SOLV-RESOL-009.",
     libs={"lib/x.sol/placeholder.txt": "placeholder\n"})
 BAD("SOL-TCK-0373", "modules", "REQ-2602",
-    'var x = nope::thing()\nprint("EXECUTED-INVALID")\n',
+    (('var x: Any = nope::thing()\n'
+    'print("EXECUTED-INVALID")\n'
+    '')),
     {"family": "RESOL", "code": "SOLV-RESOL-015"},
     "A qualified reference to a module no file declares pins SOLV-RESOL-015.")
 BAD("SOL-TCK-0374", "objects", "REQ-2603",
@@ -167,13 +169,38 @@ BAD("SOL-TCK-0374", "objects", "REQ-2603",
     {"family": "TYPE", "code": "SOLV-TYPE-011"},
     "A value returned from a class initializer block pins SOLV-TYPE-011.")
 BAD("SOL-TCK-0375", "objects", "REQ-2604",
-    'interface P {\n    func go(): Integer\n}\nclass X implements P {\n    delegate var a\n\n'
-    '    X() {\n    }\n}\nprint("EXECUTED-INVALID")\n', {},
+    (('interface P {\n'
+    '    method go(): Integer\n'
+    '}\n'
+    'class X implements P {\n'
+    '    delegate a\n'
+    '\n'
+    '    X() {\n'
+    '    }\n'
+    '}\n'
+    'print("EXECUTED-INVALID")\n'
+    '')), {},
     "A delegate declaration without an explicit type is rejected.")
 BAD("SOL-TCK-0376", "objects", "REQ-2605",
-    'interface P {\n    func go(): Integer\n}\nclass Impl implements P {\n    Impl() {\n    }\n\n'
-    '    func go(): Integer {\n        return 1\n    }\n}\nclass X implements P {\n'
-    '    delegate var a: P\n\n    X() {\n    }\n}\nprint("EXECUTED-INVALID")\n', {},
+    (('interface P {\n'
+    '    method go(): Integer\n'
+    '}\n'
+    'class Impl implements P {\n'
+    '    Impl() {\n'
+    '    }\n'
+    '\n'
+    '    method go(): Integer {\n'
+    '        return 1\n'
+    '    }\n'
+    '}\n'
+    'class X implements P {\n'
+    '    delegate a: P\n'
+    '\n'
+    '    X() {\n'
+    '    }\n'
+    '}\n'
+    'print("EXECUTED-INVALID")\n'
+    '')), {},
     "An unassigned delegate violates the normal constructor initialization rule.")
 OK("SOL-TCK-0377", "types", "REQ-2606",
    'var a: Any = 42\nvar s: Any = "hi"\nprint(a)\nprint("|")\nprint(s)\nprint("|")\n'

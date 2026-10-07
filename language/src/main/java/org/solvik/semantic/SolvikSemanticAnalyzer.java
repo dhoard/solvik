@@ -33,6 +33,7 @@ import java.util.Optional;
 import java.util.Set;
 import org.solvik.ast.AstNode;
 import org.solvik.ast.CompilationUnitNode;
+import org.solvik.ast.declaration.CallableDeclNode;
 import org.solvik.ast.declaration.ClassDeclNode;
 import org.solvik.ast.declaration.DeclarationNode;
 import org.solvik.ast.declaration.DelegateDeclNode;
@@ -46,7 +47,6 @@ import org.solvik.ast.declaration.PropertyDeclNode;
 import org.solvik.ast.declaration.SignatureDeclNode;
 import org.solvik.ast.declaration.StaticBlockNode;
 import org.solvik.ast.declaration.TypeParameterNode;
-import org.solvik.ast.declaration.FunctionTypeRefNode;
 import org.solvik.ast.declaration.TypeRef;
 import org.solvik.ast.declaration.TypeRefNode;
 import org.solvik.ast.expression.BinaryExprNode;
@@ -65,8 +65,6 @@ import org.solvik.ast.expression.LiteralNode;
 import org.solvik.ast.expression.LongLiteralNode;
 import org.solvik.ast.expression.MapEntryExprNode;
 import org.solvik.ast.expression.MatchBranchNode;
-import org.solvik.ast.expression.AnonymousFunctionExprNode;
-import org.solvik.ast.expression.CaptureItem;
 import org.solvik.ast.expression.MatchExprNode;
 import org.solvik.ast.expression.MemberAccessExprNode;
 import org.solvik.ast.expression.NameRefExprNode;
@@ -108,13 +106,11 @@ import org.solvik.ast.statement.WhileStmtNode;
 import org.solvik.diagnostic.Diagnostic;
 import org.solvik.diagnostic.DiagnosticBag;
 import org.solvik.diagnostic.DiagnosticCode;
-import org.solvik.parser.FileScope;
 import org.solvik.regex.RegexPattern;
 import org.solvik.regex.RegexSyntax;
 import org.solvik.source.SourceSpan;
 import org.solvik.source.StringEscapes;
 import org.solvik.type.AnyType;
-import org.solvik.type.FunctionType;
 import org.solvik.type.BooleanType;
 import org.solvik.type.ByteType;
 import org.solvik.type.CharacterType;
@@ -223,34 +219,6 @@ public final class SolvikSemanticAnalyzer {
     private final Map<ExpressionNode, EnumVariantSymbol> variantConstructions = new IdentityHashMap<>();
     /** The compiled constant of each {@code Regex} construction whose pattern is a source constant. */
     private final Map<CallExprNode, RegexPattern> regexConstants = new IdentityHashMap<>();
-    /**
-     * The declared function each function-reference expression names: a bare name or a module-qualified
-     * name used in a value position (docs/LANGUAGE_SPEC.md section 6). Kept separate from
-     * {@code nameSymbols} so an immediate call is never mistaken for a reference to a function value,
-     * which is what preserves the statically resolved direct-call path.
-     */
-    private final Map<ExpressionNode, FunctionSymbol> functionReferences = new IdentityHashMap<>();
-    /**
-     * The member reads that create a bound method value, recorded as the method and the {@code super}
-     * directness the read needs (docs/LANGUAGE_SPEC.md section 6, "Bound method references"). A plain
-     * instance-method read dispatches on the receiver's runtime class, exactly as an immediate call
-     * would; a {@code super.method} read is marked non-virtual so lowering binds the immediate
-     * superclass implementation and bypasses redispatch, matching an immediate {@code super.method(...)}
-     * call. Lowering recovers the receiver expression from the recorded read node itself.
-     */
-    private final Map<MemberAccessExprNode, ResolvedMethod> methodReferences = new IdentityHashMap<>();
-    /**
-     * The call expressions that invoke a function value, with the function type of their callee. Lowering
-     * emits an indirect invocation for each; a call absent from this map is a statically resolved direct
-     * call and keeps its existing path.
-     */
-    private final Map<CallExprNode, FunctionType> indirectCalls = new IdentityHashMap<>();
-    /**
-     * The callable each anonymous function expression denotes (docs/LANGUAGE_SPEC.md section 6). The
-     * expression is an expression and not a declaration, so it enters no scope and no name can reach
-     * its body; this map is the only record of that body, and lowering builds one call target from it.
-     */
-    private final Map<AnonymousFunctionExprNode, FunctionSymbol> anonymousFunctions = new IdentityHashMap<>();
     /** The compiled pattern of each {@code switch} regex case whose label is a string literal. */
     private final Map<RegexCaseLabelNode, RegexPattern> regexCasePatterns = new IdentityHashMap<>();
     private final Map<EnumPatternNode, EnumVariantSymbol> enumPatterns = new IdentityHashMap<>();
@@ -286,68 +254,6 @@ public final class SolvikSemanticAnalyzer {
      */
     private boolean checkingStaticMember;
     /**
-     * Whether an instance receiver exists in some enclosing callable, across any anonymous-function
-     * boundary. It distinguishes {@code this} inside a closure written in an instance method — a
-     * receiver that a capture list would have to bind, so the honest report is an unlisted capture —
-     * from {@code this} with no enclosing receiver anywhere, which is RESOL-005. It is carried through
-     * a boundary and restored exactly as the receiver-tracking fields around it are.
-     */
-    private boolean enclosingReceiverAvailable;
-    /**
-     * The names of the local declarations whose initializer is currently being checked, innermost first.
-     * A binding is created and marked initialized only after its initializer is checked, so a name here is
-     * one whose value does not exist yet. It is consulted by exactly one rule — a capture item naming the
-     * binding its own expression initializes, which the specification reports as read-before-initialization
-     * rather than as an unknown name (docs/LANGUAGE_SPEC.md section 6: "listing that binding in the capture
-     * list is an ordinary read-before-initialization error ({@code SOLV-TYPE-008}), because the value does
-     * not exist when its initializer is evaluated").
-     *
-     * <p>It is deliberately not used for an ordinary read of a name under declaration. Resolution cannot
-     * see such a name at all — the binding is not in scope yet — and the resulting
-     * {@code SOLV-RESOL-001} is not wrong: a shadowed outer binding of the same name really is the binding
-     * the read sees, and turning every shadowing declaration into a read-before-initialization error would
-     * break ordinary programs to serve a rule that is only ever stated about capture items.
-     */
-    private final Deque<String> pendingDeclarations = new ArrayDeque<>();
-
-    /**
-     * Whether {@code name} names the innermost local binding currently being initialized. Innermost rather
-     * than any match, because a nested declaration shadows an outer one whose initializer is also in
-     * flight, and the nested one is the binding a capture item at this position could name.
-     */
-    private boolean declaringBindingNamed(String name) {
-        return name.equals(pendingDeclarations.peekFirst());
-    }
-
-    /**
-     * The receiver the anonymous function whose body is being checked captured through a written
-     * {@code [this]} item, or {@code null} when it wrote none. Inside such a body that receiver is what
-     * {@code this} means and what a nested {@code [this]} item captures, which is how one receiver reaches
-     * an arbitrarily deep closure: "every intervening closure must list and forward that value
-     * explicitly", and writing {@code [this]} on each of them is what threads the same value inward.
-     * Null for every body that is not a closure body and for a closure that captured no receiver.
-     */
-    private CapturedValue currentBoundaryReceiver;
-    /**
-     * The capture item names that the anonymous function whose body is being checked rejected as
-     * {@code var mutable}s, so a body read or write of one reports the mutable-capture code the specification
-     * assigns it. Empty outside an anonymous function body, and read only by
-     * {@link #reportCapturedMutableUse}.
-     */
-    private Set<String> currentRejectedCaptures = Set.of();
-    /**
-     * The capture item names this closure's capture list reported and bound nothing for, other than the
-     * {@code var mutable} names carried by {@link #currentRejectedCaptures}: an unknown name, the binding under
-     * initialization, and an item naming something capture cannot bind. A body reference to one of these
-     * names is reported nowhere, because the item already reported the one root cause.
-     *
-     * <p>"After an invalid capture item is reported, body checking must not cascade the same root cause
-     * into an unlisted-capture or unknown-name diagnostic" (docs/LANGUAGE_SPEC.md section 6). The
-     * {@code var mutable} case needs the opposite treatment -- it earns the same code again at each body use -- so
-     * the two sets are deliberately separate rather than one "rejected names" set.
-     */
-    private Set<String> suppressedCaptureNames = Set.of();
-    /**
      * Type parameters a member reference must not resolve to, because the member being analyzed is a
      * {@code static} member of the class that declares them
      * (docs/LANGUAGE_SPEC.md section 7). A static member belongs to the class itself, so it cannot see
@@ -368,12 +274,10 @@ public final class SolvikSemanticAnalyzer {
     private FunctionSymbol entryPoint;
     /** The compiler-synthesized entry point built from executable top-level statements, if any. */
     private FunctionSymbol implicitMain;
-    /** The module of the file whose item is currently being collected or checked; null = default. */
+    /** The program being analyzed; its module blocks decide which module each declaration belongs to. */
+    private CompilationUnitNode unit;
+    /** The module of the declaration currently being collected or checked; null = default module. */
     private String currentModule;
-    /** The file-local prefix-to-module bindings of the current file. */
-    private Map<String, String> currentPrefixes = Map.of();
-    /** The module/namespace context of every resolved top-level item, keyed by node identity. */
-    private Map<AstNode, FileScope> itemScopes = Map.of();
 
     /** The declarations of one named module. */
     private static final class ModuleContents {
@@ -390,41 +294,33 @@ public final class SolvikSemanticAnalyzer {
         this.typeEnvironment = Objects.requireNonNull(typeEnvironment);
     }
 
-    /** Runs declaration collection and static checking over a parsed Solvik source file. */
+    /** Runs declaration collection and static checking over one resolved Solvik program. */
     public static SemanticResult analyze(CompilationUnitNode unit) {
-        return analyze(unit, Map.of());
-    }
-
-    /**
-     * Runs declaration collection and static checking, using {@code itemScopes} to resolve each
-     * top-level item against the module and prefixes of the physical file that declared it.
-     */
-    public static SemanticResult analyze(CompilationUnitNode unit, Map<AstNode, FileScope> itemScopes) {
         Objects.requireNonNull(unit, "unit");
         if (unit.hasUnresolvedIncludes()) {
             throw new IllegalArgumentException("include directives must be resolved before semantic analysis");
         }
         SolvikSemanticAnalyzer analyzer = new SolvikSemanticAnalyzer(new TypeEnvironment());
-        analyzer.itemScopes = Objects.requireNonNull(itemScopes, "itemScopes");
+        analyzer.unit = unit;
         analyzer.collectDeclarations(unit);
         analyzer.checkBodies(unit);
         DiagnosticBag bag = analyzer.diagnostics.build();
         if (bag.hasErrors()) {
             return SemanticResult.failure(bag);
         }
-        return SemanticResult.success(new CheckedProgram(unit, analyzer.functions, analyzer.classes, analyzer.interfaces, analyzer.enums, analyzer.declaredClasses, analyzer.declaredInterfaces, analyzer.declaredEnums, analyzer.expressionTypes, analyzer.localSymbols, analyzer.nameSymbols, analyzer.propertyAccesses, analyzer.constructorCalls, analyzer.methodCalls, analyzer.builtinToStringCalls, analyzer.builtinEqualsCalls, analyzer.builtinHashCodeCalls, analyzer.forInBindings, analyzer.conversions, analyzer.coercions, analyzer.testedTypes, analyzer.superConstructorCalls, analyzer.variantConstructions, analyzer.regexConstants, analyzer.functionReferences, analyzer.methodReferences, analyzer.indirectCalls, analyzer.anonymousFunctions, analyzer.enumPatterns, analyzer.patternBindings, analyzer.patternBindingTypes, analyzer.regexCasePatterns, analyzer.qualifiedFunctionCalls, analyzer.entryPoint, analyzer.catchBindings, analyzer.exceptionClassNames, analyzer.exceptionParents));
+        return SemanticResult.success(new CheckedProgram(unit, analyzer.functions, analyzer.classes, analyzer.interfaces, analyzer.enums, analyzer.declaredClasses, analyzer.declaredInterfaces, analyzer.declaredEnums, analyzer.expressionTypes, analyzer.localSymbols, analyzer.nameSymbols, analyzer.propertyAccesses, analyzer.constructorCalls, analyzer.methodCalls, analyzer.builtinToStringCalls, analyzer.builtinEqualsCalls, analyzer.builtinHashCodeCalls, analyzer.forInBindings, analyzer.conversions, analyzer.coercions, analyzer.testedTypes, analyzer.superConstructorCalls, analyzer.variantConstructions, analyzer.regexConstants, analyzer.enumPatterns, analyzer.patternBindings, analyzer.patternBindingTypes, analyzer.regexCasePatterns, analyzer.qualifiedFunctionCalls, analyzer.entryPoint, analyzer.catchBindings, analyzer.exceptionClassNames, analyzer.exceptionParents));
     }
 
     /**
-     * Sets the current module and prefix context from the given node when that node is a resolved
-     * top-level item. Nested nodes leave the enclosing item's context in place, so a whole function
-     * or class body is checked in the module of the file that declared it.
+     * Sets the current module from a declaration's enclosing {@code module} block. A declaration that
+     * belongs to no block is a member of the implicit default module. Nested nodes leave the enclosing
+     * item's module in place, so a whole function or class body is checked in the module that declared
+     * it, and two blocks with one name - in one file or across included files - contribute to the one
+     * module this selects.
      */
     private void useScope(AstNode node) {
-        FileScope scope = itemScopes.get(node);
-        if (scope != null) {
-            currentModule = scope.moduleNameOrNull();
-            currentPrefixes = scope.prefixes();
+        if (node instanceof DeclarationNode declaration) {
+            currentModule = unit.moduleNameOf(declaration).orElse(null);
         }
     }
 
@@ -453,62 +349,6 @@ public final class SolvikSemanticAnalyzer {
             }
         }
         return symbols.resolveInRoot(name);
-    }
-
-    /**
-     * Reports a body reference to a binding of an enclosing function that the current function boundary
-     * hides, and returns true when it did. The specification names this diagnostic for exactly that shape
-     * — "An outer local or parameter referenced by the body but omitted from the capture list is
-     * {@code SEM_UNLISTED_CAPTURE} ... reported on the body reference. ... Top-level and module-qualified
-     * function declarations are globally resolved declarations rather than local state and need no
-     * capture entry" — and that same passage keeps a genuine typo an unknown name, because a name no
-     * enclosing function declares is hidden by nothing.
-     *
-     * <p>A {@code var mutable} that the capture list <em>does</em> name never reaches here: the item is rejected as
-     * a mutable capture and its name is recorded so the body reports the mutable-capture code for it, as
-     * the specification requires. An unlisted {@code var mutable} does reach here, and stays this diagnostic —
-     * "Referencing the same outer `var mutable` without listing it remains `SEM_UNLISTED_CAPTURE` at the body
-     * reference; the compiler never silently converts it into a capture".
-     */
-    private boolean reportUnlistedCapture(String name, SourceSpan span) {
-        if (!symbols.hiddenAcrossFunctionBoundary(name)) {
-            return false;
-        }
-        error(DiagnosticCode.SEM_UNLISTED_CAPTURE, span, //
-                        "an anonymous function body uses '" + name + "' from the enclosing function, which it does not capture");
-        return true;
-    }
-
-    /**
-     * Reports a body reference to a {@code var mutable} that this closure's capture list names, and returns true
-     * when it did. Such a name is deliberately not bound in the body's scope — binding a mirror of it
-     * would be exactly the silent conversion the specification forbids — so a use of it resolves to
-     * nothing and has to be classified here rather than by resolution. "Naming a `var mutable` in a capture list
-     * is {@code SEM_MUTABLE_CAPTURE} ({@code SOLV-SEM-057}), reported on that capture item, and a read or
-     * write of that captured name in the body is reported with the same code": one code, two placements,
-     * and the program is already rejected by the item report that precedes this one.
-     */
-    private boolean reportCapturedMutableUse(String name, SourceSpan span) {
-        if (!currentRejectedCaptures.contains(name)) {
-            return false;
-        }
-        error(DiagnosticCode.SEM_MUTABLE_CAPTURE, span, "an anonymous function body uses capture item '" + name + "' which names a mutable 'var mutable' binding");
-        return true;
-    }
-
-    /**
-     * True when a body reference names a capture item that was already reported and bound nothing, so the
-     * reference earns no diagnostic of its own.
-     *
-     * <p>The item position reported the single root cause -- an unknown name, the binding under
-     * initialization, or an item naming something capture cannot bind -- and resolving the same spelling in
-     * the body finds nothing only because that item bound nothing. Reporting it again as an unknown name
-     * would restate the item's defect as a second, unrelated one, which the specification forbids. A
-     * {@code var mutable} named by the list is handled by {@link #reportCapturedMutableUse} instead, because the
-     * specification assigns that case a code at <em>both</em> placements.
-     */
-    private boolean suppressesCascade(String name) {
-        return suppressedCaptureNames.contains(name);
     }
 
     /** A module prefix followed by a member path, e.g. {@code math.add} or {@code math.Result.Ok}. */
@@ -557,10 +397,11 @@ public final class SolvikSemanticAnalyzer {
                 break;
             }
         }
-        if (current instanceof NameRefExprNode name) {
-            String module = currentPrefixes.get(name.name());
-            if (module != null && !path.isEmpty() && namespaceSteps.get(0)) {
-                return new QualifiedPrefix(module, path, namespaceSteps.get(namespaceSteps.size() - 1));
+        if (current instanceof NameRefExprNode name && !path.isEmpty() && namespaceSteps.get(0)) {
+            // A module name qualifies a reference in every file of the program: the module namespace is
+            // the program's, so no file-local prefix binding is consulted (docs/LANGUAGE_SPEC.md section 20).
+            if (modules.containsKey(name.name())) {
+                return new QualifiedPrefix(name.name(), path, namespaceSteps.get(namespaceSteps.size() - 1));
             }
         }
         return null;
@@ -652,7 +493,7 @@ public final class SolvikSemanticAnalyzer {
         // when both ends belong to the same source. Otherwise anchor it at the first statement.
         SourceSpan span = first.sourceId() == last.sourceId() ? SourceSpan.of(first.sourceId(), first.startOffset(), last.endOffset()) : first;
         BlockNode body = new BlockNode(statements, span);
-        FunctionDeclNode declaration = new FunctionDeclNode(false, false, "main", List.of(), List.of(), new TypeRefNode("Unit", span), body, span);
+        FunctionDeclNode declaration = new FunctionDeclNode(false, false, "main", List.of(), List.of(), null, body, span);
         FunctionSymbol symbol = new FunctionSymbol("main", span, List.of(), List.of(), UnitType.INSTANCE, true, declaration);
         declaredFunctions.put(declaration, symbol);
         functions.put("main", symbol);
@@ -962,16 +803,35 @@ public final class SolvikSemanticAnalyzer {
         functions.put(name, symbol);
     }
 
+    /**
+     * The resolved return type of a callable declaration, plus whether the declaration's written type
+     * resolved. A callable that writes no {@code : Type} produces no value; the internal sentinel
+     * carries that fact (docs/LANGUAGE_SPEC.md section 6) and never appears in source syntax or in a
+     * diagnostic. A written type that fails to resolve becomes {@code Any} so the recorded resolution
+     * error, not a null reference, is what downstream checks observe.
+     */
+    private ReturnType callableReturnType(CallableDeclNode declaration) {
+        if (declaration.declaredReturnType().isEmpty()) {
+            return new ReturnType(UnitType.INSTANCE, true);
+        }
+        Type resolved = resolveType(declaration.declaredReturnType().get());
+        return resolved != null ? new ReturnType(resolved, true) : new ReturnType(AnyType.INSTANCE, false);
+    }
+
+    /** A callable's resolved return type and whether its written type resolved. */
+    private record ReturnType(Type type, boolean known) {
+    }
+
     private void collectFunction(FunctionDeclNode declaration) {
         useScope(declaration);
         List<TypeParameterType> typeParameters = declareTypeParameters(declaration.typeParameters());
         Map<String, TypeParameterType> previousScope = typeParameterScope;
         typeParameterScope = scopeOf(typeParameters);
         List<VariableSymbol> parameters = buildParameters(declaration.parameters());
-        Type returnType = resolveType(declaration.returnType());
+        ReturnType declaredReturn = callableReturnType(declaration);
         typeParameterScope = previousScope;
         FunctionSymbol functionSymbol = new FunctionSymbol(declaration.name(), declaration.span(), parameters, typeParameters, //
-                        returnType != null ? returnType : AnyType.INSTANCE, returnType != null, declaration);
+                        declaredReturn.type(), declaredReturn.known(), declaration);
         declaredFunctions.put(declaration, functionSymbol);
         if (declareTopLevel(functionSymbol, declaration.span(), "function")) {
             functions.put(aggregateKey(declaration.name()), functionSymbol);
@@ -1002,10 +862,10 @@ public final class SolvikSemanticAnalyzer {
             List<TypeParameterType> memberTypeParameters = declareTypeParameters(signature.typeParameters());
             typeParameterScope = mergedScope(interfaceScope, memberTypeParameters);
             List<VariableSymbol> parameters = buildParameters(signature.parameters());
-            Type returnType = resolveType(signature.returnType());
+            ReturnType declaredReturn = callableReturnType(signature);
             typeParameterScope = new HashMap<>();
             FunctionSymbol symbol = FunctionSymbol.declaredInterfaceSignature(signature.name(), signature.span(), parameters, memberTypeParameters, //
-                            returnType != null ? returnType : AnyType.INSTANCE, returnType != null, signature, declaration);
+                            declaredReturn.type(), declaredReturn.known(), signature, declaration);
             if ("toString".equals(signature.name())) {
                 error(DiagnosticCode.SEM_RESERVED_MEMBER, signature.span(), "member 'toString' is reserved by Any.toString and cannot be declared by an interface");
             }
@@ -1024,10 +884,10 @@ public final class SolvikSemanticAnalyzer {
             List<TypeParameterType> memberTypeParameters = declareTypeParameters(method.typeParameters());
             typeParameterScope = mergedScope(interfaceScope, memberTypeParameters);
             List<VariableSymbol> parameters = buildParameters(method.parameters());
-            Type returnType = resolveType(method.returnType());
+            ReturnType declaredReturn = callableReturnType(method);
             typeParameterScope = new HashMap<>();
             FunctionSymbol symbol = FunctionSymbol.declaredInterfaceMethod(method.name(), method.span(), parameters, memberTypeParameters, //
-                            returnType != null ? returnType : AnyType.INSTANCE, returnType != null, method, declaration);
+                            declaredReturn.type(), declaredReturn.known(), method, declaration);
             if ("toString".equals(method.name())) {
                 error(DiagnosticCode.SEM_RESERVED_MEMBER, method.span(), "member 'toString' is reserved by Any.toString and cannot be declared by an interface");
             }
@@ -1203,13 +1063,13 @@ public final class SolvikSemanticAnalyzer {
             Map<String, TypeParameterType> classScope = typeParameterScope;
             typeParameterScope = mergedScope(classScope, methodTypeParameters);
             List<VariableSymbol> parameters = buildParameters(method.parameters());
-            Type returnType = resolveType(method.returnType());
+            ReturnType declaredReturn = callableReturnType(method);
             typeParameterScope = classScope;
             if (synthesizedMessage && isSynthesizedMessageMember(method.name())) {
                 error(DiagnosticCode.SEM_RESERVED_MEMBER, method.span(), "method '" + method.name() + "' is reserved by the synthesized exception message");
             }
             FunctionSymbol symbol = FunctionSymbol.declaredMethod(method.name(), method.span(), parameters, methodTypeParameters, //
-                            returnType != null ? returnType : AnyType.INSTANCE, returnType != null, method, declaration, method.isMutable(), method.isOverride());
+                            declaredReturn.type(), declaredReturn.known(), method, declaration, method.isMutable(), method.isOverride());
             methods.add(symbol);
             if (propertyNames.contains(method.name())) {
                 error(DiagnosticCode.RESOL_DUPLICATE_NAME, method.span(), "member '" + method.name() + "' is already declared");
@@ -1260,7 +1120,7 @@ public final class SolvikSemanticAnalyzer {
             Map<String, TypeParameterType> classScope = typeParameterScope;
             typeParameterScope = mergedScope(classScope, methodTypeParameters);
             List<VariableSymbol> parameters = buildParameters(method.parameters());
-            Type returnType = resolveType(method.returnType());
+            ReturnType declaredReturn = callableReturnType(method);
             typeParameterScope = classScope;
             if (propertyNames.contains(method.name()) || methodNames.contains(method.name())) {
                 // `propertyNames` and `methodNames` already hold every instance member and every
@@ -1272,7 +1132,7 @@ public final class SolvikSemanticAnalyzer {
             } else {
                 methodNames.add(method.name());
                 staticMethods.add(FunctionSymbol.declaredStaticMethod(method.name(), method.span(), parameters, methodTypeParameters, //
-                                returnType != null ? returnType : AnyType.INSTANCE, returnType != null, method, declaration));
+                                declaredReturn.type(), declaredReturn.known(), method, declaration));
             }
         }
         StaticBlockNode staticBlock = null;
@@ -1823,22 +1683,12 @@ public final class SolvikSemanticAnalyzer {
      * a constructor additionally tracks definite property initialization and verifies that every
      * property is assigned on every successful path.
      *
-     * <p>All the per-body state is saved and restored rather than merely reset, because an anonymous
-     * function's body is checked from inside an enclosing body and must leave the outer one intact.
+     * <p>Every callable body is its own lexical boundary: it opens a scope that hides the enclosing
+     * callable's bindings, so a function or method can only reach its parameters and its own locals.
+     * All the per-body state is saved and restored rather than merely reset, because a body is checked
+     * from inside the analyzer's ongoing traversal.
      */
     private void checkCallable(FunctionSymbol function, BlockNode body, ClassSymbol owner, boolean constructor) {
-        checkCallable(function, body, owner, constructor, false);
-    }
-
-    /**
-     * Checks one callable body. When {@code lexicalBoundary} is set the body is checked as its own
-     * function boundary: it opens a scope that hides every enclosing function's bindings, and it runs
-     * with no receiver and no enclosing type parameters, because an anonymous function is written with
-     * concrete types and cannot reach {@code this} or an outer binding until capture exists
-     * (docs/LANGUAGE_SPEC.md section 6, "Anonymous functions" and "Explicit immutable closure
-     * capture"). Globals stay visible: they are resolved outside the lexical chain.
-     */
-    private void checkCallable(FunctionSymbol function, BlockNode body, ClassSymbol owner, boolean constructor, boolean lexicalBoundary) {
         FunctionSymbol previousFunction = currentFunction;
         ClassSymbol previousClass = currentClass;
         InterfaceSymbol previousInterface = currentInterface;
@@ -1861,56 +1711,13 @@ public final class SolvikSemanticAnalyzer {
         int previousBreakDepth = breakDepth;
         loopDepth = 0;
         breakDepth = 0;
-        boolean previousReceiverAvailable = enclosingReceiverAvailable;
         Map<String, TypeParameterType> previousScope = typeParameterScope;
-        Set<String> previousRejectedCaptures = currentRejectedCaptures;
-        Set<String> previousSuppressedCaptures = suppressedCaptureNames;
-        CapturedValue previousBoundaryReceiver = currentBoundaryReceiver;
-        if (lexicalBoundary) {
-            // No receiver and no enclosing type parameters cross the boundary. Leaving `currentClass`
-            // and `currentInterface` null stops `this` and `super` from resolving to the enclosing
-            // method's receiver, while `enclosingReceiverAvailable` still records that such a receiver
-            // exists — which is what lets their diagnostics report an unlisted capture instead of
-            // claiming no receiver exists anywhere. An empty type-parameter scope makes an enclosing
-            // method's type parameter report as unknown rather than silently visible
-            // (docs/LANGUAGE_SPEC.md section 6).
-            currentClass = null;
-            currentInterface = null;
-            typeParameterScope = Map.of();
-            symbols.enterFunctionBoundaryScope();
-            enclosingReceiverAvailable = previousClass != null || previousInterface != null || previousReceiverAvailable;
-            // The names this closure's capture list named as `var mutable`s. The item check rejected each of them
-            // and bound none of them, so a body use has to be classified from this set rather than by
-            // resolution -- binding a mirror would be the silent conversion the specification forbids.
-            currentRejectedCaptures = function.rejectedCaptureNames();
-            suppressedCaptureNames = function.suppressedCaptureNames();
-            // The receiver this closure captured through `[this]`, if any, is the only receiver its body can
-            // mean and the only one a nested `[this]` item can name. It is deliberately not installed as
-            // `currentClass`: the body's `this` has this type, but nothing else about being inside a class
-            // follows, and `super` in particular must stay unavailable to a closure body.
-            currentBoundaryReceiver = function.receiverCapture().orElse(null);
-        } else {
-            currentClass = owner;
-            typeParameterScope = mergedScope(scopeOf(ownerTypeParameters(function)), function.typeParameters());
-            symbols.enterScope();
-            enclosingReceiverAvailable = owner != null || function.isInterfaceMember() || previousReceiverAvailable;
-        }
+        currentClass = owner;
+        typeParameterScope = mergedScope(scopeOf(ownerTypeParameters(function)), function.typeParameters());
+        symbols.enterScope();
         for (VariableSymbol parameter : function.parameters()) {
             if (!symbols.declare(parameter)) {
                 error(DiagnosticCode.RESOL_DUPLICATE_NAME, parameter.declarationSpan(), "parameter '" + parameter.name() + "' is already declared");
-            }
-        }
-        if (lexicalBoundary) {
-            // Capture bindings are declared after the parameters so that a capture naming a parameter is
-            // reported against the written capture item, which is the defect a reader would point at, and
-            // not against the parameter that was there first. A duplicate within the list is reported on
-            // its second item. `declare` stays the single authority either way, which is why there is no
-            // separate duplicate-capture pass (docs/LANGUAGE_SPEC.md section 6: a duplicate capture item
-            // and a capture item naming a parameter are both SOLV-RESOL-002).
-            for (CapturedValue captured : function.captures()) {
-                if (!symbols.declare(captured.source())) {
-                    error(DiagnosticCode.RESOL_DUPLICATE_NAME, captured.captureSpan(), "capture item '" + captured.name() + "' duplicates another capture or a parameter");
-                }
             }
         }
         checkBlock(body);
@@ -1921,7 +1728,7 @@ public final class SolvikSemanticAnalyzer {
             }
         }
         SourceSpan declarationSpan = function.declaration() != null ? function.declaration().span() : function.declarationSpan();
-        if (function.isReturnTypeKnown() && function.returnType() != UnitType.INSTANCE && !alwaysReturns(body)) {
+        if (function.returnsValue() && !alwaysReturns(body)) {
             error(DiagnosticCode.TYPE_MISSING_RETURN_PATH, declarationSpan, callableDescription(function) + " must return a value on every path");
         }
         symbols.exitScope();
@@ -1934,23 +1741,16 @@ public final class SolvikSemanticAnalyzer {
         definitelyInitialized = previousInitialized;
         narrowedTypes = previousNarrowed;
         writtenVariables = previousWritten;
-        enclosingReceiverAvailable = previousReceiverAvailable;
-        currentRejectedCaptures = previousRejectedCaptures;
-        suppressedCaptureNames = previousSuppressedCaptures;
-        currentBoundaryReceiver = previousBoundaryReceiver;
-        // Restored, not reset: a body checked from inside another body (an anonymous function inside a
-        // loop, say) must leave the enclosing body's loop nesting intact so a later `break` in it is
-        // still measured against the right number of enclosing loops.
+        // Restored, not reset: a body checked from inside another body must leave the enclosing body's
+        // loop nesting intact so a later `break` in it is still measured against the right number of
+        // enclosing loops.
         loopDepth = previousLoopDepth;
         breakDepth = previousBreakDepth;
     }
 
-    /**
-     * How a callable is named in a diagnostic. A written callable is named; an anonymous function has
-     * no name to report, so it is described by what it is.
-     */
+    /** How a callable is named in a diagnostic. */
     private static String callableDescription(FunctionSymbol function) {
-        return function.isAnonymous() ? "an anonymous function" : "function '" + function.name() + "'";
+        return "function '" + function.name() + "'";
     }
 
     /** The declared type parameters of the class or interface that owns a callable. */
@@ -2047,37 +1847,29 @@ public final class SolvikSemanticAnalyzer {
     }
 
     private void checkLocalDecl(LocalDeclNode declaration) {
-        Type declaredType = null;
-        if (declaration.declaredType().isPresent()) {
-            declaredType = resolveType(declaration.declaredType().get());
-        }
+        // Every local writes its type (docs/LANGUAGE_SPEC.md section 2), so there is no inference here:
+        // the declared type is what the binding has, and an initializer must be assignable to it. A
+        // written type that failed to resolve is reported by resolveType and leaves the binding typed
+        // Any so downstream checks observe the recorded error rather than a missing type.
+        Type declaredType = resolveType(declaration.declaredType());
         if (declaredType != null) {
             expectedTypes.push(declaredType);
         }
-        // The binding being declared is recorded while its initializer is checked, which is what lets a
-        // capture item naming it report read-before-initialization (see `pendingDeclarations`).
-        pendingDeclarations.push(declaration.name());
         try {
             Type initializerType = checkExpression(declaration.initializer());
-            Type variableType;
-            if (declaredType != null) {
-                variableType = declaredType;
-            if (initializerType != null && !assignableOrWidened(declaration.initializer(), initializerType, declaredType)) {
+            Type variableType = declaredType != null ? declaredType : AnyType.INSTANCE;
+            if (declaredType != null && initializerType != null && !assignableOrWidened(declaration.initializer(), initializerType, declaredType)) {
                 errorExpected(DiagnosticCode.TYPE_MISMATCH, declaration.initializer().span(), //
                                 "initializer is not assignable to declared type " + declaredType.name(), declaredType.name(), initializerType.name());
             }
-        } else {
-            variableType = initializerType != null ? initializerType : AnyType.INSTANCE;
-        }
-        boolean mutable = declaration.bindingKind() == BindingKind.MUTABLE;
-        VariableSymbol symbol = new VariableSymbol(declaration.name(), declaration.span(), variableType, mutable, false);
-        symbol.markInitialized();
-        if (!symbols.declare(symbol)) {
-            error(DiagnosticCode.RESOL_DUPLICATE_NAME, declaration.span(), "name '" + declaration.name() + "' is already declared in this scope");
-        }
-        localSymbols.put(declaration, symbol);
+            boolean mutable = declaration.bindingKind() == BindingKind.MUTABLE;
+            VariableSymbol symbol = new VariableSymbol(declaration.name(), declaration.span(), variableType, mutable, false);
+            symbol.markInitialized();
+            if (!symbols.declare(symbol)) {
+                error(DiagnosticCode.RESOL_DUPLICATE_NAME, declaration.span(), "name '" + declaration.name() + "' is already declared in this scope");
+            }
+            localSymbols.put(declaration, symbol);
         } finally {
-            pendingDeclarations.pop();
             if (declaredType != null) {
                 expectedTypes.pop();
             }
@@ -2337,12 +2129,12 @@ public final class SolvikSemanticAnalyzer {
                 expectedTypes.pop();
             }
             if (expected == UnitType.INSTANCE) {
-                error(DiagnosticCode.TYPE_UNEXPECTED_RETURN_VALUE, statement.span(), "a Unit function cannot return a value");
+                error(DiagnosticCode.TYPE_UNEXPECTED_RETURN_VALUE, statement.span(), "a function that declares no return type cannot return a value");
             } else if (actual != null && !assignableOrWidened(value, actual, expected)) {
                 errorExpected(DiagnosticCode.TYPE_RETURN_MISMATCH, value.span(), //
                                 "returned value is not assignable to " + expected.name(), expected.name(), actual.name());
             }
-        } else if (expected != UnitType.INSTANCE && currentFunction.isReturnTypeKnown()) {
+        } else if (currentFunction.returnsValue()) {
             error(DiagnosticCode.TYPE_MISSING_RETURN_VALUE, statement.span(), "a function returning " + expected.name() + " must return a value");
         }
         if (checkingConstructor) {
@@ -2496,38 +2288,11 @@ public final class SolvikSemanticAnalyzer {
     private void checkAssign(AssignStmtNode statement) {
         ExpressionNode value = statement.value();
         ExpressionNode target = statement.target();
-        // The declared type of a binding or property is resolved before the value is typed, and only so
-        // that a generic function reference written on the right-hand side has the expected function type
-        // section 6 requires. Gating on that one shape keeps every other assignment analysing in the
-        // order it always has — target type resolution can itself report, and diagnostic order is part of
-        // what a program prints — so no existing expression form, a generic variant construction in
-        // particular, newly infers from an assignment target.
-        Type assignmentTargetType = isGenericFunctionReference(value) ? declaredAssignmentTargetType(target) : null;
-        // An instance-property target is answered null above because its declared type needs the receiver
-        // typed first; checkPropertyAssign supplies the expected type itself in that case.
-        boolean genericReferenceValue = assignmentTargetType == null && isGenericFunctionReference(value);
-        Type valueType;
-        if (assignmentTargetType != null) {
-            expectedTypes.push(assignmentTargetType);
-            try {
-                valueType = checkExpression(value);
-            } finally {
-                expectedTypes.pop();
-            }
-        } else if (genericReferenceValue && target instanceof MemberAccessExprNode) {
-            // Left untyped here so the receiver is typed exactly once, by checkPropertyAssign.
-            valueType = null;
-        } else {
-            valueType = checkExpression(value);
-        }
+        Type valueType = checkExpression(value);
         if (target instanceof NameRefExprNode name) {
             Optional<Symbol> resolved = resolveName(name.name());
             if (resolved.isEmpty()) {
-                if (!reportCapturedMutableUse(name.name(), name.span()) //
-                                && !suppressesCascade(name.name()) //
-                                && !reportUnlistedCapture(name.name(), name.span())) {
-                    error(DiagnosticCode.RESOL_UNKNOWN_NAME, name.span(), "unknown name '" + name.name() + "'");
-                }
+                error(DiagnosticCode.RESOL_UNKNOWN_NAME, name.span(), "unknown name '" + name.name() + "'");
                 return;
             }
             Symbol symbol = resolved.get();
@@ -2552,7 +2317,7 @@ public final class SolvikSemanticAnalyzer {
             return;
         }
         if (target instanceof MemberAccessExprNode member) {
-            checkMemberAssign(member, value, valueType, genericReferenceValue);
+            checkMemberAssign(member, value, valueType);
             return;
         }
         error(DiagnosticCode.TYPE_INVALID_ASSIGNMENT_TARGET, target.span(), "assignment target must be a mutable local or a var mutable property");
@@ -2560,45 +2325,27 @@ public final class SolvikSemanticAnalyzer {
 
     /**
      * Classifies a {@code target = value} assignment whose target is a member access and dispatches to the
-     * one property check that owns it. The classification itself is unchanged from the sequence this method
-     * replaces: a safe access is refused, a class name in target position names a static member rather than
-     * a value (section 7), a module-qualified class name reaches the same static members a bare one does, and
-     * anything else is an instance property write.
-     *
-     * <p>What is new is that this method, and not the checks it calls, is responsible for the value being
-     * typed. A reference to a generic function on the right-hand side is held back rather than typed up front
-     * — its type depends on the property it writes, and naming that property is exactly what the
-     * classification above is for — so a check that stops before resolving one never got to supply the
-     * expected type the reference was waiting for. The reference is typed here against no expectation
-     * instead, which is what an unresolvable expression position does everywhere else in this analyzer. The
-     * alternative is strictly worse than the code this replaced: an untyped expression reports nothing, so a
-     * program with two defects — a target that does not resolve and a reference no context instantiates —
-     * would show only one of them.
+     * one property check that owns it: a safe access is refused, a class name in target position names a
+     * static member rather than a value (section 7), a module-qualified class name reaches the same static
+     * members a bare one does, and anything else is an instance property write.
      */
-    private void checkMemberAssign(MemberAccessExprNode member, ExpressionNode value, Type valueType, boolean typesValueHere) {
-        if (!checkMemberTarget(member, value, valueType, typesValueHere) && typesValueHere) {
-            checkExpression(value);
-        }
+    private void checkMemberAssign(MemberAccessExprNode member, ExpressionNode value, Type valueType) {
+        checkMemberTarget(member, value, valueType);
     }
 
-    /**
-     * Routes a member assignment to its property check and returns whether that check typed the value.
-     *
-     * <p>Only a value the caller held back can come back untyped: {@code typesValueHere} is true exactly when
-     * the caller left {@code valueType} unset, so every other assignment reaches a check with its value
-     * already typed and the caller's fallback is never reached.
-     */
-    private boolean checkMemberTarget(MemberAccessExprNode member, ExpressionNode value, Type valueType, boolean typesValueHere) {
+    /** Routes a member assignment to its property check. */
+    private void checkMemberTarget(MemberAccessExprNode member, ExpressionNode value, Type valueType) {
         if (member.isSafe()) {
             error(DiagnosticCode.TYPE_INVALID_ASSIGNMENT_TARGET, member.span(), "cannot assign through a '?.' safe access");
-            return false;
+            return;
         }
         if (member.receiver() instanceof NameRefExprNode name) {
             // A class name in assignment target position is a static member write; the class name
             // is not a value, so this must be decided before the receiver is typed (section 7).
             ClassSymbol classSymbol = classSymbolNamed(name);
             if (classSymbol != null) {
-                return checkStaticPropertyAssign(member, classSymbol, member.memberName(), value, valueType, typesValueHere);
+                checkStaticPropertyAssign(member, classSymbol, member.memberName(), value, valueType);
+                return;
             }
         }
         QualifiedPrefix qualified = qualifiedPrefix(member);
@@ -2611,58 +2358,23 @@ public final class SolvikSemanticAnalyzer {
                 // reports the module/name error rather than a member error. A target written with
                 // `::` throughout (`math::Counter::count`) is not a member access node at all and
                 // is refused by the general assignment-target rule below.
-                return checkStaticPropertyAssign(member, classSymbol, qualified.path.get(1), value, valueType, typesValueHere);
+                checkStaticPropertyAssign(member, classSymbol, qualified.path.get(1), value, valueType);
+                return;
             }
         }
-        return checkPropertyAssign(member, value, valueType, typesValueHere);
+        checkPropertyAssign(member, value, valueType);
     }
 
     /**
-     * The declared type an assignment target receives values at, for the one case where knowing it before
-     * the value is typed changes what the value can be: a generic function reference used as a value needs
-     * an expected function type (docs/LANGUAGE_SPEC.md section 6).
-     *
-     * <p>Only a binding is answered here, because a binding's declared type is settled without analyzing
-     * anything else. A property is not: naming one requires the classification that
-     * {@link #checkMemberAssign} performs — a static property through its owner's name, an instance one only
-     * once its receiver is typed — and having this helper repeat that classification in a second place would
-     * leave two definitions of "which property does this target write" free to drift apart. So the whole
-     * member-access target, including the static case whose type is equally easy to state, is left to the one
-     * place that has to make the decision anyway.
-     *
-     * <p>Returning nothing is never an error. A target this helper cannot answer keeps the order and the
-     * diagnostics it has always had, and the reference on the right then reports its own missing expected type.
+     * Checks a {@code receiver.member = value} assignment and enforces property mutability. The value has
+     * already been typed by the caller, so this method only resolves the property and compares.
      */
-    private Type declaredAssignmentTargetType(ExpressionNode target) {
-        if (target instanceof NameRefExprNode name) {
-            // An unknown name is reported by the assignment path itself, in its existing position.
-            return resolveName(name.name()).orElse(null) instanceof VariableSymbol variable ? variable.type() : null;
-        }
-        return null;
-    }
-
-    /**
-     * Checks a {@code receiver.member = value} assignment and enforces property mutability. Returns whether
-     * {@code value} was typed by the end of it.
-     *
-     * <p>{@code typesValueHere} is set for one shape only: the value is a reference to a generic function,
-     * which section 6 lets an expression position decide only once an expected function type is in scope, and
-     * a property's declared type may be written in its owner's type parameters and so becomes available only
-     * after the receiver's type arguments are known. This method, rather than the caller, is where an instance
-     * property can supply that type, so it types the value with the property's substituted type pushed. Every
-     * other value arrives already typed and analysis is unchanged.
-     *
-     * <p>The paths that stop before a property is resolved return {@code false}. They have reported their own
-     * error, but a held-back value still has to be typed so that it reports its own too, and only the caller
-     * can do that. The return value is therefore about what a reader is told, not about whether analysis may
-     * continue: each of these programs is already unlowerable.
-     */
-    private boolean checkPropertyAssign(MemberAccessExprNode member, ExpressionNode value, Type valueType, boolean typesValueHere) {
+    private void checkPropertyAssign(MemberAccessExprNode member, ExpressionNode value, Type valueType) {
         Type receiverType = checkExpression(member.receiver());
         if (isNullableType(receiverType)) {
             error(DiagnosticCode.TYPE_NULLABLE_DEREFERENCE, member.receiver().span(), //
                             "receiver of '" + member.memberName() + "' may be null; use '?.' or check for null first");
-            return false;
+            return;
         }
         if (receiverType == RegexType.INSTANCE) {
             if (isRegexMethodName(member.memberName())) {
@@ -2670,7 +2382,7 @@ public final class SolvikSemanticAnalyzer {
             } else {
                 error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, member.span(), "Regex has no property '" + member.memberName() + "'");
             }
-            return false;
+            return;
         }
         if (receiverType == RegexMatchType.INSTANCE) {
             switch (member.memberName()) {
@@ -2684,7 +2396,7 @@ public final class SolvikSemanticAnalyzer {
                     error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, member.span(), "RegexMatch has no property '" + member.memberName() + "'");
                 }
             }
-            return false;
+            return;
         }
         BuiltinCollectionMember collectionMember = collectionMember(receiverType, member.memberName());
         if (collectionMember != null) {
@@ -2693,14 +2405,14 @@ public final class SolvikSemanticAnalyzer {
             } else {
                 error(DiagnosticCode.TYPE_INVALID_ASSIGNMENT_TARGET, member.span(), "cannot assign to method '" + member.memberName() + "'");
             }
-            return false;
+            return;
         }
         ClassSymbol classSymbol = classSymbolFor(receiverType);
         if (classSymbol == null) {
             if (receiverType != null) {
                 error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, member.span(), "type " + receiverType.name() + " has no member '" + member.memberName() + "'");
             }
-            return false;
+            return;
         }
         Optional<PropertySymbol> resolved = classSymbol.property(member.memberName());
         if (resolved.isEmpty()) {
@@ -2709,19 +2421,11 @@ public final class SolvikSemanticAnalyzer {
             } else {
                 error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, member.span(), "class " + classSymbol.name() + " has no property '" + member.memberName() + "'");
             }
-            return false;
+            return;
         }
         PropertySymbol property = resolved.get();
         propertyAccesses.put(member, property);
         Type propertyType = property.type().substitute(composeSubstitutions(classSymbol.propertySubstitution(property), substitutionFor(receiverType)));
-        if (typesValueHere) {
-            expectedTypes.push(propertyType);
-            try {
-                valueType = checkExpression(value);
-            } finally {
-                expectedTypes.pop();
-            }
-        }
         if (valueType != null && !assignableOrWidened(value, valueType, propertyType)) {
             errorExpected(DiagnosticCode.TYPE_MISMATCH, value.span(), //
                             "value is not assignable to property type " + propertyType.name(), propertyType.name(), valueType.name());
@@ -2736,7 +2440,6 @@ public final class SolvikSemanticAnalyzer {
         } else if (checkingConstructor && !property.hasInitializer()) {
             definitelyInitialized.add(property);
         }
-        return true;
     }
 
     private void checkExprStmt(ExprStmtNode statement) {
@@ -2812,9 +2515,16 @@ public final class SolvikSemanticAnalyzer {
         return "Result".equals(base.name()) && parameterized.arguments().size() == 2;
     }
 
-    /** A human label for a possibly-null type used in error messages. */
+    /**
+     * A human label for a possibly-null type used in error messages. A callable that produces no value
+     * has no source-level type spelling, so it is labelled by what it is rather than by the internal
+     * sentinel's name (docs/LANGUAGE_SPEC.md section 6).
+     */
     private static String labelOf(Type type) {
-        return type == null ? "<none>" : type.name();
+        if (type == null) {
+            return "<none>";
+        }
+        return type == UnitType.INSTANCE ? "no value" : type.name();
     }
 
     private Type checkExpression(ExpressionNode expression) {
@@ -2863,8 +2573,6 @@ public final class SolvikSemanticAnalyzer {
                 return record(expression, checkNamespaceAccess((NamespaceAccessExprNode) expression));
             case MATCH_EXPR:
                 return record(expression, checkMatch((MatchExprNode) expression));
-            case ANONYMOUS_FUNCTION_EXPR:
-                return record(expression, checkAnonymousFunction((AnonymousFunctionExprNode) expression));
             case BLOCK_EXPR:
                 return record(expression, checkBlockExpr((BlockExprNode) expression));
             case IF_EXPR:
@@ -2954,21 +2662,16 @@ public final class SolvikSemanticAnalyzer {
     private Type checkName(NameRefExprNode name) {
         Optional<Symbol> resolved = resolveName(name.name());
         if (resolved.isEmpty()) {
-            if (reportCapturedMutableUse(name.name(), name.span()) || suppressesCascade(name.name()) || reportUnlistedCapture(name.name(), name.span())) {
-                return null;
-            }
             error(DiagnosticCode.RESOL_UNKNOWN_NAME, name.span(), "unknown name '" + name.name() + "'");
             return null;
         }
         Symbol symbol = resolved.get();
         if (symbol instanceof FunctionSymbol function) {
-            // A bare reference to a visible function is a function value, not an error
-            // (docs/LANGUAGE_SPEC.md section 6, "Named functions as values"). The reference is recorded
-            // in its own map rather than in `nameSymbols`, because that map is shared with the call
-            // path: recording a function there would make an immediate call `sum(1, 2)` look like a
-            // name that also has a function type, and lowering would send a statically resolved call
-            // down the indirect path. Keeping the two facts apart is what preserves direct calls.
-            return functionValueOf(name, function);
+            // Functions are declarations, not values (docs/LANGUAGE_SPEC.md section 6): a bare reference
+            // names the declaration but produces no value. An immediate call is resolved by the call path,
+            // which never passes through here, so this is always the value-position error.
+            error(DiagnosticCode.TYPE_FUNCTION_AS_VALUE, name.span(), "function '" + function.name() + "' is not a value; call it as '" + function.name() + "(...)'");
+            return null;
         }
         if (symbol instanceof ClassSymbol classSymbol) {
             error(DiagnosticCode.TYPE_CLASS_AS_VALUE, name.span(), "class '" + classSymbol.name() + "' cannot be used as a value");
@@ -2992,171 +2695,6 @@ public final class SolvikSemanticAnalyzer {
         return narrowed != null ? narrowed : variable.type();
     }
 
-    /**
-     * The function type of a reference to {@code function}, recorded so lowering emits the value
-     * (docs/LANGUAGE_SPEC.md section 6, "Named functions as values").
-     *
-     * <p>A generic declaration is instantiated contextually here, to one monomorphic function type; see
-     * {@link #instantiateGenericValue}. Nothing about the produced value differs from a non-generic
-     * reference: "Contextual instantiations of one generic declaration at different function types also
-     * share that declaration's canonical runtime identity: instantiation changes static typing, not the
-     * underlying executable value", so both paths record the same {@link FunctionSymbol} and lowering
-     * emits the same canonical value from the same site.
-     *
-     * <p>A predeclared function is <em>not</em> generic and so is never instantiated: lowering gives each
-     * one a real call target, since {@code var output: func(Any?): Unit = println} is specified.
-     */
-    private Type functionValueOf(ExpressionNode reference, FunctionSymbol function) {
-        if (!function.typeParameters().isEmpty()) {
-            return instantiateGenericValue(reference, function);
-        }
-        functionReferences.put(reference, function);
-        return function.functionType();
-    }
-
-    /**
-     * Instantiates a generic function reference to one monomorphic function type under the expected type
-     * in scope (docs/LANGUAGE_SPEC.md section 6, "Generic function values").
-     *
-     * <p>"A generic function declaration does not itself produce a first-class polymorphic value. It must
-     * be instantiated to one monomorphic function type at each value-reference site, and that
-     * instantiation is contextual." The expected function type supplies the constraints, one complete
-     * substitution is determined, and it is applied to the declared parameter and result types. Ordinary
-     * function-type assignability then runs on the substituted type in the caller, which is why nothing
-     * here reports an assignability problem of its own.
-     *
-     * <p>Inference follows the order the section states. Declared parameter types are unified against the
-     * expected parameter types first; the declared result is unified against the expected result second, so
-     * a result position can confirm or complete a substitution but cannot overturn one the parameter
-     * positions already established. {@link #unifyTypeParameter} binds by {@code putIfAbsent} for exactly
-     * that reason, and reusing it rather than writing a parallel inference is what keeps a generic value
-     * reference and a generic call agreeing about what the same pair of types means.
-     *
-     * <p>Anything that is not a complete function signature is insufficient, and the section names one
-     * code for it: an expected {@code Any}, an unbounded type parameter, or no expected type at all is
-     * {@code SOLV-TYPE-030} "reported on the function or method reference", and "no second inference
-     * diagnostic exists". A reference whose substitution comes out incomplete reports that same code,
-     * because the cause is the same condition the section describes — a type parameter the context never
-     * determined — and two codes for one missing piece of evidence would leave a reader choosing between
-     * them. Returning {@code null} after either report is what stops the caller adding an assignability
-     * error for a type this reference never received.
-     *
-     * <p>An arity mismatch between the declaration and the expected type is deliberately <em>not</em> an
-     * inference failure. The expected type still exposes a complete function signature, so the
-     * substitution is derived from the positions the two lists share, and the resulting monomorphic type
-     * simply is not assignable to what was expected — which the caller reports as the single mismatch the
-     * reader actually has to fix.
-     */
-    private Type instantiateGenericValue(ExpressionNode reference, FunctionSymbol function) {
-        List<TypeParameterType> typeParameters = function.typeParameters();
-        FunctionType expected = completeFunctionSignatureOf(expectedTypes.isEmpty() ? null : expectedTypes.peek());
-        if (expected == null) {
-            errorExpected(DiagnosticCode.TYPE_CANNOT_INFER, reference.span(), //
-                            "the generic function '" + function.name() + "' is used as a value with no expected function type to instantiate it", //
-                            "a declared function type such as func(Integer): Integer", contextDescription());
-            return null;
-        }
-        FunctionType declared = function.functionType();
-        Map<TypeParameterType, Type> bindings = new IdentityHashMap<>();
-        int positions = Math.min(declared.parameterTypes().size(), expected.parameterTypes().size());
-        for (int i = 0; i < positions; i++) {
-            unifyTypeParameter(declared.parameterTypes().get(i), expected.parameterTypes().get(i), typeParameters, bindings);
-        }
-        unifyTypeParameter(declared.returnType(), expected.returnType(), typeParameters, bindings);
-        for (TypeParameterType parameter : typeParameters) {
-            if (!bindings.containsKey(parameter)) {
-                errorExpected(DiagnosticCode.TYPE_CANNOT_INFER, reference.span(), //
-                                "the generic function '" + function.name() + "' has a type parameter the expected type does not determine: '" + parameter.name() + "'", //
-                                "an expected function type that determines " + parameter.name(), contextDescription());
-                return null;
-            }
-        }
-        // Recorded as a canonical function value exactly as a non-generic reference is: the substitution
-        // changed this expression's type and nothing about the executable value it denotes.
-        functionReferences.put(reference, function);
-        return declared.substitute(bindings);
-    }
-
-    /**
-     * Instantiates a generic *method* reference to one monomorphic function type under the expected type
-     * in scope (docs/LANGUAGE_SPEC.md section 6, "Bound method references": "A generic method reference is
-     * instantiated contextually under the same monomorphic rules as a generic top-level function
-     * reference, so {@code var operation: func(Integer): Integer = object.identity} is accepted and an
-     * unconstrained reference is {@code SOLV-TYPE-030}").
-     *
-     * <p>The rules are the same as {@link #instantiateGenericValue} and are reused rather than rewritten,
-     * with one addition this case has and a top-level function does not: the receiver's class type
-     * arguments are already fixed, so the declared signature is first closed over them and only the
-     * method's own type parameters are left to infer. The receiver substitution is the one an immediate
-     * call to the same method would compose ({@code methodSubstitution} with {@code substitutionFor}), so
-     * a reference and a call agree about what the same receiver means.
-     */
-    private Type instantiateGenericMethodReference(MemberAccessExprNode reference, FunctionSymbol method, ClassSymbol classSymbol, Type receiverType) {
-        return instantiateGenericMethodReference(reference, method, composeSubstitutions(classSymbol.methodSubstitution(method.name()), substitutionFor(receiverType)), false);
-    }
-
-    /**
-     * Instantiates a generic method reference against a receiver substitution the caller has already
-     * composed. Both member-read paths use it: a written receiver composes {@code methodSubstitution}
-     * with {@code substitutionFor}, and a {@code super} read composes it with the enclosing class's own
-     * superclass substitution, which is what an immediate {@code super.method(...)} call uses.
-     *
-     * <p>{@code superCall} is carried into the recording rather than inferred here, because a generic
-     * method reached through {@code super} must still bind the immediate superclass implementation
-     * without virtual redispatch — instantiating it changes its typing and nothing about its directness.
-     */
-    private Type instantiateGenericMethodReference(MemberAccessExprNode reference, FunctionSymbol method, Map<TypeParameterType, Type> receiverSubstitution, boolean superCall) {
-        FunctionType expected = completeFunctionSignatureOf(expectedTypes.isEmpty() ? null : expectedTypes.peek());
-        if (expected == null) {
-            errorExpected(DiagnosticCode.TYPE_CANNOT_INFER, reference.span(), //
-                            "the generic method '" + method.name() + "' is used as a value with no expected function type to instantiate it", //
-                            "a declared function type such as func(Integer): Integer", contextDescription());
-            return null;
-        }
-        List<Type> declaredParameterTypes = substitutedParameterTypes(method.parameters(), receiverSubstitution);
-        Type declaredReturnType = method.returnType().substitute(receiverSubstitution);
-        List<TypeParameterType> typeParameters = method.typeParameters();
-        Map<TypeParameterType, Type> bindings = new IdentityHashMap<>();
-        int positions = Math.min(declaredParameterTypes.size(), expected.parameterTypes().size());
-        for (int i = 0; i < positions; i++) {
-            unifyTypeParameter(declaredParameterTypes.get(i), expected.parameterTypes().get(i), typeParameters, bindings);
-        }
-        unifyTypeParameter(declaredReturnType, expected.returnType(), typeParameters, bindings);
-        for (TypeParameterType parameter : typeParameters) {
-            if (!bindings.containsKey(parameter)) {
-                errorExpected(DiagnosticCode.TYPE_CANNOT_INFER, reference.span(), //
-                                "the generic method '" + method.name() + "' has a type parameter the expected type does not determine: '" + parameter.name() + "'", //
-                                "an expected function type that determines " + parameter.name(), contextDescription());
-                return null;
-            }
-        }
-        methodReferences.put(reference, new ResolvedMethod(method, false, superCall));
-        return FunctionType.canonical(substitutedTypes(declaredParameterTypes, bindings), declaredReturnType.substitute(bindings));
-    }
-
-    /**
-     * The complete function signature an expected type exposes for instantiating a generic function
-     * reference, or {@code null} when it exposes none. A nullable function type exposes the signature it
-     * wraps, because {@code (func(Integer): Integer)?} constrains every type parameter exactly as the
-     * non-null form does and the nullability is the caller's assignability question. {@code Any} and a
-     * bare type parameter expose none, which is what the section states: "An expected {@code Any}, an
-     * unbounded type parameter, or any other type that does not expose a complete function signature is
-     * insufficient." A generic class type such as {@code List<Integer>} is that "any other type" — it
-     * names no parameter and result types, so nothing could be unified against them.
-     */
-    private static FunctionType completeFunctionSignatureOf(Type expected) {
-        Type unwrapped = expected instanceof NullableType nullable ? nullable.inner() : expected;
-        return unwrapped instanceof FunctionType functionType ? functionType : null;
-    }
-
-    /** How the expected type reads to a programmer, for the inference diagnostic's found clause. */
-    private String contextDescription() {
-        if (expectedTypes.isEmpty()) {
-            return "no expected type";
-        }
-        return "the expected type " + expectedTypes.peek().name();
-    }
-
     private Type checkThis(ThisExprNode expression) {
         if (checkingStaticMember) {
             // The enclosing class is still recorded so its type parameters resolve, so `this` must be
@@ -3170,20 +2708,6 @@ public final class SolvikSemanticAnalyzer {
         if (currentInterface != null) {
             // Inside a default method `this` is the conforming instance, statically the interface.
             return currentInterface.type();
-        }
-        if (currentBoundaryReceiver != null) {
-            // `[this]` was written on this closure, so the receiver reaches the body as a captured value
-            // rather than as a receiver in scope. Its type is the one the item resolved to wherever the
-            // outermost receiver lived, and a `this` here is exactly what a nested `[this]` forwards.
-            return currentBoundaryReceiver.type();
-        }
-        if (enclosingReceiverAvailable) {
-            // The receiver exists in an enclosing callable but no `[this]` item carried it into this
-            // anonymous function (docs/LANGUAGE_SPEC.md section 6, "Explicit immutable closure capture"):
-            // "a closure body may use `this` only when `[this]` is written".
-            error(DiagnosticCode.SEM_UNLISTED_CAPTURE, expression.span(), //
-                            "an anonymous function body uses 'this', which it does not capture");
-            return null;
         }
         error(DiagnosticCode.RESOL_THIS_OUTSIDE_CLASS, expression.span(), "'this' is only valid inside an instance method or constructor");
         return null;
@@ -3203,14 +2727,6 @@ public final class SolvikSemanticAnalyzer {
             return null;
         }
         if (currentClass == null) {
-            if (enclosingReceiverAvailable) {
-                // `super` reaches the enclosing class's superclass through the receiver, which an
-                // anonymous function does not have. The specification gives no capture form for `super`
-                // and no dedicated code, so this stays the outside-a-class diagnostic with a message
-                // that states the actual reason rather than the static-member one above.
-                error(DiagnosticCode.RESOL_SUPER_OUTSIDE_CLASS, span, "'super' is not available inside an anonymous function");
-                return null;
-            }
             error(DiagnosticCode.RESOL_SUPER_OUTSIDE_CLASS, span, "'super' is only valid inside an instance method or constructor");
             return null;
         }
@@ -3434,11 +2950,6 @@ public final class SolvikSemanticAnalyzer {
         if (target == null) {
             return BooleanType.INSTANCE;
         }
-        if (target instanceof FunctionType) {
-            error(DiagnosticCode.TYPE_INVALID_TYPE_OPERAND, expression.typeRef().span(), //
-                            "a function type cannot be the target of a type test");
-            return BooleanType.INSTANCE;
-        }
         if (target instanceof NullableType || target == NullType.INSTANCE) {
             error(DiagnosticCode.TYPE_INVALID_TYPE_OPERAND, expression.typeRef().span(), //
                             "a type test must name a non-null type");
@@ -3463,11 +2974,6 @@ public final class SolvikSemanticAnalyzer {
         Type target = resolveType(expression.typeRef());
         if (target == null) {
             return null;
-        }
-        if (target instanceof FunctionType) {
-            error(DiagnosticCode.TYPE_INVALID_TYPE_OPERAND, expression.typeRef().span(), //
-                            "a function type cannot be the target of a checked cast");
-            return target;
         }
         if (target instanceof NullableType || target == NullType.INSTANCE) {
             error(DiagnosticCode.TYPE_INVALID_TYPE_OPERAND, expression.typeRef().span(), //
@@ -3538,14 +3044,6 @@ public final class SolvikSemanticAnalyzer {
                         return resolveMethodCall(expression, name, member.get(), true);
                     }
                 }
-                // An unqualified call whose target resolves to nothing still has to be classified the way a
-                // plain name reference is: an outer function-valued binding the capture list omitted is an
-                // unlisted capture, a captured `var mutable` is the mutable-capture code, and a name an already
-                // reported capture item named earns no further report. Only after none of those apply is this
-                // genuinely an unknown name (docs/LANGUAGE_SPEC.md section 6).
-                if (reportCapturedMutableUse(name.name(), name.span()) || suppressesCascade(name.name()) || reportUnlistedCapture(name.name(), name.span())) {
-                    return null;
-                }
                 error(DiagnosticCode.RESOL_UNKNOWN_NAME, name.span(), "unknown name '" + name.name() + "'");
                 return null;
             }
@@ -3570,27 +3068,15 @@ public final class SolvikSemanticAnalyzer {
             }
             if (!(symbol instanceof FunctionSymbol function)) {
                 if (symbol instanceof VariableSymbol variable) {
-                    // A call through a function-typed binding is an indirect call, and a call through a
-                    // binding of any other type is the ordinary "not callable" error
-                    // (docs/LANGUAGE_SPEC.md section 6). Both must be decided from the binding's type
-                    // here rather than by falling through, because the callee resolves to a variable and
-                    // the code below assumes a call on a declaration.
+                    // A binding is never callable: functions and methods are declarations rather than
+                    // values, so no variable can hold a call target (docs/LANGUAGE_SPEC.md section 6).
                     nameSymbols.put(name, variable);
                     expressionTypes.put(name, variable.type());
-                    // The refined type is what decides callability, so a null check that has narrowed a
-                    // nullable function-typed binding makes the call legal, matching every other use of
-                    // the binding (docs/LANGUAGE_SPEC.md section 6: a nullable function value cannot be
-                    // invoked "without prior refinement or another existing non-null mechanism").
-                    Type refined = narrowedTypes.getOrDefault(variable, variable.type());
-                    if (refined instanceof FunctionType functionType) {
-                        return checkIndirectCall(expression, functionType);
-                    }
                 }
                 error(DiagnosticCode.TYPE_NOT_CALLABLE, name.span(), "'" + name.name() + "' is not a function");
                 return null;
             }
             nameSymbols.put(name, function);
-            expressionTypes.put(name, function.functionType());
             return resolveCallableType(expression, function.name(), function, Map.of());
         }
         QualifiedPrefix qualified = qualifiedPrefix(callee);
@@ -3614,53 +3100,14 @@ public final class SolvikSemanticAnalyzer {
             return checkMethodCall(expression, member);
         }
         if (callee instanceof NamespaceAccessExprNode) {
-            error(DiagnosticCode.RESOL_UNKNOWN_MODULE, callee.span(), "'::' must name a visible module or alias prefix");
+            error(DiagnosticCode.RESOL_UNKNOWN_MODULE, callee.span(), "'::' must name a module");
             return null;
         }
-        // A call whose callee is any other expression is indirect exactly when that expression has a
-        // function type; `f(1)` where `f` is a function-typed field or a collection element reaches here
-        // with an already-checked callee type, and must not be reported as "not callable"
-        // (docs/LANGUAGE_SPEC.md section 6).
-        if (checkExpression(callee) instanceof FunctionType functionType) {
-            return checkIndirectCall(expression, functionType);
-        }
+        // A callee of any other shape - a parenthesized expression, a block expression, a literal - is
+        // not a declaration and therefore not callable: no expression in the language has a function type.
+        checkExpression(callee);
         error(DiagnosticCode.TYPE_NOT_CALLABLE, callee.span(), "expression is not callable");
         return null;
-    }
-
-    /**
-     * Types a call through a function-typed value (docs/LANGUAGE_SPEC.md section 6, "Function values and
-     * invocation") and records it for lowering as an indirect call.
-     *
-     * <p>Arity is checked before argument-type compatibility, matching the ordering a resolved direct
-     * call uses, so a call that supplies the wrong number of arguments reports the count rather than a
-     * cascade of per-parameter mismatches. The declared parameter types come from the callee's own
-     * function type, which is what makes a contravariantly assignable callee accepted without any
-     * re-reading of the declaration it came from.
-     *
-     * <p>A nullable function type is not invocable and reaches the caller's "not callable" report: the
-     * specification requires a refinement or another existing non-null mechanism first, and every such
-     * mechanism is a separate expression form that would have produced a non-null type here.
-     */
-    private Type checkIndirectCall(CallExprNode expression, FunctionType functionType) {
-        if (!expression.typeArguments().isEmpty()) {
-            // A function value is monomorphic: it carries no type parameters to supply, so explicit
-            // arguments here would either be ignored or imply a runtime instantiation that does not exist.
-            for (TypeRef argument : expression.typeArguments()) {
-                resolveType(argument);
-            }
-            error(DiagnosticCode.TYPE_NOT_GENERIC, expression.span(), //
-                            "a function value is monomorphic, so it cannot be called with explicit type arguments");
-        }
-        // A function value is monomorphic, so every parameter type it declares is closed and can be
-        // supplied to its arguments as an expected type before they are checked.
-        List<Type> argumentTypes = checkArgumentTypesWithFinalParameters(expression, functionType.parameterTypes());
-        if (!checkArity(expression, "the called function value", functionType.parameterTypes().size(), argumentTypes.size())) {
-            return functionType.returnType();
-        }
-        checkArgumentTypesAgainst(expression, "the called function value", functionType.parameterTypes(), argumentTypes);
-        indirectCalls.put(expression, functionType);
-        return functionType.returnType();
     }
 
     /** Types {@code T(value)}, the explicit numeric conversion of docs/LANGUAGE_SPEC.md section 4. */
@@ -3835,33 +3282,6 @@ public final class SolvikSemanticAnalyzer {
         return property.type().substitute(composeSubstitutions(classSymbol.propertySubstitution(property), substitutionFor(receiverType)));
     }
 
-    /**
-     * Handles a call whose callee reads a property of function type: the call is indirect, invoking the
-     * stored value (docs/LANGUAGE_SPEC.md section 6, "Bound method references": "a property may itself
-     * have a function type ... member resolution decides statically whether `receiver.member` reads a
-     * stored function value or creates a bound method value").
-     *
-     * <p>Returns the call's result type, or {@code null} when the member is not a function-typed
-     * property, which lets the callers keep their existing "not callable" report for every other
-     * property. Only the stored-value half of that sentence is implemented: creating a bound method value
-     * is a later change, and no declared method reaches here as a property.
-     */
-    private Type checkCallThroughFunctionProperty(CallExprNode call, MemberAccessExprNode member, Type receiverType) {
-        ClassSymbol classSymbol = classSymbolFor(receiverType);
-        if (classSymbol == null) {
-            return null;
-        }
-        Optional<PropertySymbol> property = classSymbol.property(member.memberName());
-        if (property.isEmpty() || !(propertyTypeThrough(classSymbol, property.get(), receiverType) instanceof FunctionType functionType)) {
-            return null;
-        }
-        // The member read is recorded as the property read it is, so lowering evaluates the receiver and
-        // reads the slot exactly as an ordinary read of the same property would, and then invokes.
-        propertyAccesses.put(member, property.get());
-        expressionTypes.put(member, functionType);
-        return checkIndirectCall(call, functionType);
-    }
-
     /** Resolves {@code super.method(...)} to the immediate superclass implementation. */
     private Type checkSuperMethodCall(CallExprNode call, MemberAccessExprNode member) {
         ClassSymbol superClass = requireSuperclass(member.span());
@@ -3899,7 +3319,6 @@ public final class SolvikSemanticAnalyzer {
             return null;
         }
         FunctionSymbol target = method.get();
-        expressionTypes.put(member, target.functionType());
         Type result = resolveCallableType(call, superClass.name() + "." + target.name(), target, composeSubstitutions(superClass.methodSubstitution(target.name()), superTypeSubstitution()));
         methodCalls.put(call, new ResolvedMethod(target, true, true));
         return result;
@@ -4005,23 +3424,8 @@ public final class SolvikSemanticAnalyzer {
             methodCalls.put(call, new ResolvedMethod(target, false));
             return result;
         }
-        Optional<PropertySymbol> staticProperty = classSymbol.staticProperty(memberName);
-        if (staticProperty.isPresent()) {
-            // A static property whose declared type is a function type is invoked exactly like any other
-            // function value: section 6 reserves SOLV-TYPE-002 for "an invocation whose callee is not a
-            // function type", and this callee is one. The class name contributes no run-time evaluation,
-            // so the call reads the declaring class's static cell and invokes the stored value. Anything
-            // else — a non-function static property — stays the ordinary not-callable report.
-            Type propertyType = staticProperty.get().type().substitute(classSymbol.propertySubstitution(staticProperty.get()));
-            if (propertyType instanceof FunctionType functionType && call.callee() instanceof MemberAccessExprNode staticCallee) {
-                // The member read is recorded as the property read it is, so lowering reads the declaring
-                // class's static cell and invokes the stored value exactly as an ordinary read would, then
-                // invokes. A qualified reference reaches here with a member-access callee in every shape a
-                // static member call can take, so the read always has a node to record against.
-                propertyAccesses.put(staticCallee, staticProperty.get());
-                expressionTypes.put(staticCallee, functionType);
-                return checkIndirectCall(call, functionType);
-            }
+        if (classSymbol.staticProperty(memberName).isPresent()) {
+            // A static property holds data, never a call target (docs/LANGUAGE_SPEC.md section 6).
             error(DiagnosticCode.TYPE_NOT_CALLABLE, span, "static property '" + classSymbol.name() + "." + memberName + "' is not callable");
             return null;
         }
@@ -4050,14 +3454,10 @@ public final class SolvikSemanticAnalyzer {
      * class name, and an instance member of the same name is reported rather than resolved because the
      * write would need an object the reference does not supply (docs/LANGUAGE_SPEC.md section 7).
      *
-     * <p>Returns whether {@code value} was typed by the end of the check, which is the question
-     * {@link #checkMemberAssign} asks of every property check it makes. With {@code typesValueHere} the
-     * value is a reference to a generic function that this method types itself, against the declared type —
-     * a static property's type is a fact of the declaration, available without analyzing anything else.
-     * The paths that never reach a property return {@code false} so the reference still gets typed, and
-     * still gets its own report, beside this method's.
+     * <p>The value has already been typed by the caller, so this method only resolves the property and
+     * compares. A path that never reaches a property has still reported its own error.
      */
-    private boolean checkStaticPropertyAssign(MemberAccessExprNode target, ClassSymbol classSymbol, String memberName, ExpressionNode value, Type valueType, boolean typesValueHere) {
+    private void checkStaticPropertyAssign(MemberAccessExprNode target, ClassSymbol classSymbol, String memberName, ExpressionNode value, Type valueType) {
         Optional<PropertySymbol> staticProperty = classSymbol.staticProperty(memberName);
         if (staticProperty.isEmpty()) {
             if (classSymbol.staticMethod(memberName).isPresent() || classSymbol.method(memberName).isPresent()) {
@@ -4068,21 +3468,10 @@ public final class SolvikSemanticAnalyzer {
             } else {
                 error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, target.span(), "class " + classSymbol.name() + " has no static property '" + memberName + "'");
             }
-            return false;
+            return;
         }
         PropertySymbol property = staticProperty.get();
         propertyAccesses.put(target, property);
-        if (typesValueHere) {
-            // A static property's declared type is a fact of the declaration, so it can be supplied without
-            // analyzing anything else; this is the one place it is supplied, which is what keeps the
-            // classification of a static target in a single method.
-            expectedTypes.push(property.type());
-            try {
-                valueType = checkExpression(value);
-            } finally {
-                expectedTypes.pop();
-            }
-        }
         if (valueType != null && !assignableOrWidened(value, valueType, property.type())) {
             errorExpected(DiagnosticCode.TYPE_MISMATCH, value.span(), //
                             "value is not assignable to property type " + property.type().name(), property.type().name(), valueType.name());
@@ -4090,7 +3479,6 @@ public final class SolvikSemanticAnalyzer {
         if (!property.isMutable()) {
             error(DiagnosticCode.TYPE_ASSIGN_TO_IMMUTABLE, target.span(), "cannot assign to immutable '" + classSymbol.name() + "." + memberName + "'");
         }
-        return true;
     }
 
     /**
@@ -4310,10 +3698,9 @@ public final class SolvikSemanticAnalyzer {
             } else if (symbol instanceof EnumSymbol) {
                 error(DiagnosticCode.TYPE_ENUM_AS_VALUE, expression.span(), "enum '" + written + "' must be constructed through one of its variants");
             } else if (symbol instanceof FunctionSymbol function) {
-                // `module::name` names the same declaration as the unqualified name, so it must yield
-                // the same canonical function value and not a second identity
-                // (docs/LANGUAGE_SPEC.md section 6).
-                return functionValueOf(expression, function);
+                // `module::name` names the same declaration the unqualified name does, and it is still a
+                // declaration rather than a value (docs/LANGUAGE_SPEC.md section 6).
+                error(DiagnosticCode.TYPE_FUNCTION_AS_VALUE, expression.span(), "function '" + written + "' is not a value; call it as '" + written + "(...)'");
             } else {
                 error(DiagnosticCode.RESOL_UNKNOWN_NAME, expression.span(), "unknown name '" + written + "'");
             }
@@ -4345,13 +3732,11 @@ public final class SolvikSemanticAnalyzer {
             return null;
         }
         if (interfaceSymbol.member(expression.memberName()).isPresent()) {
-            // A declared interface method read without a call creates a bound method value, so an
-            // interface-typed receiver contributes a function value whose implementation the conforming
-            // instance selects (docs/LANGUAGE_SPEC.md section 6, "Bound method references"). Interfaces
-            // declare no type parameters, so the read type needs no substitution.
-            FunctionSymbol target = interfaceSymbol.member(expression.memberName()).get();
-            methodReferences.put(expression, new ResolvedMethod(target, false));
-            return target.functionType();
+            // A declared interface method read without a call would be a method value, and methods are
+            // declarations rather than values (docs/LANGUAGE_SPEC.md sections 6 and 8). An immediate call
+            // resolves through the call path instead, so the read is always this error.
+            error(DiagnosticCode.TYPE_FUNCTION_AS_VALUE, expression.span(), "method '" + expression.memberName() + "' cannot be used as a value; call it as '." + expression.memberName() + "(...)'");
+            return null;
         }
         error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, expression.span(), "interface " + interfaceType.name() + " has no member '" + expression.memberName() + "'");
         return null;
@@ -4428,15 +3813,9 @@ public final class SolvikSemanticAnalyzer {
             error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, member.span(), "type " + receiverType.name() + " has no member '" + member.memberName() + "'");
             return null;
         }
-        Optional<PropertySymbol> storedFunction = classSymbol.property(member.memberName());
-        if (storedFunction.isPresent()) {
-            // A property of function type holds a callable value, so the call invokes that value
-            // indirectly; any other property stays "not callable". The caller applies the receiver's
-            // nullability to the result, as it does for every other member call.
-            Type throughProperty = checkCallThroughFunctionProperty(call, member, receiverType);
-            if (throughProperty != null) {
-                return throughProperty;
-            }
+        if (classSymbol.property(member.memberName()).isPresent()) {
+            // A property holds data, never a call target: functions and methods are declarations rather
+            // than values (docs/LANGUAGE_SPEC.md section 6), so calling a property is always this error.
             error(DiagnosticCode.TYPE_NOT_CALLABLE, member.span(), "'" + member.memberName() + "' is not callable");
             return null;
         }
@@ -4446,7 +3825,6 @@ public final class SolvikSemanticAnalyzer {
             return null;
         }
         FunctionSymbol target = method.get();
-        expressionTypes.put(member, target.functionType());
         Type result = resolveCallableType(call, classSymbol.name() + "." + target.name(), target, composeSubstitutions(classSymbol.methodSubstitution(member.memberName()), substitutionFor(receiverType)));
         methodCalls.put(call, new ResolvedMethod(target, false));
         return result;
@@ -4559,7 +3937,6 @@ public final class SolvikSemanticAnalyzer {
             return null;
         }
         FunctionSymbol method = target.get();
-        expressionTypes.put(member, method.functionType());
         Type result = resolveCallableType(call, interfaceType.name() + "." + method.name(), method, substitutionFor(interfaceType));
         methodCalls.put(call, new ResolvedMethod(method, false));
         return result;
@@ -4567,7 +3944,6 @@ public final class SolvikSemanticAnalyzer {
 
     private Type resolveMethodCall(CallExprNode call, NameRefExprNode calleeName, FunctionSymbol method, boolean implicitThis) {
         nameSymbols.put(calleeName, method);
-        expressionTypes.put(calleeName, method.functionType());
         Type result = resolveCallableType(call, implicitReceiverLabel(method), method, Map.of());
         methodCalls.put(call, new ResolvedMethod(method, implicitThis));
         return result;
@@ -5127,19 +4503,6 @@ public final class SolvikSemanticAnalyzer {
             }
             return;
         }
-        // A declared parameter may itself be a function type whose parameter or result positions
-        // mention the type parameters, as `f: func(T): T`. A function value argument carries a
-        // monomorphic function type, so descending both sides is what binds `T` from it.
-        // Arity is deliberately not reconciled here: a mismatch leaves the parameter unbound and
-        // the caller reports the resulting defect, rather than unifyTypeParameter inventing a second
-        // arity diagnostic alongside the existing assignability one.
-        if (parameter instanceof FunctionType declaredFunction && argument instanceof FunctionType appliedFunction
-                && declaredFunction.parameterTypes().size() == appliedFunction.parameterTypes().size()) {
-            for (int i = 0; i < declaredFunction.parameterTypes().size(); i++) {
-                unifyTypeParameter(declaredFunction.parameterTypes().get(i), appliedFunction.parameterTypes().get(i), typeParameters, bindings);
-            }
-            unifyTypeParameter(declaredFunction.returnType(), appliedFunction.returnType(), typeParameters, bindings);
-        }
     }
 
     private static boolean containsTypeParameter(List<TypeParameterType> typeParameters, TypeParameterType candidate) {
@@ -5266,18 +4629,11 @@ public final class SolvikSemanticAnalyzer {
             return resolved.type().substitute(composeSubstitutions(classSymbol.propertySubstitution(resolved), substitutionFor(receiverType)));
         }
         if (classSymbol.method(expression.memberName()).isPresent()) {
-            // A declared instance method read without a call creates a bound method value (docs/
-            // LANGUAGE_SPEC.md section 6, "Bound method references"). The receiver expression is evaluated
-            // once and retained by the value, and the implementation is selected by that receiver's
-            // runtime class, so the recording carries no fixed target — the method name in the table is
-            // what an immediate call would dispatch on. A generic method is instantiated contextually
-            // under the same monomorphic rules as a generic top-level function reference.
-            FunctionSymbol target = classSymbol.method(expression.memberName()).get();
-            if (!target.typeParameters().isEmpty()) {
-                return instantiateGenericMethodReference(expression, target, classSymbol, receiverType);
-            }
-            methodReferences.put(expression, new ResolvedMethod(target, false));
-            return target.functionType().substitute(composeSubstitutions(classSymbol.methodSubstitution(expression.memberName()), substitutionFor(receiverType)));
+            // A declared instance method read without a call would be a method value, and methods are
+            // declarations rather than values (docs/LANGUAGE_SPEC.md section 6). An immediate call
+            // resolves through the call path instead, so the read is always this error.
+            error(DiagnosticCode.TYPE_FUNCTION_AS_VALUE, expression.span(), "method '" + expression.memberName() + "' cannot be used as a value; call it as '." + expression.memberName() + "(...)'");
+            return null;
         }
         error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, expression.span(), "class " + classSymbol.name() + " has no member '" + expression.memberName() + "'");
         return null;
@@ -5354,29 +4710,11 @@ public final class SolvikSemanticAnalyzer {
             return property.get().type().substitute(composeSubstitutions(superClass.propertySubstitution(property.get()), superTypeSubstitution()));
         }
         if (superClass.method(expression.memberName()).isPresent()) {
-            // A bare read of a universal member stays the compile-time error sections 3 and 23.4 require
-            // even through `super`: only a *declared* callable binds, and `toString`, `equals`, and
-            // `hashCode` are language-defined rather than declared (docs/LANGUAGE_SPEC.md section 6,
-            // "Bound method references"). A class may override one, which puts it in the superclass's
-            // method table, so this path has to refuse the name rather than bind the override it finds.
-            String universal = expression.memberName();
-            if ("toString".equals(universal) || "equals".equals(universal) || "hashCode".equals(universal)) {
-                error(DiagnosticCode.TYPE_FUNCTION_AS_VALUE, expression.span(), "method '" + universal + "' cannot be used as a value");
-                return null;
-            }
-            // `super.method` as a value binds the immediate superclass implementation without virtual
-            // redispatch, matching an immediate `super.method(...)` call (docs/LANGUAGE_SPEC.md section 6,
-            // "Bound method references"). The receiver is the enclosing `this`, supplied by lowering.
-            FunctionSymbol target = superClass.method(expression.memberName()).get();
-            Map<TypeParameterType, Type> receiverSubstitution = composeSubstitutions(superClass.methodSubstitution(expression.memberName()), superTypeSubstitution());
-            if (!target.typeParameters().isEmpty()) {
-                // A generic method reached through `super` is still a generic method reference, so it is
-                // instantiated contextually rather than left carrying the method's own unbound type
-                // parameters, which no assignability question could answer.
-                return instantiateGenericMethodReference(expression, target, receiverSubstitution, true);
-            }
-            methodReferences.put(expression, new ResolvedMethod(target, false, true));
-            return target.functionType().substitute(receiverSubstitution);
+            // A method read without a call is a method value, and methods are declarations rather than
+            // values (docs/LANGUAGE_SPEC.md section 6). An immediate `super.method(...)` call resolves
+            // through the call path instead, so the read is always this error.
+            error(DiagnosticCode.TYPE_FUNCTION_AS_VALUE, expression.span(), "method '" + expression.memberName() + "' cannot be used as a value; call it as '." + expression.memberName() + "(...)'");
+            return null;
         }
         error(DiagnosticCode.RESOL_UNKNOWN_MEMBER, expression.span(), "class " + superClass.name() + " has no member '" + expression.memberName() + "'");
         return null;
@@ -5399,188 +4737,6 @@ public final class SolvikSemanticAnalyzer {
         private final List<Type> boundTypes = new ArrayList<>();
         private final Set<String> seenPatterns = new HashSet<>();
         private boolean catchAll;
-    }
-
-    /**
-     * Types an anonymous function expression (docs/LANGUAGE_SPEC.md section 6, "Anonymous functions")
-     * as the function value it produces. Its parameter and return types resolve in the enclosing scope
-     * — they are written with concrete types, so nothing about the body's own scope reaches them — and
-     * its body is then checked as its own function boundary, so {@code break} and {@code continue}
-     * cannot cross into or out of it and a {@code return} returns from it. The result type of the
-     * expression is the function type the value has, which is what an assignment or a call site matches
-     * against.
-     *
-     * <p>The capture list is resolved in the enclosing scope <em>before</em> the body is checked, because a
-     * capture item names a binding of the enclosing function and so must resolve where the expression is
-     * written and not where its body is. {@link #resolveCaptures} produces both the values to bind in the
-     * body and the rejected {@code var mutable} names the body has to report, from that one resolution pass.
-     */
-    private Type checkAnonymousFunction(AnonymousFunctionExprNode expression) {
-        Map<String, TypeParameterType> previousScope = typeParameterScope;
-        typeParameterScope = Map.of();
-        List<VariableSymbol> parameters = buildParameters(expression.parameters());
-        Type returnType = resolveType(expression.returnType());
-        Captures captures = resolveCaptures(expression);
-        typeParameterScope = previousScope;
-        boolean returnTypeKnown = returnType != null;
-        FunctionSymbol function = FunctionSymbol.anonymous("<anonymous>", expression.span(), parameters, //
-                        returnType != null ? returnType : AnyType.INSTANCE, returnTypeKnown, expression.body(), captures.bound(), captures.rejected(), captures.suppressed());
-        checkCallable(function, expression.body(), null, false, true);
-        anonymousFunctions.put(expression, function);
-        return function.functionType();
-    }
-
-    /**
-     * Resolves one anonymous function's capture items against the closure-creation site (docs/LANGUAGE_SPEC.md
-     * section 6, "Explicit immutable closure capture") in a single pass, producing both the values to bind
-     * in the body — in source order, which the specification uses as environment order — and the names it
-     * rejected as {@code var mutable}s.
-     *
-     * <p>One pass over one resolution is the point: the rejected names have to reach the body so it can
-     * report the mutable-capture code for each use, and a second lookup could disagree with the first
-     * about what an item named. Both halves of the result come from the same decision about the same item.
-     *
-     * <p>Items resolve through the ordinary lexical chain, which is what makes capture transitivity
-     * structural rather than a rule to remember: the chain stops at the enclosing boundary, so the only
-     * outer name an inner item can find is one the enclosing closure itself holds — either its own local or
-     * a capture binding it declared. "In nested closures, a name used in an inner capture list counts as a
-     * use by the enclosing closure, so every intervening closure must list and forward that value
-     * explicitly" then follows from no name above the enclosing boundary being reachable at all.
-     *
-     * <p>An item that resolves to an immutable local or parameter is recorded directly, with the enclosing
-     * binding as its source: lowering gives it a slot of its own in the closure's frame, so the value is
-     * copied at creation and a later reassignment of the enclosing binding is invisible through the
-     * closure. An item that names a {@code var mutable} is reported and its name recorded, never bound — binding a
-     * mirror of it would be the silent conversion the specification forbids. An item naming {@code this} is
-     * recorded with no source binding and becomes the receiver of the created value.
-     */
-    private Captures resolveCaptures(AnonymousFunctionExprNode expression) {
-        List<CapturedValue> bound = new ArrayList<>();
-        Set<String> rejected = new LinkedHashSet<>();
-        Set<String> suppressed = new LinkedHashSet<>();
-        for (CaptureItem item : expression.captures()) {
-            if (item.isThis()) {
-                CapturedValue receiver = resolveReceiverCapture(item);
-                if (receiver != null) {
-                    bound.add(receiver);
-                }
-                continue;
-            }
-            Symbol resolved = symbols.resolveLocalChain(item.name()).orElse(null);
-            if (resolved == null) {
-                if (declaringBindingNamed(item.name())) {
-                    // Naming the binding this very expression initializes is the one case where a capture
-                    // item names a real binding that resolution cannot see, because that binding is not
-                    // declared until the initializer this expression belongs to has produced a value. The
-                    // specification calls it read-before-initialization rather than invalid or unknown,
-                    // which is honest about the cause: the value does not exist yet.
-                    error(DiagnosticCode.TYPE_UNINITIALIZED_VARIABLE, item.span(), "capture item '" + item.name() + "' names the variable being initialized");
-                    // The item reported the root cause, and the body's use of the same spelling would be a
-                    // second report of the same defect. It is suppressed rather than re-coded, because the
-                    // body cannot mean anything the item did not already name.
-                    suppressed.add(item.name());
-                    continue;
-                }
-                // "An unknown name in a capture list remains SOLV-RESOL-001": the item position earns no
-                // different code, so a typo in a capture list reads like a typo anywhere else.
-                error(DiagnosticCode.RESOL_UNKNOWN_NAME, item.span(), "unknown name '" + item.name() + "' in capture list");
-                suppressed.add(item.name());
-                continue;
-            }
-            // Unreachable under the current grammar, and allow-listed as such by
-            // SolvikDiagnosticCodeCoverageTest: `resolveLocalChain` walks only the scopes below the root
-            // scope, and the only symbols declared into those scopes are VariableSymbols, so a capture
-            // item naming a function, class, enum, or interface resolves to nothing and is reported above
-            // as SOLV-RESOL-001. Kept live deliberately: a future revision that declares a non-variable
-            // symbol into a function scope makes this the correct diagnostic, and the alternative is to
-            // bind the item to a symbol that capture is defined to reject. The allow-list entry in
-            // SolvikDiagnosticCodeCoverageTest carries the full reachability analysis.
-            if (!(resolved instanceof VariableSymbol binding)) {
-                error(DiagnosticCode.SEM_INVALID_CAPTURE, item.span(), "'" + item.name() + "' names a " + symbolKind(resolved) + ", which capture cannot bind");
-                suppressed.add(item.name());
-                continue;
-            }
-            if (binding.isMutable()) {
-                error(DiagnosticCode.SEM_MUTABLE_CAPTURE, item.span(), "capture item '" + item.name() + "' names a mutable 'var mutable' binding, which capture cannot bind");
-                rejected.add(item.name());
-                continue;
-            }
-            bound.add(CapturedValue.ofBinding(item, binding));
-        }
-        return new Captures(List.copyOf(bound), Set.copyOf(rejected), Set.copyOf(suppressed));
-    }
-
-    /**
-     * What one capture list resolved to: the values its accepted items bind in the body, the names its
-     * rejected {@code var mutable} items leave unbound so the body can still report them, and the names its other
-     * reported items leave unbound so the body reports them no further.
-     */
-    private record Captures(List<CapturedValue> bound, Set<String> rejected, Set<String> suppressed) {
-
-        Captures {
-            bound = List.copyOf(bound);
-            rejected = Set.copyOf(rejected);
-            suppressed = Set.copyOf(suppressed);
-        }
-    }
-
-    /**
-     * Resolves a written {@code this} capture item. "a closure body may use {@code this} only when
-     * {@code [this]} is written", and the item itself needs an enclosing instance receiver to name:
-     * {@code this} where none exists "remains {@code SOLV-RESOL-005}", which is the same decision
-     * {@link #checkThis} makes for a body that writes {@code this} without capturing it.
-     *
-     * <p>An item written inside another closure forwards that closure's captured receiver rather than
-     * finding a receiver of its own, because a closure body has no receiver and the enclosing closure is
-     * the only thing that could supply one. The forwarding item is still required: it is the written use
-     * that obliges the intervening closure to carry the value.
-     */
-    private CapturedValue resolveReceiverCapture(CaptureItem item) {
-        if (currentBoundaryReceiver != null) {
-            return CapturedValue.ofReceiver(currentBoundaryReceiver.type(), item.span());
-        }
-        Type receiverType = enclosingReceiverType();
-        if (receiverType == null) {
-            error(DiagnosticCode.RESOL_THIS_OUTSIDE_CLASS, item.span(), "'this' is only valid inside an instance method or constructor");
-            return null;
-        }
-        return CapturedValue.ofReceiver(receiverType, item.span());
-    }
-
-    /**
-     * The static type of the receiver an enclosing callable would offer a {@code [this]} capture, or
-     * {@code null} when no enclosing instance callable exists. Derived from the same fields
-     * {@link #checkThis} consults, so the two cannot disagree about whether a receiver is in scope; a
-     * static member records no receiver, because it runs with none.
-     */
-    private Type enclosingReceiverType() {
-        if (checkingStaticMember) {
-            return null;
-        }
-        if (currentClass != null) {
-            return currentClass.type();
-        }
-        if (currentInterface != null) {
-            return currentInterface.type();
-        }
-        return null;
-    }
-
-    /** What kind of declaration a captured name resolved to, for a diagnostic that must say why it is not capturable. */
-    private static String symbolKind(Symbol symbol) {
-        if (symbol instanceof FunctionSymbol) {
-            return "function declaration";
-        }
-        if (symbol instanceof ClassSymbol) {
-            return "class";
-        }
-        if (symbol instanceof InterfaceSymbol) {
-            return "interface";
-        }
-        if (symbol instanceof EnumSymbol) {
-            return "enum";
-        }
-        return "declaration";
     }
 
     /**
@@ -6109,17 +5265,6 @@ public final class SolvikSemanticAnalyzer {
 
     /** A canonical signature of a written type reference, including its nullable marker. */
     private static String typeRefSignature(TypeRef reference) {
-        if (reference instanceof FunctionTypeRefNode function) {
-            StringBuilder parameters = new StringBuilder("func(");
-            for (int i = 0; i < function.parameterRefs().size(); i++) {
-                if (i > 0) {
-                    parameters.append(',');
-                }
-                parameters.append(typeRefSignature(function.parameterRefs().get(i)));
-            }
-            parameters.append("): ").append(typeRefSignature(function.returnTypeRef()));
-            return function.isNullable() ? "(" + parameters + ")?" : parameters.toString();
-        }
         TypeRefNode nominal = (TypeRefNode) reference;
         StringBuilder signature = new StringBuilder(nominal.name());
         if (!nominal.arguments().isEmpty()) {
@@ -6410,31 +5555,9 @@ public final class SolvikSemanticAnalyzer {
         if (resolvedTypes.containsKey(reference)) {
             return resolvedTypes.get(reference);
         }
-        Type result = reference instanceof FunctionTypeRefNode functionRef //
-                ? resolveFunctionTypeReference(functionRef)
-                : resolveTypeUncached((TypeRefNode) reference);
+        Type result = resolveTypeUncached((TypeRefNode) reference);
         resolvedTypes.put(reference, result);
         return result;
-    }
-
-    /**
-     * Resolves a written function type reference to the canonical {@link FunctionType}. The result
-     * type is synthesized as {@code Unit} when omitted, matching a callable with no declared return.
-     * Any component that failed to resolve becomes {@link AnyType} so the recorded error, not a
-     * null reference, is what downstream checks observe.
-     */
-    private Type resolveFunctionTypeReference(FunctionTypeRefNode reference) {
-        List<Type> parameterTypes = new ArrayList<>(reference.parameterRefs().size());
-        for (TypeRef parameterRef : reference.parameterRefs()) {
-            Type parameterType = resolveType(parameterRef);
-            parameterTypes.add(parameterType == null ? AnyType.INSTANCE : parameterType);
-        }
-        Type returnType = resolveType(reference.returnTypeRef());
-        Type function = FunctionType.canonical(parameterTypes, returnType == null ? AnyType.INSTANCE : returnType);
-        // The grouped `(func(...): R)?` spelling makes the whole function value nullable; the
-        // ungrouped `func(...): R?` nulls only the result, which the nested return reference already
-        // recorded. isNullable() is set exactly for the grouped form (docs/LANGUAGE_SPEC.md section 11).
-        return reference.isNullable() ? function.nullableView() : function;
     }
 
     private Type resolveTypeUncached(TypeRefNode reference) {
@@ -6460,16 +5583,15 @@ public final class SolvikSemanticAnalyzer {
         } else {
             Optional<Type> resolved;
             if (reference.hasModulePrefix()) {
-                String moduleName = currentPrefixes.get(reference.modulePrefix());
-                if (moduleName == null) {
+                ModuleContents contents = modules.get(reference.modulePrefix());
+                if (contents == null) {
                     errorExpected(DiagnosticCode.RESOL_UNKNOWN_MODULE, reference.span(), //
-                                    "unknown module prefix '" + reference.modulePrefix() + "'", "a visible module prefix", "'" + reference.modulePrefix() + "'");
+                                    "unknown module '" + reference.modulePrefix() + "'", "a declared module", "'" + reference.modulePrefix() + "'");
                     for (TypeRef argument : reference.arguments()) {
                         resolveType(argument);
                     }
                     return null;
                 }
-                ModuleContents contents = modules.get(moduleName);
                 Type moduleType = contents == null ? null : contents.types.get(reference.name());
                 resolved = Optional.ofNullable(moduleType);
             } else {
@@ -6478,6 +5600,14 @@ public final class SolvikSemanticAnalyzer {
                 resolved = moduleType != null ? Optional.of(moduleType) : typeEnvironment.resolve(reference.name());
             }
             if (resolved.isEmpty()) {
+                if (!reference.hasModulePrefix() && "Unit".equals(reference.name())) {
+                    // The retired source-level Unit type earns a message that names the replacement
+                    // rather than the generic unknown-type report (docs/LANGUAGE_SPEC.md section 6).
+                    errorExpected(DiagnosticCode.RESOL_UNKNOWN_TYPE, reference.span(), //
+                                    "there is no 'Unit' type; a callable that writes no ': Type' produces no value", //
+                                    "no return type annotation", "'Unit'");
+                    return null;
+                }
                 String written = reference.hasModulePrefix() ? reference.modulePrefix() + "." + reference.name() : reference.name();
                 errorExpected(DiagnosticCode.RESOL_UNKNOWN_TYPE, reference.span(), //
                                 "unknown type '" + written + "'", "a declared or built-in type", "'" + written + "'");

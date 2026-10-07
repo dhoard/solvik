@@ -191,55 +191,157 @@ def rej(tid, req, src, libs=None, code=None):
 
 # --- REQ-1900: a newline ends a construct; `;` only separates one line.
 succ("SOL-TCK-0286", "REQ-1900",
-     'var a = 1\nvar b = 2\nprint("n" .. a .. b)\n', "n12")
+     (('var a: Integer = 1\n'
+    'var b: Integer = 2\n'
+    'print("n" .. a .. b)\n'
+    '')), "n12")
 succ("SOL-TCK-0287", "REQ-1900",
-     'var a = 1; var b = 2\nprint("x" .. a .. b)\n', "x12")
+     (('var a: Integer = 1; var b: Integer = 2\n'
+    'print("x" .. a .. b)\n'
+    '')), "x12")
 rej("SOL-TCK-0288", "REQ-1900",
-    'var a = 1 print("a" .. a)\n' + NEG)
+    ('var a: Integer = 1 print("a" .. a)\n'
+    '\n'
+    'print("EXECUTED-INVALID")\n'
+    ''))
 # The three SOLV-PARS-012 arms: the `;` ends its line, ends the file, and
 # precedes the stand-alone closing brace of the block that encloses it.
 rej("SOL-TCK-0496", "REQ-1900",
-    'var a = 1;\nprint("s" .. a)\n' + NEG, code="SOLV-PARS-012")
+    ('var a: Integer = 1;\n'
+    'print("s" .. a)\n'
+    '\n'
+    'print("EXECUTED-INVALID")\n'
+    ''), code="SOLV-PARS-012")
 rej("SOL-TCK-0497", "REQ-1900",
-    'var v = {\n    42;\n}\nprint("v" .. v)\n' + NEG, code="SOLV-PARS-012")
+    ('var v: Integer = {\n'
+    '    42;\n'
+    '}\n'
+    'print("v" .. v)\n'
+    '\n'
+    'print("EXECUTED-INVALID")\n'
+    ''), code="SOLV-PARS-012")
 rej("SOL-TCK-0498", "REQ-1900",
-    'var a = 1\nprint("e" .. a);', code="SOLV-PARS-012")
+    (('var a: Integer = 1\n'
+    'print("e" .. a);')), code="SOLV-PARS-012")
 
 # --- REQ-1901: bracketed continuations are grammar, not lookahead.
 succ("SOL-TCK-0289", "REQ-1901",
-     'func add(x: Integer, y: Integer): Integer {\n    return x + y\n}\nvar v = add(\n    1,\n    2,\n)\nprint("v" .. v)\n', "v3")
+     (('func add(x: Integer, y: Integer): Integer {\n'
+    '    return x + y\n'
+    '}\n'
+    'var v: Integer = add(\n'
+    '    1,\n'
+    '    2,\n'
+    ')\n'
+    'print("v" .. v)\n'
+    '')), "v3")
 rej("SOL-TCK-0290", "REQ-1901",
-    'var v = 1\n    + 2\nprint("v" .. v)\n' + NEG)
+    ('var v: Integer = 1\n'
+    '    + 2\n'
+    'print("v" .. v)\n'
+    '\n'
+    'print("EXECUTED-INVALID")\n'
+    ''))
 
 # --- REQ-1902: operators and commas continue; operator lines do not join.
 succ("SOL-TCK-0291", "REQ-1902",
-     'var a = 1\nvar b = a +\n    1\nprint("b" .. b)\n', "b2")
+     (('var a: Integer = 1\n'
+    'var b: Integer = a +\n'
+    '    1\n'
+    'print("b" .. b)\n'
+    '')), "b2")
 succ("SOL-TCK-0292", "REQ-1902",
-     'class C {\n    C(x: Integer, y: Integer) {\n        this.sum = x + y\n    }\n\n    var sum: Integer\n}\n'
-     'var c = C(1,\n    2)\nprint("r" .. c.sum)\n', "r3")
+     (('class C {\n'
+    '    C(x: Integer, y: Integer) {\n'
+    '        this.sum = x + y\n'
+    '    }\n'
+    '\n'
+    '    var sum: Integer\n'
+    '}\n'
+    'var c: C = C(1,\n'
+    '    2)\n'
+    'print("r" .. c.sum)\n'
+    '')), "r3")
 rej("SOL-TCK-0293", "REQ-1902",
-    'var a = 1\nvar b = a\n    + 1\nprint("b" .. b)\n' + NEG)
+    ('var a: Integer = 1\n'
+    'var b: Integer = a\n'
+    '    + 1\n'
+    'print("b" .. b)\n'
+    '\n'
+    'print("EXECUTED-INVALID")\n'
+    ''))
 rej("SOL-TCK-0294", "REQ-1902",
-    'var a = 2\nvar b = a\n    * 3\nprint("b" .. b)\n' + NEG)
+    ('var a: Integer = 2\n'
+    'var b: Integer = a\n'
+    '    * 3\n'
+    'print("b" .. b)\n'
+    '\n'
+    'print("EXECUTED-INVALID")\n'
+    ''))
 
 # --- REQ-1903: member-suffix continuation and the canonical standalone `else`.
 succ("SOL-TCK-0295", "REQ-1903",
-     'class S {\n    S() {\n    }\n\n    func load(): S {\n        return this\n    }\n\n'
-     '    func value(): Integer {\n        return 42\n    }\n}\n'
-     'var s = S()\nvar r = s\n    .load()\n    .value()\nprint("r" .. r)\n', "r42")
+     (('class S {\n'
+    '    S() {\n'
+    '    }\n'
+    '\n'
+    '    method load(): S {\n'
+    '        return this\n'
+    '    }\n'
+    '\n'
+    '    method value(): Integer {\n'
+    '        return 42\n'
+    '    }\n'
+    '}\n'
+    'var s: S = S()\n'
+    'var r: Integer = s\n'
+    '    .load()\n'
+    '    .value()\n'
+    'print("r" .. r)\n'
+    '')), "r42")
 succ("SOL-TCK-0296", "REQ-1903",
-     'class W {\n    W() {\n    }\n\n    func opt(): String? {\n        return "z"\n    }\n}\n'
-     'var w = W()\nvar v = w.opt()\n    ?.hashCode()\nprint("v" .. (v != null))\n', "vtrue")
+     (('class W {\n'
+    '    W() {\n'
+    '    }\n'
+    '\n'
+    '    method opt(): String? {\n'
+    '        return "z"\n'
+    '    }\n'
+    '}\n'
+    'var w: W = W()\n'
+    'var v: Integer? = w.opt()\n'
+    '    ?.hashCode()\n'
+    'print("v" .. (v != null))\n'
+    '')), "vtrue")
 succ("SOL-TCK-0297", "REQ-1903",
-     'var c = false\nif (c) {\n    print("y")\n}\nelse {\n    print("n")\n}\n', "n")
+     (('var c: Boolean = false\n'
+    'if (c) {\n'
+    '    print("y")\n'
+    '}\n'
+    'else {\n'
+    '    print("n")\n'
+    '}\n'
+    '')), "n")
 succ("SOL-TCK-0298", "REQ-1903",
-     'var c = true\nvar r = if (c) {\n    1\n}\nelse {\n    2\n}\nprint("r" .. r)\n', "r1")
+     (('var c: Boolean = true\n'
+    'var r: Integer = if (c) {\n'
+    '    1\n'
+    '}\n'
+    'else {\n'
+    '    2\n'
+    '}\n'
+    'print("r" .. r)\n'
+    '')), "r1")
 
 # --- REQ-1904: a newline inside a comment is a physical newline.
 succ("SOL-TCK-0299", "REQ-1904",
-     'var a = 1 /* c\n*/ print("bc" .. a)\n', "bc1")
+     (('var a: Integer = 1 /* c\n'
+    '*/ print("bc" .. a)\n'
+    '')), "bc1")
 succ("SOL-TCK-0300", "REQ-1904",
-     'var a = 1 // note\nprint("lc" .. a)\n', "lc1")
+     (('var a: Integer = 1 // note\n'
+    'print("lc" .. a)\n'
+    '')), "lc1")
 
 # --- REQ-1905: `return` followed by a newline is a complete bare return.
 rej("SOL-TCK-0301", "REQ-1905",
@@ -254,9 +356,17 @@ succ("SOL-TCK-0303", "REQ-1905",
 
 # --- REQ-1906: blank lines add no second boundary; EOF closes the final line.
 succ("SOL-TCK-0304", "REQ-1906",
-     'var a = 1\n\n\nvar b = 2\n\nprint("z" .. a .. b)\n', "z12")
+     (('var a: Integer = 1\n'
+    '\n'
+    '\n'
+    'var b: Integer = 2\n'
+    '\n'
+    'print("z" .. a .. b)\n'
+    '')), "z12")
 add("SOL-TCK-0305", "REQ-1906", "syntax",
-    'var a = 1\nvar b = 2\nprint("e" .. a .. b)', "SUCCESS", stdout="e12")
+    (('var a: Integer = 1\n'
+    'var b: Integer = 2\n'
+    'print("e" .. a .. b)')), "SUCCESS", stdout="e12")
 
 # --- REQ-1907: an include ends where its physical line ends.
 LIBDIR = {"lib/m.sol": LIB}

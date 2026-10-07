@@ -49,15 +49,16 @@ public final class SolvikStaticMemberSemanticTest {
     public void staticMembersAreRecordedSeparatelyFromInstanceMembers() {
         ClassSymbol counter = check("""
                 class Counter {
-                    static var limit: Integer = 10
-                    static func reset() {
+                    var static limit: Integer = 10
+                    method static reset() {
                         println("reset")
                     }
                     var id: Integer = 1
-                    func describe(): String {
+                    method describe(): String {
                         return "counter"
                     }
                 }
+
                 """).classSymbol("Counter").orElseThrow();
 
         assertThat(counter.declaredStaticProperties()).hasSize(1);
@@ -80,8 +81,9 @@ public final class SolvikStaticMemberSemanticTest {
         ClassSymbol counter = check("""
                 class Counter {
                     var id: Integer = 1
-                    static var limit: Integer = 10
+                    var static limit: Integer = 10
                 }
+
                 """).classSymbol("Counter").orElseThrow();
 
         // The instance property keeps slot 0; the static is marked with the sentinel so lowering can
@@ -95,9 +97,10 @@ public final class SolvikStaticMemberSemanticTest {
     public void aStaticPropertyKeepsItsOwnDeclaredTypeAndMutability() {
         ClassSymbol counter = check("""
                 class Counter {
-                    static var limit: Integer = 10
-                    static var mutable attempts: String = "none"
+                    var static limit: Integer = 10
+                    var static mutable attempts: String = "none"
                 }
+
                 """).classSymbol("Counter").orElseThrow();
 
         PropertySymbol limit = counter.staticProperty("limit").orElseThrow();
@@ -114,13 +117,14 @@ public final class SolvikStaticMemberSemanticTest {
     public void aStaticMethodIsMarkedStaticWhileAnInstanceMethodIsNot() {
         ClassSymbol counter = check("""
                 class Counter {
-                    static func reset() {
+                    method static reset() {
                         println("reset")
                     }
-                    func describe(): String {
+                    method describe(): String {
                         return "counter"
                     }
                 }
+
                 """).classSymbol("Counter").orElseThrow();
 
         FunctionSymbol reset = counter.staticMethod("reset").orElseThrow();
@@ -132,11 +136,12 @@ public final class SolvikStaticMemberSemanticTest {
     public void theClassInitializerBlockIsRecordedOnTheClassSymbol() {
         ClassSymbol counter = check("""
                 class Counter {
-                    static var limit: Integer = 10
+                    var static limit: Integer = 10
                     static {
                         println("initializing")
                     }
                 }
+
                 """).classSymbol("Counter").orElseThrow();
 
         assertThat(counter.staticBlock()).isPresent();
@@ -148,10 +153,11 @@ public final class SolvikStaticMemberSemanticTest {
         ClassSymbol plain = check("""
                 class Plain {
                     var id: Integer = 1
-                    func describe(): String {
+                    method describe(): String {
                         return "plain"
                     }
                 }
+
                 """).classSymbol("Plain").orElseThrow();
 
         assertThat(plain.declaredStaticProperties()).isEmpty();
@@ -165,9 +171,10 @@ public final class SolvikStaticMemberSemanticTest {
         // rule is reported for instance properties only, never for a static without one.
         CheckedProgram program = check("""
                 class Counter {
-                    static var limit: Integer
+                    var static limit: Integer
                     var id: Integer = 1
                 }
+
                 """);
         ClassSymbol counter = program.classSymbol("Counter").orElseThrow();
         assertThat(counter.properties()).hasSize(1);
@@ -182,13 +189,14 @@ public final class SolvikStaticMemberSemanticTest {
         // is the counterpart to the negative test that forbids reaching an instance method.
         CheckedProgram program = check("""
                 class Counter {
-                    static func base(): Integer {
+                    method static base(): Integer {
                         return 1
                     }
-                    static func total(): Integer {
+                    method static total(): Integer {
                         return base()
                     }
                 }
+
                 """);
         ClassSymbol counter = program.classSymbol("Counter").orElseThrow();
         assertThat(counter.staticMethod("total")).isPresent();
@@ -198,13 +206,14 @@ public final class SolvikStaticMemberSemanticTest {
     public void aClassInitializerMayCallASiblingStaticMethod() {
         check("""
                 class Counter {
-                    static func initialize(): Integer {
+                    method static initialize(): Integer {
                         return 1
                     }
                     static {
                         var ignored: Integer = initialize()
                     }
                 }
+
                 """);
     }
 
@@ -214,10 +223,11 @@ public final class SolvikStaticMemberSemanticTest {
         // Java's `static <T> T id(T value)`.
         ClassSymbol counter = check("""
                 class Counter {
-                    static func identity<Value>(value: Value): Value {
+                    method static identity<Value>(value: Value): Value {
                         return value
                     }
                 }
+
                 """).classSymbol("Counter").orElseThrow();
 
         FunctionSymbol identity = counter.staticMethod("identity").orElseThrow();
@@ -229,12 +239,14 @@ public final class SolvikStaticMemberSemanticTest {
         // Statics are reached through the declaring class's name, so a base and a derived class sharing
         // a static name are two independent members rather than a shadowing conflict.
         CheckedProgram program = check("""
-                mutable class Base {
-                    static var label: String = "base"
+                class mutable Base {
+                    var static label: String = "base"
                 }
                 class Derived extends Base {
-                    static var label: String = "derived"
+                    var static label: String = "derived"
                 }
+
+
                 """);
         ClassSymbol base = program.classSymbol("Base").orElseThrow();
         ClassSymbol derived = program.classSymbol("Derived").orElseThrow();
@@ -254,16 +266,17 @@ public final class SolvikStaticMemberSemanticTest {
         check("""
                 class Counter {
                     var id: Integer = 1
-                    func count(): Integer {
+                    method count(): Integer {
                         return this.id
                     }
-                    func twice(): Integer {
+                    method twice(): Integer {
                         return this.count()
                     }
-                    static func reset() {
+                    method static reset() {
                         println("reset")
                     }
                 }
+
                 """);
     }
 
@@ -271,11 +284,12 @@ public final class SolvikStaticMemberSemanticTest {
     public void aStaticMemberInOneClassDoesNotLeakIntoAnUnrelatedClass() {
         ClassSymbol other = check("""
                 class Counter {
-                    static var limit: Integer = 10
+                    var static limit: Integer = 10
                 }
                 class Other {
                     var id: Integer = 1
                 }
+
                 """).classSymbol("Other").orElseThrow();
 
         assertThat(other.declaredStaticProperties()).isEmpty();
@@ -289,12 +303,13 @@ public final class SolvikStaticMemberSemanticTest {
         // must not displace or corrupt the recorded entry point.
         CheckedProgram program = check("""
                 class Counter {
-                    static var limit: Integer = 10
-                    static func reset() {
+                    var static limit: Integer = 10
+                    method static reset() {
                         println("reset")
                     }
                 }
                 println("running")
+
                 """);
         assertThat(program.entryPoint()).isPresent();
         assertThat(program.classSymbol("Counter").orElseThrow().declaredStaticProperties()).hasSize(1);

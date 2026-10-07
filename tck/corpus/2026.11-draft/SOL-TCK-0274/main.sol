@@ -1,12 +1,12 @@
-mutable class Both {
+class mutable Both {
     Both() {
     }
 
-    override func equals(other: Any?): Boolean {
+    method override equals(other: Any?): Boolean {
         return true
     }
 
-    override func hashCode(): Integer {
+    method override hashCode(): Integer {
         return 5
     }
 }
@@ -14,5 +14,5 @@ class Plain extends Both {
     Plain() {
     }
 }
-var s = Plain()
+var s: Plain = Plain()
 print("inh" .. (s == s) .. s.hashCode())

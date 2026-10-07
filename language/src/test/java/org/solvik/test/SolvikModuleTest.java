@@ -30,7 +30,6 @@ import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Source;
 import org.junit.jupiter.api.Test;
 import org.solvik.ast.CompilationUnitNode;
-import org.solvik.ast.declaration.IncludeDeclNode;
 import org.solvik.diagnostic.DiagnosticCode;
 import org.solvik.parser.IncludeResolutionResult;
 import org.solvik.parser.SolvikParseResult;
@@ -40,8 +39,8 @@ import org.solvik.semantic.SolvikSemanticAnalyzer;
 import org.solvik.source.SourceFile;
 
 /**
- * Module namespaces and aliased includes (docs/LANGUAGE_SPEC.md section 20): parsing, name
- * validation, module merging, module-aware resolution, and end-to-end execution.
+ * Module namespaces (docs/LANGUAGE_SPEC.md section 20): module-block parsing, name validation,
+ * module merging, module-aware resolution, and end-to-end execution.
  */
 public final class SolvikModuleTest {
 
@@ -62,7 +61,7 @@ public final class SolvikModuleTest {
 
     private static SemanticResult analyze(IncludeResolutionResult resolved) {
         assertThat(resolved.isSuccess()).as("resolution must succeed: " + resolved.diagnostics().all()).isTrue();
-        return SolvikSemanticAnalyzer.analyze(resolved.requireUnit(), resolved.itemScopes());
+        return SolvikSemanticAnalyzer.analyze(resolved.requireUnit());
     }
 
     private static void assertDiagnostic(SemanticResult result, DiagnosticCode expected) {
@@ -82,35 +81,66 @@ public final class SolvikModuleTest {
     // ---------------------------------------------------------------------------------------------
 
     @Test
-    public void moduleAndAliasParse() {
-        CompilationUnitNode unit = parseOk("module com_example_util\ninclude \"lib.sol\" alias util\n");
-        assertThat(unit.moduleDeclaration().isPresent()).isTrue();
-        assertThat(unit.moduleDeclaration().get().name()).isEqualTo("com_example_util");
-        IncludeDeclNode include = (IncludeDeclNode) unit.items().get(0);
-        assertThat(include.hasAlias()).isTrue();
-        assertThat(include.alias()).isEqualTo("util");
+    public void moduleBlockParsesAndCarriesItsDeclarations() {
+        CompilationUnitNode unit = parseOk("module util {\n    func add(a: Integer, b: Integer): Integer {\n        return a + b\n    }\n}\n");
+        assertThat(unit.modules()).hasSize(1);
+        assertThat(unit.modules().get(0).name()).isEqualTo("util");
+        // A module block is structural: its declarations remain declarations of the compilation unit,
+        // and each one can be asked which module it belongs to.
+        assertThat(unit.declarations()).hasSize(1);
+        assertThat(unit.moduleNameOf(unit.declarations().get(0))).contains("util");
     }
 
     @Test
-    public void unaliasedIncludeHasNoAlias() {
-        CompilationUnitNode unit = parseOk("include \"lib.sol\"\n");
-        IncludeDeclNode include = (IncludeDeclNode) unit.items().get(0);
-        assertThat(include.hasAlias()).isFalse();
-        assertThat(include.alias()).isNull();
+    public void declarationsOutsideEveryBlockBelongToTheDefaultModule() {
+        CompilationUnitNode unit = parseOk("func f(): Integer {\n    return 1\n}\n");
+        assertThat(unit.modules()).isEmpty();
+        assertThat(unit.declarations()).hasSize(1);
+        assertThat(unit.moduleNameOf(unit.declarations().get(0))).isEmpty();
+    }
+
+    @Test
+    public void oneFileMayDeclareModulesAndDefaultModuleStatements() {
+        CompilationUnitNode unit = parseOk("module util {\n    func f(): Integer {\n        return 1\n    }\n}\n\nprintln(1)\n");
+        assertThat(unit.modules()).hasSize(1);
+        assertThat(unit.statements()).hasSize(1);
+    }
+
+    @Test
+    public void oneFileMayDeclareSeveralModules() {
+        CompilationUnitNode unit = parseOk("module first {\n}\nmodule second {\n}\n");
+        assertThat(unit.modules()).extracting(module -> module.name()).containsExactly("first", "second");
+    }
+
+    @Test
+    public void nestedModuleBlockIsRejected() {
+        parseFails("module outer {\n    module inner {\n    }\n}\n");
+    }
+
+    @Test
+    public void statementInsideANamedModuleIsRejected() {
+        parseFails("module util {\n    println(1)\n}\n");
     }
 
     @Test
     public void dottedModuleNameIsRejected() {
-        parseFails("module foo.bar\n");
+        parseFails("module foo.bar {\n}\n");
+    }
+
+    @Test
+    public void includeAliasModifierIsRejected() {
+        // Aliases are gone: a file references another module through the module's own name, so the
+        // retired `alias` clause is rejected rather than reinterpreted.
+        parseFails("include \"lib.sol\" alias util\n");
     }
 
     // ---------------------------------------------------------------------------------------------
-    // Name validation, alias binding, merging
+    // Name validation and module merging
     // ---------------------------------------------------------------------------------------------
 
     @Test
     public void invalidModuleNameIsRejected() {
-        IncludeResolutionResult result = resolve("root.sol", Map.of("root.sol", "module Bad\n"));
+        IncludeResolutionResult result = resolve("root.sol", Map.of("root.sol", "module Bad {\n}\n"));
         assertResolutionDiagnostic(result, DiagnosticCode.RESOL_MODULE_INVALID_NAME);
     }
 
@@ -119,7 +149,7 @@ public final class SolvikModuleTest {
         // A root file with no `include` still declares a module, and section 20 requires its name to
         // satisfy the module naming rule. The name is validated during include resolution, so the
         // include-free root must still reach that validation rather than skipping it.
-        String message = evalFailure("module Bad_Name\n\nprintln(1)\n");
+        String message = evalFailure("module Bad_Name {\n}\n\nprintln(1)\n");
         assertThat(message).as("expected SOLV-RESOL-012 but got: " + message).contains("SOLV-RESOL-012");
     }
 
@@ -127,99 +157,55 @@ public final class SolvikModuleTest {
     public void validModuleNameInAnIncludeFreeRootStillCompilesAndRuns() {
         // The negative half of the same rule: a root module name that satisfies the naming rule must
         // keep compiling and executing, so the validation cannot reject every root declaration.
-        assertThat(evalMemory("module app_main\n\nprintln(1)\n")).isEqualTo("1\n");
+        assertThat(evalMemory("module app_main {\n}\n\nprintln(1)\n")).isEqualTo("1\n");
     }
 
     @Test
     public void includeFreeRootReferencesItsOwnModule() {
-        // A file may always reference its own module through its declared name. The root file declares
-        // a module here and has no includes, so the qualified reference must resolve without any
-        // include to make the prefix visible.
-        assertThat(evalMemory("module app_main\n\nfunc value(): Integer {\n    return 7\n}\n\nprintln(app_main::value())\n")).isEqualTo("7\n");
+        // A file may always reference its own module through its declared name, whether or not any
+        // include made that name visible.
+        assertThat(evalMemory(
+                        "module app_main {\n    func value(): Integer {\n        return 7\n    }\n}\n\nprintln(app_main::value())\n"))
+                .isEqualTo("7\n");
     }
 
     @Test
     public void includeFreeRootRejectsAnUnknownModulePrefix() {
-        // The negative half: binding the root's own module name must not make every prefix visible.
-        String message = evalFailure("module app_main\n\nfunc value(): Integer {\n    return 7\n}\n\nprintln(other_mod::value())\n");
+        // The negative half: resolving a file's own module name must not make every prefix visible.
+        String message = evalFailure(
+                "module app_main {\n    func value(): Integer {\n        return 7\n    }\n}\n\nprintln(other_mod::value())\n");
         assertThat(message).as("expected SOLV-RESOL-015 but got: " + message).contains("SOLV-RESOL-015");
     }
 
-    @Test
-    public void invalidAliasNameIsRejected() {
-        IncludeResolutionResult result = resolve("root.sol", Map.of( //
-                        "root.sol", "include \"lib.sol\" alias Bad\n", //
-                        "lib.sol", "module lib_mod\n"));
-        assertResolutionDiagnostic(result, DiagnosticCode.RESOL_MODULE_INVALID_NAME);
-    }
-
-    @Test
-    public void aliasOnDefaultModuleFileIsRejected() {
-        IncludeResolutionResult result = resolve("root.sol", Map.of( //
-                        "root.sol", "include \"lib.sol\" alias util\n", //
-                        "lib.sol", "func greet(): Unit {\n}\n"));
-        assertResolutionDiagnostic(result, DiagnosticCode.RESOL_ALIAS_DEFAULT_MODULE);
-    }
-
-    @Test
-    public void duplicateAliasIsRejected() {
-        IncludeResolutionResult result = resolve("root.sol", Map.of( //
-                        "root.sol", "include \"a.sol\" alias util\ninclude \"b.sol\" alias util\n", //
-                        "a.sol", "module mod_a\n", //
-                        "b.sol", "module mod_b\n"));
-        assertResolutionDiagnostic(result, DiagnosticCode.RESOL_ALIAS_DUPLICATE);
-    }
-
-    @Test
-    public void aliasCollidingWithOwnModuleNameIsRejected() {
-        IncludeResolutionResult result = resolve("root.sol", Map.of( //
-                        "root.sol", "module app_main\ninclude \"a.sol\" alias app_main\n", //
-                        "a.sol", "module mod_a\n"));
-        assertResolutionDiagnostic(result, DiagnosticCode.RESOL_ALIAS_DUPLICATE);
-    }
-
     /**
-     * An alias colliding with a prefix an earlier unaliased include already made visible is
-     * SOLV-RESOL-013 (docs/LANGUAGE_SPEC.md section 20).
+     * Two files that declare the same module merge into one namespace; there is no include-topology
+     * rule to violate, because a module name denotes a namespace rather than a prefix bound per file.
      */
     @Test
-    public void aliasCollidingWithAnUnaliasedModulePrefixIsRejected() {
-        IncludeResolutionResult result = resolve("root.sol", Map.of( //
-                        "root.sol", "include \"a.sol\"\ninclude \"b.sol\" alias app\n", //
-                        "a.sol", "module app\nfunc fa(): Integer {\n    return 1\n}\n", //
-                        "b.sol", "module mod_b\nfunc fb(): Integer {\n    return 2\n}\n"));
-        assertResolutionDiagnostic(result, DiagnosticCode.RESOL_ALIAS_DUPLICATE);
-    }
-
-    /**
-     * The mirror ordering must agree: an alias bound first and an unaliased include of a differently
-     * named module afterwards bind one prefix to two modules, which is the same SOLV-RESOL-013
-     * collision rather than a silently discarded binding.
-     */
-    @Test
-    public void unaliasedIncludeCollidingWithAnEarlierAliasIsRejected() {
-        IncludeResolutionResult result = resolve("root.sol", Map.of( //
-                        "root.sol", "include \"b.sol\" alias app\ninclude \"a.sol\"\n", //
-                        "a.sol", "module app\nfunc fa(): Integer {\n    return 1\n}\n", //
-                        "b.sol", "module mod_b\nfunc fb(): Integer {\n    return 2\n}\n"));
-        assertResolutionDiagnostic(result, DiagnosticCode.RESOL_ALIAS_DUPLICATE);
-    }
-
-    /**
-     * Repeating a prefix that already denotes the same module is not a collision: two files of one
-     * module merge, and a file may re-include its own module.
-     */
-    @Test
-    public void theSameModulePrefixBoundTwiceIsNotACollision() {
+    public void filesDeclaringTheSameModuleMerge() {
         SemanticResult merged = analyze(resolve("root.sol", Map.of( //
                         "root.sol", "include \"a.sol\"\ninclude \"b.sol\"\n", //
-                        "a.sol", "module app\nfunc fa(): Integer {\n    return 1\n}\n", //
-                        "b.sol", "module app\nfunc fb(): Integer {\n    return 2\n}\n")));
+                        "a.sol", "module app {\n    func fa(): Integer {\n        return 1\n    }\n}\n", //
+                        "b.sol", "module app {\n    func fb(): Integer {\n        return 2\n    }\n}\n")));
         assertThat(merged.isSuccess()).as("same-module includes merge: " + merged.diagnostics().all()).isTrue();
-        SemanticResult ownModule = analyze(resolve("root.sol", Map.of( //
-                        "root.sol", "module app\ninclude \"a.sol\"\n", //
-                        "a.sol", "module app\nfunc fa(): Integer {\n    return 1\n}\n")));
-        assertThat(ownModule.isSuccess()).as("own module re-included: " + ownModule.diagnostics().all()).isTrue();
+    }
+
+    @Test
+    public void duplicateInSameModuleIsRejected() {
+        SemanticResult result = analyze(resolve("root.sol", Map.of( //
+                        "root.sol", "include \"a.sol\"\ninclude \"b.sol\"\n", //
+                        "a.sol", "module shared {\n    class Dup {\n    }\n}\n", //
+                        "b.sol", "module shared {\n    class Dup {\n    }\n}\n")));
+        assertDiagnostic(result, DiagnosticCode.RESOL_DUPLICATE_NAME);
+    }
+
+    @Test
+    public void defaultModuleDuplicateIsStillRejected() {
+        SemanticResult result = analyze(resolve("root.sol", Map.of( //
+                        "root.sol", "include \"a.sol\"\ninclude \"b.sol\"\n", //
+                        "a.sol", "func dup() {\n}\n", //
+                        "b.sol", "func dup() {\n}\n")));
+        assertDiagnostic(result, DiagnosticCode.RESOL_DUPLICATE_NAME);
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -229,76 +215,50 @@ public final class SolvikModuleTest {
     @Test
     public void sameNameInDifferentModulesCoexists() {
         SemanticResult result = analyze(resolve("root.sol", Map.of( //
-                        "root.sol", "include \"a.sol\" alias a\ninclude \"b.sol\" alias b\nvar x: a::User = a::User()\nvar y: b::User = b::User()\n", //
-                        "a.sol", "module mod_a\nclass User {\n}\n", //
-                        "b.sol", "module mod_b\nclass User {\n}\n")));
+                        "root.sol", "include \"a.sol\"\ninclude \"b.sol\"\nvar x: mod_a::User = mod_a::User()\nvar y: mod_b::User = mod_b::User()\n", //
+                        "a.sol", "module mod_a {\n    class User {\n    }\n}\n", //
+                        "b.sol", "module mod_b {\n    class User {\n    }\n}\n")));
         assertThat(result.isSuccess()).as("expected success but got " + result.diagnostics().all()).isTrue();
-    }
-
-    @Test
-    public void duplicateInSameModuleIsRejected() {
-        SemanticResult result = analyze(resolve("root.sol", Map.of( //
-                        "root.sol", "include \"a.sol\"\ninclude \"b.sol\"\n", //
-                        "a.sol", "module shared\nclass Dup {\n}\n", //
-                        "b.sol", "module shared\nclass Dup {\n}\n")));
-        assertDiagnostic(result, DiagnosticCode.RESOL_DUPLICATE_NAME);
-    }
-
-    @Test
-    public void defaultModuleDuplicateIsStillRejected() {
-        SemanticResult result = analyze(resolve("root.sol", Map.of( //
-                        "root.sol", "include \"a.sol\"\ninclude \"b.sol\"\n", //
-                        "a.sol", "func dup(): Unit {\n}\n", //
-                        "b.sol", "func dup(): Unit {\n}\n")));
-        assertDiagnostic(result, DiagnosticCode.RESOL_DUPLICATE_NAME);
     }
 
     @Test
     public void qualifiedFunctionCallResolves() {
         SemanticResult result = analyze(resolve("root.sol", Map.of( //
-                        "root.sol", "include \"m.sol\" alias m\nvar r: Integer = m::add(1, 2)\n", //
-                        "m.sol", "module math_util\nfunc add(a: Integer, b: Integer): Integer {\n    return a + b\n}\n")));
+                        "root.sol", "include \"m.sol\"\nvar r: Integer = math_util::add(1, 2)\n", //
+                        "m.sol", "module math_util {\n    func add(a: Integer, b: Integer): Integer {\n        return a + b\n    }\n}\n")));
         assertThat(result.isSuccess()).as("expected success but got " + result.diagnostics().all()).isTrue();
     }
 
     @Test
     public void dotSeparatedReferenceIsNotModuleAccess() {
-        // `.` is member access, so `m.add` is a member access on an unknown value `m`, not a call.
+        // `.` is member access, so `math_util.add` is a member access on an unknown value, not a call.
         SemanticResult result = analyze(resolve("root.sol", Map.of( //
-                        "root.sol", "include \"m.sol\" alias m\nvar r: Integer = m.add(1, 2)\n", //
-                        "m.sol", "module math_util\nfunc add(a: Integer, b: Integer): Integer {\n    return a + b\n}\n")));
+                        "root.sol", "include \"m.sol\"\nvar r: Integer = math_util.add(1, 2)\n", //
+                        "m.sol", "module math_util {\n    func add(a: Integer, b: Integer): Integer {\n        return a + b\n    }\n}\n")));
         assertDiagnostic(result, DiagnosticCode.RESOL_UNKNOWN_NAME);
-    }
-
-    @Test
-    public void unaliasedModulePrefixResolves() {
-        SemanticResult result = analyze(resolve("root.sol", Map.of( //
-                        "root.sol", "include \"m.sol\"\nvar r: Integer = math_util::add(1, 2)\n", //
-                        "m.sol", "module math_util\nfunc add(a: Integer, b: Integer): Integer {\n    return a + b\n}\n")));
-        assertThat(result.isSuccess()).as("expected success but got " + result.diagnostics().all()).isTrue();
     }
 
     @Test
     public void qualifiedConstructionResolves() {
         SemanticResult result = analyze(resolve("root.sol", Map.of( //
-                        "root.sol", "include \"m.sol\" alias m\nvar b: m::Box = m::Box(7)\n", //
-                        "m.sol", "module box_mod\nclass Box {\n    var v: Integer\n    Box(v: Integer) {\n        this.v = v\n    }\n}\n")));
+                        "root.sol", "include \"m.sol\"\nvar b: box_mod::Box = box_mod::Box(7)\n", //
+                        "m.sol", "module box_mod {\n    class Box {\n        var v: Integer\n        Box(v: Integer) {\n            this.v = v\n        }\n    }\n}\n")));
         assertThat(result.isSuccess()).as("expected success but got " + result.diagnostics().all()).isTrue();
     }
 
     @Test
     public void qualifiedEnumVariantResolves() {
         SemanticResult result = analyze(resolve("root.sol", Map.of( //
-                        "root.sol", "include \"m.sol\" alias m\nvar r: m::Result = m::Result.Ok(1)\n", //
-                        "m.sol", "module res_mod\nenum Result {\n    Ok(Integer)\n    Error(String)\n}\n")));
+                        "root.sol", "include \"m.sol\"\nvar r: res_mod::Result = res_mod::Result.Ok(1)\n", //
+                        "m.sol", "module res_mod {\n    enum Result {\n        Ok(Integer)\n        Error(String)\n    }\n}\n")));
         assertThat(result.isSuccess()).as("expected success but got " + result.diagnostics().all()).isTrue();
     }
 
     @Test
     public void unknownModulePrefixIsRejected() {
         SemanticResult result = analyze(resolve("root.sol", Map.of( //
-                        "root.sol", "include \"m.sol\" alias m\nfunc f(x: nope::Thing): Integer {\n    return 0\n}\n", //
-                        "m.sol", "module mod_x\nclass Thing {\n}\n")));
+                        "root.sol", "include \"m.sol\"\nfunc f(x: nope::Thing): Integer {\n    return 0\n}\n", //
+                        "m.sol", "module mod_x {\n    class Thing {\n    }\n}\n")));
         assertDiagnostic(result, DiagnosticCode.RESOL_UNKNOWN_MODULE);
     }
 
@@ -306,40 +266,40 @@ public final class SolvikModuleTest {
     public void declarationNamedLikePrefixIsAllowed() {
         // `::` distinguishes a qualified reference from a declaration, so no collision rule is needed.
         SemanticResult result = analyze(resolve("root.sol", Map.of( //
-                        "root.sol", "include \"m.sol\" alias util\nfunc util(): Integer {\n    return 1\n}\n", //
-                        "m.sol", "module m_mod\n")));
+                        "root.sol", "include \"m.sol\"\nfunc util(): Integer {\n    return 1\n}\n", //
+                        "m.sol", "module m_mod {\n}\n")));
         assertThat(result.isSuccess()).as("expected success but got " + result.diagnostics().all()).isTrue();
     }
 
     @Test
     public void crossModuleExtendsResolves() {
         SemanticResult result = analyze(resolve("root.sol", Map.of( //
-                        "root.sol", "include \"base.sol\" alias base\nclass Derived extends base::Base {\n}\n", //
-                        "base.sol", "module base_mod\nmutable class Base {\n}\n")));
+                        "root.sol", "include \"base.sol\"\nclass Derived extends base_mod::Base {\n}\n", //
+                        "base.sol", "module base_mod {\n    class mutable Base {\n    }\n}\n")));
         assertThat(result.isSuccess()).as("expected success but got " + result.diagnostics().all()).isTrue();
     }
 
     @Test
     public void crossModuleEnumMatchResolves() {
         SemanticResult result = analyze(resolve("root.sol", Map.of( //
-                        "root.sol", "include \"m.sol\" alias m\nvar r: m::Result = m::Result.Ok(5)\nvar text = match r {\n    Ok(v) => \"ok\"\n    Error(e) => \"err\"\n}\n", //
-                        "m.sol", "module res_mod\nenum Result {\n    Ok(Integer)\n    Error(String)\n}\n")));
+                        "root.sol", "include \"m.sol\"\nvar r: res_mod::Result = res_mod::Result.Ok(5)\nvar text: String = match r {\n    Ok(v) => \"ok\"\n    Error(e) => \"err\"\n}\n", //
+                        "m.sol", "module res_mod {\n    enum Result {\n        Ok(Integer)\n        Error(String)\n    }\n}\n")));
         assertThat(result.isSuccess()).as("expected success but got " + result.diagnostics().all()).isTrue();
     }
 
     @Test
     public void crossModuleSealedPatternResolves() {
         SemanticResult result = analyze(resolve("root.sol", Map.of( //
-                        "root.sol", "include \"m.sol\" alias m\nfunc describe(s: m::Shape): String {\n    return match s {\n        c: m::Circle => \"circle\"\n        _ => \"other\"\n    }\n}\n", //
-                        "m.sol", "module shape_mod\nabstract class Shape {\n}\nclass Circle extends Shape {\n}\n")));
+                        "root.sol", "include \"m.sol\"\nfunc describe(s: shape_mod::Shape): String {\n    return match s {\n        c: shape_mod::Circle => \"circle\"\n        _ => \"other\"\n    }\n}\n", //
+                        "m.sol", "module shape_mod {\n    class abstract Shape {\n    }\n    class Circle extends Shape {\n    }\n}\n")));
         assertThat(result.isSuccess()).as("expected success but got " + result.diagnostics().all()).isTrue();
     }
 
     @Test
     public void userDeclaredObjectIsAllowedInANamedModule() {
         SemanticResult result = analyze(resolve("root.sol", Map.of( //
-                        "root.sol", "include \"o.sol\" alias o\nvar value: o::Object = o::Object()\n", //
-                        "o.sol", "module obj_mod\nclass Object {\n}\n")));
+                        "root.sol", "include \"o.sol\"\nvar value: obj_mod::Object = obj_mod::Object()\n", //
+                        "o.sol", "module obj_mod {\n    class Object {\n    }\n}\n")));
         assertThat(result.isSuccess()).as("expected success but got " + result.diagnostics().all()).isTrue();
     }
 
@@ -351,8 +311,8 @@ public final class SolvikModuleTest {
     public void namespacedProgramRuns() throws IOException {
         Path dir = Files.createTempDirectory("solvik-modules");
         try {
-            write(dir, "lib.sol", "module greet_lib\nfunc greet(name: String): String {\n    return \"Hello, \" .. name .. \"!\"\n}\n");
-            Path root = write(dir, "root.sol", "module app_main\ninclude \"lib.sol\" alias lib\nprintln(lib::greet(\"Solvik\"))\n");
+            write(dir, "lib.sol", "module greet_lib {\n    func greet(name: String): String {\n        return \"Hello, \" .. name .. \"!\"\n    }\n}\n");
+            Path root = write(dir, "root.sol", "module app_main {\n}\n\ninclude \"lib.sol\"\n\nprintln(greet_lib::greet(\"Solvik\"))\n");
             assertThat(evalFile(root)).isEqualTo("Hello, Solvik!\n");
         } finally {
             deleteRecursively(dir);
@@ -363,9 +323,9 @@ public final class SolvikModuleTest {
     public void sameFunctionNameInDifferentModulesRuns() throws IOException {
         Path dir = Files.createTempDirectory("solvik-modules");
         try {
-            write(dir, "a.sol", "module mod_a\nfunc value(): Integer {\n    return 1\n}\n");
-            write(dir, "b.sol", "module mod_b\nfunc value(): Integer {\n    return 2\n}\n");
-            Path root = write(dir, "root.sol", "include \"a.sol\" alias a\ninclude \"b.sol\" alias b\nprintln(a::value() + b::value())\n");
+            write(dir, "a.sol", "module mod_a {\n    func value(): Integer {\n        return 1\n    }\n}\n");
+            write(dir, "b.sol", "module mod_b {\n    func value(): Integer {\n        return 2\n    }\n}\n");
+            Path root = write(dir, "root.sol", "include \"a.sol\"\ninclude \"b.sol\"\nprintln(mod_a::value() + mod_b::value())\n");
             assertThat(evalFile(root)).isEqualTo("3\n");
         } finally {
             deleteRecursively(dir);

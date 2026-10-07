@@ -13,21 +13,21 @@ class Point {
         this.y = y
     }
 
-    override func equals(other: Any?): Boolean {
+    method override equals(other: Any?): Boolean {
         if (other is Point) {
             return this.x == other.x && this.y == other.y
         }
         return false
     }
 
-    override func hashCode(): Integer {
+    method override hashCode(): Integer {
         return 31 * this.x + this.y
     }
 }
 
-var a = Point(1, 2)
-var b = Point(1, 2)
-var c = Point(3, 4)
+var a: Point = Point(1, 2)
+var b: Point = Point(1, 2)
+var c: Point = Point(3, 4)
 
 // The override decides `==` and an explicit `equals` call; they agree.
 println(a == b)

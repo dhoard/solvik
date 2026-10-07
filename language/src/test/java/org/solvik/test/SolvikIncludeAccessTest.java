@@ -61,7 +61,7 @@ public final class SolvikIncludeAccessTest {
     @TestFactory
     public Stream<DynamicTest> includingAPathWithoutTheSolExtensionReportsInvalidPath() throws IOException {
         Path program = scratch().resolve("include-bad.sol");
-        Files.writeString(program, "include \"missing\"\nfunc f(): Unit {\n}\n");
+        Files.writeString(program, "include \"missing\"\nfunc f() {\n}\n");
         assertThat(codeContains(runExpectingFailure(program), DiagnosticCode.RESOL_INCLUDE_INVALID_PATH)).isTrue();
         return Stream.of(DynamicTest.dynamicTest("include without .sol -> invalid-path", () -> {
             assertThat(codeContains(runExpectingFailure(program), DiagnosticCode.RESOL_INCLUDE_INVALID_PATH)).isTrue();
@@ -71,7 +71,7 @@ public final class SolvikIncludeAccessTest {
     @TestFactory
     public Stream<DynamicTest> includingAFileThatDoesNotExistReportsNotFound() throws IOException {
         Path program = scratch().resolve("include-missing.sol");
-        Files.writeString(program, "include \"does-not-exist.sol\"\nfunc f(): Unit {\n}\n");
+        Files.writeString(program, "include \"does-not-exist.sol\"\nfunc f() {\n}\n");
         assertThat(codeContains(runExpectingFailure(program), DiagnosticCode.RESOL_INCLUDE_NOT_FOUND)).isTrue();
         return Stream.of(DynamicTest.dynamicTest("missing include -> not-found", () -> {
             assertThat(codeContains(runExpectingFailure(program), DiagnosticCode.RESOL_INCLUDE_NOT_FOUND)).isTrue();
@@ -115,7 +115,7 @@ public final class SolvikIncludeAccessTest {
     @TestFactory
     public Stream<DynamicTest> includingWithoutFileAccessReportsIOError() throws IOException {
         Path target = scratch().resolve("neighbor.sol");
-        Files.writeString(target, "func g(): Unit {\n}\n");
+        Files.writeString(target, "func g() {\n}\n");
         Path program = scratch().resolve("include-denied.sol");
         Files.writeString(program, "include \"" + literalPath(target) + "\"\n\nfunc f(): Unit {\n}\n");
         return Stream.of(DynamicTest.dynamicTest("include without file access -> io-error", () -> {

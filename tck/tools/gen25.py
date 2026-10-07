@@ -199,40 +199,130 @@ def BAD(tid, cat, req, src, diag, note):
 
 # --- section 8.
 BAD("SOL-TCK-0341", "objects", "REQ-2300",
-    'interface Named {\n    var name: String\n}\nclass U implements Named {\n'
-    '    var name: String\n\n    U(name: String) {\n        this.name = name\n    }\n}\n'
-    'var u = U("x")\nprint(u.name)\n' + NEG, {},
+    ('interface Named {\n'
+    '    var name: String\n'
+    '}\n'
+    'class U implements Named {\n'
+    '    var name: String\n'
+    '\n'
+    '    U(name: String) {\n'
+    '        this.name = name\n'
+    '    }\n'
+    '}\n'
+    'var u: U = U("x")\n'
+    'print(u.name)\n'
+    '\n'
+    'print("EXECUTED-INVALID")\n'
+    ''), {},
     "A stored property in an interface is the negated sentence.")
 BAD("SOL-TCK-0342", "objects", "REQ-2301",
-    'interface Named {\n    func greet(who: String): String\n}\nclass U implements Named {\n'
-    '    U() {\n    }\n\n    func greet(who: Integer): String {\n        return "hi"\n    }\n}\n'
-    'print("EXECUTED-INVALID")\n', {},
+    (('interface Named {\n'
+    '    method greet(who: String): String\n'
+    '}\n'
+    'class U implements Named {\n'
+    '    U() {\n'
+    '    }\n'
+    '\n'
+    '    method greet(who: Integer): String {\n'
+    '        return "hi"\n'
+    '    }\n'
+    '}\n'
+    'print("EXECUTED-INVALID")\n'
+    '')), {},
     "The implementing method changes the interface parameter type to Integer.")
 OK("SOL-TCK-0343", "objects", "REQ-2302",
-   'mutable class Animal {\n    Animal() {\n    }\n}\nclass Dog extends Animal {\n    Dog() {\n    }\n}\n'
-   'interface Maker {\n    func make(): Animal\n}\nclass DogMaker implements Maker {\n'
-   '    DogMaker() {\n    }\n\n    func make(): Dog {\n        return Dog()\n    }\n}\n'
-   'var m: Maker = DogMaker()\nprint("covok")\n',
+   (('class mutable Animal {\n'
+    '    Animal() {\n'
+    '    }\n'
+    '}\n'
+    'class Dog extends Animal {\n'
+    '    Dog() {\n'
+    '    }\n'
+    '}\n'
+    'interface Maker {\n'
+    '    method make(): Animal\n'
+    '}\n'
+    'class DogMaker implements Maker {\n'
+    '    DogMaker() {\n'
+    '    }\n'
+    '\n'
+    '    method make(): Dog {\n'
+    '        return Dog()\n'
+    '    }\n'
+    '}\n'
+    'var m: Maker = DogMaker()\n'
+    'print("covok")\n'
+    '')),
    "covok",
    "Returning the subtype Dog for an interface method declared to return Animal is a covariant "
    "return and is accepted.")
 BAD("SOL-TCK-0344", "objects", "REQ-2302",
-    'mutable class Animal {\n    Animal() {\n    }\n}\nclass Rock {\n    Rock() {\n    }\n}\n'
-    'interface Maker {\n    func make(): Animal\n}\nclass RockMaker implements Maker {\n'
-    '    RockMaker() {\n    }\n\n    func make(): Rock {\n        return Rock()\n    }\n}\n'
-    'var m: Maker = RockMaker()\nprint("EXECUTED-INVALID")\n', {},
+    (('class mutable Animal {\n'
+    '    Animal() {\n'
+    '    }\n'
+    '}\n'
+    'class Rock {\n'
+    '    Rock() {\n'
+    '    }\n'
+    '}\n'
+    'interface Maker {\n'
+    '    method make(): Animal\n'
+    '}\n'
+    'class RockMaker implements Maker {\n'
+    '    RockMaker() {\n'
+    '    }\n'
+    '\n'
+    '    method make(): Rock {\n'
+    '        return Rock()\n'
+    '    }\n'
+    '}\n'
+    'var m: Maker = RockMaker()\n'
+    'print("EXECUTED-INVALID")\n'
+    '')), {},
     "Rock is unrelated to Animal, so the return type is not covariant.")
 BAD("SOL-TCK-0345", "objects", "REQ-2303",
-    'interface A {\n    func speak(): String {\n        return "a"\n    }\n}\n'
-    'interface B {\n    func speak(): String {\n        return "b"\n    }\n}\n'
-    'class C implements A, B {\n    C() {\n    }\n}\n'
-    'var c = C()\nprint(c.speak())\n' + NEG, {},
+    ('interface A {\n'
+    '    method speak(): String {\n'
+    '        return "a"\n'
+    '    }\n'
+    '}\n'
+    'interface B {\n'
+    '    method speak(): String {\n'
+    '        return "b"\n'
+    '    }\n'
+    '}\n'
+    'class C implements A, B {\n'
+    '    C() {\n'
+    '    }\n'
+    '}\n'
+    'var c: C = C()\n'
+    'print(c.speak())\n'
+    '\n'
+    'print("EXECUTED-INVALID")\n'
+    ''), {},
     "Two interfaces supply the same default and the class does not override it.")
 OK("SOL-TCK-0346", "objects", "REQ-2303",
-   'interface A {\n    func speak(): String {\n        return "a"\n    }\n}\n'
-   'interface B {\n    func speak(): String {\n        return "b"\n    }\n}\n'
-   'class C implements A, B {\n    C() {\n    }\n\n    func speak(): String {\n        return "c"\n'
-   '    }\n}\nvar c = C()\nprint("conf" .. c.speak())\n',
+   (('interface A {\n'
+    '    method speak(): String {\n'
+    '        return "a"\n'
+    '    }\n'
+    '}\n'
+    'interface B {\n'
+    '    method speak(): String {\n'
+    '        return "b"\n'
+    '    }\n'
+    '}\n'
+    'class C implements A, B {\n'
+    '    C() {\n'
+    '    }\n'
+    '\n'
+    '    method speak(): String {\n'
+    '        return "c"\n'
+    '    }\n'
+    '}\n'
+    'var c: C = C()\n'
+    'print("conf" .. c.speak())\n'
+    '')),
    "confc",
    "The explicit override resolves the same default from both interfaces and its value is what "
    "runs.")
@@ -261,19 +351,55 @@ BAD("SOL-TCK-0349", "exceptions", "REQ-2306",
 
 # --- section 23.4: Result operation diagnostics.
 BAD("SOL-TCK-0350", "result", "REQ-2307",
-    RESULT + 'func use(): Result<Integer, String> {\n    var r = get()\n    var b = r.nope()\n'
-    '    return Result.Ok(1)\n}\nprint("EXECUTED-INVALID")\n',
+    ('enum Result<T, E> {\n'
+    '    Ok(T)\n'
+    '    Err(E)\n'
+    '}\n'
+    'func get(): Result<Integer, String> {\n'
+    '    return Result.Ok(1)\n'
+    '}\n'
+    'func use(): Result<Integer, String> {\n'
+    '    var r: Result<Integer, String> = get()\n'
+    '    var b: Any = r.nope()\n'
+    '    return Result.Ok(1)\n'
+    '}\n'
+    'print("EXECUTED-INVALID")\n'
+    ''),
     {"family": "RESOL", "code": "SOLV-RESOL-004"},
     "An unknown member on a Result receiver pins the specification-named SOLV-RESOL-004.")
 BAD("SOL-TCK-0351", "result", "REQ-2308",
-    RESULT + 'func use(): Result<Integer, String> {\n    var r = get()\n    var b = r.isOk(1)\n'
-    '    return Result.Ok(1)\n}\nprint("EXECUTED-INVALID")\n',
+    ('enum Result<T, E> {\n'
+    '    Ok(T)\n'
+    '    Err(E)\n'
+    '}\n'
+    'func get(): Result<Integer, String> {\n'
+    '    return Result.Ok(1)\n'
+    '}\n'
+    'func use(): Result<Integer, String> {\n'
+    '    var r: Result<Integer, String> = get()\n'
+    '    var b: Boolean = r.isOk(1)\n'
+    '    return Result.Ok(1)\n'
+    '}\n'
+    'print("EXECUTED-INVALID")\n'
+    ''),
     {"family": "TYPE", "code": "SOLV-TYPE-003"},
     "isOk takes no arguments, so the extra argument is the wrong argument count and pins "
     "SOLV-TYPE-003.")
 BAD("SOL-TCK-0352", "result", "REQ-2309",
-    RESULT + 'func use(): Result<Integer, String> {\n    var r = get()\n    var f = r.isOk\n'
-    '    return Result.Ok(1)\n}\nprint("EXECUTED-INVALID")\n',
+    ('enum Result<T, E> {\n'
+    '    Ok(T)\n'
+    '    Err(E)\n'
+    '}\n'
+    'func get(): Result<Integer, String> {\n'
+    '    return Result.Ok(1)\n'
+    '}\n'
+    'func use(): Result<Integer, String> {\n'
+    '    var r: Result<Integer, String> = get()\n'
+    '    var f: Any = r.isOk\n'
+    '    return Result.Ok(1)\n'
+    '}\n'
+    'print("EXECUTED-INVALID")\n'
+    ''),
     {"family": "TYPE", "code": "SOLV-TYPE-014"},
     "A bare member read of a Result operation pins the specification-named SOLV-TYPE-014.")
 

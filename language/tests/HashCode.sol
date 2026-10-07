@@ -12,22 +12,22 @@ class Point {
         this.y = y
     }
 
-    override func equals(other: Any?): Boolean {
+    method override equals(other: Any?): Boolean {
         if (other is Point) {
             return this.x == other.x && this.y == other.y
         }
         return false
     }
 
-    override func hashCode(): Integer {
+    method override hashCode(): Integer {
         // Reads exactly the fields `equals` reads.
         return 31 * this.x + this.y
     }
 }
 
-var a = Point(1, 2)
-var b = Point(1, 2)
-var c = Point(9, 9)
+var a: Point = Point(1, 2)
+var b: Point = Point(1, 2)
+var c: Point = Point(9, 9)
 
 // Equal values agree on both members.
 println(a == b)
@@ -55,8 +55,8 @@ println(zeros.size)
 // A class overriding neither member falls back to reference identity for both.
 class Plain {
 }
-var p = Plain()
-var q = Plain()
+var p: Plain = Plain()
+var q: Plain = Plain()
 println(p == q)
 println(p.hashCode() == q.hashCode())
 println(p.hashCode() == p.hashCode())

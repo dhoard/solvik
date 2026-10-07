@@ -13,7 +13,7 @@ class Box {
         this.size = size
     }
 
-    func report(): String {
+    method report(): String {
         return "size=" .. size
     }
 }

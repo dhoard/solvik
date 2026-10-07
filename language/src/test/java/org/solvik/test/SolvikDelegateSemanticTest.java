@@ -49,21 +49,24 @@ public final class SolvikDelegateSemanticTest {
     /** A concrete implementor of {@code Repository}, reused by the positive programs below. */
     private static final String MEMORY_REPOSITORY = """
             class MemoryRepository implements Repository {
-                func save(value: String): Unit {
+                method save(value: String) {
                 }
             }
+
             """;
 
     @Test
     public void delegateSatisfiesARequirement() {
         CheckedProgram program = check("""
                 interface Repository {
-                    func save(value: String): Unit
+                    method save(value: String)
                 }
+
                 """ + MEMORY_REPOSITORY + """
                 class UserService implements Repository {
-                    delegate var repository: Repository = MemoryRepository()
+                    delegate  repository: Repository = MemoryRepository()
                 }
+
                 """);
         ClassSymbol service = program.classSymbol("UserService").orElseThrow();
         FunctionSymbol save = service.interfaceImplementation("save").orElseThrow();
@@ -84,12 +87,14 @@ public final class SolvikDelegateSemanticTest {
     public void delegateIsAnImmutableTypedProperty() {
         CheckedProgram program = check("""
                 interface Repository {
-                    func save(value: String): Unit
+                    method save(value: String)
                 }
+
                 """ + MEMORY_REPOSITORY + """
                 class UserService implements Repository {
-                    delegate var repository: Repository = MemoryRepository()
+                    delegate  repository: Repository = MemoryRepository()
                 }
+
                 """);
         PropertySymbol repository = program.classSymbol("UserService").orElseThrow().property("repository").orElseThrow();
         assertThat(repository.isDelegate()).isTrue();
@@ -101,15 +106,17 @@ public final class SolvikDelegateSemanticTest {
     public void explicitMethodTakesPrecedenceOverADelegate() {
         CheckedProgram program = check("""
                 interface Repository {
-                    func save(value: String): Unit
+                    method save(value: String)
                 }
+
                 """ + MEMORY_REPOSITORY + """
                 class UserService implements Repository {
-                    delegate var repository: Repository = MemoryRepository()
+                    delegate  repository: Repository = MemoryRepository()
 
-                    func save(value: String): Unit {
+                    method save(value: String) {
                     }
                 }
+
                 """);
         ClassSymbol service = program.classSymbol("UserService").orElseThrow();
         FunctionSymbol save = service.interfaceImplementation("save").orElseThrow();
@@ -123,16 +130,19 @@ public final class SolvikDelegateSemanticTest {
     public void inheritedMethodTakesPrecedenceOverADelegate() {
         CheckedProgram program = check("""
                 interface Repository {
-                    func save(value: String): Unit
+                    method save(value: String)
                 }
+
                 """ + MEMORY_REPOSITORY + """
-                mutable class Base {
-                    func save(value: String): Unit {
+                class mutable Base {
+                    method save(value: String) {
                     }
                 }
                 class UserService extends Base implements Repository {
-                    delegate var repository: Repository = MemoryRepository()
+                    delegate  repository: Repository = MemoryRepository()
                 }
+
+
                 """);
         ClassSymbol service = program.classSymbol("UserService").orElseThrow();
         FunctionSymbol save = service.interfaceImplementation("save").orElseThrow();
@@ -145,20 +155,21 @@ public final class SolvikDelegateSemanticTest {
     public void delegateTakesPrecedenceOverAnInterfaceDefault() {
         CheckedProgram program = check("""
                 interface Repository {
-                    func save(value: String): Unit
+                    method save(value: String)
 
-                    func saveTwice(value: String): Unit {
+                    method saveTwice(value: String) {
                         save(value)
                         save(value)
                     }
                 }
                 class MemoryRepository implements Repository {
-                    func save(value: String): Unit {
+                    method save(value: String) {
                     }
                 }
                 class UserService implements Repository {
-                    delegate var repository: Repository = MemoryRepository()
+                    delegate  repository: Repository = MemoryRepository()
                 }
+
                 """);
         ClassSymbol service = program.classSymbol("UserService").orElseThrow();
         // The delegate's contract exposes both the requirement and the default, and the delegated
@@ -174,15 +185,16 @@ public final class SolvikDelegateSemanticTest {
     public void delegateOverridesAnInterfaceDefaultItAlsoSupplies() {
         CheckedProgram program = check("""
                 interface Greeter {
-                    func greet(): String {
+                    method greet(): String {
                         return "default"
                     }
                 }
                 class DefaultGreeter implements Greeter {
                 }
                 class Service implements Greeter {
-                    delegate var greeter: Greeter = DefaultGreeter()
+                    delegate  greeter: Greeter = DefaultGreeter()
                 }
+
                 """);
         ClassSymbol service = program.classSymbol("Service").orElseThrow();
         // Both a default and a delegate can supply `greet`; the delegate wins by the architecture
@@ -196,14 +208,16 @@ public final class SolvikDelegateSemanticTest {
     public void aSubclassInheritsTheForwardingMethodFromItsSuperclass() {
         CheckedProgram program = check("""
                 interface Repository {
-                    func save(value: String): Unit
+                    method save(value: String)
                 }
+
                 """ + MEMORY_REPOSITORY + """
-                mutable class UserService implements Repository {
-                    delegate var repository: Repository = MemoryRepository()
+                class mutable UserService implements Repository {
+                    delegate  repository: Repository = MemoryRepository()
                 }
                 class AuditedService extends UserService {
                 }
+
                 """);
         ClassSymbol base = program.classSymbol("UserService").orElseThrow();
         ClassSymbol derived = program.classSymbol("AuditedService").orElseThrow();
@@ -218,15 +232,16 @@ public final class SolvikDelegateSemanticTest {
     public void delegatePropertyCanBeWrittenInConstructor() {
         CheckedProgram program = check("""
                 interface Repository {
-                    func save(value: String): Unit
+                    method save(value: String)
                 }
                 class UserService implements Repository {
-                    delegate var repository: Repository
+                    delegate  repository: Repository
 
                     UserService(repository: Repository) {
                         this.repository = repository
                     }
                 }
+
                 """);
         ClassSymbol service = program.classSymbol("UserService").orElseThrow();
         assertThat(service.interfaceImplementation("save").orElseThrow().isSynthesized()).isTrue();
@@ -238,20 +253,21 @@ public final class SolvikDelegateSemanticTest {
     public void twoDelegatesWithDistinctContractsResolveDistinctMembers() {
         CheckedProgram program = check("""
                 interface Reader {
-                    func read(): String
+                    method read(): String
                 }
                 interface Writer {
-                    func write(value: String): Unit
+                    method write(value: String)
                 }
                 class Both implements Reader, Writer {
-                    delegate var reader: Reader
-                    delegate var writer: Writer
+                    delegate  reader: Reader
+                    delegate  writer: Writer
 
                     Both(reader: Reader, writer: Writer) {
                         this.reader = reader
                         this.writer = writer
                     }
                 }
+
                 """);
         ClassSymbol both = program.classSymbol("Both").orElseThrow();
         assertThat(both.ambiguousDelegatedRequirements().isEmpty()).isTrue();
@@ -265,19 +281,20 @@ public final class SolvikDelegateSemanticTest {
     public void aDiamondDelegateContractIsNotAmbiguous() {
         CheckedProgram program = check("""
                 interface Root {
-                    func greet(): String
+                    method greet(): String
                 }
                 interface Left extends Root {
                 }
                 interface Right extends Root {
                 }
                 class Service implements Root {
-                    delegate var root: Right
+                    delegate  root: Right
 
                     Service(root: Right) {
                         this.root = root
                     }
                 }
+
                 """);
         ClassSymbol service = program.classSymbol("Service").orElseThrow();
         // One delegate property exposes the member once even though two extension paths reach it.
@@ -289,18 +306,19 @@ public final class SolvikDelegateSemanticTest {
     public void aDelegateMaySupplyAnExtendedRequirement() {
         CheckedProgram program = check("""
                 interface Named {
-                    func name(): String
+                    method name(): String
                 }
                 interface Aged extends Named {
-                    func age(): Integer
+                    method age(): Integer
                 }
                 class Person implements Aged {
-                    delegate var aged: Aged
+                    delegate  aged: Aged
 
                     Person(aged: Aged) {
                         this.aged = aged
                     }
                 }
+
                 """);
         ClassSymbol person = program.classSymbol("Person").orElseThrow();
         assertThat(person.interfaceImplementation("name").orElseThrow().isSynthesized()).isTrue();
@@ -312,15 +330,15 @@ public final class SolvikDelegateSemanticTest {
     public void delegationRemainsNominallyTyped() {
         CheckedProgram program = check("""
                 interface Named {
-                    func name(): String
+                    method name(): String
                 }
                 class Person implements Named {
-                    func name(): String {
+                    method name(): String {
                         return "x"
                     }
                 }
                 class Service implements Named {
-                    delegate var named: Named
+                    delegate  named: Named
 
                     Service(named: Named) {
                         this.named = named
@@ -331,6 +349,7 @@ public final class SolvikDelegateSemanticTest {
                 }
                     var service: Named = Service(Person())
                     println(use(service))
+
                 """);
         Type named = program.interfaceSymbol("Named").orElseThrow().type();
         Type service = program.classSymbol("Service").orElseThrow().type();
@@ -342,15 +361,16 @@ public final class SolvikDelegateSemanticTest {
     public void delegateMemberIsVisibleThroughTheClassDispatchTable() {
         CheckedProgram program = check("""
                 interface Repository {
-                    func find(id: Integer): String
+                    method find(id: Integer): String
                 }
                 class Service implements Repository {
-                    delegate var repository: Repository
+                    delegate  repository: Repository
 
                     Service(repository: Repository) {
                         this.repository = repository
                     }
                 }
+
                 """);
         ClassSymbol service = program.classSymbol("Service").orElseThrow();
         assertThat(service.method("find").orElseThrow()).isEqualTo(service.interfaceImplementation("find").orElseThrow());
@@ -361,23 +381,24 @@ public final class SolvikDelegateSemanticTest {
     public void explicitMethodResolvesATwoDelegateConflict() {
         CheckedProgram program = check("""
                 interface PrinterA {
-                    func print(): Unit
+                    method print()
                 }
                 interface PrinterB {
-                    func print(): Unit
+                    method print()
                 }
                 class X implements PrinterA, PrinterB {
-                    delegate var a: PrinterA
-                    delegate var b: PrinterB
+                    delegate  a: PrinterA
+                    delegate  b: PrinterB
 
                     X(a: PrinterA, b: PrinterB) {
                         this.a = a
                         this.b = b
                     }
 
-                    func print(): Unit {
+                    method print() {
                     }
                 }
+
                 """);
         ClassSymbol x = program.classSymbol("X").orElseThrow();
         assertThat(x.ambiguousDelegatedRequirements().isEmpty()).isTrue();
@@ -389,15 +410,16 @@ public final class SolvikDelegateSemanticTest {
     public void delegateInterfaceMembersAreNotImplementedByAnUnrelatedClass() {
         CheckedProgram program = check("""
                 interface Named {
-                    func name(): String
+                    method name(): String
                 }
                 class Service implements Named {
-                    delegate var named: Named
+                    delegate  named: Named
 
                     Service(named: Named) {
                         this.named = named
                     }
                 }
+
                 """);
         InterfaceSymbol named = program.interfaceSymbol("Named").orElseThrow();
         assertThat(named.members().stream().map(FunctionSymbol::name).collect(Collectors.toList())).isEqualTo(List.of("name"));

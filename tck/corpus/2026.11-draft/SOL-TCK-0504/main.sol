@@ -4,9 +4,9 @@
 // Oracle quotations verified verbatim against docs/LANGUAGE_SPEC.md:
 //   - A nested block may shadow an outer declaration.
 //
-var x = 10
+var x: Integer = 10
 {
-    var mutable x = 20
+    var mutable x: Integer = 20
     x = 30
     print("s" .. x)
 }

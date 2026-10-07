@@ -7,6 +7,6 @@ class Point {
         this.y = y
     }
 }
-var a = Point(1, 2)
-var b = Point(1, 2)
+var a: Point = Point(1, 2)
+var b: Point = Point(1, 2)
 print("cls" .. (a === b))

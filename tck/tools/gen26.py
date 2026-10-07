@@ -82,19 +82,6 @@ REQS_SPEC = {
                 "nothing."],
         note="The program declares one function and has no top-level statement, so the expected "
              "stdout is empty and the expected language exit status is 0."),
-    "REQ-2405": dict(
-        section="4. Root Type Hierarchy",
-        summary="`Unit` is a real type with one value and renders as `Unit` through its fixed, "
-                "non-overridable `toString`",
-        kind="runtime",
-        quotes=["Built-in scalars provide fixed, non-overridable implementations: `Integer`, "
-                "`Long`, `Byte`, and `Short` render in decimal, `Float` and `Double` use Java-style "
-                "floating-point text, `Boolean` renders `true` or `false`, `Character` renders its "
-                "character, `String` renders its contents, and `Unit` renders `Unit`.",
-                "`Unit` has one value and is the result of a function that returns normally without "
-                "a value."],
-        note="A value-less function is bound to a `Unit` local and printed, so the expected bytes "
-             "`xUnit` show both the function's side effect and the fixed `Unit` rendering."),
     "REQ-2406": dict(
         section="13. switch",
         summary="Constant case expressions must be compile-time constants assignable to the "
@@ -158,17 +145,31 @@ OK("SOL-TCK-0358", "process", "REQ-2404",
    "",
    "With no executable top-level statement the program has no entry point, prints nothing, and "
    "exits 0.")
-OK("SOL-TCK-0359", "types", "REQ-2405",
-   'func f() {\n    print("x")\n}\nvar u: Unit = f()\nprint(u)\n',
-   "xUnit",
-   "The value-less function's result is bound to a Unit local and its fixed rendering is `Unit`.")
 BAD("SOL-TCK-0360", "control", "REQ-2406",
-    'var x = 1\nswitch (x) {\n    case x {\n        print("same")\n    }\n    default {\n    }\n'
-    '        print("default")\n}\nprint("EXECUTED-INVALID")\n', {},
+    (('var x: Integer = 1\n'
+    'switch (x) {\n'
+    '    case x {\n'
+    '        print("same")\n'
+    '    }\n'
+    '    default {\n'
+    '    }\n'
+    '        print("default")\n'
+    '}\n'
+    'print("EXECUTED-INVALID")\n'
+    '')), {},
     "A case label naming a runtime binding is not a compile-time constant.")
 BAD("SOL-TCK-0361", "control", "REQ-2407",
-    'var x = 1\nswitch (x) {\n    case regex r"1" {\n        print("one")\n    }\n    default {\n    }\n'
-    '        print("d")\n}\nprint("EXECUTED-INVALID")\n', {},
+    (('var x: Integer = 1\n'
+    'switch (x) {\n'
+    '    case regex r"1" {\n'
+    '        print("one")\n'
+    '    }\n'
+    '    default {\n'
+    '    }\n'
+    '        print("d")\n'
+    '}\n'
+    'print("EXECUTED-INVALID")\n'
+    '')), {},
     "A regex case on an Integer switch value is not a String switch value.")
 
 

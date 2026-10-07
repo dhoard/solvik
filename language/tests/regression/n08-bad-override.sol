@@ -1,10 +1,10 @@
-mutable class A {
-    func f(): Integer {
+class mutable A {
+    method f(): Integer {
         return 1
     }
 }
 class B extends A {
-    override func f(): Integer {
+    method override f(): Integer {
         return 2
     }
 }

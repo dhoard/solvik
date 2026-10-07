@@ -16,40 +16,45 @@
 package org.solvik.ast;
 
 import java.util.ArrayList;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import org.solvik.ast.declaration.DeclarationNode;
 import org.solvik.ast.declaration.IncludeDeclNode;
-import org.solvik.ast.declaration.ModuleDeclNode;
+import org.solvik.ast.declaration.ModuleBlockNode;
 import org.solvik.ast.statement.StatementNode;
 import org.solvik.source.SourceSpan;
 
 /**
- * A parsed Solvik source file: the top-level declarations and the executable top-level statements,
- * in source order, plus the EOF position metadata. The statements form the implicit
- * {@code func main(): Unit} body (docs/LANGUAGE_SPEC.md section 6); a file that mixes declarations
- * and statements freely keeps both kinds in one ordered list so AST traversal still follows source
- * order. This is the root of the syntax AST returned by the parser.
+ * A parsed Solvik program: the top-level items in source order, plus the EOF position metadata.
+ *
+ * <p>The language treats a physical file as a source container rather than a namespace, so a unit
+ * holds: file-level {@code include} directives (replaced by the included file's items before
+ * semantic analysis), zero or more {@code module Name { ... }} blocks, the default-module
+ * declarations, and the executable top-level statements that form the implicit entry point
+ * (docs/LANGUAGE_SPEC.md sections 6 and 20). Several blocks with one name — in one file or across
+ * included files — contribute to the same module, so {@link #declarations()} flattens every
+ * declaration of every module in source order and {@link #moduleNameOf(DeclarationNode)} reports the
+ * module a declaration belongs to, with an empty result meaning the implicit default module.
  */
 public final class CompilationUnitNode extends AstNode {
 
     private final List<AstNode> items;
     private final List<DeclarationNode> declarations;
     private final List<StatementNode> statements;
+    private final List<ModuleBlockNode> modules;
+    private final Map<DeclarationNode, String> moduleNames;
     private final boolean hasUnresolvedIncludes;
-    private final ModuleDeclNode moduleDeclaration;
 
     public CompilationUnitNode(List<AstNode> items, SourceSpan span) {
-        this(items, null, span);
-    }
-
-    public CompilationUnitNode(List<AstNode> items, ModuleDeclNode moduleDeclaration, SourceSpan span) {
         super(AstKind.COMPILATION_UNIT, span);
         this.items = List.copyOf(items);
-        this.moduleDeclaration = moduleDeclaration;
         List<DeclarationNode> declarationList = new ArrayList<>();
         List<StatementNode> statementList = new ArrayList<>();
+        List<ModuleBlockNode> moduleList = new ArrayList<>();
+        Map<DeclarationNode, String> names = new IdentityHashMap<>();
         boolean unresolved = false;
         for (AstNode item : this.items) {
             Objects.requireNonNull(item, "item");
@@ -59,18 +64,21 @@ public final class CompilationUnitNode extends AstNode {
                 statementList.add(statement);
             } else if (item instanceof IncludeDeclNode) {
                 unresolved = true;
+            } else if (item instanceof ModuleBlockNode module) {
+                moduleList.add(module);
+                for (DeclarationNode member : module.members()) {
+                    declarationList.add(member);
+                    names.put(member, module.name());
+                }
             } else {
                 throw new IllegalArgumentException("top-level node is neither a declaration nor a statement: " + item.getClass().getName());
             }
         }
         this.declarations = List.copyOf(declarationList);
         this.statements = List.copyOf(statementList);
+        this.modules = List.copyOf(moduleList);
+        this.moduleNames = names;
         this.hasUnresolvedIncludes = unresolved;
-    }
-
-    /** The file's {@code module} declaration, or empty when the file is in the default module. */
-    public Optional<ModuleDeclNode> moduleDeclaration() {
-        return Optional.ofNullable(moduleDeclaration);
     }
 
     /** The top-level items in source order, including any unresolved include directives. */
@@ -83,19 +91,31 @@ public final class CompilationUnitNode extends AstNode {
         return hasUnresolvedIncludes;
     }
 
+    /** The named {@code module} blocks of the unit, in source order. */
+    public List<ModuleBlockNode> modules() {
+        return modules;
+    }
+
+    /** Every declaration of every module, in source order, plus the default module's declarations. */
     public List<DeclarationNode> declarations() {
         return declarations;
     }
 
+    /** The module a declaration belongs to, or empty when it belongs to the implicit default module. */
+    public Optional<String> moduleNameOf(DeclarationNode declaration) {
+        return Optional.ofNullable(moduleNames.get(declaration));
+    }
+
     /**
-     * The executable top-level statements in source order. Non-empty exactly when the file has an
-     * implicit {@code main}; each statement is a local of that implicit main, not a global.
+     * The executable top-level statements in source order. Non-empty exactly when the program has an
+     * implicit {@code main}; each statement is a local of that implicit main, not a global. Named
+     * modules are declaration-only, so every statement here belongs to the default module.
      */
     public List<StatementNode> statements() {
         return statements;
     }
 
-    /** Whether the file's top-level statements form an implicit {@code main}. */
+    /** Whether the top-level statements form an implicit {@code main}. */
     public boolean hasImplicitMain() {
         return !statements.isEmpty();
     }

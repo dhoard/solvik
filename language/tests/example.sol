@@ -5,12 +5,18 @@
 // Deferred features (string interpolation, iteration protocols, safe casts, default parameters,
 // overloading, `fallthrough`) are deliberately absent: they are not part of the language.
 
-module example_app
-
-// Compile-time file inclusion (section 20): one unaliased include from the default module and one
-// aliased include of a named module, reached through the `::` namespace separator.
+// Compile-time file inclusion (section 20): an unaliased include brings the included file's source
+// and its named modules into this program. A file may also declare its own `module Name { ... }`
+// block, and declarations outside every block belong to the implicit default module. A reference to
+// a module's declaration is qualified with the module name and the `::` separator.
 include "IncludeLibrary.sol"
-include "ModulesLib.sol" alias math
+include "ModulesLib.sol"
+
+module example_math {
+    func double(value: Integer): Integer {
+        return value * 2
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Declarations. Declaration lookup is order-independent (section 6), so executable
@@ -30,65 +36,65 @@ class Point {
         this.label = label
     }
 
-    override func toString(): String {
+    method override toString(): String {
         return "Point(" .. this.x .. ";" .. this.label .. ")"
     }
 
-    override func equals(other: Any?): Boolean {
+    method override equals(other: Any?): Boolean {
         if (other is Point) {
             return this.x == other.x && this.y == other.y && this.label == other.label
         }
         return false
     }
 
-    override func hashCode(): Integer {
+    method override hashCode(): Integer {
         return 31 * (31 * this.x + this.y) + this.label.hashCode()
     }
 }
 
 // -- Inheritance: `mutable` classes, `mutable`/`override` chains, `abstract` bases (sections 7, 12)
 
-mutable class Gear {
+class mutable Gear {
     var ratio: Integer
 
     Gear(ratio: Integer) {
         this.ratio = ratio
     }
 
-    mutable func name(): String {
+    method mutable name(): String {
         return "gear:" .. this.ratio
     }
 
     // A bare name never resolves to a property (section 7); virtual dispatch reaches the override.
-    func drive(): String {
+    method drive(): String {
         return this.name()
     }
 }
 
-mutable class Boosted extends Gear {
+class mutable Boosted extends Gear {
     Boosted() {
         super(8)
     }
 
-    override mutable func name(): String {
+    method override mutable name(): String {
         return "boosted-" .. super.name()
     }
 }
 
 class Chip extends Boosted {
-    override func name(): String {
+    method override name(): String {
         return "chip-" .. super.name()
     }
 }
 
-abstract class Vehicle {
+class abstract Vehicle {
     var wheels: Integer
 
     Vehicle(wheels: Integer) {
         this.wheels = wheels
     }
 
-    func summary(): String {
+    method summary(): String {
         return this.wheels .. " wheels"
     }
 }
@@ -102,21 +108,21 @@ class Trike extends Vehicle {
 // -- Interfaces: abstract members, default methods, multiple implementation (section 8)
 
 interface Named {
-    func name(): String
+    method name(): String
 
-    func greeting(): String {
+    method greeting(): String {
         return "Hello " .. name()
     }
 }
 
 interface Aged {
-    func age(): Integer
+    method age(): Integer
 
-    func shout(): String {
+    method shout(): String {
         return name() .. "!"
     }
 
-    func name(): String {
+    method name(): String {
         return "unknown"
     }
 }
@@ -131,11 +137,11 @@ class Person implements Named, Aged {
     }
 
     // Both interfaces offer `name` (one abstract, one default); the class resolves it explicitly.
-    func name(): String {
+    method name(): String {
         return this.fullName
     }
 
-    func age(): Integer {
+    method age(): Integer {
         return this.years
     }
 }
@@ -143,17 +149,17 @@ class Person implements Named, Aged {
 // -- Composition by delegation (section 9): the delegate type is a non-generic interface
 
 interface Loud {
-    func shout(text: String): String
+    method shout(text: String): String
 }
 
 class Echo implements Loud {
-    func shout(text: String): String {
+    method shout(text: String): String {
         return text .. "!!"
     }
 }
 
 class Announcer implements Loud {
-    delegate var speaker: Loud
+    delegate speaker: Loud
 
     Announcer(speaker: Loud) {
         this.speaker = speaker
@@ -169,13 +175,10 @@ class Slot<T> {
         this.value = value
     }
 
-    func get(): T {
+    method get(): T {
         return this.value
     }
 
-    func mapWith(transform: func(T): T): T {
-        return transform(this.value)
-    }
 }
 
 func pick<T>(first: T, other: T): T {
@@ -221,7 +224,7 @@ func parse(raw: String): Result<Integer, String> {
 
 func parseDoubled(raw: String): Result<Integer, String> {
     // The postfix `?` propagates an Err as an immediate return and unwraps an Ok.
-    var value = parse(raw)?
+    var value: Integer = parse(raw)?
     return Result.Ok(value + value)
 }
 
@@ -230,7 +233,7 @@ func parseDoubled(raw: String): Result<Integer, String> {
 class ValidationError extends RuntimeException {
 }
 
-mutable class ScaledError extends ApplicationException {
+class mutable ScaledError extends ApplicationException {
     var level: Integer
 
     ScaledError(level: Integer) {
@@ -270,28 +273,22 @@ func factorial(n: Integer): Integer {
     return n * factorial(n - 1)
 }
 
-func scaleBy(factor: Integer): func(Integer): Integer {
-    // Explicit immutable capture: `factor` is bound into the closure at creation.
-    return func [factor](value: Integer): Integer {
-        return value * factor
-    }
+func triple(value: Integer): Integer {
+    return value * 3
 }
 
 class Tagger {
     var tag: String = "tag"
 
-    func attach(value: Integer): String {
+    method attach(value: Integer): String {
         return this.tag .. value.toString()
     }
 
-    func bonusBy(bonus: Integer): func(Integer): Integer {
-        // Both `this` and the immutable parameter must appear in the capture list.
-        return func [this, bonus](value: Integer): Integer {
-            return value + bonus
-        }
+    method bonusBy(value: Integer): Integer {
+        return value + 1
     }
 
-    var transform: func(Integer): Integer = func(value: Integer): Integer {
+    method transform(value: Integer): Integer {
         return value - 1
     }
 }
@@ -350,16 +347,16 @@ func lateBound(n: Integer): String {
 // -- 1. Bindings and mutability (section 2) -----------------------------------
 
 var name: String = "Solvik"
-var inferred = 42
+var literal: Integer = 42
 var mutable counter: Integer = 0
 counter = counter + 7
 // A semicolon separates two constructs sharing one physical line and never terminates one.
-var one = 1; var two = 2; println(one + two)
+var one: Integer = 1; var two: Integer = 2; println(one + two)
 // A call argument list may end with a trailing comma and spread across lines.
 println(add(1, 2,))
-var spread = add(1,
+var spread: Integer = add(1,
     41)
-println(name .. " " .. inferred .. " " .. counter)
+println(name .. " " .. literal .. " " .. counter)
 println(spread .. " " .. factorial(5))
 
 // -- 2. Literals and numeric types (sections 1, 4) -----------------------------
@@ -387,7 +384,7 @@ println(-5)
 println(2 * 3 + 4)
 println(1 < 2 && !(3 >= 4) || false)
 // Expression continuation after a binary operator (section 16).
-var total = 1 +
+var total: Integer = 1 +
     2 +
     3
 println(total)
@@ -395,25 +392,25 @@ println(total)
 // -- 3. Strings, raw strings, concatenation (sections 3, 15) -------------------
 
 println("tab[\t]nl[\n]quote[\"]backslash[\\]native-escape[\N]")
-var raw = r#"\d+ "quoted" C:\temp"#
+var raw: String = r#"\d+ "quoted" C:\temp"#
 println(raw)
-var hashy = r##"contains "# text"##
+var hashy: String = r##"contains "# text"##
 println(hashy)
-var sql = r#"SELECT 1"#
+var sql: String = r#"SELECT 1"#
 println(sql)
 // `..` renders both operands through `toString`; it is not `+`, which stays numeric.
 println("sum=" .. total .. ", flag=" .. (total > 3))
 // A member chain continues across lines through a leading `.` (section 16).
-var chained = "solvik"
+var chained: String = "solvik"
     .toString()
     .toString()
 println(chained)
 
 // -- 4. Equality, identity, hashing (section 3) --------------------------------
 
-var p1 = Point(1, 2, "first")
-var p2 = Point(1, 2, "first")
-var sameRef = p1
+var p1: Point = Point(1, 2, "first")
+var p2: Point = Point(1, 2, "first")
+var sameRef: Point = p1
 println(p1 == p2)
 println(p1 != p2)
 println(p1 === sameRef)
@@ -427,7 +424,7 @@ var erased: Any = p1
 if (erased is Point) {
     println(erased.label)
 }
-var recast = erased as Point
+var recast: Point = erased as Point
 println(recast.label)
 // `var` freezes the binding, not the object: a `var mutable` property stays writable.
 p1.label = "second"
@@ -444,7 +441,7 @@ println(vehicle.summary())
 
 // -- 6. Interfaces and delegation (sections 8, 9) ------------------------------
 
-var person = Person("Dana", 30)
+var person: Person = Person("Dana", 30)
 println(person.greeting())
 println(person.shout())
 var loud: Loud = Announcer(Echo())
@@ -452,9 +449,8 @@ println(loud.shout("hey"))
 
 // -- 7. Generics (section 11) ---------------------------------------------------
 
-var slot = Slot(7)
+var slot: Slot<Integer> = Slot(7)
 println(slot.get())
-println(slot.mapWith(scaleBy(3)))
 var texts: Slot<String> = Slot("abc")
 println(texts.get())
 // Explicit type arguments are permitted on direct calls.
@@ -482,21 +478,44 @@ println(area(Trike()))
 println(area(VehicleHolder().make()))
 
 class VehicleHolder {
-    func make(): Vehicle {
+    method make(): Vehicle {
         return Trike()
     }
 }
 
+// -- 8b. Static members and the class initializer (section 7) --------------------
+
+// A `var static` property belongs to the class, a `method static` has no receiver, and a `static`
+// block runs once, on first active use of the class.
+class Registry {
+    var static mutable entries: Integer = 0
+    var static label: String = "registry"
+
+    static {
+        Registry.entries = 1
+    }
+
+    method static bump(): Integer {
+        Registry.entries = Registry.entries + 1
+        return Registry.entries
+    }
+}
+
+println(Registry.label)
+println(Registry.bump())
+println(Registry.bump())
+println(Registry.entries)
+
 // -- 9. Result values: operations, propagation, must-consume (section 23) -------
 
-var good = parse("ok")
+var good: Result<Integer, String> = parse("ok")
 println(good.isOk())
 println(good.unwrap())
-var bad = parse("bad")
+var bad: Result<Integer, String> = parse("bad")
 println(bad.isErr())
 println(bad.unwrapErr())
 println(good.expect("should be ok"))
-var propagated = parseDoubled("ok")
+var propagated: Result<Integer, String> = parseDoubled("ok")
 println(propagated.unwrap())
 println(parseDoubled("bad").unwrapErr())
 // A Result must be consumed; `ignore()` is the deliberate discard.
@@ -523,7 +542,7 @@ println(describe(7))
 
 // -- 11. Control flow (section 17) ------------------------------------------------
 
-var mutable walked = ""
+var mutable walked: String = ""
 for (i in 1...3) {
     walked = walked .. i
 }
@@ -535,8 +554,8 @@ for (i in 3..>0) {
 }
 println(walked)
 
-var mutable loopTotal = 0
-var mutable spins = 0
+var mutable loopTotal: Integer = 0
+var mutable spins: Integer = 0
 while (true) {
     spins = spins + 1
     if (spins == 2) {
@@ -550,7 +569,7 @@ while (true) {
 println(loopTotal)
 
 // An `if`/`else if`/`else` chain as an expression, with statements before the tail (section 21.4).
-var band = if (counter > 100) {
+var band: String = if (counter > 100) {
     "high"
 }
 else if (counter > 5) {
@@ -562,19 +581,19 @@ else {
 println(band)
 
 // A block expression: statements then a tail expression (section 21.2).
-var computed = {
-    var base = 20
+var computed: Integer = {
+    var base: Integer = 20
     base + 22
 }
 println(computed)
 
 // A stand-alone scope block introduces an independent scope and may shadow (section 6).
 {
-    var name = "inner"
+    var name: String = "inner"
     println(name)
 }
 {
-    var name = "also inner"
+    var name: String = "also inner"
     println(name)
 }
 
@@ -591,7 +610,7 @@ switch (99) {
     }
 }
 // `switch` expressions and regex dispatch:
-var kind = switch (counter) {
+var kind: String = switch (counter) {
     case 0 {
         "none"
     }
@@ -603,7 +622,7 @@ var kind = switch (counter) {
     }
 }
 println(kind)
-var viaRegex = switch (name) {
+var viaRegex: String = switch (name) {
     case regex r#"^[a-z]+$"# {
         "lower"
     }
@@ -617,66 +636,26 @@ println(lateBound(0))
 println(lateBound(1))
 println(lateBound(7))
 
-// -- 13. Function values (section 6) ----------------------------------------------
+// -- 13. Calls (section 6) -------------------------------------------------------
 
-// Named functions are values; module-qualified functions too. Every reference to one
-// declaration is the same canonical value, and every function value renders as `func`.
-var formatter: func(Integer): String = render
-var doubled: func(Integer): Integer = scaleBy(2)
-var doubler: func(Integer): Integer = math::double
-println(formatter(3))
-println(doubled(21))
-println(doubler(21))
-println(math::double(10))
-println(scaleBy(3)(3))
-
-// Anonymous functions and explicit capture.
-var plusOne: func(Integer): Integer = func(value: Integer): Integer {
-    return value + 1
+// Functions and methods are declarations rather than values, so every call is statically resolved to
+// the declaration it names: recursion, generic calls, methods, static methods, and module-qualified
+// calls all work, while a bare function or method name in value position is a compile-time error.
+func applyTwice(value: Integer): Integer {
+    return triple(triple(value))
 }
-println(plusOne(41))
-var offset: func(Integer): Integer = scaleBy(10)
-println(offset(4))
-var tagger = Tagger()
-var attach: func(Integer): String = tagger.attach
-println(attach(7))
-var withBonus: func(Integer): Integer = tagger.bonusBy(100)
-println(withBonus(1) == withBonus(1))
-println(withBonus(1))
-// A property may itself hold a function value.
+
+println(add(1, 2))
+println(factorial(5))
+println(applyTwice(4))
+println(render(99))
+println(pick<Integer>(1, 2))
+println(example_math::double(10))
+println(math_utils::double(10))
+var tagger: Tagger = Tagger()
+println(tagger.attach(7))
+println(tagger.bonusBy(100))
 println(tagger.transform(9))
-// Bound references are fresh identities; named references are canonical.
-println(attach === tagger.attach)
-var aliased: func(Integer): String = tagger.attach
-println(attach.equals(aliased))
-// The predeclared `println` is itself a function value.
-var output: func(Any?): Unit = println
-output("via-value")
-println(plusOne.toString())
-println(formatter === formatter)
-// Nullable function values refine like any other nullable value.
-var mutable optional: (func(Integer): Integer)? = null
-if (optional != null) {
-    println("no")
-}
-else {
-    println("fn-null")
-}
-optional = plusOne
-if (optional != null) {
-    println(optional(9))
-}
-// A generic function used as a value is instantiated to the type its position expects.
-var integerRender: func(Integer): String = render
-println(integerRender(8))
-// Function values flow through parameters and results.
-func applyTwice(operation: func(Integer): Integer, value: Integer): Integer {
-    return operation(operation(value))
-}
-println(applyTwice(plusOne, 40))
-// A generic function used as a value can also produce closures through a factory type.
-var factory: func(Integer): func(Integer): Integer = scaleBy
-println(factory(2)(40))
 
 // -- 14. Collections (section 11) ---------------------------------------------------
 
@@ -710,9 +689,9 @@ println(explicit.get(0))
 
 // -- 15. Regex (section 14) -----------------------------------------------------------
 
-var email = Regex(r#"(\w+)@(\w+)"#)
+var email: Regex = Regex(r#"(\w+)@(\w+)"#)
 println(email.matches("a@b"))
-var firstMatch = email.find("mail x@y and p@q")
+var firstMatch: RegexMatch? = email.find("mail x@y and p@q")
 if (firstMatch != null) {
     println(firstMatch.value .. "@" .. firstMatch.start .. "-" .. firstMatch.end .. "#" .. firstMatch.groupCount)
     println(firstMatch.group(1) ?? "?")
@@ -740,7 +719,7 @@ try {
 }
 catch (e: ApplicationException) {
     println("is scaled: " .. (e is ScaledError))
-    var scaled = e as ScaledError
+    var scaled: ScaledError = e as ScaledError
     println("base caught level " .. scaled.level)
     println("msg: " .. (e.getMessage() ?? "none"))
 }
@@ -786,15 +765,19 @@ catch (e: RuntimeException) {
     println("outer caught " .. e.getMessage())
 }
 
-// -- 17. Unit and the last words ---------------------------------------------------------
+// -- 17. No-value callables and the last words -------------------------------------------
 
-var unitValue: Unit = {
-    print("block-tail|")
+// A callable that writes no `: Type` produces no value: it is called for its effect, and using the
+// call as a value is a compile-time error. The body still returns normally.
+func announce(text: String) {
+    println(text)
 }
-println(unitValue)
+announce("no-value call")
 print("no-newline ")
 shoutLine("and a line")
-// Included program pieces participate in the one program (section 20).
+// Included program pieces participate in the one program (section 20), and so does a module block
+// declared in this file.
 println(greet("World"))
-println(math::double(21))
+println(math_utils::double(21))
+println(example_math::double(21))
 exit(0)

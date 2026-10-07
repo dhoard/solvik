@@ -75,7 +75,7 @@ public final class SolvikParserTest {
         FunctionDeclNode fn = onlyFunction(cu);
         assertNode(fn, AstKind.FUNCTION_DECL, DOC, DOC.substring(0, DOC.indexOf('}') + 1));
         assertThat(fn.name()).isEqualTo("add");
-        assertThat(fn.returnType().name()).isEqualTo("Integer");
+        assertThat(fn.declaredReturnType().orElseThrow().name()).isEqualTo("Integer");
 
         int aPos = DOC.indexOf("a: Integer");
         assertNode(fn.parameters().get(0), AstKind.PARAMETER, DOC, "a: Integer");
@@ -122,7 +122,7 @@ public final class SolvikParserTest {
     /** A call argument list may end with a trailing comma; it contributes no argument. */
     @Test
     public void trailingCommaInCallArgumentsIsAccepted() {
-        String src = "func f(): Unit {\n    g(1, 2,)\n}\n";
+        String src = "func f() {\n    g(1, 2,)\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("trailingarg.sol", src));
         CallExprNode c = call(expr(fn, 0).expression());
         assertThat(c.arguments().size()).isEqualTo(2);
@@ -145,7 +145,7 @@ public final class SolvikParserTest {
     /** A trailing comma before a closing delimiter on the next line parses across the boundary. */
     @Test
     public void multilineArgumentListWithTrailingCommaIsAccepted() {
-        String src = "func f(): Unit {\n    g(\n        1,\n        2,\n    )\n}\n";
+        String src = "func f() {\n    g(\n        1,\n        2,\n    )\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("multilinearg.sol", src));
         CallExprNode c = call(expr(fn, 0).expression());
         assertThat(c.arguments().size()).isEqualTo(2);
@@ -155,7 +155,7 @@ public final class SolvikParserTest {
     /** A call with explicit type arguments accepts a trailing comma before its {@code )}. */
     @Test
     public void trailingCommaAfterExplicitTypeArgumentsIsAccepted() {
-        String src = "func f(): Unit {\n    List<Integer>(1, 2, 3,)\n}\n";
+        String src = "func f() {\n    List<Integer>(1, 2, 3,)\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("trailingtypearg.sol", src));
         CallExprNode c = call(expr(fn, 0).expression());
         assertThat(c.typeArguments().size()).isEqualTo(1);
@@ -166,14 +166,14 @@ public final class SolvikParserTest {
     /** A single argument with a trailing comma is still a one-argument call. */
     @Test
     public void singleArgumentWithTrailingCommaIsAccepted() {
-        String src = "func f(): Unit {\n    g(1,)\n}\n";
+        String src = "func f() {\n    g(1,)\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("singlearg.sol", src));
         CallExprNode c = call(expr(fn, 0).expression());
         assertThat(c.arguments().size()).isEqualTo(1);
         assertNode(c.arguments().get(0), AstKind.INTEGER_LITERAL, src, "1");
     }
 
-    /** A callable may omit its return type; the omitted type is `Unit` (specification section 6). */
+    /** A callable may omit its return type, and then it declares that it produces no value. */
     @Test
     public void functionMayOmitItsReturnType() {
         String src = "func greet() {\n    return\n}\n";
@@ -181,7 +181,7 @@ public final class SolvikParserTest {
         FunctionDeclNode fn = onlyFunction(cu);
         assertThat(fn.name()).isEqualTo("greet");
         assertNode(fn, AstKind.FUNCTION_DECL, src, src.substring(0, src.indexOf('}') + 1));
-        assertThat(fn.returnType().name()).isEqualTo("Unit");
+        assertThat(fn.declaredReturnType()).isEmpty();
         assertThat(fn.body().statements().size()).isEqualTo(1);
     }
 
@@ -213,14 +213,14 @@ public final class SolvikParserTest {
 
     @Test
     public void literalsNamesAndStrings() {
-        String src = "func f(): Unit {\n  var a: Integer = 42\n  var mutable b: Boolean = true\n  var c = \"esc\\t\"\n}\n";
+        String src = "func f() {\n  var a: Integer = 42\n  var mutable b: Boolean = true\n  var c: String = \"esc\\t\"\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("literals.sol", src));
 
         LocalDeclNode a = local(fn, 0);
         assertNode(a, AstKind.LOCAL_DECL, src, "var a: Integer = 42");
         assertThat(a.bindingKind()).isEqualTo(BindingKind.IMMUTABLE);
         assertThat(a.name()).isEqualTo("a");
-        assertThat(a.declaredType().orElseThrow().name()).isEqualTo("Integer");
+        assertThat(a.declaredType().name()).isEqualTo("Integer");
         IntegerLiteralNode lit = (IntegerLiteralNode) a.initializer();
         assertNode(lit, AstKind.INTEGER_LITERAL, src, "42");
         assertThat(lit.lexeme()).isEqualTo("42");
@@ -233,8 +233,9 @@ public final class SolvikParserTest {
         assertThat(bool.value()).isTrue();
 
         LocalDeclNode c = local(fn, 2);
-        assertNode(c, AstKind.LOCAL_DECL, src, "var c = \"esc\\t\"");
-        assertThat(c.declaredType().isEmpty()).isTrue();
+        assertNode(c, AstKind.LOCAL_DECL, src, "var c: String = \"esc\\t\"");
+        // A local declaration always writes its type; nothing is inferred from the initializer.
+        assertThat(c.declaredType().name()).isEqualTo("String");
         StringLiteralNode str = (StringLiteralNode) c.initializer();
         assertNode(str, AstKind.STRING_LITERAL, src, "\"esc\\t\"");
         assertThat(str.lexeme()).isEqualTo("\"esc\\t\"");
@@ -251,7 +252,7 @@ public final class SolvikParserTest {
 
     @Test
     public void binaryPrecedenceAssociativityAndParentheses() {
-        String src = "func f(): Integer {\n    var x = 1 - 2 - 3 * 4\n    var y = (1 + 2) / 3\n    return x\n}\n";
+        String src = "func f(): Integer {\n    var x: Integer = 1 - 2 - 3 * 4\n    var y: Integer = (1 + 2) / 3\n    return x\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("prec.sol", src));
 
         BinaryExprNode top = binary(local(fn, 0).initializer());
@@ -288,20 +289,17 @@ public final class SolvikParserTest {
 
     @Test
     public void callsMemberAccessAndFoldingOrder() {
-        String src = "func f(): Unit {\n    obj.method(1)(2)\n    g(h.a.b(3), p + q.r)\n}\n";
+        String src = "func f() {\n    obj.compute(1)\n    g(h.a.b(3), p + q.r)\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("calls.sol", src));
 
         CallExprNode outer = call(expr(fn, 0).expression());
         assertThat(outer.arguments().size()).isEqualTo(1);
-        CallExprNode inner = call(outer.callee());
-        MemberAccessExprNode m = member(inner.callee());
-        assertThat(m.memberName()).isEqualTo("method");
+        MemberAccessExprNode m = member(outer.callee());
+        assertThat(m.memberName()).isEqualTo("compute");
         assertThat(name(m.receiver()).name()).isEqualTo("obj");
         // Folded nodes start at the base primary and end at their own suffix.
-        assertNode(m, AstKind.MEMBER_ACCESS_EXPR, src, "obj.method");
-        assertNode(inner, AstKind.CALL_EXPR, src, "obj.method(1)");
-        assertNode(outer, AstKind.CALL_EXPR, src, "obj.method(1)(2)");
-        assertThat(inner.arguments().size()).isEqualTo(1);
+        assertNode(m, AstKind.MEMBER_ACCESS_EXPR, src, "obj.compute");
+        assertNode(outer, AstKind.CALL_EXPR, src, "obj.compute(1)");
 
         CallExprNode call2 = call(expr(fn, 1).expression());
         assertThat(name(call2.callee()).name()).isEqualTo("g");
@@ -317,7 +315,7 @@ public final class SolvikParserTest {
 
     @Test
     public void callOnParenthesizedExpression() {
-        String src = "func f(a: Integer, b: Integer, c: Integer): Unit {\n    (a + b).c(1)\n}\n";
+        String src = "func f(a: Integer, b: Integer, c: Integer) {\n    (a + b).c(1)\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("parencall.sol", src));
         CallExprNode c = call(expr(fn, 0).expression());
         MemberAccessExprNode m = member(c.callee());
@@ -329,7 +327,7 @@ public final class SolvikParserTest {
 
     @Test
     public void zeroArgumentCallsAreDistinctFromMemberReads() {
-        String src = "func f(): Unit {\n    obj.load()\n    obj.field\n    plain()\n}\n";
+        String src = "func f() {\n    obj.load()\n    obj.field\n    plain()\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("noargs.sol", src));
         assertNode(expr(fn, 0).expression(), AstKind.CALL_EXPR, src, "obj.load()");
         assertNode(expr(fn, 1).expression(), AstKind.MEMBER_ACCESS_EXPR, src, "obj.field");
@@ -349,7 +347,7 @@ public final class SolvikParserTest {
 
     @Test
     public void ifElseIfElseStructure() {
-        String src = "func f(c: Boolean): Unit {\n    if (c) {\n        return\n    }\n    else if (c) {\n        return\n    }\n    else {\n        return\n    }\n}\n";
+        String src = "func f(c: Boolean) {\n    if (c) {\n        return\n    }\n    else if (c) {\n        return\n    }\n    else {\n        return\n    }\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("if.sol", src));
         IfStmtNode if1 = (IfStmtNode) fn.body().statements().get(0);
         assertNode(if1.condition(), AstKind.NAME_REF_EXPR, src, "c");
@@ -365,7 +363,7 @@ public final class SolvikParserTest {
 
     @Test
     public void ifWithoutElseHasNoBranch() {
-        String src = "func f(c: Boolean): Unit {\n    if (c) {\n        g()\n    }\n}\n";
+        String src = "func f(c: Boolean) {\n    if (c) {\n        g()\n    }\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("if.sol", src));
         IfStmtNode if1 = (IfStmtNode) fn.body().statements().get(0);
         assertThat(if1.elseBranch().isEmpty()).isTrue();
@@ -376,7 +374,7 @@ public final class SolvikParserTest {
 
     @Test
     public void blocksMayBeEmpty() {
-        String src = "func f(): Unit {\n}\n";
+        String src = "func f() {\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("emptybody.sol", src));
         assertThat(fn.body().statements().size()).isEqualTo(0);
         assertThat(fn.parameters().size()).isEqualTo(0);
@@ -385,7 +383,7 @@ public final class SolvikParserTest {
 
     @Test
     public void bareReturnHasNoValue() {
-        String src = "func f(): Unit {\n    return\n}\n";
+        String src = "func f() {\n    return\n}\n";
         ReturnStmtNode r = ret(onlyFunction(parseOk("bare.sol", src)), 0);
         assertThat(r.value().isEmpty()).isTrue();
         assertThat(r.children()).isEqualTo(List.of());
@@ -395,7 +393,7 @@ public final class SolvikParserTest {
 
     @Test
     public void multipleFunctionsPreserveOrderAndSpans() {
-        String src = "func a(): Unit {\n}\nfunc b(x: Integer): Integer {\n    return x\n}\n";
+        String src = "func a() {\n}\nfunc b(x: Integer): Integer {\n    return x\n}\n";
         CompilationUnitNode cu = parseOk("two.sol", src);
         assertThat(cu.declarations().size()).isEqualTo(2);
         assertThat(((FunctionDeclNode) cu.declarations().get(0)).name()).isEqualTo("a");
@@ -433,7 +431,7 @@ public final class SolvikParserTest {
     /** Structural invariant: children follow source order without overlap. */
     @Test
     public void siblingsFollowSourceOrder() {
-        String src = "func f(): Unit {\n    var v = h(1, 2, obj.x)\n    return v\n}\n";
+        String src = "func f() {\n    var v: Any = h(1, 2, obj.x)\n    return v\n}\n";
         Deque<AstNode> stack = new ArrayDeque<>();
         stack.push(parseOk("order.sol", src));
         while (!stack.isEmpty()) {
@@ -475,7 +473,7 @@ public final class SolvikParserTest {
      */
     @Test
     public void formerKeywordIsNowAnOrdinaryIdentifier() {
-        FunctionDeclNode fn = onlyFunction(parseOk("former.sol", "func fun(): Unit {\n}\n"));
+        FunctionDeclNode fn = onlyFunction(parseOk("former.sol", "func fun() {\n}\n"));
         assertThat(fn.name()).isEqualTo("fun");
     }
 }

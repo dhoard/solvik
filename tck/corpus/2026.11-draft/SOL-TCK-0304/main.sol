@@ -1,6 +1,6 @@
-var a = 1
+var a: Integer = 1
 
 
-var b = 2
+var b: Integer = 2
 
 print("z" .. a .. b)

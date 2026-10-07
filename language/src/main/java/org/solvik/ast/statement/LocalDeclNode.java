@@ -25,8 +25,9 @@ import org.solvik.ast.expression.ExpressionNode;
 import org.solvik.source.SourceSpan;
 
 /**
- * A {@code var} or {@code var mutable} local declaration with an initializer. The type annotation is
- * syntactically optional; inference rules are a Phase 4 concern.
+ * A {@code var name: Type = expression} or {@code var mutable name: Type = expression} local
+ * declaration (docs/LANGUAGE_SPEC.md section 2). The type annotation is always written: a local
+ * initializer never infers a type, so a declaration without one does not parse.
  */
 public final class LocalDeclNode extends StatementNode {
 
@@ -39,7 +40,7 @@ public final class LocalDeclNode extends StatementNode {
         super(AstKind.LOCAL_DECL, span);
         this.bindingKind = Objects.requireNonNull(bindingKind);
         this.name = Objects.requireNonNull(name);
-        this.declaredType = declaredType;
+        this.declaredType = Objects.requireNonNull(declaredType);
         this.initializer = Objects.requireNonNull(initializer);
     }
 
@@ -51,9 +52,9 @@ public final class LocalDeclNode extends StatementNode {
         return name;
     }
 
-    /** The written type annotation, or empty when only the initializer spelling exists. */
-    public Optional<TypeRef> declaredType() {
-        return Optional.ofNullable(declaredType);
+    /** The written type annotation; a local always writes one. */
+    public TypeRef declaredType() {
+        return declaredType;
     }
 
     public ExpressionNode initializer() {
@@ -62,9 +63,6 @@ public final class LocalDeclNode extends StatementNode {
 
     @Override
     public List<AstNode> children() {
-        if (declaredType == null) {
-            return List.of(initializer);
-        }
         return List.of(declaredType, initializer);
     }
 }

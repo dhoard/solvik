@@ -30,7 +30,7 @@ public final class SolvikIncludeSemanticTest {
     private static SemanticResult analyze(String rootName, Map<String, String> files) {
         IncludeResolutionResult resolved = VirtualIncludeFiles.resolve(rootName, files);
         assertThat(resolved.isSuccess()).as("resolution must succeed: " + resolved.diagnostics().all()).isTrue();
-        return SolvikSemanticAnalyzer.analyze(resolved.requireUnit(), resolved.itemScopes());
+        return SolvikSemanticAnalyzer.analyze(resolved.requireUnit());
     }
 
     private static void assertOk(SemanticResult result) {
@@ -63,10 +63,10 @@ public final class SolvikIncludeSemanticTest {
     public void genericTypeAndInterfaceSplitAcrossFilesResolve() {
         assertOk(analyze("root.sol", Map.of( //
                         "root.sol", "include \"model.sol\"\nfunc identity<T>(value: T): T {\n    return value\n}\n", //
-                        "model.sol", "interface Named {\n    func name(): String\n}\nclass Holder<T> {\n}\n")));
+                        "model.sol", "interface Named {\n    method name(): String\n}\nclass Holder<T> {\n}\n")));
         assertOk(analyze("root.sol", Map.of( //
                         "root.sol", "include \"model.sol\"\nfunc describe(n: Named): String {\n    return n.name()\n}\n", //
-                        "model.sol", "interface Named {\n    func name(): String\n}\n")));
+                        "model.sol", "interface Named {\n    method name(): String\n}\n")));
     }
 
     @Test
@@ -88,8 +88,8 @@ public final class SolvikIncludeSemanticTest {
     public void duplicateFunctionAcrossDistinctFilesIsRejected() {
         assertCode(analyze("root.sol", Map.of( //
                         "root.sol", "include \"a.sol\"\ninclude \"b.sol\"\n", //
-                        "a.sol", "func dup(): Unit {\n}\n", //
-                        "b.sol", "func dup(): Unit {\n}\n")), DiagnosticCode.RESOL_DUPLICATE_NAME);
+                        "a.sol", "func dup() {\n}\n", //
+                        "b.sol", "func dup() {\n}\n")), DiagnosticCode.RESOL_DUPLICATE_NAME);
     }
 
     @Test
@@ -102,7 +102,7 @@ public final class SolvikIncludeSemanticTest {
 
     @Test
     public void redeclaringBuiltinsIsRejected() {
-        assertCode(analyze("root.sol", Map.of("root.sol", "func print(value: Any?): Unit {\n}\n")), DiagnosticCode.RESOL_DUPLICATE_NAME);
+        assertCode(analyze("root.sol", Map.of("root.sol", "func print(value: Any?) {\n}\n")), DiagnosticCode.RESOL_DUPLICATE_NAME);
         assertCode(analyze("root.sol", Map.of("root.sol", "class String {\n}\n")), DiagnosticCode.RESOL_DUPLICATE_NAME);
     }
 
@@ -110,7 +110,7 @@ public final class SolvikIncludeSemanticTest {
     public void explicitMainInAnIncludedFileIsRejected() {
         assertCode(analyze("root.sol", Map.of( //
                         "root.sol", "include \"lib.sol\"\n", //
-                        "lib.sol", "func main(): Unit {\n}\n")), DiagnosticCode.SEM_INVALID_ENTRY_POINT);
+                        "lib.sol", "func main() {\n}\n")), DiagnosticCode.SEM_INVALID_ENTRY_POINT);
     }
 
     /**
@@ -119,7 +119,7 @@ public final class SolvikIncludeSemanticTest {
     @Test
     public void abstractSubclassInSamePhysicalFileIsValid() {
         assertOk(analyze("root.sol", Map.of( //
-                        "root.sol", "abstract class Shape {\n}\nclass Circle extends Shape {\n}\n")));
+                        "root.sol", "class abstract Shape {\n}\nclass Circle extends Shape {\n}\n")));
     }
 
     /**
@@ -131,7 +131,7 @@ public final class SolvikIncludeSemanticTest {
     public void abstractSubclassInAnIncludedFileIsValid() {
         assertOk(analyze("root.sol", Map.of( //
                         "root.sol", "include \"lib.sol\"\nclass Circle extends Shape {\n}\n", //
-                        "lib.sol", "abstract class Shape {\n}\n")));
+                        "lib.sol", "class abstract Shape {\n}\n")));
     }
 
     /**
@@ -147,7 +147,7 @@ public final class SolvikIncludeSemanticTest {
     public void mutableClassExtendedFromAnIncludedFileIsValid() {
         assertOk(analyze("root.sol", Map.of( //
                         "root.sol", "include \"lib.sol\"\nclass Circle extends Shape {\n}\n", //
-                        "lib.sol", "mutable class Shape {\n}\n")));
+                        "lib.sol", "class mutable Shape {\n}\n")));
     }
 
     /**

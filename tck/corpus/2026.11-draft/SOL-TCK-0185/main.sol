@@ -2,5 +2,5 @@ enum Color {
     RED
     GREEN
 }
-var c = Color.RED
+var c: Color = Color.RED
 print("qualified")

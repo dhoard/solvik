@@ -165,10 +165,11 @@ public final class SolvikCollectionMemberDispatchTest {
     public void unknownMemberOnACollectionReceiverIsRejected() {
         // The universal members are reachable; a name in neither table is still a compile-time error.
         String text = """
-                func f(): Unit {
+                func f() {
                     var mutable nums: List<Integer> = List(1)
                     println(nums.bogus())
                 }
+
                 """;
         CompilationUnitNode unit = parseOk("dispatch-neg.sol", text);
         SemanticResult result = SolvikSemanticAnalyzer.analyze(unit);

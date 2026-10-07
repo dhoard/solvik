@@ -70,7 +70,9 @@ public final class SolvikTypeHierarchyPropertyTest {
                 AnyType.INSTANCE, NothingType.INSTANCE, NullType.INSTANCE, //
                 NumberType.INSTANCE, ByteType.INSTANCE, ShortType.INSTANCE, IntegerType.INSTANCE, //
                 LongType.INSTANCE, FloatType.INSTANCE, DoubleType.INSTANCE, //
-                BooleanType.INSTANCE, CharacterType.INSTANCE, StringType.INSTANCE, UnitType.INSTANCE, //
+                // The no-value sentinel is not a value type: it has no source spelling and no supertype,
+                // so it takes no part in the value-type hierarchy properties below.
+                BooleanType.INSTANCE, CharacterType.INSTANCE, StringType.INSTANCE, //
                 RegexType.INSTANCE, RegexMatchType.INSTANCE, //
                 BuiltinCollectionTypes.LIST, BuiltinCollectionTypes.SET, //
                 BuiltinCollectionTypes.MAP, BuiltinCollectionTypes.STACK, //

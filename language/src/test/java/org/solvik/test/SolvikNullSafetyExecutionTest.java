@@ -104,7 +104,7 @@ public final class SolvikNullSafetyExecutionTest {
     public void safeMethodCallDoesNotEvaluateArgumentsForANullReceiver() {
         assertThat(run("""
                 class Box {
-                    func plus(x: Integer): Integer {
+                    method plus(x: Integer): Integer {
                         return x
                     }
                 }
@@ -114,6 +114,7 @@ public final class SolvikNullSafetyExecutionTest {
                 }
                     var box: Box? = null
                     println(box?.plus(side()) ?? -1)
+
                 """)).isEqualTo("-1\n");
     }
 
@@ -132,26 +133,28 @@ public final class SolvikNullSafetyExecutionTest {
     public void typeTestWorksForInterfaces() {
         assertThat(run("""
                 interface Named {
-                    func name(): String
+                    method name(): String
                 }
                 class User implements Named {
-                    func name(): String {
+                    method name(): String {
                         return "Doug"
                     }
                 }
                     var v: Any = User()
                     println(v is Named)
-                    var named = v as Named
+                    var named: Named = v as Named
                     println(named.name())
+
                 """)).isEqualTo("true\nDoug\n");
     }
 
     @Test
     public void checkedCastReturnsTheValueOnSuccess() {
         assertThat(run(BOX + """
-                    var v: Any = Box(3)
-                    var box = v as Box
-                    println(box.value)
+                        var v: Any = Box(3)
+                        var box: Box = v as Box
+                        println(box.value)
+
                 """)).isEqualTo("3\n");
     }
 
@@ -159,9 +162,10 @@ public final class SolvikNullSafetyExecutionTest {
     public void unsuccessfulCastRaisesARuntimeTypeError() {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         PolyglotException failure = runFailing(BOX + """
-                    var v: Any = "not a box"
-                    var box = v as Box
-                    println(box.value)
+                        var v: Any = "not a box"
+                        var box: Box = v as Box
+                        println(box.value)
+
                 """, out);
         assertThat(failure).as("the cast must fail").isNotNull();
         assertThat(failure.isGuestException()).as("a guest exception is reported").isTrue();
@@ -192,32 +196,35 @@ public final class SolvikNullSafetyExecutionTest {
     @Test
     public void builtinTypeTestsAndCastsExecute() {
         assertThat(run("""
-                    var v: Any = 1
-                    println(v is Integer)
-                    println(v is String)
-                    var n = v as Integer
-                    println(n + 1)
+                        var v: Any = 1
+                        println(v is Integer)
+                        println(v is String)
+                        var n: Integer = v as Integer
+                        println(n + 1)
+
                 """)).isEqualTo("true\nfalse\n2\n");
     }
 
     @Test
     public void inheritanceTypeTestsWalkTheRuntimeClassChain() {
         assertThat(run("""
-                mutable class Animal {
-                    mutable func speak(): String {
+                class mutable Animal {
+                    method mutable speak(): String {
                         return "..."
                     }
                 }
                 class Dog extends Animal {
-                    override func speak(): String {
+                    method override speak(): String {
                         return "woof"
                     }
                 }
                     var v: Any = Dog()
                     println(v is Dog)
                     println(v is Animal)
-                    var animal = v as Animal
+                    var animal: Animal = v as Animal
                     println(animal.speak())
+
+
                 """)).isEqualTo("true\ntrue\nwoof\n");
     }
 }

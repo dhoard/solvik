@@ -15,5 +15,5 @@ func msg(): String {
 func get(): Result<Integer, String> {
     return Result.Ok(1)
 }
-var r = get()
+var r: Result<Integer, String> = get()
 print(r.expect(msg()))

@@ -23,13 +23,10 @@ import org.solvik.ast.AstNode;
 import org.solvik.source.SourceSpan;
 
 /**
- * A written type reference: a simple name, optional generic type arguments, and, from Phase 10, an
- * optional {@code ?} marking the nullable type {@code T?} (docs/LANGUAGE_SPEC.md sections 5 and 11).
- * Phase 1 records the name only; resolution to the compiler type model happens in later phases.
- *
- * <p>A function-type reference is {@link FunctionTypeRefNode}, a separate final node; both share the
- * {@link TypeRef} abstraction so a declared-type position can carry either and the analyzer resolves
- * them through a single path while dispatching the two structurally.
+ * A written nominal type reference: an optional module prefix, a name, optional generic type
+ * arguments, and an optional {@code ?} marking the nullable type {@code T?}
+ * (docs/LANGUAGE_SPEC.md sections 5 and 11). Resolution to the compiler type model happens in the
+ * semantic layer.
  */
 public final class TypeRefNode extends TypeRef {
 

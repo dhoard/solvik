@@ -30,32 +30,34 @@ import org.solvik.semantic.SolvikSemanticAnalyzer;
  * A qualified reference must resolve to a module member, and a module member that is not a value
  * (class, interface, enum) is rejected with the matching diagnostic instead of being silently typed.
  * These pin the classification of each qualified read and call shape, including the unknown-module,
- * unknown-name, and unknown-variant branches. A qualified function name is a value — the same canonical
- * function value the unqualified name yields — so it is checked positively here rather than rejected.
+ * unknown-name, and unknown-variant branches. A callable is a declaration rather than a value, so a
+ * qualified call is accepted while a qualified bare function name used as a value is rejected.
  */
 public final class SolvikNamespaceNegativeTest {
 
     private static final String LIBRARY = """
-            module my_lib
-            class Thing {
-            }
-            class Holder {
-                static var mutable count: Integer = 0
-                static var limit: Integer = 1
-                static func bump(): Integer {
-                    Holder.count = Holder.count + 1
-                    return Holder.count
+            module my_lib {
+                class Thing {
+                }
+                class Holder {
+                    var static mutable count: Integer = 0
+                    var static limit: Integer = 1
+                    method static bump(): Integer {
+                        Holder.count = Holder.count + 1
+                        return Holder.count
+                    }
+                }
+                interface Contract {
+                }
+                enum Color {
+                    Red
+                    Green
+                }
+                func hello(): Integer {
+                    return 1
                 }
             }
-            interface Contract {
-            }
-            enum Color {
-                Red
-                Green
-            }
-            func hello(): Integer {
-                return 1
-            }
+
             """;
 
     private static DiagnosticCode firstError(String body) {
@@ -74,96 +76,89 @@ public final class SolvikNamespaceNegativeTest {
 
     private static SemanticResult analyze(String body) {
         IncludeResolutionResult resolved = VirtualIncludeFiles.resolve("root.sol", Map.of(
-                "root.sol", "include \"lib.sol\" alias m\nfunc f() {\n" + body + "\n}\n",
+                "root.sol", "include \"lib.sol\"\nfunc f() {\n" + body + "\n}\n",
                 "lib.sol", LIBRARY));
         assertThat(resolved.isSuccess()).as("resolution must succeed: " + resolved.diagnostics().all()).isTrue();
-        return SolvikSemanticAnalyzer.analyze(resolved.requireUnit(), resolved.itemScopes());
+        return SolvikSemanticAnalyzer.analyze(resolved.requireUnit());
     }
 
     @Test
     public void qualifiedClassReadIsRejected() {
-        assertThat(firstError("var x = m::Thing")).isEqualTo(DiagnosticCode.TYPE_CLASS_AS_VALUE);
+        assertThat(firstError("var x: Any = my_lib::Thing")).isEqualTo(DiagnosticCode.TYPE_CLASS_AS_VALUE);
     }
 
     @Test
     public void qualifiedInterfaceReadIsRejected() {
-        assertThat(firstError("var x = m::Contract")).isEqualTo(DiagnosticCode.TYPE_INTERFACE_AS_VALUE);
+        assertThat(firstError("var x: Any = my_lib::Contract")).isEqualTo(DiagnosticCode.TYPE_INTERFACE_AS_VALUE);
     }
 
     @Test
     public void qualifiedEnumReadIsRejected() {
-        assertThat(firstError("var x = m::Color")).isEqualTo(DiagnosticCode.TYPE_ENUM_AS_VALUE);
+        assertThat(firstError("var x: Any = my_lib::Color")).isEqualTo(DiagnosticCode.TYPE_ENUM_AS_VALUE);
     }
 
     /**
-     * A qualified function name resolves and types as a function value (docs/LANGUAGE_SPEC.md section 6).
-     * It must be accepted: rejecting it would make qualification change what a declaration denotes, and
-     * the identity of the resulting value is pinned in {@code SolvikFunctionValueTest}.
+     * A qualified function name denotes a declaration, not a value, so reading it as one is rejected
+     * exactly as the unqualified form is.
      */
     @Test
-    public void qualifiedFunctionReadResolvesAsAFunctionValue() {
-        SemanticResult result = analyze("var x = m::hello\n");
-        assertThat(result.isSuccess()).as("qualified function reference must analyze: " + result.diagnostics().all()).isTrue();
+    public void qualifiedFunctionReadAsAValueIsRejected() {
+        assertThat(firstError("var x: Any = my_lib::hello")).isEqualTo(DiagnosticCode.TYPE_FUNCTION_AS_VALUE);
     }
 
-    /**
-     * A qualified name that resolves to no module member stays an unknown-name error. Listed alongside
-     * the accepted qualified function read so the pair shows that qualification decides resolution, not
-     * whether a function denotes a value.
-     */
     @Test
     public void qualifiedUnknownFunctionReadIsRejected() {
-        assertThat(firstError("var x = m::nothing")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_NAME);
+        assertThat(firstError("var x: Any = my_lib::nothing")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_NAME);
     }
 
     @Test
     public void qualifiedUnknownReadIsRejected() {
-        assertThat(firstError("var x = m::Nope")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_NAME);
+        assertThat(firstError("var x: Any = my_lib::Nope")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_NAME);
     }
 
     @Test
     public void qualifiedReadOfANonEnumMemberIsRejected() {
-        assertThat(firstError("var x = m::Nope.Bar")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_NAME);
+        assertThat(firstError("var x: Any = my_lib::Nope.Bar")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_NAME);
     }
 
     @Test
     public void qualifiedCallOfAnEnumIsRejected() {
-        assertThat(firstError("m::Color()")).isEqualTo(DiagnosticCode.TYPE_ENUM_AS_VALUE);
+        assertThat(firstError("my_lib::Color()")).isEqualTo(DiagnosticCode.TYPE_ENUM_AS_VALUE);
     }
 
     @Test
     public void qualifiedCallOfAnUnknownNameIsRejected() {
-        assertThat(firstError("m::Nope()")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_NAME);
+        assertThat(firstError("my_lib::Nope()")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_NAME);
     }
 
     @Test
     public void qualifiedCallOfAnInterfaceIsRejected() {
-        assertThat(firstError("m::Contract()")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_NAME);
+        assertThat(firstError("my_lib::Contract()")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_NAME);
     }
 
     @Test
     public void qualifiedCallOfAnUnknownVariantIsRejected() {
-        assertThat(firstError("m::Color.Nope()")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_MEMBER);
+        assertThat(firstError("my_lib::Color.Nope()")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_MEMBER);
     }
 
     @Test
     public void deeplyQualifiedCallIsRejected() {
-        assertThat(firstError("m::A.B.C()")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_NAME);
+        assertThat(firstError("my_lib::A.B.C()")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_NAME);
     }
 
     @Test
     public void qualifiedCallErrorPathsCheckTheirArguments() {
-        assertThat(firstError("m::Color(5)")).isEqualTo(DiagnosticCode.TYPE_ENUM_AS_VALUE);
-        assertThat(firstError("m::Nope(5)")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_NAME);
+        assertThat(firstError("my_lib::Color(5)")).isEqualTo(DiagnosticCode.TYPE_ENUM_AS_VALUE);
+        assertThat(firstError("my_lib::Nope(5)")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_NAME);
         // The module and the class both resolve, so only the member is unknown; this matches the enum
         // case above, where an unknown variant of a known enum is an unknown member.
-        assertThat(firstError("m::Thing.Nope(5)")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_MEMBER);
-        assertThat(firstError("m::A.B.C(5)")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_NAME);
+        assertThat(firstError("my_lib::Thing.Nope(5)")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_MEMBER);
+        assertThat(firstError("my_lib::A.B.C(5)")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_NAME);
     }
 
     @Test
     public void qualifiedCallStillReportsAnInvalidArgument() {
-        SemanticResult result = analyze("m::Nope(Byte(300))");
+        SemanticResult result = analyze("my_lib::Nope(Byte(300))");
         assertThat(result.isSuccess()).as("analysis must fail").isFalse();
         assertThat(result.diagnostics().all()).extracting(Diagnostic::code)
                 .contains(DiagnosticCode.TYPE_CONVERSION_OUT_OF_RANGE, DiagnosticCode.RESOL_UNKNOWN_NAME);
@@ -171,12 +166,12 @@ public final class SolvikNamespaceNegativeTest {
 
     @Test
     public void unknownModulePrefixReadIsRejected() {
-        assertThat(firstError("var x = nope::Thing")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_MODULE);
+        assertThat(firstError("var x: Any = nope::Thing")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_MODULE);
     }
 
     @Test
     public void qualifiedVariantReadResolves() {
-        SemanticResult result = analyze("var color: m::Color = m::Color.Red");
+        SemanticResult result = analyze("var color: my_lib::Color = my_lib::Color.Red");
         assertThat(result.isSuccess()).as("expected success but got " + result.diagnostics().all()).isTrue();
     }
 
@@ -186,13 +181,13 @@ public final class SolvikNamespaceNegativeTest {
 
     @Test
     public void qualifiedStaticMemberReadResolves() {
-        SemanticResult result = analyze("var n: Integer = m::Holder.count\nvar limit: Integer = m::Holder.limit\nvar bumped: Integer = m::Holder.bump()");
+        SemanticResult result = analyze("var n: Integer = my_lib::Holder.count\nvar limit: Integer = my_lib::Holder.limit\nvar bumped: Integer = my_lib::Holder.bump()");
         assertThat(result.isSuccess()).as("expected success but got " + result.diagnostics().all()).isTrue();
     }
 
     @Test
     public void qualifiedStaticPropertyAssignmentResolves() {
-        SemanticResult result = analyze("m::Holder.count = 4");
+        SemanticResult result = analyze("my_lib::Holder.count = 4");
         assertThat(result.isSuccess()).as("expected success but got " + result.diagnostics().all()).isTrue();
     }
 
@@ -201,27 +196,27 @@ public final class SolvikNamespaceNegativeTest {
         // Only `prefix::Class.member` names a static member. `prefix::Class::member` is not a qualified
         // name the language defines, and lowering has no node for a bare namespace chain used as a
         // value, so it must be refused by analysis rather than escaping as a host failure.
-        assertThat(firstError("var n: Integer = m::Holder::count")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_NAME);
+        assertThat(firstError("var n: Integer = my_lib::Holder::count")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_NAME);
     }
 
     @Test
     public void anAllNamespaceQualifiedStaticMemberCallIsRejected() {
-        assertThat(firstError("m::Holder::bump()")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_NAME);
+        assertThat(firstError("my_lib::Holder::bump()")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_NAME);
     }
 
     @Test
     public void anAllNamespaceQualifiedVariantReadIsRejected() {
         // The same rule guards the enum variant path, which shares the qualified read.
-        assertThat(firstError("var color: m::Color = m::Color::Red")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_NAME);
+        assertThat(firstError("var color: my_lib::Color = my_lib::Color::Red")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_NAME);
     }
 
     @Test
     public void anAllNamespaceQualifiedVariantCallIsRejected() {
-        assertThat(firstError("m::Color::Red()")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_NAME);
+        assertThat(firstError("my_lib::Color::Red()")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_NAME);
     }
 
     @Test
     public void aQualifiedStaticMemberDoesNotReachAnInstanceMember() {
-        assertThat(firstError("var n: Integer = m::Thing.nope")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_MEMBER);
+        assertThat(firstError("var n: Integer = my_lib::Thing.nope")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_MEMBER);
     }
 }

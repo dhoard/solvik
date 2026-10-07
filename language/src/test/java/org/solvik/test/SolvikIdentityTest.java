@@ -37,21 +37,22 @@ public final class SolvikIdentityTest {
     @Test
     public void identityAnswersAliasesAndDistinctObjects() {
         assertThat(run("""
-                    class Point {
-                        var x: Integer
+                        class Point {
+                            var x: Integer
 
-                        Point(x: Integer) {
-                            this.x = x
+                            Point(x: Integer) {
+                                this.x = x
+                            }
                         }
-                    }
 
-                    var first = Point(1)
-                    var second = Point(1)
-                    var aliasPoint = first
-                    println(first === second)
-                    println(first === aliasPoint)
-                    println(first !== second)
-                    println(first !== aliasPoint)
+                        var first: Point = Point(1)
+                        var second: Point = Point(1)
+                        var aliasPoint: Point = first
+                        println(first === second)
+                        println(first === aliasPoint)
+                        println(first !== second)
+                        println(first !== aliasPoint)
+
                 """)).isEqualTo("false\ntrue\ntrue\nfalse\n");
     }
 
@@ -59,70 +60,73 @@ public final class SolvikIdentityTest {
     public void identityIsUnaffectedByAnEqualsOverride() {
         // `==` consults the override; `===` must not, even though it has an observable side effect.
         assertThat(run("""
-                    class Point {
-                        var x: Integer
+                        class Point {
+                            var x: Integer
 
-                        Point(x: Integer) {
-                            this.x = x
+                            Point(x: Integer) {
+                                this.x = x
+                            }
+
+                            method override equals(other: Any?): Boolean {
+                                println("equals called")
+                                return true
+                            }
+
+                            method override hashCode(): Integer {
+                                return 1
+                            }
                         }
 
-                        override func equals(other: Any?): Boolean {
-                            println("equals called")
-                            return true
-                        }
+                        var a: Point = Point(1)
+                        var b: Point = Point(2)
+                        println(a === b)
+                        println(a !== b)
 
-                        override func hashCode(): Integer {
-                            return 1
-                        }
-                    }
-
-                    var a = Point(1)
-                    var b = Point(2)
-                    println(a === b)
-                    println(a !== b)
                 """)).isEqualTo("false\ntrue\n");
     }
 
     @Test
     public void identityThroughAnInterfaceReceiver() {
         assertThat(run("""
-                    interface Identified {
-                        func id(): Integer
-                    }
-
-                    class Item implements Identified {
-                        var n: Integer
-
-                        Item(n: Integer) {
-                            this.n = n
+                        interface Identified {
+                            method id(): Integer
                         }
 
-                        func id(): Integer {
-                            return this.n
-                        }
-                    }
+                        class Item implements Identified {
+                            var n: Integer
 
-                    var a: Identified = Item(1)
-                    var b: Identified = a
-                    println(a === b)
-                    println(a === Item(1))
-                    println(a !== Item(1))
+                            Item(n: Integer) {
+                                this.n = n
+                            }
+
+                            method id(): Integer {
+                                return this.n
+                            }
+                        }
+
+                        var a: Identified = Item(1)
+                        var b: Identified = a
+                        println(a === b)
+                        println(a === Item(1))
+                        println(a !== Item(1))
+
                 """)).isEqualTo("true\nfalse\ntrue\n");
     }
 
     @Test
     public void identityAcrossASuperclassAndSubclass() {
         assertThat(run("""
-                    mutable class Base {
-                    }
+                        class mutable Base {
+                        }
 
-                    class Derived extends Base {
-                    }
+                        class Derived extends Base {
+                        }
 
-                    var base: Base = Derived()
-                    var derived: Derived = Derived()
-                    println(base === base)
-                    println(base === derived)
+                        var base: Base = Derived()
+                        var derived: Derived = Derived()
+                        println(base === base)
+                        println(base === derived)
+
                 """)).isEqualTo("true\nfalse\n");
     }
 
@@ -176,50 +180,52 @@ public final class SolvikIdentityTest {
     @Test
     public void identityEvaluatesEachOperandExactlyOnce() {
         assertThat(run("""
-                    class Item {
-                    }
-
-                    class Counter {
-                        var mutable calls: Integer
-
-                        Counter() {
-                            this.calls = 0
+                        class Item {
                         }
-                    }
 
-                    func make(counter: Counter): Item {
-                        counter.calls = counter.calls + 1
-                        return Item()
-                    }
+                        class Counter {
+                            var mutable calls: Integer
 
-                    var counter = Counter()
-                    println(make(counter) === make(counter))
-                    println(counter.calls)
+                            Counter() {
+                                this.calls = 0
+                            }
+                        }
+
+                        func make(counter: Counter): Item {
+                            counter.calls = counter.calls + 1
+                            return Item()
+                        }
+
+                        var counter: Counter = Counter()
+                        println(make(counter) === make(counter))
+                        println(counter.calls)
+
                 """)).isEqualTo("false\n2\n");
     }
 
     @Test
     public void identityNegationEvaluatesEachOperandExactlyOnce() {
         assertThat(run("""
-                    class Item {
-                    }
-
-                    class Counter {
-                        var mutable calls: Integer
-
-                        Counter() {
-                            this.calls = 0
+                        class Item {
                         }
-                    }
 
-                    func make(counter: Counter): Item {
-                        counter.calls = counter.calls + 1
-                        return Item()
-                    }
+                        class Counter {
+                            var mutable calls: Integer
 
-                    var counter = Counter()
-                    println(make(counter) !== make(counter))
-                    println(counter.calls)
+                            Counter() {
+                                this.calls = 0
+                            }
+                        }
+
+                        func make(counter: Counter): Item {
+                            counter.calls = counter.calls + 1
+                            return Item()
+                        }
+
+                        var counter: Counter = Counter()
+                        println(make(counter) !== make(counter))
+                        println(counter.calls)
+
                 """)).isEqualTo("true\n2\n");
     }
 
@@ -264,21 +270,22 @@ public final class SolvikIdentityTest {
     @Test
     public void notEqualsEqualsRendersBooleanForAliasesAndCollections() {
         assertThat(run("""
-                    class Box {
-                    }
+                        class Box {
+                        }
 
-                    var first = Box()
-                    var second = Box()
-                    var dup = first
+                        var first: Box = Box()
+                        var second: Box = Box()
+                        var dup: Box = first
 
-                    var a: List<Integer> = List(1, 2)
-                    var b: List<Integer> = a
-                    var c: List<Integer> = List(1, 2)
+                        var a: List<Integer> = List(1, 2)
+                        var b: List<Integer> = a
+                        var c: List<Integer> = List(1, 2)
 
-                    println(first !== second)
-                    println(first !== dup)
-                    println(a !== c)
-                    println(a !== b)
+                        println(first !== second)
+                        println(first !== dup)
+                        println(a !== c)
+                        println(a !== b)
+
                 """)).isEqualTo("true\nfalse\ntrue\nfalse\n");
     }
 

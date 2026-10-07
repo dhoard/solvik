@@ -43,7 +43,7 @@ REQS = {
   notes="Both halves are needed: a construction with no message argument must store nothing and report null rather than an empty string, and a supplied message must be reported back exactly. Expected bytes are derived from section 5's rule that print renders null as the literal null and appends no separator, so the two tests are separate programs rather than one concatenated stream.",
   quotes=["Construction accepts a single optional trailing `String?` argument",
           "A construction with no message argument stores no message; `getMessage()` then returns `null`.",
-          "func getMessage(): String?   // synthesized on every guest exception type"]),
+          "method getMessage(): String?   // synthesized on every guest exception type"]),
  "REQ-1302": dict(
   section="22.1 Exception types",
   summary="The message is a compiler-synthesized private slot and never a readable member, so reading e.message on an exception is the compile-time error SOLV-RESOL-004",
@@ -177,288 +177,360 @@ def add(tid, src, outcome, **exp):
     EXPECT[tid] = {"outcome": outcome, **exp}
 
 # --- REQ-1300: a handler written on the root base catches a class under a built-in base.
-add("SOL-TCK-0142", PE + '''func guard() {
-    try {
-        throw ParseError("bad int")
-    }
-    catch (e: Exception) {
-        print("handled")
-        print(e.getMessage())
-    }
-}
-guard()
-''', "SUCCESS", stdout="handledbad int")
+add("SOL-TCK-0142", (('class mutable ParseError extends RuntimeException {\n'
+    '}\n'
+    'func guard() {\n'
+    '    try {\n'
+    '        throw ParseError("bad int")\n'
+    '    }\n'
+    '    catch (e: Exception) {\n'
+    '        print("handled")\n'
+    '        print(e.getMessage())\n'
+    '    }\n'
+    '}\n'
+    'guard()\n'
+    '')), "SUCCESS", stdout="handledbad int")
 
-add("SOL-TCK-0143", PE + '''mutable class DeepError extends ParseError {
-}
-func guard() {
-    try {
-        throw DeepError("deep")
-    }
-    catch (e: Exception) {
-        print(e.getMessage())
-    }
-}
-guard() 
-''', "SUCCESS", stdout="deep")
+add("SOL-TCK-0143", (('class mutable ParseError extends RuntimeException {\n'
+    '}\n'
+    'class mutable DeepError extends ParseError {\n'
+    '}\n'
+    'func guard() {\n'
+    '    try {\n'
+    '        throw DeepError("deep")\n'
+    '    }\n'
+    '    catch (e: Exception) {\n'
+    '        print(e.getMessage())\n'
+    '    }\n'
+    '}\n'
+    'guard() \n'
+    '')), "SUCCESS", stdout="deep")
 
 # --- REQ-1301: optional trailing message; getMessage() yields it or null.
-add("SOL-TCK-0144", PE + '''func guard() {
-    try {
-        throw ParseError()
-    }
-    catch (e: ParseError) {
-        print("[" .. e.getMessage() .. "]")
-    }
-}
-guard()
-''', "SUCCESS", stdout="[null]")
+add("SOL-TCK-0144", (('class mutable ParseError extends RuntimeException {\n'
+    '}\n'
+    'func guard() {\n'
+    '    try {\n'
+    '        throw ParseError()\n'
+    '    }\n'
+    '    catch (e: ParseError) {\n'
+    '        print("[" .. e.getMessage() .. "]")\n'
+    '    }\n'
+    '}\n'
+    'guard()\n'
+    '')), "SUCCESS", stdout="[null]")
 
-add("SOL-TCK-0145", PE + '''func guard() {
-    try {
-        throw ParseError("bad int")
-    }
-    catch (e: ParseError) {
-        print("[" .. e.getMessage() .. "]")
-    }
-}
-guard()
-''', "SUCCESS", stdout="[bad int]")
+add("SOL-TCK-0145", (('class mutable ParseError extends RuntimeException {\n'
+    '}\n'
+    'func guard() {\n'
+    '    try {\n'
+    '        throw ParseError("bad int")\n'
+    '    }\n'
+    '    catch (e: ParseError) {\n'
+    '        print("[" .. e.getMessage() .. "]")\n'
+    '    }\n'
+    '}\n'
+    'guard()\n'
+    '')), "SUCCESS", stdout="[bad int]")
 
 # --- REQ-1302: the message is never a readable member.
-add("SOL-TCK-0146", PE + '''func guard() {
-    try {
-        throw ParseError("m")
-    }
-    catch (e: ParseError) {
-        print(e.message)
-    }
-}
-guard()
-''' + NEG, "COMPILE_ERROR", diag={"family": "RESOL", "code": "SOLV-RESOL-004"})
+add("SOL-TCK-0146", (('class mutable ParseError extends RuntimeException {\n'
+    '}\n'
+    'func guard() {\n'
+    '    try {\n'
+    '        throw ParseError("m")\n'
+    '    }\n'
+    '    catch (e: ParseError) {\n'
+    '        print(e.message)\n'
+    '    }\n'
+    '}\n'
+    'guard()\n'
+    '\n'
+    'print("EXECUTED-INVALID")\n'
+    '')), "COMPILE_ERROR", diag={"family": "RESOL", "code": "SOLV-RESOL-004"})
 
 # --- REQ-1303: message type and arity.
-add("SOL-TCK-0147", PE + 'throw ParseError(7)\n' + NEG,
+add("SOL-TCK-0147", (('class mutable ParseError extends RuntimeException {\n'
+    '}\n'
+    'throw ParseError(7)\n'
+    '\n'
+    'print("EXECUTED-INVALID")\n'
+    '')),
     "COMPILE_ERROR", diag={"family": "TYPE", "code": "SOLV-TYPE-001"})
 
-add("SOL-TCK-0148", PE + 'throw ParseError("a", "b")\n' + NEG,
+add("SOL-TCK-0148", (('class mutable ParseError extends RuntimeException {\n'
+    '}\n'
+    'throw ParseError("a", "b")\n'
+    '\n'
+    'print("EXECUTED-INVALID")\n'
+    '')),
     "COMPILE_ERROR", diag={"family": "TYPE", "code": "SOLV-TYPE-003"})
 
 # --- REQ-1304: the message is independent of the declared constructor.
-add("SOL-TCK-0149", '''mutable class CodeError extends RuntimeException {
-    var code: Integer
-
-    CodeError(code: Integer) {
-        this.code = code
-    }
-}
-func guard() {
-    try {
-        throw CodeError(7, "sub message")
-    }
-    catch (e: CodeError) {
-        print(e.code)
-        print("[" .. e.getMessage() .. "]")
-    }
-}
-guard()
-''', "SUCCESS", stdout="7[sub message]")
+add("SOL-TCK-0149", (('class mutable CodeError extends RuntimeException {\n'
+    '    var code: Integer\n'
+    '\n'
+    '    CodeError(code: Integer) {\n'
+    '        this.code = code\n'
+    '    }\n'
+    '}\n'
+    'func guard() {\n'
+    '    try {\n'
+    '        throw CodeError(7, "sub message")\n'
+    '    }\n'
+    '    catch (e: CodeError) {\n'
+    '        print(e.code)\n'
+    '        print("[" .. e.getMessage() .. "]")\n'
+    '    }\n'
+    '}\n'
+    'guard()\n'
+    '')), "SUCCESS", stdout="7[sub message]")
 
 # --- REQ-1305: getMessage() exists on a handler typed on a base.
-add("SOL-TCK-0150", PE + '''func guard() {
-    try {
-        throw ParseError("via base")
-    }
-    catch (e: RuntimeException) {
-        print("[" .. e.getMessage() .. "]")
-    }
-}
-guard()
-''', "SUCCESS", stdout="[via base]")
+add("SOL-TCK-0150", (('class mutable ParseError extends RuntimeException {\n'
+    '}\n'
+    'func guard() {\n'
+    '    try {\n'
+    '        throw ParseError("via base")\n'
+    '    }\n'
+    '    catch (e: RuntimeException) {\n'
+    '        print("[" .. e.getMessage() .. "]")\n'
+    '    }\n'
+    '}\n'
+    'guard()\n'
+    '')), "SUCCESS", stdout="[via base]")
 
 # --- REQ-1306: message/getMessage reserved on exception types, ordinary elsewhere.
-add("SOL-TCK-0151", 'class Bad extends RuntimeException {\n    var message: String = "mine"\n}\n' + NEG,
+add("SOL-TCK-0151", ('class Bad extends RuntimeException {\n'
+    '    var message: String = "mine"\n'
+    '}\n'
+    '\n'
+    'print("EXECUTED-INVALID")\n'
+    ''),
     "COMPILE_ERROR", diag={"family": "SEM", "code": "SOLV-SEM-037"})
 
-add("SOL-TCK-0152", 'class Bad extends RuntimeException {\n    func getMessage(): String {\n        return "mine"\n    }\n}\n' + NEG,
+add("SOL-TCK-0152", (('class Bad extends RuntimeException {\n'
+    '    method getMessage(): String {\n'
+    '        return "mine"\n'
+    '    }\n'
+    '}\n'
+    '\n'
+    'print("EXECUTED-INVALID")\n'
+    '')),
     "COMPILE_ERROR", diag={"family": "SEM", "code": "SOLV-SEM-037"})
 
-add("SOL-TCK-0153", '''class Note {
-    var message: String = "fine"
-
-    func getMessage(): String {
-        return this.message
-    }
-}
-var n = Note()
-print(n.message)
-print(n.getMessage())
-''', "SUCCESS", stdout="finefine")
+add("SOL-TCK-0153", (('class Note {\n'
+    '    var message: String = "fine"\n'
+    '\n'
+    '    method getMessage(): String {\n'
+    '        return this.message\n'
+    '    }\n'
+    '}\n'
+    'var n: Note = Note()\n'
+    'print(n.message)\n'
+    'print(n.getMessage())\n'
+    '')), "SUCCESS", stdout="finefine")
 
 # --- REQ-1307: the built-in bases are not constructible but do serve as handler types.
-add("SOL-TCK-0154", 'throw RuntimeException("x")\n' + NEG,
+add("SOL-TCK-0154", ('throw RuntimeException("x")\n'
+    '\n'
+    'print("EXECUTED-INVALID")\n'
+    ''),
     "COMPILE_ERROR", diag={})
 
-add("SOL-TCK-0155", 'class ConfigError extends ApplicationException {\n}\nfunc guard() {\n    try {\n        throw ConfigError("no config")\n    }\n    catch (e: ApplicationException) {\n        print("[" .. e.getMessage() .. "]")\n    }\n}\nguard()\n',
+add("SOL-TCK-0155", ('class ConfigError extends ApplicationException {\n'
+    '}\n'
+    'func guard() {\n'
+    '    try {\n'
+    '        throw ConfigError("no config")\n'
+    '    }\n'
+    '    catch (e: ApplicationException) {\n'
+    '        print("[" .. e.getMessage() .. "]")\n'
+    '    }\n'
+    '}\n'
+    'guard()\n'
+    ''),
     "SUCCESS", stdout="[no config]")
 
 # --- REQ-1308: first matching clause in source order runs.
-add("SOL-TCK-0156", PE + '''mutable class SubError extends ParseError {
-}
-func guard() {
-    try {
-        throw SubError("s")
-    }
-    catch (e: SubError) {
-        print("specific")
-    }
-    catch (e: RuntimeException) {
-        print("base")
-    }
-}
-guard()
-''', "SUCCESS", stdout="specific")
+add("SOL-TCK-0156", (('class mutable ParseError extends RuntimeException {\n'
+    '}\n'
+    'class mutable SubError extends ParseError {\n'
+    '}\n'
+    'func guard() {\n'
+    '    try {\n'
+    '        throw SubError("s")\n'
+    '    }\n'
+    '    catch (e: SubError) {\n'
+    '        print("specific")\n'
+    '    }\n'
+    '    catch (e: RuntimeException) {\n'
+    '        print("base")\n'
+    '    }\n'
+    '}\n'
+    'guard()\n'
+    '')), "SUCCESS", stdout="specific")
 
 # --- REQ-1309: a clause made unreachable by an earlier base clause is SOLV-SEM-055.
-add("SOL-TCK-0157", '''func guard() {
-    try {
-        print("trying")
-    }
-    catch (e: Exception) {
-        print("root")
-    }
-    catch (e: RuntimeException) {
-        print("runtime")
-    }
-}
-guard()
-''' + NEG, "COMPILE_ERROR", diag={"family": "SEM", "code": "SOLV-SEM-055"})
+add("SOL-TCK-0157", ('func guard() {\n'
+    '    try {\n'
+    '        print("trying")\n'
+    '    }\n'
+    '    catch (e: Exception) {\n'
+    '        print("root")\n'
+    '    }\n'
+    '    catch (e: RuntimeException) {\n'
+    '        print("runtime")\n'
+    '    }\n'
+    '}\n'
+    'guard()\n'
+    '\n'
+    'print("EXECUTED-INVALID")\n'
+    ''), "COMPILE_ERROR", diag={"family": "SEM", "code": "SOLV-SEM-055"})
 
 # --- REQ-1310: the catch binding is not visible after its clause.
-add("SOL-TCK-0158", PE + '''func guard() {
-    try {
-        throw ParseError("x")
-    }
-    catch (e: ParseError) {
-        print("caught")
-    }
-    print(e)
-}
-guard()
-''' + NEG, "COMPILE_ERROR", diag={"family": "RESOL", "code": "SOLV-RESOL-001"})
+add("SOL-TCK-0158", (('class mutable ParseError extends RuntimeException {\n'
+    '}\n'
+    'func guard() {\n'
+    '    try {\n'
+    '        throw ParseError("x")\n'
+    '    }\n'
+    '    catch (e: ParseError) {\n'
+    '        print("caught")\n'
+    '    }\n'
+    '    print(e)\n'
+    '}\n'
+    'guard()\n'
+    '\n'
+    'print("EXECUTED-INVALID")\n'
+    '')), "COMPILE_ERROR", diag={"family": "RESOL", "code": "SOLV-RESOL-001"})
 
 # --- REQ-1311: two clauses may reuse the same binding name.
-add("SOL-TCK-0159", PE + '''mutable class OtherError extends RuntimeException {
-}
-func guard() {
-    try {
-        throw ParseError("one")
-    }
-    catch (e: ParseError) {
-        print("[" .. e.getMessage() .. "]")
-    }
-    catch (e: OtherError) {
-        print("[" .. e.getMessage() .. "]")
-    }
-}
-guard()
-print("done")
-''', "SUCCESS", stdout="[one]done")
+add("SOL-TCK-0159", (('class mutable ParseError extends RuntimeException {\n'
+    '}\n'
+    'class mutable OtherError extends RuntimeException {\n'
+    '}\n'
+    'func guard() {\n'
+    '    try {\n'
+    '        throw ParseError("one")\n'
+    '    }\n'
+    '    catch (e: ParseError) {\n'
+    '        print("[" .. e.getMessage() .. "]")\n'
+    '    }\n'
+    '    catch (e: OtherError) {\n'
+    '        print("[" .. e.getMessage() .. "]")\n'
+    '    }\n'
+    '}\n'
+    'guard()\n'
+    'print("done")\n'
+    '')), "SUCCESS", stdout="[one]done")
 
 # --- REQ-1312: the binding is initialized, so it can be rethrown.
-add("SOL-TCK-0160", PE + '''func guard() {
-    try {
-        try {
-            throw ParseError("kept")
-        }
-        catch (e: ParseError) {
-            throw e
-        }
-    }
-    catch (again: ParseError) {
-        print("outer")
-        print("[" .. again.getMessage() .. "]")
-    }
-}
-guard()
-''', "SUCCESS", stdout="outer[kept]")
+add("SOL-TCK-0160", (('class mutable ParseError extends RuntimeException {\n'
+    '}\n'
+    'func guard() {\n'
+    '    try {\n'
+    '        try {\n'
+    '            throw ParseError("kept")\n'
+    '        }\n'
+    '        catch (e: ParseError) {\n'
+    '            throw e\n'
+    '        }\n'
+    '    }\n'
+    '    catch (again: ParseError) {\n'
+    '        print("outer")\n'
+    '        print("[" .. again.getMessage() .. "]")\n'
+    '    }\n'
+    '}\n'
+    'guard()\n'
+    '')), "SUCCESS", stdout="outer[kept]")
 
 # --- REQ-1313: a handler type must be a guest exception type.
-add("SOL-TCK-0161", '''class Plain {
-}
-func guard() {
-    try {
-        print("trying")
-    }
-    catch (e: Plain) {
-        print("caught")
-    }
-}
-guard()
-''' + NEG, "COMPILE_ERROR", diag={"family": "SEM", "code": "SOLV-SEM-054"})
+add("SOL-TCK-0161", ('class Plain {\n'
+    '}\n'
+    'func guard() {\n'
+    '    try {\n'
+    '        print("trying")\n'
+    '    }\n'
+    '    catch (e: Plain) {\n'
+    '        print("caught")\n'
+    '    }\n'
+    '}\n'
+    'guard()\n'
+    '\n'
+    'print("EXECUTED-INVALID")\n'
+    ''), "COMPILE_ERROR", diag={"family": "SEM", "code": "SOLV-SEM-054"})
 
 # --- REQ-1314: finally runs before the value propagates to an enclosing handler.
-add("SOL-TCK-0162", PE + '''func guarded() {
-    try {
-        throw ParseError("p")
-    }
-    finally {
-        print("released")
-    }
-}
-func driver() {
-    try {
-        guarded()
-    }
-    catch (e: Exception) {
-        print("handled")
-        print("[" .. e.getMessage() .. "]")
-    }
-}
-driver()
-''', "SUCCESS", stdout="releasedhandled[p]")
+add("SOL-TCK-0162", (('class mutable ParseError extends RuntimeException {\n'
+    '}\n'
+    'func guarded() {\n'
+    '    try {\n'
+    '        throw ParseError("p")\n'
+    '    }\n'
+    '    finally {\n'
+    '        print("released")\n'
+    '    }\n'
+    '}\n'
+    'func driver() {\n'
+    '    try {\n'
+    '        guarded()\n'
+    '    }\n'
+    '    catch (e: Exception) {\n'
+    '        print("handled")\n'
+    '        print("[" .. e.getMessage() .. "]")\n'
+    '    }\n'
+    '}\n'
+    'driver()\n'
+    '')), "SUCCESS", stdout="releasedhandled[p]")
 
 # --- REQ-1315: a try with only a finally clause is accepted and runs it.
-add("SOL-TCK-0163", PE + '''func guard() {
-    try {
-        print("body")
-    }
-    finally {
-        print("fin")
-    }
-}
-guard()
-print("after")
-''', "SUCCESS", stdout="bodyfinafter")
+add("SOL-TCK-0163", (('class mutable ParseError extends RuntimeException {\n'
+    '}\n'
+    'func guard() {\n'
+    '    try {\n'
+    '        print("body")\n'
+    '    }\n'
+    '    finally {\n'
+    '        print("fin")\n'
+    '    }\n'
+    '}\n'
+    'guard()\n'
+    'print("after")\n'
+    '')), "SUCCESS", stdout="bodyfinafter")
 
 # --- REQ-1316: a trailing throw covers the value-on-all-paths obligation.
-add("SOL-TCK-0164", PE + '''func pick(n: Integer): Integer {
-    if (n > 0) {
-        return n
-    }
-    throw ParseError("negative")
-}
-print("[" .. pick(5) .. "]")
-''', "SUCCESS", stdout="[5]")
+add("SOL-TCK-0164", (('class mutable ParseError extends RuntimeException {\n'
+    '}\n'
+    'func pick(n: Integer): Integer {\n'
+    '    if (n > 0) {\n'
+    '        return n\n'
+    '    }\n'
+    '    throw ParseError("negative")\n'
+    '}\n'
+    'print("[" .. pick(5) .. "]")\n'
+    '')), "SUCCESS", stdout="[5]")
 
 # --- REQ-1317: the value crosses call boundaries to an enclosing frame's handler.
-add("SOL-TCK-0165", PE + '''func inner() {
-    throw ParseError("two frames down")
-}
-func middle() {
-    inner()
-}
-func driver() {
-    try {
-        middle()
-    }
-    catch (e: Exception) {
-        print("handled")
-        print("[" .. e.getMessage() .. "]")
-    }
-}
-driver()
-''', "SUCCESS", stdout="handled[two frames down]")
+add("SOL-TCK-0165", (('class mutable ParseError extends RuntimeException {\n'
+    '}\n'
+    'func inner() {\n'
+    '    throw ParseError("two frames down")\n'
+    '}\n'
+    'func middle() {\n'
+    '    inner()\n'
+    '}\n'
+    'func driver() {\n'
+    '    try {\n'
+    '        middle()\n'
+    '    }\n'
+    '    catch (e: Exception) {\n'
+    '        print("handled")\n'
+    '        print("[" .. e.getMessage() .. "]")\n'
+    '    }\n'
+    '}\n'
+    'driver()\n'
+    '')), "SUCCESS", stdout="handled[two frames down]")
 
 
 CATEGORY = {tid: "exceptions" for tid in S}

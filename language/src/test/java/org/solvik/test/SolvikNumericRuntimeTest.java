@@ -194,13 +194,14 @@ public final class SolvikNumericRuntimeTest {
     @Test
     public void nanIsUnorderedAndNeverEqualsItself() {
         assertThat(run("""
-                    var nan = 0.0 / 0.0
-                    println(nan < 1.0)
-                    println(nan > 1.0)
-                    println(nan <= 1.0)
-                    println(nan >= 1.0)
-                    println(nan == nan)
-                    println(nan != nan)
+                        var nan: Double = 0.0 / 0.0
+                        println(nan < 1.0)
+                        println(nan > 1.0)
+                        println(nan <= 1.0)
+                        println(nan >= 1.0)
+                        println(nan == nan)
+                        println(nan != nan)
+
                 """)).isEqualTo("false\nfalse\nfalse\nfalse\nfalse\ntrue\n");
     }
 

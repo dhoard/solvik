@@ -45,7 +45,6 @@ Hello Dana
 Dana!
 hey!!
 7
-21
 abc
 2
 b
@@ -58,6 +57,10 @@ true
 false
 trike 3 wheels
 trike 3 wheels
+registry
+2
+3
+3
 true
 42
 true
@@ -88,26 +91,15 @@ zero
 small
 large
 3
-42
-42
+120
+36
+99
+2
 20
-9
-42
-40
+20
 tag7
-true
 101
 8
-false
-false
-via-value
-func
-true
-fn-null
-10
-8
-42
-80
 4
 9
 2
@@ -140,7 +132,8 @@ ok:42
 rethrowing inner
 cleanup-b
 outer caught inner
-block-tail|Unit
+no-value call
 no-newline and a line!
 Hello, World!
+42
 42

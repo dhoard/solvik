@@ -4,11 +4,11 @@
 // Oracle quotations verified verbatim against docs/LANGUAGE_SPEC.md:
 //   - Multiple class inheritance is forbidden.
 //
-mutable class A {
+class mutable A {
     A() {
     }
 }
-mutable class B {
+class mutable B {
     B() {
     }
 }

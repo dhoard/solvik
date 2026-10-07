@@ -68,7 +68,7 @@ public final class SolvikToStringSemanticTest {
     public void toStringResolvesOnEveryReceiverKind() {
         check("""
                 interface Named {
-                    func name(): String
+                    method name(): String
                 }
                 class User implements Named {
                     var label: String
@@ -77,11 +77,11 @@ public final class SolvikToStringSemanticTest {
                         this.label = label
                     }
 
-                    func name(): String {
+                    method name(): String {
                         return this.label
                     }
 
-                    override func toString(): String {
+                    method override toString(): String {
                         return this.label
                     }
                 }
@@ -92,6 +92,7 @@ public final class SolvikToStringSemanticTest {
                 func render(i: Integer, l: Long, d: Double, b: Boolean, c: Character, s: String, a: Any, o: Number, u: User, n: Named, color: Color): String {
                     return i.toString() .. l.toString() .. d.toString() .. b.toString() .. c.toString() .. s.toString() .. a.toString() .. o.toString() .. u.toString() .. n.toString() .. color.toString()
                 }
+
                 """);
     }
 
@@ -115,10 +116,11 @@ public final class SolvikToStringSemanticTest {
     public void declaringOverrideToStringIsAccepted() {
         check("""
                 class C {
-                    override func toString(): String {
+                    method override toString(): String {
                         return "c"
                     }
                 }
+
                 """);
     }
 
@@ -134,17 +136,17 @@ public final class SolvikToStringSemanticTest {
 
     @Test
     public void toStringWithoutOverrideIsRejected() {
-        assertThat(first(checkFails("class C {\n    func toString(): String {\n        return \"c\"\n    }\n}\n")).code()).isEqualTo(DiagnosticCode.SEM_ACCIDENTAL_OVERRIDE);
+        assertThat(first(checkFails("class C {\n    method toString(): String {\n        return \"c\"\n    }\n}\n")).code()).isEqualTo(DiagnosticCode.SEM_ACCIDENTAL_OVERRIDE);
     }
 
     @Test
     public void overrideToStringWithWrongReturnTypeIsRejected() {
-        assertThat(first(checkFails("class C {\n    override func toString(): Integer {\n        return 1\n    }\n}\n")).code()).isEqualTo(DiagnosticCode.SEM_OVERRIDE_SIGNATURE);
+        assertThat(first(checkFails("class C {\n    method override toString(): Integer {\n        return 1\n    }\n}\n")).code()).isEqualTo(DiagnosticCode.SEM_OVERRIDE_SIGNATURE);
     }
 
     @Test
     public void overrideToStringWithParameterIsRejected() {
-        assertThat(first(checkFails("class C {\n    override func toString(x: Integer): String {\n        return \"c\"\n    }\n}\n")).code()).isEqualTo(DiagnosticCode.SEM_OVERRIDE_SIGNATURE);
+        assertThat(first(checkFails("class C {\n    method override toString(x: Integer): String {\n        return \"c\"\n    }\n}\n")).code()).isEqualTo(DiagnosticCode.SEM_OVERRIDE_SIGNATURE);
     }
 
     @Test
@@ -154,38 +156,42 @@ public final class SolvikToStringSemanticTest {
 
     @Test
     public void interfaceMemberNamedToStringIsRejected() {
-        assertThat(first(checkFails("interface Named {\n    func toString(): String\n}\n")).code()).isEqualTo(DiagnosticCode.SEM_RESERVED_MEMBER);
+        assertThat(first(checkFails("interface Named {\n    method toString(): String\n}\n")).code()).isEqualTo(DiagnosticCode.SEM_RESERVED_MEMBER);
     }
 
     @Test
     public void openToStringOverrideCanBeOverriddenAgain() {
         check("""
-                mutable class Base {
-                    mutable override func toString(): String {
+                class mutable Base {
+                    method override mutable toString(): String {
                         return "base"
                     }
                 }
                 class Child extends Base {
-                    override func toString(): String {
+                    method override toString(): String {
                         return "child"
                     }
                 }
+
+
                 """);
     }
 
     @Test
     public void overrideOfFinalToStringIsRejected() {
         assertThat(first(checkFails("""
-                mutable class Base {
-                    override func toString(): String {
+                class mutable Base {
+                    method override toString(): String {
                         return "base"
                     }
                 }
                 class Child extends Base {
-                    override func toString(): String {
+                    method override toString(): String {
                         return "child"
                     }
                 }
+
+
                 """)).code()).isEqualTo(DiagnosticCode.SEM_OVERRIDE_FINAL);
     }
 

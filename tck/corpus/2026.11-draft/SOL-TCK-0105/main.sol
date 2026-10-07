@@ -4,12 +4,12 @@
 // Oracle quotations verified verbatim against docs/LANGUAGE_SPEC.md:
 //   - `matches` requires the complete input to match.
 //
-var digit = Regex(r#"^\d+$"#)
+var digit: Regex = Regex(r#"^\d+$"#)
 print(digit.matches("123"))
 print(" ")
 print(digit.matches("12a"))
 print(" ")
-var bare = Regex(r#"\d+"#)
+var bare: Regex = Regex(r#"\d+"#)
 print(bare.matches("12a"))
 print(" ")
 print(bare.matches("123"))

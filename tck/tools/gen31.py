@@ -132,14 +132,12 @@ REQS_SPEC = {
         note="A plain `var` local is declared and printed with no reassignment, so the program "
              "exercises the immutable default rather than the writable form."),
     "REQ-2910": dict(
-        section="2. Variables and Mutability",
-        summary="A `var` binding may carry an explicit type annotation, so `var name: Type = expression` "
-                "declares an immutable typed binding",
-        kind="runtime",
-        quotes=["The canonical forms are `var name = expression`, `var name: Type = expression`, "
-                "`var mutable name = expression`, and `var mutable name: Type = expression`"],
-        note="The declared type is `Integer` and the initializer is an `Integer` literal, so the "
-             "program only compiles if the annotation position is accepted and the value reads back."),
+  section='2. Variables and Mutability',
+  summary='A `var` binding may carry an explicit type annotation, so `var name: Type = expression` declares an immutable typed binding',
+  kind='runtime',
+  quotes=['The canonical forms are `var name: Type = expression` and `var mutable name: Type = expression`: the declaration keyword comes first and the modifier that permits reassignment follows it.'],
+  tests=['SOL-TCK-0501'],
+  note='The declared type is `Integer` and the initializer is an `Integer` literal, so the program only compiles if the annotation position is accepted and the value reads back.'),
     "REQ-2911": dict(
         section="2. Variables and Mutability",
         summary="`var mutable` declares a mutable binding, so a typed `var mutable` local may be "
@@ -215,11 +213,23 @@ OK("SOL-TCK-0390", "types", "REQ-2900",
    "var2",
    "The `var mutable` local is reassigned and the assigned value is observed.")
 BAD("SOL-TCK-0391", "names", "REQ-2901",
-    'var x = 1\nfunc f(): Integer {\n    return x\n}\nprint("EXECUTED-INVALID")\n', {},
+    (('var x: Integer = 1\n'
+    'func f(): Integer {\n'
+    '    return x\n'
+    '}\n'
+    'print("EXECUTED-INVALID")\n'
+    '')), {},
     "A declared function cannot see the implicit main's top-level local.")
 OK("SOL-TCK-0392", "control", "REQ-2902",
-   '{\n    var result = 1\n    print("s" .. result)\n}\n{\n    var result = 2\n'
-   '    print("s" .. result)\n}\n',
+   (('{\n'
+    '    var result: Integer = 1\n'
+    '    print("s" .. result)\n'
+    '}\n'
+    '{\n'
+    '    var result: Integer = 2\n'
+    '    print("s" .. result)\n'
+    '}\n'
+    '')),
    "s1s2",
    "Sibling blocks each declare the same local name and both print their own value.")
 OK("SOL-TCK-0393", "control", "REQ-2903",
@@ -228,7 +238,14 @@ OK("SOL-TCK-0393", "control", "REQ-2903",
    "The break inside the scope block exits the enclosing range loop, so the loop body does not run "
    "to completion and only the post-loop text appears.")
 OK("SOL-TCK-0394", "control", "REQ-2904",
-   'var x = 9\nswitch (x) {\n    case 1 {\n        print("one")\n    }\n}\nprint("swafter")\n',
+   (('var x: Integer = 9\n'
+    'switch (x) {\n'
+    '    case 1 {\n'
+    '        print("one")\n'
+    '    }\n'
+    '}\n'
+    'print("swafter")\n'
+    '')),
    "swafter",
    "With no matching case and no default, the statement switch does nothing and the program "
    "continues.")
@@ -249,7 +266,9 @@ OK("SOL-TCK-0398", "modules", "REQ-2908",
    libs={"a.sol": 'print("ca")\n', "sub/.keep": "placeholder\n"})
 
 OK("SOL-TCK-0500", "types", "REQ-2909",
-   'var x = 1\nprint("u" .. x)\n',
+   (('var x: Integer = 1\n'
+    'print("u" .. x)\n'
+    '')),
    "u1",
    "A plain `var` local is declared and read back with no reassignment.")
 OK("SOL-TCK-0501", "types", "REQ-2910",
@@ -261,15 +280,32 @@ OK("SOL-TCK-0502", "types", "REQ-2911",
    "m4",
    "A typed mutable declaration is reassigned and the assigned value is observed.")
 OK("SOL-TCK-0503", "types", "REQ-2912",
-   'var mutable c = 0\nc = 1\nc = 2\nc = c + 1\nprint("chain" .. c)\n',
+   (('var mutable c: Integer = 0\n'
+    'c = 1\n'
+    'c = 2\n'
+    'c = c + 1\n'
+    'print("chain" .. c)\n'
+    '')),
    "chain3",
    "A mutable binding is reassigned repeatedly, including from its own previous value.")
 OK("SOL-TCK-0504", "control", "REQ-2913",
-   'var x = 10\n{\n    var mutable x = 20\n    x = 30\n    print("s" .. x)\n}\nprint("o" .. x)\n',
+   (('var x: Integer = 10\n'
+    '{\n'
+    '    var mutable x: Integer = 20\n'
+    '    x = 30\n'
+    '    print("s" .. x)\n'
+    '}\n'
+    'print("o" .. x)\n'
+    '')),
    "s30o10",
    "The inner mutable shadow is reassigned and printed; the outer immutable binding is unchanged.")
 BAD("SOL-TCK-0505", "types", "REQ-2914",
-    'var x = 10\n{\n    x = 20\n}\nprint("EXECUTED-INVALID")\n',
+    (('var x: Integer = 10\n'
+    '{\n'
+    '    x = 20\n'
+    '}\n'
+    'print("EXECUTED-INVALID")\n'
+    '')),
     {"family": "TYPE"},
     "A nested block cannot write to an outer immutable binding.")
 BAD("SOL-TCK-0506", "syntax", "REQ-2915",

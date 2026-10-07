@@ -14,6 +14,6 @@ class User {
     }
 }
 
-var user = User("Doug")
+var user: User = User("Doug")
 user.name = "Douglas"
 print(user.name)

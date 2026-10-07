@@ -2,11 +2,11 @@ class W {
     W() {
     }
 
-    func opt(): String? {
+    method opt(): String? {
         return "z"
     }
 }
-var w = W()
-var v = w.opt()
+var w: W = W()
+var v: Integer? = w.opt()
     ?.hashCode()
 print("v" .. (v != null))

@@ -11,13 +11,13 @@ func parse(raw: String): Result<Integer, String> {
     return Result.Ok(42)
 }
 func viaResult(): Result<Integer, String> {
-    var value = parse("ok")?
+    var value: Integer = parse("ok")?
     return Result.Ok(value + 1)
 }
-var good = parse("ok")
+var good: Result<Integer, String> = parse("ok")
 println(good.isOk())
 println(good.unwrap())
-var bad = parse("bad")
+var bad: Result<Integer, String> = parse("bad")
 println(bad.isErr())
 println(bad.unwrapErr())
 println(viaResult().unwrap())

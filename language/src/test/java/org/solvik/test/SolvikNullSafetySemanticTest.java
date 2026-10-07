@@ -77,13 +77,15 @@ public final class SolvikNullSafetySemanticTest {
 
     @Test
     public void nullLiteralHasTheNullType() {
-        CheckedProgram program = check("func f(): Unit {\n    var x = null\n}\n");
+        // `Null` is not a source type name; the null literal's type is observable through a binding
+        // whose declared type is nullable, and the initializer still types as the null type.
+        CheckedProgram program = check("func f() {\n    var x: String? = null\n}\n");
         assertThat(program.typeOf(local(function(program, 0), 0).initializer()).orElseThrow()).isEqualTo(NullType.INSTANCE);
     }
 
     @Test
     public void nonNullValuesAreAssignableToNullableTypes() {
-        CheckedProgram program = check("func f(s: String): Unit {\n    var a: String? = s\n    var b: String? = null\n}\n");
+        CheckedProgram program = check("func f(s: String) {\n    var a: String? = s\n    var b: String? = null\n}\n");
         FunctionDeclNode fn = function(program, 0);
         Type stringNullable = StringType.INSTANCE.nullableView();
         assertThat(program.symbolOf(local(fn, 0)).orElseThrow().type()).isEqualTo(stringNullable);
@@ -272,10 +274,11 @@ public final class SolvikNullSafetySemanticTest {
                         this.name = name
                     }
                 }
-                func f(): Unit {
-                    var holder = Holder(null)
+                func f() {
+                    var holder: Holder = Holder(null)
                     holder.name = "Doug"
                 }
+
                 """);
         Type holderType = program.classSymbol("Holder").orElseThrow().type();
         assertThat(program.classSymbol("Holder").orElseThrow().property("name").orElseThrow().type()).isEqualTo(StringType.INSTANCE.nullableView());

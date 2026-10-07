@@ -118,7 +118,7 @@ public final class SolvikCollectionBenchmarkTest {
         // The primitive storage starts small and must double without losing or reordering elements.
         assertThat(run("""
                 var mutable nums: List<Integer> = List<Integer>()
-                var mutable i = 0
+                var mutable i: Integer = 0
                 while (i < 5000) {
                     nums.add(i)
                     i = i + 1
@@ -127,6 +127,7 @@ public final class SolvikCollectionBenchmarkTest {
                 println(nums.get(0))
                 println(nums.get(4999))
                 println(nums.get(2500))
+
                 """)).isEqualTo("5000\n0\n4999\n2500\n");
     }
 

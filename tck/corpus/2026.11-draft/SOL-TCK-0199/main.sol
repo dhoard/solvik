@@ -1,9 +1,9 @@
-abstract class Base {
+class abstract Base {
 }
 class Sub extends Base {
 }
 var s: Base = Sub()
-var n = match s {
+var n: Integer = match s {
     sub: Sub => 4
     _ => 0
 }

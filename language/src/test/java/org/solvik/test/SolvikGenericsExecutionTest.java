@@ -60,16 +60,17 @@ public final class SolvikGenericsExecutionTest {
                         this.value = value
                     }
 
-                    func get(): T {
+                    method get(): T {
                         return this.value
                     }
                 }
 
-                    var intBox = Box(5)
+                    var intBox: Box<Integer> = Box(5)
                     println(intBox.value)
                     println(intBox.get())
-                    var stringBox = Box("hi")
+                    var stringBox: Box<String> = Box("hi")
                     println(stringBox.get())
+
                 """)).isEqualTo("5\n5\nhi\n");
     }
 
@@ -95,14 +96,15 @@ public final class SolvikGenericsExecutionTest {
                         this.value = value
                     }
 
-                    func replaceWith<U>(value: U): U {
+                    method replaceWith<U>(value: U): U {
                         return value
                     }
                 }
 
-                    var box = Box(1)
+                    var box: Box<Integer> = Box(1)
                     println(box.replaceWith("hello"))
                     println(box.value)
+
                 """)).isEqualTo("hello\n1\n");
     }
 
@@ -110,11 +112,11 @@ public final class SolvikGenericsExecutionTest {
     public void genericInterfaceDispatchExecutes() {
         assertThat(run("""
                 interface Container<T> {
-                    func get(): T
+                    method get(): T
                 }
 
                 class StringBox implements Container<String> {
-                    func get(): String {
+                    method get(): String {
                         return "boxed"
                     }
                 }
@@ -124,6 +126,7 @@ public final class SolvikGenericsExecutionTest {
                 }
 
                     println(describe(StringBox()))
+
                 """)).isEqualTo("boxed\n");
     }
 
@@ -131,7 +134,7 @@ public final class SolvikGenericsExecutionTest {
     public void genericClassCanImplementAMatchingGenericInterface() {
         assertThat(run("""
                 interface Container<T> {
-                    func get(): T
+                    method get(): T
                 }
 
                 class Holder<T> implements Container<T> {
@@ -141,28 +144,29 @@ public final class SolvikGenericsExecutionTest {
                         this.value = value
                     }
 
-                    func get(): T {
+                    method get(): T {
                         return this.value
                     }
                 }
 
-                    var holder = Holder("value")
+                    var holder: Holder<String> = Holder("value")
                     var container: Container<String> = holder
                     println(container.get())
+
                 """)).isEqualTo("value\n");
     }
 
     @Test
     public void inheritedGenericMembersExecuteThroughASubclass() {
         assertThat(run("""
-                mutable class Box<T> {
+                class mutable Box<T> {
                     var mutable value: T
 
                     Box(value: T) {
                         this.value = value
                     }
 
-                    mutable func get(): T {
+                    method mutable get(): T {
                         return this.value
                     }
                 }
@@ -173,9 +177,11 @@ public final class SolvikGenericsExecutionTest {
                     }
                 }
 
-                    var box = IntBox(9)
+                    var box: IntBox = IntBox(9)
                     println(box.value)
                     println(box.get())
+
+
                 """)).isEqualTo("9\n9\n");
     }
 
@@ -242,7 +248,7 @@ public final class SolvikGenericsExecutionTest {
                         this.value = value
                     }
 
-                    func firstOf<U>(other: Box<T>, fallback: U): U {
+                    method firstOf<U>(other: Box<T>, fallback: U): U {
                         println(this.value)
                         return fallback
                     }
@@ -251,6 +257,7 @@ public final class SolvikGenericsExecutionTest {
                     var box: Box<Integer> = Box(1)
                     var other: Box<Integer> = Box(2)
                     println(box.firstOf(other, "done"))
+
                 """)).isEqualTo("1\ndone\n");
     }
 

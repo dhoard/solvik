@@ -18,14 +18,14 @@ println(sw1(6))
 
 println(sw1(42))
 
-mutable class A2 {
-    mutable func v4(): Integer {
+class mutable A2 {
+    method mutable v4(): Integer {
         return 41
     }
 }
 
 class B3 extends A2 {
-    override func v4(): Integer {
+    method override v4(): Integer {
         return 7
     }
 }

@@ -9,6 +9,6 @@ class A {
     }
 }
 var a: A = A()
-var b = a as? A
+var b: A = a as? A
 
 print("EXECUTED-INVALID")

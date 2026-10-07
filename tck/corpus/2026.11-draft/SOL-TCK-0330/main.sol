@@ -7,5 +7,5 @@
 class User {
     var mutable name: String
 }
-var u = User()
+var u: User = User()
 print("EXECUTED-INVALID")

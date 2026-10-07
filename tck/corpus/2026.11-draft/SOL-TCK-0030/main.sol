@@ -11,7 +11,7 @@
 //     String here }" -- narrowing makes the non-null use legal, so `Doug` is printed.
 // Expected bytes: `Unknown|true|Doug`.
 var name: String? = null
-var display = name ?? "Unknown"
+var display: String = name ?? "Unknown"
 print(display)
 print("|")
 var rendered: String? = name?.toString()

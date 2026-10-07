@@ -7,7 +7,7 @@
 class User {
     var User: Integer = 1
 }
-var u = User()
+var u: User = User()
 print(u.User)
 
 print("EXECUTED-INVALID")

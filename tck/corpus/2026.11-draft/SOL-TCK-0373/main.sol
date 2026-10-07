@@ -4,5 +4,5 @@
 // Oracle quotations verified verbatim against docs/LANGUAGE_SPEC.md:
 //   - | `RESOL_UNKNOWN_MODULE` | `SOLV-RESOL-015` | qualified reference |
 //
-var x = nope::thing()
+var x: Any = nope::thing()
 print("EXECUTED-INVALID")

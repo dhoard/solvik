@@ -1,5 +1,5 @@
 // Solvik abstract classes and match over a class type, which needs a wildcard branch.
-abstract class Shape {
+class abstract Shape {
 }
 
 class Circle extends Shape {

@@ -131,17 +131,26 @@ def add(tid, req, category, src, outcome, **exp):
 
 # --- REQ-1400: identifier character class.
 add("SOL-TCK-0166", "REQ-1400", "lexical",
-    "var _a1B_ = 42\nprint(_a1B_)\n", "SUCCESS", stdout="42")
+    (('var _a1B_: Integer = 42\n'
+    'print(_a1B_)\n'
+    '')), "SUCCESS", stdout="42")
 
 add("SOL-TCK-0167", "REQ-1400", "lexical",
-    "var a = 5\nvar 1a = 7" + NEG, "COMPILE_ERROR", diag={})
+    ('var a: Integer = 5\n'
+    'var 1a = 7\n'
+    'print("EXECUTED-INVALID")\n'
+    ''), "COMPILE_ERROR", diag={})
 
 # --- REQ-1401: reserved keywords, leading digit.
 add("SOL-TCK-0168", "REQ-1401", "lexical",
-    "var class = 5" + NEG, "COMPILE_ERROR", diag={})
+    ('var class: Integer = 5\n'
+    'print("EXECUTED-INVALID")\n'
+    ''), "COMPILE_ERROR", diag={})
 
 add("SOL-TCK-0169", "REQ-1401", "lexical",
-    "var func = 5" + NEG, "COMPILE_ERROR", diag={})
+    ('var func: Integer = 5\n'
+    'print("EXECUTED-INVALID")\n'
+    ''), "COMPILE_ERROR", diag={})
 
 # --- REQ-1402: '$' is not an identifier character.
 add("SOL-TCK-0170", "REQ-1402", "lexical",
@@ -163,10 +172,14 @@ add("SOL-TCK-0174", "REQ-1404", "lexical",
 
 # --- REQ-1405: Integer literal and the signed 32-bit range boundary.
 add("SOL-TCK-0175", "REQ-1405", "lexical",
-    "var a = 2147483647\nprint(a)\n", "SUCCESS", stdout="2147483647")
+    (('var a: Integer = 2147483647\n'
+    'print(a)\n'
+    '')), "SUCCESS", stdout="2147483647")
 
 add("SOL-TCK-0176", "REQ-1405", "lexical",
-    "var a = 2147483648" + NEG, "COMPILE_ERROR", diag={})
+    ('var a: Integer = 2147483648\n'
+    'print("EXECUTED-INVALID")\n'
+    ''), "COMPILE_ERROR", diag={})
 
 # --- REQ-1406: L-suffixed Long literals.
 add("SOL-TCK-0177", "REQ-1406", "lexical",
@@ -194,7 +207,9 @@ add("SOL-TCK-0183", "REQ-1408", "lexical",
     "print('A')\nprint('\\n')\n", "SUCCESS", stdout="A\n")
 
 add("SOL-TCK-0184", "REQ-1408", "lexical",
-    "var a = 'AB'" + NEG, "COMPILE_ERROR", diag={})
+    ("var a: Character = 'AB'\n"
+    'print("EXECUTED-INVALID")\n'
+    ''), "COMPILE_ERROR", diag={})
 
 
 def verify_quotes():

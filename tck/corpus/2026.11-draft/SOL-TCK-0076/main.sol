@@ -21,7 +21,7 @@
 // That yields the exact stream `3 40 99 20 3 false true`.
 // Executed as top-level statements (section 20; an explicit `func main` is SOLV-SEM-001).
 // Uses print, so no platform line separator can enter the expected bytes.
-var nums = List<Integer>(10, 20, 30)
+var nums: List<Integer> = List<Integer>(10, 20, 30)
 print(nums.size)
 print(" ")
 nums.add(40)

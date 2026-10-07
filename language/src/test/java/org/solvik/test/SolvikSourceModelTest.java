@@ -222,44 +222,7 @@ public final class SolvikSourceModelTest {
         assertThat(StringEscapes.unescape("\"\\n\\t\"")).isEqualTo("\n\t");
     }
 
-    // ---- File scope -----------------------------------------------------------------------------
-
-    @Test
-    public void theDefaultFileScopeHasNoModuleAndNoPrefixes() {
-        org.solvik.parser.FileScope scope = org.solvik.parser.FileScope.DEFAULT;
-        assertThat(scope.moduleName()).isEmpty();
-        assertThat(scope.moduleNameOrNull()).isNull();
-        assertThat(scope.isDefaultModule()).isTrue();
-        assertThat(scope.prefixes()).isEmpty();
-        assertThat(scope.moduleForPrefix("anything")).isEmpty();
-    }
-
-    @Test
-    public void aNamedFileScopeExposesItsModuleAndVisiblePrefixesInDeclarationOrder() {
-        // The accessor promises declaration order, which a plain unordered copy would not preserve,
-        // and a lookup for an unknown prefix must be empty rather than null.
-        java.util.Map<String, String> prefixes = new java.util.LinkedHashMap<>();
-        prefixes.put("alpha", "first_module");
-        prefixes.put("beta", "second_module");
-        org.solvik.parser.FileScope scope = new org.solvik.parser.FileScope("owner", prefixes);
-        assertThat(scope.moduleName()).contains("owner");
-        assertThat(scope.moduleNameOrNull()).isEqualTo("owner");
-        assertThat(scope.isDefaultModule()).isFalse();
-        assertThat(scope.prefixes()).containsExactlyEntriesOf(prefixes);
-        assertThat(scope.prefixes().keySet()).containsExactly("alpha", "beta");
-        assertThat(scope.moduleForPrefix("alpha")).contains("first_module");
-        assertThat(scope.moduleForPrefix("missing")).isEmpty();
-        // The exposed map is a copy, so mutating the caller's map does not change the scope.
-        prefixes.put("gamma", "third_module");
-        assertThat(scope.prefixes()).doesNotContainKey("gamma");
-    }
-
-    @Test
-    public void aFileScopeRejectsAMissingPrefixMap() {
-        assertThatThrownBy(() -> new org.solvik.parser.FileScope("owner", null)).isInstanceOf(NullPointerException.class);
-    }
-
-    // ---- Module and alias names -----------------------------------------------------------------
+    // ---- Module names -----------------------------------------------------------------
 
     @Test
     public void moduleNamesAreLowercaseUnderscoreSeparated() {

@@ -3,32 +3,33 @@
 // and operation lowering resolve the success and error variants through the operand's nominal type,
 // not the plain registry name, because a module declaration is registered under a qualified key.
 
-module result_in_module
-
-enum Result<T, E> {
-    Ok(T)
-    Err(E)
-}
-
-func parse(raw: String): Result<Integer, String> {
-    if (raw == "bad") {
-        return Result.Err("cannot parse")
+module result_in_module {
+    enum Result<T, E> {
+        Ok(T)
+        Err(E)
     }
-    return Result.Ok(42)
+
+    func parse(raw: String): Result<Integer, String> {
+        if (raw == "bad") {
+            return Result.Err("cannot parse")
+        }
+        return Result.Ok(42)
+    }
+
+    func parseDoubled(raw: String): Result<Integer, String> {
+        var value: Integer = parse(raw)?
+        return Result.Ok(value + value)
+    }
 }
 
-func parseDoubled(raw: String): Result<Integer, String> {
-    var value = parse(raw)?
-    return Result.Ok(value + value)
-}
-
-var good = parse("ok")
+// Executable statements belong to the default module, so the module's declarations are qualified.
+var good: result_in_module::Result<Integer, String> = result_in_module::parse("ok")
 println(good.isOk())
 println(good.unwrap())
-var bad = parse("bad")
+var bad: result_in_module::Result<Integer, String> = result_in_module::parse("bad")
 println(bad.isErr())
 println(bad.unwrapErr())
 good.ignore()
 bad.ignore()
-println(parseDoubled("ok").unwrap())
-println(parseDoubled("bad").unwrapErr())
+println(result_in_module::parseDoubled("ok").unwrap())
+println(result_in_module::parseDoubled("bad").unwrapErr())

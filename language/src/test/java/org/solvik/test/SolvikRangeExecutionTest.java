@@ -51,40 +51,43 @@ public final class SolvikRangeExecutionTest {
     @Test
     public void inclusiveRangeIteratesBothEnds() {
         assertThat(run("""
-                var mutable text = ""
+                var mutable text: String = ""
                 for (i in 1...5) {
                     text = text .. i
                 }
                 println(text)
+
                 """)).isEqualTo("12345\n");
     }
 
     @Test
     public void ascendingExclusiveRangeExcludesTheEnd() {
         assertThat(run("""
-                var mutable text = ""
+                var mutable text: String = ""
                 for (i in 0..<4) {
                     text = text .. i
                 }
                 println(text)
+
                 """)).isEqualTo("0123\n");
     }
 
     @Test
     public void descendingExclusiveRangeExcludesTheEnd() {
         assertThat(run("""
-                var mutable text = ""
+                var mutable text: String = ""
                 for (i in 5..>0) {
                     text = text .. i
                 }
                 println(text)
+
                 """)).isEqualTo("54321\n");
     }
 
     @Test
     public void emptyAndReversedRangesRunZeroTimes() {
         assertThat(run("""
-                var mutable count = 0
+                var mutable count: Integer = 0
                 for (i in 0..<0) {
                     count = count + 1
                 }
@@ -95,13 +98,14 @@ public final class SolvikRangeExecutionTest {
                     count = count + 1
                 }
                 println(count)
+
                 """)).isEqualTo("0\n");
     }
 
     @Test
     public void singleElementRangesRunOnce() {
         assertThat(run("""
-                var mutable text = ""
+                var mutable text: String = ""
                 for (i in 3...3) {
                     text = text .. i
                 }
@@ -114,24 +118,26 @@ public final class SolvikRangeExecutionTest {
                     text = text .. k
                 }
                 println(text)
+
                 """)).isEqualTo("3\n3\n3\n");
     }
 
     @Test
     public void inclusiveRangeAtIntegerMaxDoesNotOverflow() {
         assertThat(run("""
-                var mutable last = 0
+                var mutable last: Integer = 0
                 for (i in 2147483647...2147483647) {
                     last = i
                 }
                 println(last)
+
                 """)).isEqualTo("2147483647\n");
     }
 
     @Test
     public void breakAndContinueControlTheLoop() {
         assertThat(run("""
-                var mutable total = 0
+                var mutable total: Integer = 0
                 for (i in 1...10) {
                     if (i == 3) {
                         continue
@@ -142,19 +148,21 @@ public final class SolvikRangeExecutionTest {
                     total = total + i
                 }
                 println(total)
+
                 """)).isEqualTo("12\n");
     }
 
     @Test
     public void nestedRangeLoopsCountEveryPair() {
         assertThat(run("""
-                var mutable pairs = 0
+                var mutable pairs: Integer = 0
                 for (i in 1...2) {
                     for (j in 1...2) {
                         pairs = pairs + 1
                     }
                 }
                 println(pairs)
+
                 """)).isEqualTo("4\n");
     }
 
@@ -166,32 +174,35 @@ public final class SolvikRangeExecutionTest {
                     return 3
                 }
 
-                var mutable text = ""
+                var mutable text: String = ""
                 for (i in 1...bound()) {
                     text = text .. i
                 }
                 println(text)
+
                 """)).isEqualTo("b123\n");
     }
 
     @Test
     public void negativeBoundsAreSupported() {
         assertThat(run("""
-                var mutable text = ""
+                var mutable text: String = ""
                 for (i in -2...0) {
                     text = text .. i
                 }
                 println(text)
+
                 """)).isEqualTo("-2-10\n");
     }
 
     @Test
     public void loopVariableDoesNotEscapeItsScope() {
         assertThat(run("""
-                var mutable i = 99
+                var mutable i: Integer = 99
                 for (i in 1...1) {
                 }
                 println(i)
+
                 """)).isEqualTo("99\n");
     }
 }

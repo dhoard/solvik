@@ -27,7 +27,6 @@ import org.solvik.type.CharacterType;
 import org.solvik.type.ClassType;
 import org.solvik.type.DoubleType;
 import org.solvik.type.FloatType;
-import org.solvik.type.FunctionType;
 import org.solvik.type.IntegerType;
 import org.solvik.type.InterfaceType;
 import org.solvik.type.LongType;
@@ -58,7 +57,10 @@ public final class SolvikTypeModelTest {
         assertThat(environment.resolve("Char").isEmpty()).as("Char is renamed to Character and is not a built-in type").isTrue();
         assertThat(environment.isBuiltin("Object")).as("Object is no longer a reserved built-in name").isFalse();
         assertThat(environment.resolve("Nothing").orElseThrow()).isEqualTo(NothingType.INSTANCE);
-        assertThat(environment.resolve("Unit").orElseThrow()).isEqualTo(UnitType.INSTANCE);
+        // There is no source type for "no value": a callable that writes no `: Type` produces no value,
+        // and the internal sentinel is not reachable by name (docs/LANGUAGE_SPEC.md section 6).
+        assertThat(environment.resolve("Unit")).isEmpty();
+        assertThat(environment.isBuiltin("Unit")).isFalse();
         assertThat(environment.resolve("Boolean").orElseThrow()).isEqualTo(BooleanType.INSTANCE);
         assertThat(environment.resolve("String").orElseThrow()).isEqualTo(StringType.INSTANCE);
         assertThat(environment.resolve("Integer").orElseThrow()).isEqualTo(IntegerType.INSTANCE);
@@ -73,7 +75,7 @@ public final class SolvikTypeModelTest {
         assertThat(environment.resolve("RegexMatch").orElseThrow()).isEqualTo(RegexMatchType.INSTANCE);
         assertThat(environment.resolve("Widget").isEmpty()).isTrue();
         assertThat(//
-                environment.builtins().stream().map(Type::name).toList()).isEqualTo(List.of("Any", "Nothing", "Number", "Byte", "Short", "Integer", "Long", "Float", "Double", "Boolean", "Character", "String", "Unit", "Regex", "RegexMatch", "Exception", "RuntimeException", "ApplicationException", "List", "Set", "Map", "Stack"));
+                environment.builtins().stream().map(Type::name).toList()).isEqualTo(List.of("Any", "Nothing", "Number", "Byte", "Short", "Integer", "Long", "Float", "Double", "Boolean", "Character", "String", "Regex", "RegexMatch", "Exception", "RuntimeException", "ApplicationException", "List", "Set", "Map", "Stack"));
     }
 
     @Test
@@ -88,10 +90,14 @@ public final class SolvikTypeModelTest {
             assertThat(numeric.isSubtypeOf(AnyType.INSTANCE)).isTrue();
         }
         // Every other listed built-in is directly below Any.
-        for (Type builtin : List.<Type>of(BooleanType.INSTANCE, CharacterType.INSTANCE, StringType.INSTANCE, UnitType.INSTANCE, RegexType.INSTANCE, RegexMatchType.INSTANCE, BuiltinCollectionTypes.LIST, BuiltinCollectionTypes.SET, BuiltinCollectionTypes.MAP, BuiltinCollectionTypes.STACK)) {
+        for (Type builtin : List.<Type>of(BooleanType.INSTANCE, CharacterType.INSTANCE, StringType.INSTANCE, RegexType.INSTANCE, RegexMatchType.INSTANCE, BuiltinCollectionTypes.LIST, BuiltinCollectionTypes.SET, BuiltinCollectionTypes.MAP, BuiltinCollectionTypes.STACK)) {
             assertThat(builtin.superType().orElseThrow()).as(builtin.name() + " must be directly below Any").isSameAs(AnyType.INSTANCE);
             assertThat(builtin.isSubtypeOf(AnyType.INSTANCE)).isTrue();
         }
+        // The no-value sentinel is not part of the hierarchy: it is not below Any, so an expression that
+        // produces no value is rejected wherever a value is required.
+        assertThat(UnitType.INSTANCE.superType()).isEmpty();
+        assertThat(UnitType.INSTANCE.isSubtypeOf(AnyType.INSTANCE)).isFalse();
         // Reflexive.
         assertThat(IntegerType.INSTANCE.isSubtypeOf(IntegerType.INSTANCE)).isTrue();
         // Unrelated nominal types are not compatible.
@@ -193,59 +199,6 @@ public final class SolvikTypeModelTest {
         assertThat(implementation.isSubtypeOf(base)).isTrue();
         assertThat(implementation.isSubtypeOf(derivedFace)).isTrue();
         assertThat(base.isSubtypeOf(implementation)).isFalse();
-    }
-
-    @Test
-    public void functionTypeCarriesParameterAndReturnTypes() {
-        FunctionType type = FunctionType.canonical(List.of(IntegerType.INSTANCE, StringType.INSTANCE), BooleanType.INSTANCE);
-        assertThat(type.parameterTypes()).isEqualTo(List.of(IntegerType.INSTANCE, StringType.INSTANCE));
-        assertThat(type.returnType()).isEqualTo(BooleanType.INSTANCE);
-        // The canonical rendering is source style, not the old internal arrow spelling.
-        assertThat(type.name()).isEqualTo("func(Integer, String): Boolean");
-        assertThat(type.isSubtypeOf(type)).isTrue();
-        // Function types are structural: two declarations with the same signature denote one type.
-        FunctionType other = FunctionType.canonical(List.of(IntegerType.INSTANCE, StringType.INSTANCE), BooleanType.INSTANCE);
-        assertThat(type.isSubtypeOf(other)).as("structurally equal function types are identical").isTrue();
-        // Structural identity is canonicalized, so equal signatures share one instance.
-        assertThat(other).isSameAs(type);
-    }
-
-    @Test
-    public void functionTypeAssignabilityIsContravariantAndCovariant() {
-        // Contravariant in the parameter: a function accepting a wider argument is assignable where
-        // a narrower argument is expected, so func(Any) is assignable to func(String).
-        FunctionType specificInput = FunctionType.canonical(List.of(StringType.INSTANCE), BooleanType.INSTANCE);
-        FunctionType anyInput = FunctionType.canonical(List.of(AnyType.INSTANCE), BooleanType.INSTANCE);
-        assertThat(anyInput.isAssignableTo(specificInput)).isTrue();
-        assertThat(specificInput.isAssignableTo(anyInput)).isFalse();
-        // Any is the nominal root: a function value is assignable to it, and any is not assignable to a
-        // narrower input type.
-        assertThat(specificInput.isAssignableTo(AnyType.INSTANCE)).isTrue();
-        // Numeric widening is not a subtype relation and so is never applied inside a function type.
-        FunctionType integerInput = FunctionType.canonical(List.of(IntegerType.INSTANCE), BooleanType.INSTANCE);
-        FunctionType longParam = FunctionType.canonical(List.of(LongType.INSTANCE), BooleanType.INSTANCE);
-        assertThat(longParam.isAssignableTo(integerInput)).isFalse();
-        assertThat(specificInput.isAssignableTo(integerInput)).isFalse();
-    }
-
-    @Test
-    public void functionTypeResultIsCovariant() {
-        FunctionType stringReturn = FunctionType.canonical(List.of(), StringType.INSTANCE);
-        FunctionType anyReturn = FunctionType.canonical(List.of(), AnyType.INSTANCE);
-        assertThat(stringReturn.isAssignableTo(anyReturn)).isTrue();
-        assertThat(anyReturn.isAssignableTo(stringReturn)).isFalse();
-    }
-
-    @Test
-    public void functionTypeAnyIsTopAndNullableWrapsTheValue() {
-        FunctionType function = FunctionType.canonical(List.of(IntegerType.INSTANCE), BooleanType.INSTANCE);
-        assertThat(function.isAssignableTo(AnyType.INSTANCE)).isTrue();
-        Type functionNullable = function.nullableView();
-        assertThat(functionNullable instanceof NullableType).isTrue();
-        // A nullable function value is not assignable to the non-null function type.
-        assertThat(functionNullable.isAssignableTo(function)).isFalse();
-        // A non-null function value is assignable to its nullable form.
-        assertThat(function.isAssignableTo(functionNullable)).isTrue();
     }
 
     @Test

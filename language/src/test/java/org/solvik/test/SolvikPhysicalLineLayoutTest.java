@@ -104,7 +104,7 @@ public final class SolvikPhysicalLineLayoutTest {
                     }
                 }
 
-                func guarded(): Unit {
+                func guarded() {
                     try {
                         classify(1)
                     }
@@ -116,7 +116,7 @@ public final class SolvikPhysicalLineLayoutTest {
                     }
                 }
 
-                func dispatch(value: Integer): Unit {
+                func dispatch(value: Integer) {
                     switch (value) {
                         case 1 {
                             classify(1)
@@ -130,8 +130,8 @@ public final class SolvikPhysicalLineLayoutTest {
                     }
                 }
 
-                var blockResult = {
-                    var inner = 1
+                var blockResult: Integer = {
+                    var inner: Integer = 1
                     inner + 1
                 }
 
@@ -141,6 +141,7 @@ public final class SolvikPhysicalLineLayoutTest {
 
                 print(classify(5))
                 print(blockResult)
+
                 """);
     }
 
@@ -148,7 +149,7 @@ public final class SolvikPhysicalLineLayoutTest {
     public void aLineCommentMayFollowEitherBraceOnItsLine() {
         layoutOk("""
                 func f(): Integer { // implementation
-                    var x = if (true) { // the test
+                    var x: Integer = if (true) { // the test
                         1
                     } // the else
                     else { // the branch
@@ -156,45 +157,47 @@ public final class SolvikPhysicalLineLayoutTest {
                     }
                     return x // done
                 } // end f
+
                 """);
     }
 
     @Test
     public void aLineCarryingTwoStatementsNeedsItsSeparatorAndTwoStatementsNeedTwoLines() {
-        layoutOk("func f(): Unit {\n    var a = 1; var b = 2; print(a + b)\n}\n");
-        layoutOk("func f(): Unit {\n    print(1); print(2); print(3)\n}\n");
+        layoutOk("func f() {\n    var a: Integer = 1; var b: Integer = 2; print(a + b)\n}\n");
+        layoutOk("func f() {\n    print(1); print(2); print(3)\n}\n");
     }
 
     @Test
     public void aStraySeparatorBeforeALineBreakIsToleratedAsASeparatorRun() {
         // `;` never terminates a line; the line's boundary does. A separator written before that
         // boundary is a run of separators, tolerated exactly as a blank line is.
-        layoutOk("func f(): Unit {\n    print(1)\n    print(2)\n}\n");
+        layoutOk("func f() {\n    print(1)\n    print(2)\n}\n");
     }
 
     @Test
     public void expressionsContinueAcrossLinesWhereverTheGrammarDemandsMore() {
         layoutOk("""
                 func f(service: Service): Integer {
-                    var total = 1 +
+                    var total: Integer = 1 +
                         2 +
                         3
-                    var chain = service
+                    var chain: Any = service
                         .load()
                         .transform()
-                    var called = compute(
+                    var called: Any = compute(
                         1,
                         2,
                         3,
                     )
                     return total
                 }
+
                 """);
     }
 
     @Test
     public void aProgramEndingWithoutATrailingNewlineIsComplete() {
-        layoutOk("func f(): Unit {\n    print(1)\n}");
+        layoutOk("func f() {\n    print(1)\n}");
         layoutOk("print(1)");
     }
 
@@ -204,24 +207,24 @@ public final class SolvikPhysicalLineLayoutTest {
 
     @Test
     public void aClosingBraceFollowedByCodeOnItsLineIsRejected() {
-        layoutFails("func g(f: func(): Integer): Integer {\n    return f()\n}\n\nprint(\n    g(\n        func(): Integer {\n            1\n        })\n)\n", DiagnosticCode.PARSER_BRACE_SHARES_LINE);
-        layoutFails("func f(): Unit {\n    print(1)\n};\n", DiagnosticCode.PARSER_BRACE_SHARES_LINE);
-        layoutFails("func f(): Unit {\n    print(1) }\n", DiagnosticCode.PARSER_BRACE_SHARES_LINE);
+        layoutFails("func f(): Integer {\n    return if (1 > 0) {\n        1 }\n}\n", DiagnosticCode.PARSER_BRACE_SHARES_LINE);
+        layoutFails("func f() {\n    print(1)\n};\n", DiagnosticCode.PARSER_BRACE_SHARES_LINE);
+        layoutFails("func f() {\n    print(1) }\n", DiagnosticCode.PARSER_BRACE_SHARES_LINE);
     }
 
     @Test
     public void braceThenClauseOnOneLineIsRejectedAsTheClauseRule() {
-        layoutFails("func f(c: Boolean): Unit {\n    if (c) {\n        print(1)\n    } else {\n        print(2)\n    }\n}\n",
+        layoutFails("func f(c: Boolean) {\n    if (c) {\n        print(1)\n    } else {\n        print(2)\n    }\n}\n",
                 DiagnosticCode.PARSER_CLAUSE_NOT_AT_LINE_START);
-        layoutFails("func f(): Unit {\n    try {\n        print(1)\n    } catch (e: RuntimeException) {\n        print(2)\n    }\n}\n",
+        layoutFails("func f() {\n    try {\n        print(1)\n    } catch (e: RuntimeException) {\n        print(2)\n    }\n}\n",
                 DiagnosticCode.PARSER_CLAUSE_NOT_AT_LINE_START);
-        layoutFails("func f(): Unit {\n    try {\n        print(1)\n    }\n    catch (e: RuntimeException) {\n        print(2)\n    } finally {\n        print(3)\n    }\n}\n",
+        layoutFails("func f() {\n    try {\n        print(1)\n    }\n    catch (e: RuntimeException) {\n        print(2)\n    } finally {\n        print(3)\n    }\n}\n",
                 DiagnosticCode.PARSER_CLAUSE_NOT_AT_LINE_START);
     }
 
     @Test
     public void aClosingBracePrecededByCodeOnItsLineIsRejected() {
-        layoutFails("func f(): Unit {\n    print(1); }\n", DiagnosticCode.PARSER_BRACE_SHARES_LINE);
+        layoutFails("func f() {\n    print(1); }\n", DiagnosticCode.PARSER_BRACE_SHARES_LINE);
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -230,15 +233,15 @@ public final class SolvikPhysicalLineLayoutTest {
 
     @Test
     public void codeWrittenAfterAnOpeningBraceOnItsLineIsRejected() {
-        layoutFails("func f(): Unit {\n    if (true) { print(1)\n    }\n}\n", DiagnosticCode.PARSER_CONTENT_AFTER_OPEN_BRACE);
-        layoutFails("func f(): Unit { print(1)\n}\n", DiagnosticCode.PARSER_CONTENT_AFTER_OPEN_BRACE);
-        layoutFails("func f(): Unit {\n    if (true) { print(1) }\n}\n", DiagnosticCode.PARSER_CONTENT_AFTER_OPEN_BRACE);
+        layoutFails("func f() {\n    if (true) { print(1)\n    }\n}\n", DiagnosticCode.PARSER_CONTENT_AFTER_OPEN_BRACE);
+        layoutFails("func f() { print(1)\n}\n", DiagnosticCode.PARSER_CONTENT_AFTER_OPEN_BRACE);
+        layoutFails("func f() {\n    if (true) { print(1) }\n}\n", DiagnosticCode.PARSER_CONTENT_AFTER_OPEN_BRACE);
     }
 
     @Test
     public void anEmptyBracePairOnOneLineIsRejectedAndTheTwoLineSpellingIsTheEmptyBody() {
-        layoutFails("func f(): Unit {}\n", DiagnosticCode.PARSER_CONTENT_AFTER_OPEN_BRACE);
-        layoutOk("func f(): Unit {\n}\n");
+        layoutFails("func f() {}\n", DiagnosticCode.PARSER_CONTENT_AFTER_OPEN_BRACE);
+        layoutOk("func f() {\n}\n");
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -247,16 +250,16 @@ public final class SolvikPhysicalLineLayoutTest {
 
     @Test
     public void aBodyBraceMustSitOnTheLineOfTheIntroducingConstruct() {
-        layoutFails("func f(): Unit {\n    try\n    {\n        print(1)\n    }\n}\n", DiagnosticCode.PARSER_BRACE_NOT_ON_INTRODUCING_LINE);
-        layoutFails("func f(c: Boolean): Unit {\n    if (c) {\n        print(1)\n    }\n    else\n    {\n        print(2)\n    }\n}\n",
+        layoutFails("func f() {\n    try\n    {\n        print(1)\n    }\n}\n", DiagnosticCode.PARSER_BRACE_NOT_ON_INTRODUCING_LINE);
+        layoutFails("func f(c: Boolean) {\n    if (c) {\n        print(1)\n    }\n    else\n    {\n        print(2)\n    }\n}\n",
                 DiagnosticCode.PARSER_BRACE_NOT_ON_INTRODUCING_LINE);
-        layoutFails("mutable class C {\n    static\n    {\n    }\n}\n", DiagnosticCode.PARSER_BRACE_NOT_ON_INTRODUCING_LINE);
+        layoutFails("class mutable C {\n    static\n    {\n    }\n}\n", DiagnosticCode.PARSER_BRACE_NOT_ON_INTRODUCING_LINE);
     }
 
     @Test
     public void aCaseBodyBraceMustCloseTheLabelLine() {
         layoutFails("""
-                func f(v: Integer): Unit {
+                func f(v: Integer) {
                     switch (v) {
                         case 1
                         {
@@ -267,9 +270,10 @@ public final class SolvikPhysicalLineLayoutTest {
                         }
                     }
                 }
+
                 """, DiagnosticCode.PARSER_BRACE_NOT_ON_INTRODUCING_LINE);
         layoutFails("""
-                func f(v: Integer): Unit {
+                func f(v: Integer) {
                     switch (v) {
                         case 1 {
                             print(1)
@@ -280,11 +284,12 @@ public final class SolvikPhysicalLineLayoutTest {
                         }
                     }
                 }
+
                 """, DiagnosticCode.PARSER_BRACE_NOT_ON_INTRODUCING_LINE);
         // A stand-alone scope as the first item of a case body is legal: its brace opens a line
         // because the case body's own brace already closed the label line.
         layoutOk("""
-                func f(v: Integer): Unit {
+                func f(v: Integer) {
                     switch (v) {
                         case 1 {
                             {
@@ -296,6 +301,7 @@ public final class SolvikPhysicalLineLayoutTest {
                         }
                     }
                 }
+
                 """);
     }
 
@@ -309,11 +315,11 @@ public final class SolvikPhysicalLineLayoutTest {
                 func describe(v: Integer): String {
                     switch (v) {
                         case 1 {
-                            var x = "one"
+                            var x: String = "one"
                             return x
                         }
                         case 2 {
-                            var x = "two"
+                            var x: String = "two"
                             return x
                         }
                         default {
@@ -324,13 +330,14 @@ public final class SolvikPhysicalLineLayoutTest {
 
                 print(describe(1))
                 print(describe(2))
+
                 """)).isEqualTo("onetwo");
     }
 
     @Test
     public void anUnbracedCaseBodyIsRejected() {
         SolvikParseResult result = org.solvik.parser.SolvikParser.parse(new SourceFile("layout.sol", """
-                func f(v: Integer): Unit {
+                func f(v: Integer) {
                     switch (v) {
                         case 1:
                             print(1)
@@ -339,6 +346,7 @@ public final class SolvikPhysicalLineLayoutTest {
                             print(0)
                     }
                 }
+
                 """));
         assertThat(result.isSuccess()).as("the colon spelling is gone from the grammar").isFalse();
     }
@@ -347,13 +355,14 @@ public final class SolvikPhysicalLineLayoutTest {
     public void siblingLexicalScopesHoldSameNameBindings() {
         assertThat(run("""
                 {
-                    var x = 1
+                    var x: Integer = 1
                     print(x)
                 }
                 {
-                    var x = 2
+                    var x: Integer = 2
                     print(x)
                 }
+
                 """)).isEqualTo("12");
     }
 

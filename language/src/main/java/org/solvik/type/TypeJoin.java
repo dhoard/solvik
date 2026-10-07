@@ -88,11 +88,8 @@ public final class TypeJoin {
         } else if (right.isAssignableTo(left)) {
             joined = left;
         } else {
-            // Two incomparable function types of one arity can still share a nearer supertype than
-            // Any: the least common function supertype the specification makes the shared join
-            // responsible for. When it does not exist, the declared hierarchy decides the join.
-            Type functionSupertype = leastCommonFunctionSupertype(left, right);
-            joined = functionSupertype == null ? nearestDeclaredSupertype(left, right) : functionSupertype;
+            // The declared hierarchy decides the join of two incomparable types.
+            joined = nearestDeclaredSupertype(left, right);
         }
         if (joined == null) {
             return null;
@@ -130,47 +127,6 @@ public final class TypeJoin {
             }
         }
         return minimal;
-    }
-
-    /**
-     * The least common function supertype of two function types, or {@code null} when either operand
-     * is not a function type, the two arities differ, some parameter pair is unrelated, or the two
-     * results have no unique join.
-     *
-     * <p>Parameters are contravariant, so the joined parameter is the <em>more specific</em> of the
-     * pair - the one assignable to the other - while the joined result is covariant and takes the
-     * nearest common supertype of the two results. When one function type is already assignable to
-     * the other the caller's subtype branches answer with the supertype itself, so this method only
-     * has to decide the incomparable case.
-     */
-    public static Type leastCommonFunctionSupertype(Type first, Type second) {
-        if (!(first instanceof FunctionType firstFunction) || !(second instanceof FunctionType secondFunction)) {
-            return null;
-        }
-        List<Type> firstParameters = firstFunction.parameterTypes();
-        List<Type> secondParameters = secondFunction.parameterTypes();
-        if (firstParameters.size() != secondParameters.size()) {
-            return null;
-        }
-        List<Type> joinedParameters = new ArrayList<>(firstParameters.size());
-        for (int index = 0; index < firstParameters.size(); index++) {
-            Type left = firstParameters.get(index);
-            Type right = secondParameters.get(index);
-            if (left.equals(right)) {
-                joinedParameters.add(left);
-            } else if (right.isAssignableTo(left)) {
-                joinedParameters.add(right);
-            } else if (left.isAssignableTo(right)) {
-                joinedParameters.add(left);
-            } else {
-                return null;
-            }
-        }
-        Type joinedResult = nearestCommonSupertype(List.of(firstFunction.returnType(), secondFunction.returnType()));
-        if (joinedResult == null) {
-            return null;
-        }
-        return FunctionType.canonical(joinedParameters, joinedResult);
     }
 
     /** The reflexive-transitive closure of a type's declared supertypes and interface edges. */

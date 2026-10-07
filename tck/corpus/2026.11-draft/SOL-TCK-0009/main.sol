@@ -10,7 +10,7 @@
 // program were ever executed, observable stdout would appear; the compile-only phase
 // independently proves execution did not occur.
 class Widget {
-    static mutable func build(): Integer {
+    method static mutable build(): Integer {
         return 1
     }
 }

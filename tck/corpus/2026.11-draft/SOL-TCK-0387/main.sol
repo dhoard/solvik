@@ -5,16 +5,16 @@
 //   - `super.member` accesses the immediate superclass implementation.
 //   - A `mutable` member may be overridden; all other members are final.
 //
-mutable class A {
-    mutable func label(): String {
+class mutable A {
+    method mutable label(): String {
         return "A"
     }
 
     A() {
     }
 }
-mutable class B extends A {
-    mutable override func label(): String {
+class mutable B extends A {
+    method override mutable label(): String {
         return "B"
     }
 
@@ -22,12 +22,12 @@ mutable class B extends A {
     }
 }
 class C extends B {
-    override func label(): String {
+    method override label(): String {
         return super.label() .. "C"
     }
 
     C() {
     }
 }
-var c = C()
+var c: C = C()
 print(c.label())

@@ -57,10 +57,11 @@ public final class SolvikInterfaceNegativeTest {
     public void missingInterfaceImplementationIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 interface Named {
-                    func name(): String
+                    method name(): String
                 }
                 class User implements Named {
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_MISSING_INTERFACE_IMPLEMENTATION);
     }
@@ -69,16 +70,17 @@ public final class SolvikInterfaceNegativeTest {
     public void missingInheritedRequirementImplementationIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 interface Named {
-                    func name(): String
+                    method name(): String
                 }
                 interface Aged extends Named {
-                    func age(): Integer
+                    method age(): Integer
                 }
                 class User implements Aged {
-                    func age(): Integer {
+                    method age(): Integer {
                         return 1
                     }
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_MISSING_INTERFACE_IMPLEMENTATION);
     }
@@ -87,17 +89,18 @@ public final class SolvikInterfaceNegativeTest {
     public void oneRequirementPerClassIsReportedEvenWithDefaultsElsewhere() {
         DiagnosticBag bag = checkFails("""
                 interface Named {
-                    func name(): String
+                    method name(): String
 
-                    func greeting(): String {
+                    method greeting(): String {
                         return "Hello " .. name()
                     }
                 }
                 interface Aged {
-                    func age(): Integer
+                    method age(): Integer
                 }
                 class User implements Named, Aged {
                 }
+
                 """);
         // `name` (no default) and `age` are both missing; `greeting` is not reported.
         List<DiagnosticCode> codes = bag.all().stream().map(Diagnostic::code).toList();
@@ -111,13 +114,14 @@ public final class SolvikInterfaceNegativeTest {
         // diagnostic. Reporting one per interface member duplicates the message for the same defect.
         DiagnosticBag bag = checkFails("""
                 interface Alpha {
-                    func greet(): String
+                    method greet(): String
                 }
                 interface Beta {
-                    func greet(): String
+                    method greet(): String
                 }
                 class Both implements Alpha, Beta {
                 }
+
                 """);
         List<DiagnosticCode> codes = bag.all().stream().map(Diagnostic::code).toList();
         assertThat(codes.stream().filter(c -> c == DiagnosticCode.SEM_MISSING_INTERFACE_IMPLEMENTATION).count()) //
@@ -129,17 +133,18 @@ public final class SolvikInterfaceNegativeTest {
         // The same duplication on the conflicting-defaults path: one conflicting name, one diagnostic.
         DiagnosticBag bag = checkFails("""
                 interface Alpha {
-                    func greet(): String {
+                    method greet(): String {
                         return "alpha"
                     }
                 }
                 interface Beta {
-                    func greet(): String {
+                    method greet(): String {
                         return "beta"
                     }
                 }
                 class Both implements Alpha, Beta {
                 }
+
                 """);
         List<DiagnosticCode> codes = bag.all().stream().map(Diagnostic::code).toList();
         assertThat(codes.stream().filter(c -> c == DiagnosticCode.SEM_CONFLICTING_DEFAULTS).count()) //
@@ -150,17 +155,18 @@ public final class SolvikInterfaceNegativeTest {
     public void conflictingDefaultsRequireExplicitResolution() {
         Diagnostic diagnostic = first(checkFails("""
                 interface A {
-                    func greet(): String {
+                    method greet(): String {
                         return "a"
                     }
                 }
                 interface B {
-                    func greet(): String {
+                    method greet(): String {
                         return "b"
                     }
                 }
                 class C implements A, B {
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_CONFLICTING_DEFAULTS);
     }
@@ -169,20 +175,21 @@ public final class SolvikInterfaceNegativeTest {
     public void conflictingDefaultsAreResolvedByAnExplicitMethod() {
         CompilationUnitNode unit = parseOk("resolve.sol", """
                 interface A {
-                    func greet(): String {
+                    method greet(): String {
                         return "a"
                     }
                 }
                 interface B {
-                    func greet(): String {
+                    method greet(): String {
                         return "b"
                     }
                 }
                 class C implements A, B {
-                    func greet(): String {
+                    method greet(): String {
                         return "c"
                     }
                 }
+
                 """);
         SemanticResult result = SolvikSemanticAnalyzer.analyze(unit);
         assertThat(result.isSuccess()).as("explicit resolution must compile: " + result.diagnostics().all()).isTrue();
@@ -192,22 +199,24 @@ public final class SolvikInterfaceNegativeTest {
     public void conflictingDefaultsAreResolvedByAnInheritedMethod() {
         CompilationUnitNode unit = parseOk("resolveinherited.sol", """
                 interface A {
-                    func greet(): String {
+                    method greet(): String {
                         return "a"
                     }
                 }
                 interface B {
-                    func greet(): String {
+                    method greet(): String {
                         return "b"
                     }
                 }
-                mutable class Base {
-                    func greet(): String {
+                class mutable Base {
+                    method greet(): String {
                         return "base"
                     }
                 }
                 class C extends Base implements A, B {
                 }
+
+
                 """);
         SemanticResult result = SolvikSemanticAnalyzer.analyze(unit);
         assertThat(result.isSuccess()).as("inherited resolution must compile: " + result.diagnostics().all()).isTrue();
@@ -217,12 +226,12 @@ public final class SolvikInterfaceNegativeTest {
     public void conflictingDefaultsFromExtendedInterfacesAreRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 interface A {
-                    func greet(): String {
+                    method greet(): String {
                         return "a"
                     }
                 }
                 interface B {
-                    func greet(): String {
+                    method greet(): String {
                         return "b"
                     }
                 }
@@ -230,6 +239,7 @@ public final class SolvikInterfaceNegativeTest {
                 }
                 class C implements Both {
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_CONFLICTING_DEFAULTS);
     }
@@ -238,13 +248,14 @@ public final class SolvikInterfaceNegativeTest {
     public void implementationWithWrongParameterTypesIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 interface Filter {
-                    func accepts(value: Integer): Boolean
+                    method accepts(value: Integer): Boolean
                 }
                 class Odd implements Filter {
-                    func accepts(value: String): Boolean {
+                    method accepts(value: String): Boolean {
                         return true
                     }
                 }
+
                 """));
         // The parameter mismatch is reported first; the return type is coincidentally fine.
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_IMPLEMENTATION_SIGNATURE);
@@ -254,13 +265,14 @@ public final class SolvikInterfaceNegativeTest {
     public void implementationWithNonCovariantReturnTypeIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 interface Named {
-                    func name(): String
+                    method name(): String
                 }
                 class User implements Named {
-                    func name(): Integer {
+                    method name(): Integer {
                         return 1
                     }
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_IMPLEMENTATION_SIGNATURE);
     }
@@ -271,15 +283,16 @@ public final class SolvikInterfaceNegativeTest {
         // Base: a call through Base-typed code would otherwise bind C's incompatible method.
         Diagnostic diagnostic = first(checkFails("""
                 interface Base {
-                    func label(): String {
+                    method label(): String {
                         return "base"
                     }
                 }
                 class C implements Base {
-                    func label(): Integer {
+                    method label(): Integer {
                         return 1
                     }
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_IMPLEMENTATION_SIGNATURE);
     }
@@ -348,11 +361,12 @@ public final class SolvikInterfaceNegativeTest {
     public void duplicateInterfaceNameIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 interface I {
-                    func f(): Integer
+                    method f(): Integer
                 }
                 interface I {
-                    func g(): Integer
+                    method g(): Integer
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_DUPLICATE_NAME);
     }
@@ -361,10 +375,11 @@ public final class SolvikInterfaceNegativeTest {
     public void duplicateInterfaceMemberIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 interface I {
-                    func f(): Integer
+                    method f(): Integer
 
-                    func f(): String
+                    method f(): String
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_DUPLICATE_NAME);
     }
@@ -376,8 +391,9 @@ public final class SolvikInterfaceNegativeTest {
                 }
 
                 interface Thing {
-                    func f(): Integer
+                    method f(): Integer
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_DUPLICATE_NAME);
     }
@@ -386,12 +402,13 @@ public final class SolvikInterfaceNegativeTest {
     public void interfaceNameCannotBeUsedAsAValue() {
         Diagnostic diagnostic = first(checkFails("""
                 interface Named {
-                    func name(): String
+                    method name(): String
                 }
                 func use(): Integer {
                     var x: Integer = Named()
                     return x
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_INTERFACE_AS_VALUE);
     }
@@ -400,11 +417,12 @@ public final class SolvikInterfaceNegativeTest {
     public void unknownMemberThroughAnInterfaceReceiverIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 interface Named {
-                    func name(): String
+                    method name(): String
                 }
                 func use(named: Named): String {
                     return named.label()
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_MEMBER);
     }
@@ -413,11 +431,12 @@ public final class SolvikInterfaceNegativeTest {
     public void wrongArgumentTypeThroughAnInterfaceReceiverIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 interface Greeter {
-                    func greet(value: Integer): String
+                    method greet(value: Integer): String
                 }
                 func use(greeter: Greeter): String {
                     return greeter.greet("x")
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
@@ -426,11 +445,12 @@ public final class SolvikInterfaceNegativeTest {
     public void callWithWrongArityThroughAnInterfaceReceiverIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 interface Greeter {
-                    func greet(value: Integer): String
+                    method greet(value: Integer): String
                 }
                 func use(greeter: Greeter): String {
                     return greeter.greet()
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_ARITY_MISMATCH);
     }
@@ -441,16 +461,17 @@ public final class SolvikInterfaceNegativeTest {
         // must not remain visible to a later top-level function.
         Diagnostic diagnostic = first(checkFails("""
                 interface Named {
-                    func name(): String
+                    method name(): String
                 }
                 class User implements Named {
-                    func name(): String {
+                    method name(): String {
                         return "Doug"
                     }
                 }
                 func later(): String {
                     return name()
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_NAME);
     }
@@ -459,16 +480,17 @@ public final class SolvikInterfaceNegativeTest {
     public void interfaceValueCannotBeAssignedToAnImplementingClassType() {
         Diagnostic diagnostic = first(checkFails("""
                 interface Named {
-                    func name(): String
+                    method name(): String
                 }
                 class User implements Named {
-                    func name(): String {
+                    method name(): String {
                         return "Doug"
                     }
                 }
                 func use(named: Named): User {
                     return named
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_RETURN_MISMATCH);
     }
@@ -477,11 +499,12 @@ public final class SolvikInterfaceNegativeTest {
     public void thisIsRejectedInsideAnInterfaceDefaultThatIsNotAMember() {
         Diagnostic diagnostic = first(checkFails("""
                 interface Named {
-                    func name(): String
+                    method name(): String
                 }
                 func helper(): Integer {
                     return this.hashCode()
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_THIS_OUTSIDE_CLASS);
     }
@@ -492,13 +515,14 @@ public final class SolvikInterfaceNegativeTest {
         // would leave a conforming class with both a requirement and a default for one name.
         Diagnostic diagnostic = first(checkFails("""
                 interface Base {
-                    func label(): String {
+                    method label(): String {
                         return "base"
                     }
                 }
                 interface Derived extends Base {
-                    func label(): String
+                    method label(): String
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_INVALID_INTERFACE);
     }
@@ -508,10 +532,11 @@ public final class SolvikInterfaceNegativeTest {
         // `extends` is class inheritance; a nominal contract is joined with `implements`.
         Diagnostic diagnostic = first(checkFails("""
                 interface Named {
-                    func name(): String
+                    method name(): String
                 }
                 class User extends Named {
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_INVALID_SUPERCLASS);
     }
@@ -521,10 +546,11 @@ public final class SolvikInterfaceNegativeTest {
         // An interface has no superclass implementation to reach.
         Diagnostic diagnostic = first(checkFails("""
                 interface Named {
-                    func name(): String {
+                    method name(): String {
                         return super.name()
                     }
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_SUPER_OUTSIDE_CLASS);
     }
@@ -534,13 +560,14 @@ public final class SolvikInterfaceNegativeTest {
         // `override` governs class inheritance only; an implementing method carries no modifier.
         Diagnostic diagnostic = first(checkFails("""
                 interface Named {
-                    func name(): String
+                    method name(): String
                 }
                 class User implements Named {
-                    override func name(): String {
+                    method override name(): String {
                         return "Doug"
                     }
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_OVERRIDE_WITHOUT_SUPER);
     }
@@ -549,13 +576,14 @@ public final class SolvikInterfaceNegativeTest {
     public void implementingMethodWithArityMismatchIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 interface Named {
-                    func name(prefix: String): String
+                    method name(prefix: String): String
                 }
                 class User implements Named {
-                    func name(): String {
+                    method name(): String {
                         return "Doug"
                     }
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_IMPLEMENTATION_SIGNATURE);
     }

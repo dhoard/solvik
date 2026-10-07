@@ -6,7 +6,7 @@
 **Related:** <Issue, prerequisite plans, superseded plans, or none>
 **Evidence baseline:** <Date, branch/commit, and relevant worktree changes>
 
-> Read `AGENTS.md` and copy this template to `docs/<DESCRIPTIVE-NAME>-PLAN.md`, unless the
+> Read `AGENTS.md` and copy this template to `plans/<DESCRIPTIVE-NAME>-PLAN.md`, unless the
 > user specifies a location. Preserve an existing plan's path when updating it. Replace
 > placeholders with concrete findings and decisions; scale detail to the change. Keep goals,
 > evidence, authority, scope, implementation steps, coverage, acceptance, and validation records.

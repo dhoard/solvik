@@ -100,17 +100,18 @@ public final class SolvikFunctionParameterTest {
     @Test
     public void unitReturningFunctionRunsItsSideEffects() {
         assertThat(run("""
-                    func bump() {
-                        println("bump")
-                    }
+                        func bump() {
+                            println("bump")
+                        }
 
-                    func explicitUnit(): Unit {
-                        println("unit")
-                    }
+                        func explicitUnit() {
+                            println("unit")
+                        }
 
-                    bump()
-                    bump()
-                    explicitUnit()
+                        bump()
+                        bump()
+                        explicitUnit()
+
                 """)).isEqualTo("bump\nbump\nunit\n");
     }
 

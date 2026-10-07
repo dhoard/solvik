@@ -16,7 +16,7 @@
 //   -> `true 2 2 2 1 false`.
 // Executed as top-level statements (section 20). Uses print, so no platform line
 // separator can enter the expected bytes.
-var frames = Stack<Integer>()
+var frames: Stack<Integer> = Stack<Integer>()
 print(frames.isEmpty)
 print(" ")
 frames.push(1)

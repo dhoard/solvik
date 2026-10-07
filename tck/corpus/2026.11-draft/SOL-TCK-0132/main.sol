@@ -5,10 +5,10 @@
 // this normally completing path reaches no result.
 // Section 21.9 gives SEM_BLOCK_RESULT_REQUIRED = SOLV-SEM-041 with the primary span
 // "offending block or case body", which is exactly this position.
-var n = 1
-var m = switch (n) {
+var n: Integer = 1
+var m: String = switch (n) {
     case 1 {
-        var q = 1
+        var q: Integer = 1
     }
     default {
         "other"

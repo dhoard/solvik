@@ -1,10 +1,10 @@
-var mutable total = 0
+var mutable total: Integer = 0
 
 for (i in 1...4) {
     total = total + i
 }
 
-var mutable n = 0
+var mutable n: Integer = 0
 
 while (n < 5) {
     n = n + 1

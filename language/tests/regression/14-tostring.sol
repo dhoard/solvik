@@ -3,7 +3,7 @@ class Money {
     Money(amount: Integer) {
         this.amount = amount
     }
-    override func toString(): String {
+    method override toString(): String {
         return "$" .. this.amount
     }
 }

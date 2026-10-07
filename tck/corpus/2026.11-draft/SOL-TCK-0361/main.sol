@@ -4,7 +4,7 @@
 // Oracle quotations verified verbatim against docs/LANGUAGE_SPEC.md:
 //   - Regex cases require a `String` switch value.
 //
-var x = 1
+var x: Integer = 1
 switch (x) {
     case regex r"1" {
         print("one")

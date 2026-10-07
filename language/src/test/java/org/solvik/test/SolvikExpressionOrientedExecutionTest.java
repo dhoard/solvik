@@ -16,12 +16,14 @@
 package org.solvik.test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import org.graalvm.polyglot.Context;
+import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Source;
 import org.junit.jupiter.api.Test;
 
@@ -47,32 +49,44 @@ public final class SolvikExpressionOrientedExecutionTest {
     @Test
     public void blockExpressionComputesValue() {
         assertThat(run("""
-                var answer = {
-                    var base = 20
+                var answer: Integer = {
+                    var base: Integer = 20
                     base + 22
                 }
                 println(answer)
 
-                var same = {
+                var same: Integer = {
                     42
                 }
                 println(same)
 
-                var semi = {
+                var semi: Integer = {
                     42
                 }
                 println(semi)
+
                 """)).isEqualTo("42\n42\n42\n");
     }
 
     @Test
-    public void unitBlockExpressionIsDistinguishedFromMissingTail() {
+    public void noValueBlockExpressionRunsItsStatementsWithoutProducingABinding() {
         assertThat(run("""
-                var logged: Unit = {
+                {
                     println("done")
                 }
-                println(logged)
-                """)).isEqualTo("done\nUnit\n");
+                println("after")
+                """)).isEqualTo("done\nafter\n");
+    }
+
+    @Test
+    public void bindingANoValueBlockExpressionIsRejected() {
+        assertThatThrownBy(() -> run("""
+                var logged: Integer = {
+                    println("done")
+                }
+                """))//
+                .isInstanceOf(PolyglotException.class)//
+                .hasMessageContaining("no value");
     }
 
     @Test
@@ -177,7 +191,7 @@ public final class SolvikExpressionOrientedExecutionTest {
                         this.value = 0
                     }
 
-                    func next(): Integer {
+                    method next(): Integer {
                         this.value = this.value + 1
                         return this.value
                     }
@@ -194,9 +208,10 @@ public final class SolvikExpressionOrientedExecutionTest {
                     }
                 }
 
-                var counter = Counter()
+                var counter: Counter = Counter()
                 println(label(counter))
                 println(counter.value)
+
                 """)).isEqualTo("first\n1\n");
     }
 
@@ -251,7 +266,7 @@ public final class SolvikExpressionOrientedExecutionTest {
     @Test
     public void statementFormsKeepTheirOldBehavior() {
         assertThat(run("""
-                func run(debug: Boolean, value: Integer): Unit {
+                func run(debug: Boolean, value: Integer) {
                     if (debug) {
                         println("debug")
                     }
@@ -266,13 +281,14 @@ public final class SolvikExpressionOrientedExecutionTest {
                 run(true, 1)
                 run(true, 9)
                 run(false, 1)
+
                 """)).isEqualTo("debug\none\ndebug\none\n");
     }
 
     @Test
     public void ifAndSwitchCanBeBlockTails() {
         assertThat(run("""
-                var fromIf = {
+                var fromIf: Integer = {
                     if (true) {
                         1
                     }
@@ -280,7 +296,7 @@ public final class SolvikExpressionOrientedExecutionTest {
                         2
                     }
                 }
-                var fromSwitch = {
+                var fromSwitch: String = {
                     switch (3) {
                         case 3 {
                             "three"
@@ -292,6 +308,7 @@ public final class SolvikExpressionOrientedExecutionTest {
                 }
                 println(fromIf)
                 println(fromSwitch)
+
                 """)).isEqualTo("1\nthree\n");
     }
 }

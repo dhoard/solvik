@@ -1,4 +1,4 @@
-var v = {
+var v: Integer = {
     42;
 }
 print("v" .. v)

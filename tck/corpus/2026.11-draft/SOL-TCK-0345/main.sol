@@ -5,12 +5,12 @@
 //   - If multiple interfaces provide an otherwise unresolved default for the same method, the class must explicitly override it.
 //
 interface A {
-    func speak(): String {
+    method speak(): String {
         return "a"
     }
 }
 interface B {
-    func speak(): String {
+    method speak(): String {
         return "b"
     }
 }
@@ -18,7 +18,7 @@ class C implements A, B {
     C() {
     }
 }
-var c = C()
+var c: C = C()
 print(c.speak())
 
 print("EXECUTED-INVALID")

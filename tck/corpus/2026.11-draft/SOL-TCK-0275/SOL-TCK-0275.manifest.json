@@ -15,8 +15,8 @@
       "family": "SEM",
       "code": "SOLV-SEM-045",
       "location": {
-        "startByteOffset": 255,
-        "endByteOffset": 326
+        "startByteOffset": 259,
+        "endByteOffset": 332
       }
     }
   }

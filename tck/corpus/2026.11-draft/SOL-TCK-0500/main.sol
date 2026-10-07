@@ -4,5 +4,5 @@
 // Oracle quotations verified verbatim against docs/LANGUAGE_SPEC.md:
 //   - `var` declares an immutable binding/property.
 //
-var x = 1
+var x: Integer = 1
 print("u" .. x)

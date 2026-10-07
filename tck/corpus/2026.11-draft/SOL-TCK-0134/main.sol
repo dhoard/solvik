@@ -6,7 +6,7 @@
 // is Number. Binding the construct to a `Number` local is therefore legal and the taken
 // branch's value is 1, so the expected stdout is exactly "1". The companion rejection test
 // SOL-TCK-0135 is what proves the join is not `Integer` or `Long`.
-var n = if (true) {
+var n: Number = if (true) {
     1
 }
 else {

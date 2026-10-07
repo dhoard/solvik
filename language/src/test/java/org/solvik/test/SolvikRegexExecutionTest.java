@@ -54,119 +54,129 @@ public final class SolvikRegexExecutionTest {
     @Test
     public void matchesRequiresTheCompleteInput() {
         assertThat(run("""
-                    var re = Regex(r#"^\\d+$"#)
-                    println(re.matches("12345"))
-                    println(re.matches("12a45"))
-                    println(re.matches(""))
+                        var re: Regex = Regex(r#"^\\d+$"#)
+                        println(re.matches("12345"))
+                        println(re.matches("12a45"))
+                        println(re.matches(""))
+
                 """)).isEqualTo("true\nfalse\nfalse\n");
     }
 
     @Test
     public void rawStringPatternsWork() {
         assertThat(run("""
-                    var re = Regex(r#"\\d+\\s+\\w+"#)
-                    println(re.matches("42 words"))
-                    println(re.matches("words 42"))
+                        var re: Regex = Regex(r#"\\d+\\s+\\w+"#)
+                        println(re.matches("42 words"))
+                        println(re.matches("words 42"))
+
                 """)).isEqualTo("true\nfalse\n");
     }
 
     @Test
     public void dynamicallyTypedPatternsAreCachedAcrossCalls() {
         assertThat(run("""
-                    func countMatches(pattern: String): Integer {
-                        var re = Regex(pattern)
-                        return re.findAll("a a a").size
-                    }
+                        func countMatches(pattern: String): Integer {
+                            var re: Regex = Regex(pattern)
+                            return re.findAll("a a a").size
+                        }
 
-                    println(countMatches("a"))
-                    println(countMatches("a"))
-                    println(countMatches("b"))
+                        println(countMatches("a"))
+                        println(countMatches("a"))
+                        println(countMatches("b"))
+
                 """)).isEqualTo("3\n3\n0\n");
     }
 
     @Test
     public void findReturnsTheFirstMatchWithOffsetsAndGroups() {
         assertThat(run("""
-                    var re = Regex(r#"(\\w+)-(\\d+)"#)
-                    var m = re.find("id-42 rest")
-                    if (m != null) {
-                        println(m.value)
-                        println(m.start)
-                        println(m.end)
-                        println(m.groupCount)
-                        println(m.group(1) ?? "none")
-                        println(m.group(2) ?? "none")
-                    }
+                        var re: Regex = Regex(r#"(\\w+)-(\\d+)"#)
+                        var m: RegexMatch? = re.find("id-42 rest")
+                        if (m != null) {
+                            println(m.value)
+                            println(m.start)
+                            println(m.end)
+                            println(m.groupCount)
+                            println(m.group(1) ?? "none")
+                            println(m.group(2) ?? "none")
+                        }
+
                 """)).isEqualTo("id-42\n0\n5\n2\nid\n42\n");
     }
 
     @Test
     public void findReturnsNullWhenThereIsNoMatch() {
         assertThat(run("""
-                    var re = Regex(r#"\\d+"#)
-                    var m = re.find("abc")
-                    println(m == null)
+                        var re: Regex = Regex(r#"\\d+"#)
+                        var m: RegexMatch? = re.find("abc")
+                        println(m == null)
+
                 """)).isEqualTo("true\n");
     }
 
     @Test
     public void groupZeroIsTheCompleteMatch() {
         assertThat(run("""
-                    var m = Regex(r#"(\\w+)-(\\d+)"#).find("ab-12")
-                    if (m != null) {
-                        println(m.group(0) ?? "none")
-                    }
+                        var m: RegexMatch? = Regex(r#"(\\w+)-(\\d+)"#).find("ab-12")
+                        if (m != null) {
+                            println(m.group(0) ?? "none")
+                        }
+
                 """)).isEqualTo("ab-12\n");
     }
 
     @Test
     public void nonParticipatingGroupsAreNull() {
         assertThat(run("""
-                    var m = Regex(r#"(a)|(b)"#).find("b")
-                    if (m != null) {
-                        println(m.group(1) ?? "none")
-                        println(m.group(2) ?? "none")
-                    }
+                        var m: RegexMatch? = Regex(r#"(a)|(b)"#).find("b")
+                        if (m != null) {
+                            println(m.group(1) ?? "none")
+                            println(m.group(2) ?? "none")
+                        }
+
                 """)).isEqualTo("none\nb\n");
     }
 
     @Test
     public void findAllReturnsEveryMatchInSourceOrder() {
         assertThat(run("""
-                    var re = Regex(r#"\\d+"#)
-                    var matches = re.findAll("a1b22c333")
-                    println(matches.size)
-                    var mutable i = 0
-                    while (i < matches.size) {
-                        var m: RegexMatch = matches.get(i)
-                        println(m.value)
-                        i = i + 1
-                    }
+                        var re: Regex = Regex(r#"\\d+"#)
+                        var matches: List<RegexMatch> = re.findAll("a1b22c333")
+                        println(matches.size)
+                        var mutable i: Integer = 0
+                        while (i < matches.size) {
+                            var m: RegexMatch = matches.get(i)
+                            println(m.value)
+                            i = i + 1
+                        }
+
                 """)).isEqualTo("3\n1\n22\n333\n");
     }
 
     @Test
     public void replaceReplacesAllMatchesAndTreatsTheReplacementAsLiteralText() {
         assertThat(run("""
-                    var re = Regex(r#"\\d+"#)
-                    println(re.replace("a1b22c333", "#"))
-                    println(re.replace("a1b2", "$1"))
+                        var re: Regex = Regex(r#"\\d+"#)
+                        println(re.replace("a1b22c333", "#"))
+                        println(re.replace("a1b2", "$1"))
+
                 """)).isEqualTo("a#b#c#\na$1b$1\n");
     }
 
     @Test
     public void constantPatternsWorkInsideLoops() {
         assertThat(run("""
-                    var mutable i = 0
-                    var mutable count = 0
-                    while (i < 3) {
-                        var re = Regex(r#"^\\d+$"#)
-                        if (re.matches("123")) {
-                            count = count + 1
+                        var mutable i: Integer = 0
+                        var mutable count: Integer = 0
+                        while (i < 3) {
+                            var re: Regex = Regex(r#"^\\d+$"#)
+                            if (re.matches("123")) {
+                                count = count + 1
+                            }
+                            i = i + 1
                         }
-                        i = i + 1
-                    }
-                    println(count)
+                        println(count)
+
                 """)).isEqualTo("3\n");
     }
 
@@ -177,9 +187,10 @@ public final class SolvikRegexExecutionTest {
                     return re.matches(value)
                 }
 
-                    var re = Regex(r#"\\d+"#)
+                    var re: Regex = Regex(r#"\\d+"#)
                     println(matchesNumber(re, "123"))
                     println(matchesNumber(re, "abc"))
+
                 """)).isEqualTo("true\nfalse\n");
     }
 
@@ -199,11 +210,12 @@ public final class SolvikRegexExecutionTest {
     @Test
     public void regexAndMatchDisplayAsTheirTypeNames() {
         assertThat(run("""
-                    println(Regex("a"))
-                    var m = Regex("a").find("a")
-                    if (m != null) {
-                        println(m)
-                    }
+                        println(Regex("a"))
+                        var m: RegexMatch? = Regex("a").find("a")
+                        if (m != null) {
+                            println(m)
+                        }
+
                 """)).isEqualTo("Regex\nRegexMatch\n");
     }
 
@@ -221,11 +233,12 @@ public final class SolvikRegexExecutionTest {
                 }
 
                     println(kind(Regex("a")))
-                    var m = Regex("a").find("a")
+                    var m: RegexMatch? = Regex("a").find("a")
                     if (m != null) {
                         println(kind(m))
                     }
                     println(kind("plain"))
+
                 """)).isEqualTo("regex\nmatch\nother\n");
     }
 
@@ -238,8 +251,9 @@ public final class SolvikRegexExecutionTest {
                         return "("
                     }
 
-                        var re = Regex(make())
+                        var re: Regex = Regex(make())
                         println("after")
+
                     """, "test.sol")));
             assertThat(out.size()).isEqualTo(0);
             assertThat(failure.isGuestException()).isEqualTo(true);
@@ -255,8 +269,9 @@ public final class SolvikRegexExecutionTest {
                         return "(?=x)"
                     }
 
-                        var re = Regex(make())
+                        var re: Regex = Regex(make())
                         println("after")
+
                     """, "test.sol")));
             assertThat(out.size()).isEqualTo(0);
             assertThat(failure.isGuestException()).isEqualTo(true);
@@ -267,13 +282,14 @@ public final class SolvikRegexExecutionTest {
     public void regexMatchFieldReadsRunThroughTheLoweringLayer() {
         // Exercises the SolvikRegexMatchReadNode branches for value, start, end, and groupCount.
         assertThat(run("""
-                    var m = Regex(r#"(\\w+)-(\\d+)"#).find("ab-12")
-                    if (m != null) {
-                        println(m.value)
-                        println(m.start)
-                        println(m.end)
-                        println(m.groupCount)
-                    }
+                        var m: RegexMatch? = Regex(r#"(\\w+)-(\\d+)"#).find("ab-12")
+                        if (m != null) {
+                            println(m.value)
+                            println(m.start)
+                            println(m.end)
+                            println(m.groupCount)
+                        }
+
                 """)).isEqualTo("ab-12\n0\n5\n2\n");
     }
 
@@ -292,10 +308,11 @@ public final class SolvikRegexExecutionTest {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         try (Context context = Context.newBuilder("solvik").out(out).err(out).allowAllAccess(true).build()) {
             PolyglotException failure = expectThrows(PolyglotException.class, () -> context.eval(build("""
-                        var m = Regex(r#"(a)"#).find("a")
-                        if (m != null) {
-                            println(m.group(5) ?? "none")
-                        }
+                            var m: RegexMatch? = Regex(r#"(a)"#).find("a")
+                            if (m != null) {
+                                println(m.group(5) ?? "none")
+                            }
+
                     """, "test.sol")));
             assertThat(out.size()).isEqualTo(0);
             assertThat(failure.isGuestException()).isEqualTo(true);

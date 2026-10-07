@@ -19,7 +19,6 @@ import com.oracle.truffle.api.CompilerDirectives.TruffleBoundary;
 import org.solvik.truffle.object.SolvikAny;
 import org.solvik.truffle.object.SolvikBuiltinCollection;
 import org.solvik.truffle.object.SolvikEnumValue;
-import org.solvik.truffle.object.SolvikFunctionValue;
 import org.solvik.truffle.object.SolvikRegex;
 import org.solvik.truffle.object.SolvikRegexMatch;
 
@@ -72,11 +71,6 @@ public final class SolvikHash {
         }
         if (value instanceof SolvikEnumValue enumValue) {
             return Integer.valueOf(enumHash(enumValue));
-        }
-        if (value instanceof SolvikFunctionValue function) {
-            // The identity hash paired with the value's reference-identity equality. It must not
-            // reach userHash: a function value has no class and no overridable hashCode.
-            return Integer.valueOf(function.valueHash());
         }
         if (value instanceof SolvikAny object) {
             return userHash(object);

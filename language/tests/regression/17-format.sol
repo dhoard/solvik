@@ -5,7 +5,7 @@ else {
     "no"
 }
 )
-var mutable x = 1
+var mutable x: Integer = 1
 x = if (x == 1) {
     10
 }

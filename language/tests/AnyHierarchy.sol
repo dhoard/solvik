@@ -2,14 +2,14 @@
 // is direct root derivation, numeric leaves reach Any through Number, and unrelated values join to
 // Any. This example is the published behavior for the corrected root hierarchy.
 
-mutable class Animal {
-    mutable func speak(): String {
+class mutable Animal {
+    method mutable speak(): String {
         return "..."
     }
 }
 
 class Dog extends Animal {
-    override func speak(): String {
+    method override speak(): String {
         return "woof"
     }
 }
@@ -24,9 +24,6 @@ enum Color {
 
 func identity(value: Any): Any {
     return value
-}
-
-func noop() {
 }
 
 var dog: Any = Dog()
@@ -46,7 +43,6 @@ else {
 }
 var pattern: Any = Regex("a")
 var values: Any = List<Integer>(1, 2)
-var unit: Any = noop()
 
 println(dog is Any)
 println(dog is Animal)
@@ -61,8 +57,6 @@ println("text" is Number)
 println(1 is String)
 println(pattern is Any)
 println(values is Any)
-println(unit is Any)
-println(unit is Unit)
 println(identity(Plain()) is Any)
 println(joined is Any)
 println(animal.speak())

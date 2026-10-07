@@ -4,7 +4,7 @@
 // Oracle quotations verified verbatim against docs/LANGUAGE_SPEC.md:
 //   - Reassignment uses ordinary `=` assignment on an existing binding and is legal only when the binding was declared `mutable`
 //
-var mutable c = 0
+var mutable c: Integer = 0
 c = 1
 c = 2
 c = c + 1

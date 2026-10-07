@@ -4,7 +4,7 @@
 // Oracle quotations verified verbatim against docs/LANGUAGE_SPEC.md:
 //   - its direct superclass is initialized first, transitively up to the root, so a base class is always set up before a derived one that relies on it;
 //
-mutable class A {
+class mutable A {
     static {
         print("A")
     }
@@ -21,5 +21,5 @@ class B extends A {
     }
 }
 print("start")
-var b = B()
+var b: B = B()
 print("end")

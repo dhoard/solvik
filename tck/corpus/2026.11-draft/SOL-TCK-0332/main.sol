@@ -8,11 +8,11 @@ class A {
     A() {
     }
 
-    func toString(): String {
+    method toString(): String {
         return "a"
     }
 }
-var a = A()
+var a: A = A()
 print(a.toString())
 
 print("EXECUTED-INVALID")

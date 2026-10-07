@@ -2,6 +2,6 @@ func f(): Boolean {
     print("c")
     return true
 }
-var r = true || f()
-var s = false || f()
+var r: Boolean = true || f()
+var s: Boolean = false || f()
 print("or" .. r .. s)

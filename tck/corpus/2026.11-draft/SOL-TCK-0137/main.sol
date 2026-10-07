@@ -31,7 +31,7 @@ func classify(value: Integer): String {
     }
 }
 print(classify(5))
-var nested = if (true) {
+var nested: Integer = if (true) {
     if (false) {
         1
     }

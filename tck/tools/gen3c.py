@@ -90,17 +90,18 @@ SPEC_N = norm(SPEC)
 REQS = {
  "REQ-1800": dict(
   section="3. Equality and reference identity",
-  summary="A user class may declare equals only as exactly `override func equals(other: Any?): Boolean`, so the override keyword, one parameter typed exactly Any?, and a return type of exactly Boolean are each required",
+  summary="A user class may declare equals only as exactly `method override equals(other: Any?): Boolean`, so the override keyword, one parameter typed exactly Any?, and a return type of exactly Boolean are each required",
   kind="compile-time",
   notes="Four rejections attack the declaration from four directions -- no override keyword, a parameter typed Any rather than Any?, an extra parameter, and a Boolean? return -- so an implementation performing only a name match, or only an arity check, fails at least one arm; each is paired with the accepted program that declares the shape exactly. All four rejections are bare because section 3 states the requirement without naming a code and the override-conformance codes it reports occur zero times in the specification.",
   quotes=["A user class may declare exactly:",
           "The compiler requires `override`, exactly one explicit parameter typed exactly `Any?`, and return type exactly `Boolean`."]),
  "REQ-1801": dict(
-  section="3. Equality and reference identity",
-  summary="A user class may declare hashCode only as exactly `override func hashCode(): Integer`, requiring the override keyword, no parameters, and a return type of exactly Integer",
-  kind="compile-time",
-  notes="The same attack pattern as the equals shape, from the parameter and return directions plus the missing override keyword, with the accepted exact-shape control shared with the equals arms. Bare rejections for the same reason: the codes reported for these cases appear nowhere in the specification.",
-  quotes=["declared by a user class only as exactly `override func hashCode(): Integer`, requiring `override`, no parameters, and return type exactly `Integer`"]),
+  section='3. Equality and reference identity',
+  summary='A user class may declare hashCode only as exactly `override func hashCode(): Integer`, requiring the override keyword, no parameters, and a return type of exactly Integer',
+  kind='compile-time',
+  quotes=['declared by a user class only as exactly `method override hashCode(): Integer`, requiring `override`, no parameters, and return type exactly `Integer`'],
+  tests=['SOL-TCK-0270', 'SOL-TCK-0271', 'SOL-TCK-0272', 'SOL-TCK-0273'],
+  notes='The same attack pattern as the equals shape, from the parameter and return directions plus the missing override keyword, with the accepted exact-shape control shared with the equals arms. Bare rejections for the same reason: the codes reported for these cases appear nowhere in the specification.'),
  "REQ-1802": dict(
   section="3. Equality and reference identity",
   summary="The equals/hashCode pairing is checked per class declaration and is never satisfied by inheritance, while a subclass of a class overriding both members needs no override of its own",
@@ -150,11 +151,11 @@ EXACT = ('class Exact {\n'
          '    Exact() {\n'
          '    }\n'
          '\n'
-         '    override func equals(other: Any?): Boolean {\n'
+         '    method override equals(other: Any?): Boolean {\n'
          '        return true\n'
          '    }\n'
          '\n'
-         '    override func hashCode(): Integer {\n'
+         '    method override hashCode(): Integer {\n'
          '        return 7\n'
          '    }\n'
          '}\n')
@@ -164,77 +165,271 @@ EQ_OK = ('class Q {\n'
          '    Q() {\n'
          '    }\n'
          '\n'
-         '    override func equals(other: Any?): Boolean {\n'
+         '    method override equals(other: Any?): Boolean {\n'
          '        return true\n'
          '    }\n'
          '\n')
 
 # --- REQ-1800 the equals declaration shape.
-add("SOL-TCK-0265", "REQ-1800", "types", EXACT + 'var p = Exact()\nprint("shape" .. (p == p))\n',
+add("SOL-TCK-0265", "REQ-1800", "types", ('class Exact {\n'
+    '    Exact() {\n'
+    '    }\n'
+    '\n'
+    '    method override equals(other: Any?): Boolean {\n'
+    '        return true\n'
+    '    }\n'
+    '\n'
+    '    method override hashCode(): Integer {\n'
+    '        return 7\n'
+    '    }\n'
+    '}\n'
+    'var p: Exact = Exact()\n'
+    'print("shape" .. (p == p))\n'
+    ''),
     "SUCCESS", stdout="shapetrue")
 add("SOL-TCK-0266", "REQ-1800", "types",
-    'class Q {\n    Q() {\n    }\n\n    func equals(other: Any?): Boolean {\n        return true\n    }\n\n'
-    '    override func hashCode(): Integer {\n        return 1\n    }\n}\nprint(1)\n' + NEG,
+    ('class Q {\n'
+    '    Q() {\n'
+    '    }\n'
+    '\n'
+    '    method equals(other: Any?): Boolean {\n'
+    '        return true\n'
+    '    }\n'
+    '\n'
+    '    method override hashCode(): Integer {\n'
+    '        return 1\n'
+    '    }\n'
+    '}\n'
+    'print(1)\n'
+    '\n'
+    'print("EXECUTED-INVALID")\n'
+    ''),
     "COMPILE_ERROR", diag={})
 add("SOL-TCK-0267", "REQ-1800", "types",
-    'class Q {\n    Q() {\n    }\n\n    override func equals(other: Any): Boolean {\n        return true\n    }\n\n'
-    '    override func hashCode(): Integer {\n        return 1\n    }\n}\nprint(1)\n' + NEG,
+    ('class Q {\n'
+    '    Q() {\n'
+    '    }\n'
+    '\n'
+    '    method override equals(other: Any): Boolean {\n'
+    '        return true\n'
+    '    }\n'
+    '\n'
+    '    method override hashCode(): Integer {\n'
+    '        return 1\n'
+    '    }\n'
+    '}\n'
+    'print(1)\n'
+    '\n'
+    'print("EXECUTED-INVALID")\n'
+    ''),
     "COMPILE_ERROR", diag={})
 add("SOL-TCK-0268", "REQ-1800", "types",
-    'class Q {\n    Q() {\n    }\n\n    override func equals(other: Any?, n: Integer): Boolean {\n        return true\n    }\n\n'
-    '    override func hashCode(): Integer {\n        return 1\n    }\n}\nprint(1)\n' + NEG,
+    ('class Q {\n'
+    '    Q() {\n'
+    '    }\n'
+    '\n'
+    '    method override equals(other: Any?, n: Integer): Boolean {\n'
+    '        return true\n'
+    '    }\n'
+    '\n'
+    '    method override hashCode(): Integer {\n'
+    '        return 1\n'
+    '    }\n'
+    '}\n'
+    'print(1)\n'
+    '\n'
+    'print("EXECUTED-INVALID")\n'
+    ''),
     "COMPILE_ERROR", diag={})
 add("SOL-TCK-0269", "REQ-1800", "types",
-    'class Q {\n    Q() {\n    }\n\n    override func equals(other: Any?): Boolean? {\n        return null\n    }\n\n'
-    '    override func hashCode(): Integer {\n        return 1\n    }\n}\nprint(1)\n' + NEG,
+    ('class Q {\n'
+    '    Q() {\n'
+    '    }\n'
+    '\n'
+    '    method override equals(other: Any?): Boolean? {\n'
+    '        return null\n'
+    '    }\n'
+    '\n'
+    '    method override hashCode(): Integer {\n'
+    '        return 1\n'
+    '    }\n'
+    '}\n'
+    'print(1)\n'
+    '\n'
+    'print("EXECUTED-INVALID")\n'
+    ''),
     "COMPILE_ERROR", diag={})
 
 # --- REQ-1801 the hashCode declaration shape.
-add("SOL-TCK-0270", "REQ-1801", "types", EXACT + 'var p = Exact()\nprint("hash" .. p.hashCode())\n',
+add("SOL-TCK-0270", "REQ-1801", "types", ('class Exact {\n'
+    '    Exact() {\n'
+    '    }\n'
+    '\n'
+    '    method override equals(other: Any?): Boolean {\n'
+    '        return true\n'
+    '    }\n'
+    '\n'
+    '    method override hashCode(): Integer {\n'
+    '        return 7\n'
+    '    }\n'
+    '}\n'
+    'var p: Exact = Exact()\n'
+    'print("hash" .. p.hashCode())\n'
+    ''),
     "SUCCESS", stdout="hash7")
 add("SOL-TCK-0271", "REQ-1801", "types",
-    EQ_OK + '    override func hashCode(x: Integer): Integer {\n        return 1\n    }\n}\nprint(1)\n' + NEG,
+    ('class Q {\n'
+    '    Q() {\n'
+    '    }\n'
+    '\n'
+    '    method override equals(other: Any?): Boolean {\n'
+    '        return true\n'
+    '    }\n'
+    '\n'
+    '    method override hashCode(x: Integer): Integer {\n'
+    '        return 1\n'
+    '    }\n'
+    '}\n'
+    'print(1)\n'
+    '\n'
+    'print("EXECUTED-INVALID")\n'
+    ''),
     "COMPILE_ERROR", diag={})
 add("SOL-TCK-0272", "REQ-1801", "types",
-    EQ_OK + '    override func hashCode(): Long {\n        return 1L\n    }\n}\nprint(1)\n' + NEG,
+    ('class Q {\n'
+    '    Q() {\n'
+    '    }\n'
+    '\n'
+    '    method override equals(other: Any?): Boolean {\n'
+    '        return true\n'
+    '    }\n'
+    '\n'
+    '    method override hashCode(): Long {\n'
+    '        return 1L\n'
+    '    }\n'
+    '}\n'
+    'print(1)\n'
+    '\n'
+    'print("EXECUTED-INVALID")\n'
+    ''),
     "COMPILE_ERROR", diag={})
 add("SOL-TCK-0273", "REQ-1801", "types",
-    EQ_OK + '    func hashCode(): Integer {\n        return 1\n    }\n}\nprint(1)\n' + NEG,
+    ('class Q {\n'
+    '    Q() {\n'
+    '    }\n'
+    '\n'
+    '    method override equals(other: Any?): Boolean {\n'
+    '        return true\n'
+    '    }\n'
+    '\n'
+    '    method hashCode(): Integer {\n'
+    '        return 1\n'
+    '    }\n'
+    '}\n'
+    'print(1)\n'
+    '\n'
+    'print("EXECUTED-INVALID")\n'
+    ''),
     "COMPILE_ERROR", diag={})
 
 # --- REQ-1802 pairing per declaration, never by inheritance.
 add("SOL-TCK-0274", "REQ-1802", "types",
-    'mutable class Both {\n    Both() {\n    }\n\n    override func equals(other: Any?): Boolean {\n        return true\n    }\n\n'
-    '    override func hashCode(): Integer {\n        return 5\n    }\n}\n'
-    'class Plain extends Both {\n    Plain() {\n    }\n}\n'
-    'var s = Plain()\nprint("inh" .. (s == s) .. s.hashCode())\n',
+    (('class mutable Both {\n'
+    '    Both() {\n'
+    '    }\n'
+    '\n'
+    '    method override equals(other: Any?): Boolean {\n'
+    '        return true\n'
+    '    }\n'
+    '\n'
+    '    method override hashCode(): Integer {\n'
+    '        return 5\n'
+    '    }\n'
+    '}\n'
+    'class Plain extends Both {\n'
+    '    Plain() {\n'
+    '    }\n'
+    '}\n'
+    'var s: Plain = Plain()\n'
+    'print("inh" .. (s == s) .. s.hashCode())\n'
+    '')),
     "SUCCESS", stdout="inhtrue5")
 add("SOL-TCK-0275", "REQ-1802", "types",
-    'mutable class Both2 {\n    Both2() {\n    }\n\n    mutable override func equals(other: Any?): Boolean {\n        return true\n    }\n\n'
-    '    mutable override func hashCode(): Integer {\n        return 5\n    }\n}\n'
-    'class OnlyEq extends Both2 {\n    OnlyEq() {\n    }\n\n    override func equals(other: Any?): Boolean {\n        return false\n    }\n}\n'
-    'var s = OnlyEq()\nprint(s)\n' + NEG,
+    ('class mutable Both2 {\n'
+    '    Both2() {\n'
+    '    }\n'
+    '\n'
+    '    method override mutable equals(other: Any?): Boolean {\n'
+    '        return true\n'
+    '    }\n'
+    '\n'
+    '    method override mutable hashCode(): Integer {\n'
+    '        return 5\n'
+    '    }\n'
+    '}\n'
+    'class OnlyEq extends Both2 {\n'
+    '    OnlyEq() {\n'
+    '    }\n'
+    '\n'
+    '    method override equals(other: Any?): Boolean {\n'
+    '        return false\n'
+    '    }\n'
+    '}\n'
+    'var s: OnlyEq = OnlyEq()\n'
+    'print(s)\n'
+    '\n'
+    'print("EXECUTED-INVALID")\n'
+    ''),
     "COMPILE_ERROR",
     diag={"family": "SEM", "code": "SOLV-SEM-045"},
-    locate="override func equals(other: Any?): Boolean {\n        return false\n    }")
+    locate="method override equals(other: Any?): Boolean {\n        return false\n    }")
 
 # --- REQ-1803 reserved member names.
 add("SOL-TCK-0276", "REQ-1803", "types",
     'class C {\n    var equals: Integer\n\n    C(equals: Integer) {\n        this.equals = equals\n    }\n}\nprint(1)\n' + NEG,
     "COMPILE_ERROR", diag={})
 add("SOL-TCK-0277", "REQ-1803", "types",
-    'interface I {\n    func hashCode(): Integer\n}\nvar x = 1\nprint(x)\n' + NEG,
+    ('interface I {\n'
+    '    method hashCode(): Integer\n'
+    '}\n'
+    'var x: Integer = 1\n'
+    'print(x)\n'
+    '\n'
+    'print("EXECUTED-INVALID")\n'
+    ''),
     "COMPILE_ERROR", diag={})
 add("SOL-TCK-0278", "REQ-1803", "types",
-    'interface I {\n    func get(): Integer\n}\n'
-    'class Impl implements I {\n    Impl() {\n    }\n\n    func get(): Integer {\n        return 1\n    }\n}\n'
-    'class Holder {\n    delegate var hashCode: I\n\n    Holder(i: I) {\n        this.hashCode = i\n    }\n}\n'
-    'print(1)\n' + NEG,
+    ('interface I {\n'
+    '    method get(): Integer\n'
+    '}\n'
+    'class Impl implements I {\n'
+    '    Impl() {\n'
+    '    }\n'
+    '\n'
+    '    method get(): Integer {\n'
+    '        return 1\n'
+    '    }\n'
+    '}\n'
+    'class Holder {\n'
+    '    delegate hashCode: I\n'
+    '\n'
+    '    Holder(i: I) {\n'
+    '        this.hashCode = i\n'
+    '    }\n'
+    '}\n'
+    'print(1)\n'
+    '\n'
+    'print("EXECUTED-INVALID")\n'
+    ''),
     "COMPILE_ERROR", diag={})
 
 # --- REQ-1804 nullable receiver calls.
 add("SOL-TCK-0279", "REQ-1804", "types",
-    'var s: String? = "ab"\nvar t = "ab"\nvar r: Boolean? = s?.equals(t)\nprint("eq" .. r)\n',
+    (('var s: String? = "ab"\n'
+    'var t: String = "ab"\n'
+    'var r: Boolean? = s?.equals(t)\n'
+    'print("eq" .. r)\n'
+    '')),
     "SUCCESS", stdout="eqtrue")
 add("SOL-TCK-0280", "REQ-1804", "types",
     # The null-receiver arm is present so the safe-call operator is shown to skip the call
@@ -249,17 +444,37 @@ add("SOL-TCK-0280", "REQ-1804", "types",
     # rather than dispatching and returning something non-null.
     "SUCCESS", stdout="hctruetrue")
 add("SOL-TCK-0281", "REQ-1804", "types",
-    'var s: String? = "ab"\nvar t = "ab"\nprint(s.equals(t))\n' + NEG, "COMPILE_ERROR", diag={})
+    ('var s: String? = "ab"\n'
+    'var t: String = "ab"\n'
+    'print(s.equals(t))\n'
+    '\n'
+    'print("EXECUTED-INVALID")\n'
+    ''), "COMPILE_ERROR", diag={})
 add("SOL-TCK-0282", "REQ-1804", "types",
     'var s: String? = "ab"\nprint(s.hashCode())\n' + NEG, "COMPILE_ERROR", diag={})
 
 # --- REQ-1805 bare member reads.
 add("SOL-TCK-0283", "REQ-1805", "types",
-    'var s = "ab"\nvar f = s.equals\nprint(1)\n' + NEG, "COMPILE_ERROR", diag={})
+    ('var s: String = "ab"\n'
+    'var f: Any = s.equals\n'
+    'print(1)\n'
+    '\n'
+    'print("EXECUTED-INVALID")\n'
+    ''), "COMPILE_ERROR", diag={})
 add("SOL-TCK-0284", "REQ-1805", "types",
-    'var s = "ab"\nvar f = s.hashCode\nprint(1)\n' + NEG, "COMPILE_ERROR", diag={})
+    ('var s: String = "ab"\n'
+    'var f: Any = s.hashCode\n'
+    'print(1)\n'
+    '\n'
+    'print("EXECUTED-INVALID")\n'
+    ''), "COMPILE_ERROR", diag={})
 add("SOL-TCK-0285", "REQ-1805", "types",
-    'var s = "ab"\nvar f = s.toString\nprint(1)\n' + NEG, "COMPILE_ERROR", diag={})
+    ('var s: String = "ab"\n'
+    'var f: Any = s.toString\n'
+    'print(1)\n'
+    '\n'
+    'print("EXECUTED-INVALID")\n'
+    ''), "COMPILE_ERROR", diag={})
 
 
 def verify():
@@ -281,9 +496,9 @@ def verify():
             continue
         # "reported on the single unpaired member" is only a checkable claim if the program
         # contains exactly one member the rule could report on. Assert that structurally:
-        # the needle must be the only `override func equals` in the violating class body.
+        # the needle must be the only `method override equals` in the violating class body.
         viol = src[src.index("class OnlyEq"):]
-        if viol.count("override func equals") != 1:
+        if viol.count("method override equals") != 1:
             bad.append(("SPAN", tid, "violating class has more than one candidate member"))
         # The protocol field is a UTF-8 BYTE offset (TCK.md section 3), so the offsets are
         # taken from the encoded program text rather than from Python character indices.

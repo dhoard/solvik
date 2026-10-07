@@ -1,5 +1,5 @@
 interface Named {
-    func name(): String
+    method name(): String
 }
 class User implements Named {
 }

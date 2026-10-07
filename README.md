@@ -39,7 +39,6 @@ semantics:
 - nominal generics with compile-time checking;
 - value-carrying enums and abstract classes, with exhaustive `match` over enum variants;
 - non-fallthrough `switch`;
-- first-class function values, including anonymous functions, explicit capture, and bound method references;
 - first-class `Regex`;
 - Rust-style raw strings;
 - `..` string concatenation;
@@ -76,7 +75,7 @@ class Named implements Greeter {
 }
 
 class Service implements Greeter {
-    delegate var greeter: Greeter
+    delegate greeter: Greeter
 
     Service(greeter: Greeter) {
         this.greeter = greeter
@@ -148,7 +147,7 @@ delegation provide reusable behavior without encouraging deep inheritance hierar
 
 ```solvik
 class Service implements Logger {
-    delegate var logger: Logger
+    delegate logger: Logger
 }
 ```
 
@@ -194,8 +193,8 @@ The comparison is about design direction, not source compatibility or feature eq
 ### Explicit mutability
 
 ```solvik
-var name = "Solvik"
-var mutable count = 0
+var name: String = "Solvik"
+var mutable count: Integer = 0
 
 count = count + 1
 name = "Other" // compile error
@@ -231,14 +230,14 @@ A class is extendable only when declared `mutable` or `abstract`, and a method i
 when declared `mutable`.
 
 ```solvik
-mutable class Animal {
-    mutable func speak(): String {
+class mutable Animal {
+    method mutable speak(): String {
         return "..."
     }
 }
 
 class Dog extends Animal {
-    override func speak(): String {
+    method override speak(): String {
         return "woof"
     }
 }
@@ -252,11 +251,11 @@ Behavior reuse does not require inheritance.
 
 ```solvik
 interface Logger {
-    func log(message: String)
+    method log(message: String)
 }
 
 class Service implements Logger {
-    delegate var logger: Logger
+    delegate logger: Logger
 
     Service(logger: Logger) {
         this.logger = logger
@@ -280,51 +279,42 @@ knowable subtype set, so a `match` over one always requires a wildcard branch.
 
 Cases may use compile-time constants and regular-expression patterns, with an optional `default`.
 
-### First-class functions
+### Functions and methods are declarations
 
-A function is a value: it can be stored in a binding or a property, passed to a function, returned from
-one, compared, and invoked.
-
-A function type is written where any other type is written, and it names the parameter types and the
-result type:
+A callable is a declaration, never a value: Solvik has no function types, no function values, no
+anonymous functions, no capture lists, and no bound method references. A function is called directly,
+and its name denotes the declaration:
 
 ```solvik
 func twice(value: Integer): Integer {
     return value * 2
 }
 
-var operation: func(Integer): Integer = twice
-println(operation(21))
+println(twice(21))          // 42
+var operation: Integer = twice   // compile error: a function is not a value
 ```
 
-The name of a function without parentheses is a value, so `twice` is the value and `twice(21)` is a
-call. One declaration has one value, which is what makes two references to it comparable.
-
-An anonymous function is written in any position that expects a value, and a capture list names the
-values it binds when it is created:
+`func` declares a free function at module scope, and `method` declares a class or interface member.
+A callable that writes no `: Type` produces no value, so it can be called as a statement but cannot be
+bound, passed, or printed:
 
 ```solvik
-func makeOffset(base: Integer): func(Integer): Integer {
-    return func [base](value: Integer): Integer {
-        return value + base
+class Counter {
+    var mutable value: Integer = 0
+
+    method bump(by: Integer) {
+        this.value = this.value + by
     }
 }
 
-var offsetByTen: func(Integer): Integer = makeOffset(10)
-println(offsetByTen(5))
+func log(message: String) {
+    print(message)
+}
+
+var counter: Counter = Counter()
+counter.bump(2)
+log("bumped")               // a statement: the call produces no value
 ```
-
-Reading a declared instance method without calling it binds that receiver:
-
-```solvik
-var attach: func(Integer): String = Tagger().attach
-println(attach(7))
-```
-
-Function values are closed over their own identity and rendering rather than their implementation: any
-function value prints as `func`, `==` and `===` hold of one declaration's value and no other, and a
-bound method reference or a closure invokes the same target an immediate call reaches. A call whose
-target is known statically is unaffected: it keeps its statically resolved path.
 
 ### First-class regular expressions
 
@@ -337,8 +327,8 @@ Constant regex patterns can be compiled once and reused by the runtime.
 Rust-style raw-string delimiters avoid escaping-heavy source:
 
 ```solvik
-var text = r#"He said "hello"."#
-var more = r##"A value containing "# inside"##
+var text: String = r#"He said "hello"."#
+var more: String = r##"A value containing "# inside"##
 ```
 
 The opening delimiter determines the exact closing delimiter.
@@ -348,7 +338,7 @@ The opening delimiter determines the exact closing delimiter.
 Solvik uses `..` rather than overloading `+` for both arithmetic and strings:
 
 ```solvik
-var total = 10
+var total: Integer = 10
 println("total = " .. total)
 ```
 

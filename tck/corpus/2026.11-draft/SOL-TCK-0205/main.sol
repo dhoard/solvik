@@ -2,15 +2,15 @@ enum Color {
     RED
     GREEN
 }
-var c = Color.GREEN
-var n = match c {
+var c: Color = Color.GREEN
+var n: Integer = match c {
     RED => {
-        var t = 1
+        var t: Integer = 1
         print("r")
         t
     }
     GREEN => {
-        var t = 2
+        var t: Integer = 2
         print("g")
         t
     }

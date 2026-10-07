@@ -57,56 +57,56 @@ public final class SolvikNumericNegativeTest {
     // section 4): `Long` and `Float` share no widened type because `Long` loses precision as a Float.
     @Test
     public void mixedArithmeticWithNoCommonWidenedTypeIsRejected() {
-        assertThat(first(checkFails("func f(): Unit {\n    var x = 1L + 1.5f\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_OPERANDS);
+        assertThat(first(checkFails("func f() {\n    var x: Any = 1L + 1.5f\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_OPERANDS);
     }
 
     @Test
     public void mixedOrderingWithNoCommonWidenedTypeIsRejected() {
-        assertThat(first(checkFails("func f(): Unit {\n    var x = 1L < 1.5f\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_OPERANDS);
+        assertThat(first(checkFails("func f() {\n    var x: Any = 1L < 1.5f\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_OPERANDS);
     }
 
     @Test
     public void mixedEqualityWithNoCommonWidenedTypeIsRejected() {
-        assertThat(first(checkFails("func f(): Unit {\n    var x = 1L == 1.5f\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_OPERANDS);
+        assertThat(first(checkFails("func f() {\n    var x: Any = 1L == 1.5f\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_OPERANDS);
     }
 
     // Precision-losing "widening" is rejected: the integral-to-floating relation holds only when
     // every source value is exactly representable in the target.
     @Test
     public void integerToFloatIsRejectedAsPrecisionLoss() {
-        assertThat(first(checkFails("func f(): Unit {\n    var x: Float = 1\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
+        assertThat(first(checkFails("func f() {\n    var x: Float = 1\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
 
     @Test
     public void longToDoubleIsRejectedAsPrecisionLoss() {
-        assertThat(first(checkFails("func f(): Unit {\n    var x: Double = 1L\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
+        assertThat(first(checkFails("func f() {\n    var x: Double = 1L\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
 
     @Test
     public void longToFloatIsRejectedAsPrecisionLoss() {
-        assertThat(first(checkFails("func f(): Unit {\n    var x: Float = 1L\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
+        assertThat(first(checkFails("func f() {\n    var x: Float = 1L\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
 
     @Test
     public void floatingToIntegralIsRejected() {
-        assertThat(first(checkFails("func f(): Unit {\n    var x: Long = 1.5f\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
+        assertThat(first(checkFails("func f() {\n    var x: Long = 1.5f\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
 
     @Test
     public void implicitNarrowingIsRejected() {
-        assertThat(first(checkFails("func f(): Unit {\n    var x: Integer = 1L\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
+        assertThat(first(checkFails("func f() {\n    var x: Integer = 1L\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
 
     @Test
     public void implicitFloatingNarrowingIsRejected() {
-        assertThat(first(checkFails("func f(): Unit {\n    var x: Float = 1.5\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
+        assertThat(first(checkFails("func f() {\n    var x: Float = 1.5\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
 
     @Test
     public void mixedIdentityIsRejected() {
         // `==` widens numeric operands, but `===` requires reference identity, which scalars lack,
         // and widening does not add an identity edge (docs/LANGUAGE_SPEC.md section 3).
-        assertThat(first(checkFails("func f(): Unit {\n    var x = 1 === 1L\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_OPERANDS);
+        assertThat(first(checkFails("func f() {\n    var x: Any = 1 === 1L\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_OPERANDS);
     }
 
     // Non-coercion boundary. Widening is only a value-to-typed-slot coercion; it must not leak into
@@ -125,7 +125,7 @@ public final class SolvikNumericNegativeTest {
     public void rangeBoundDoesNotWiden() {
         // `for-in` range bounds are exactly Integer; a Long bound is not widened.
         assertThat(first(checkFails(
-                        "func f(): Unit {\n    for (i in 1L...3L) {\n        println(i)\n    }\n}\n")).code())
+                        "func f() {\n    for (i in 1L...3L) {\n        println(i)\n    }\n}\n")).code())
                         .isEqualTo(DiagnosticCode.SEM_INVALID_RANGE_BOUND);
     }
 
@@ -151,51 +151,51 @@ public final class SolvikNumericNegativeTest {
 
     @Test
     public void convertingANonNumericValueIsRejected() {
-        assertThat(first(checkFails("func f(): Unit {\n    var x = Long(\"no\")\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_CONVERSION);
+        assertThat(first(checkFails("func f() {\n    var x: Long = Long(\"no\")\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_CONVERSION);
     }
 
     @Test
     public void callingANonNumericTypeIsRejected() {
-        assertThat(first(checkFails("func f(): Unit {\n    var x = String(1)\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_CONVERSION);
+        assertThat(first(checkFails("func f() {\n    var x: Any = String(1)\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_CONVERSION);
     }
 
     @Test
     public void callingTheAbstractNumberTypeIsRejected() {
-        assertThat(first(checkFails("func f(): Unit {\n    var x = Number(1)\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_CONVERSION);
+        assertThat(first(checkFails("func f() {\n    var x: Any = Number(1)\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_CONVERSION);
     }
 
     @Test
     public void conversionArityMismatchIsRejected() {
-        assertThat(first(checkFails("func f(): Unit {\n    var x = Long(1, 2)\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_ARITY_MISMATCH);
+        assertThat(first(checkFails("func f() {\n    var x: Long = Long(1, 2)\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_ARITY_MISMATCH);
     }
 
     @Test
     public void constantIntegralConversionOutOfRangeIsRejected() {
-        assertThat(first(checkFails("func f(): Unit {\n    var x = Byte(300)\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_CONVERSION_OUT_OF_RANGE);
+        assertThat(first(checkFails("func f() {\n    var x: Byte = Byte(300)\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_CONVERSION_OUT_OF_RANGE);
     }
 
     @Test
     public void constantFloatingConversionOutOfRangeIsRejected() {
-        assertThat(first(checkFails("func f(): Unit {\n    var x = Byte(1e30)\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_CONVERSION_OUT_OF_RANGE);
+        assertThat(first(checkFails("func f() {\n    var x: Byte = Byte(1e30)\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_CONVERSION_OUT_OF_RANGE);
     }
 
     @Test
     public void longLiteralOutOfRangeIsRejected() {
-        assertThat(first(checkFails("func f(): Unit {\n    var x = 9223372036854775808L\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_LONG_LITERAL_OUT_OF_RANGE);
+        assertThat(first(checkFails("func f() {\n    var x: Long = 9223372036854775808L\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_LONG_LITERAL_OUT_OF_RANGE);
     }
 
     @Test
     public void unsupportedCharacterEscapeIsRejected() {
-        assertThat(first(checkFails("func f(): Unit {\n    var x = '\\q'\n}\n")).code()).isEqualTo(DiagnosticCode.LEXER_INVALID_ESCAPE);
+        assertThat(first(checkFails("func f() {\n    var x: Character = '\\q'\n}\n")).code()).isEqualTo(DiagnosticCode.LEXER_INVALID_ESCAPE);
     }
 
     @Test
     public void characterArithmeticIsRejected() {
-        assertThat(first(checkFails("func f(): Unit {\n    var x = 'A' + 'B'\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_OPERANDS);
+        assertThat(first(checkFails("func f() {\n    var x: Any = 'A' + 'B'\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_OPERANDS);
     }
 
     @Test
     public void characterOrderingIsRejected() {
-        assertThat(first(checkFails("func f(): Unit {\n    var x = 'A' < 'B'\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_OPERANDS);
+        assertThat(first(checkFails("func f() {\n    var x: Any = 'A' < 'B'\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_OPERANDS);
     }
 }

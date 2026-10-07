@@ -1,4 +1,4 @@
-var mutable total = 0
+var mutable total: Integer = 0
 for (i in 1...5) {
     if (i == 3) {
         continue
@@ -7,13 +7,13 @@ for (i in 1...5) {
 }
 println(total)
 
-var mutable n = 0
+var mutable n: Integer = 0
 while (n < 3) {
     n = n + 1
 }
 println(n)
 
-var mutable acc = ""
+var mutable acc: String = ""
 for (i in 5..>0) {
     acc = acc .. i
 }

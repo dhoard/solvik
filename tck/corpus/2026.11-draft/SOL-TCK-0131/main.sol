@@ -9,8 +9,8 @@
 // brackets are this test's own addition: a statement switch elsewhere in the corpus
 // already derives the bare bytes "two" from the statement-form rules, and sharing those
 // exact bytes would make the two expectations mutually uncheckable.
-var n = 2
-var word = switch (n) {
+var n: Integer = 2
+var word: String = switch (n) {
     case 1 {
         "one"
     }

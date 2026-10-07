@@ -7,14 +7,14 @@
 // a base-typed reference, while the base class's own implementation is unchanged. The two
 // observables are printed together, so a statically-bound call (which would print
 // "base/base") and a broken base implementation both fail the oracle.
-mutable class Base {
-    mutable func label(): String {
+class mutable Base {
+    method mutable label(): String {
         return "base"
     }
 }
 
 class Sub extends Base {
-    override func label(): String {
+    method override label(): String {
         return "sub"
     }
 }

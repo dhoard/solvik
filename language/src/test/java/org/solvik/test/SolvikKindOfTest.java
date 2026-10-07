@@ -101,9 +101,10 @@ public final class SolvikKindOfTest {
         // The most common reference type in a real program is an ordinary class; its locals must not
         // receive a primitive slot kind, confirming the fall-through path for nominal types.
         CompilationUnitNode unit = parseOk("kindof.sol", """
-                mutable class Box {
+                class mutable Box {
                     var mutable value: Integer = 0
                 }
+
                 """);
         SemanticResult result = SolvikSemanticAnalyzer.analyze(unit);
         assertThat(result.isSuccess()).as("analysis must succeed: " + result.diagnostics().all()).isTrue();

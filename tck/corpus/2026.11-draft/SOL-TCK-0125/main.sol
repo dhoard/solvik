@@ -8,7 +8,7 @@
 // between `Nothing` and a fabricated `Unit`, zero, `null`, or empty string, all of which
 // section 21 forbids the implementation from inventing.
 func f(): Integer {
-    var v = {
+    var v: Nothing = {
         return 7
     }
 }

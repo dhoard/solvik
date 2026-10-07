@@ -89,7 +89,7 @@ public final class SolvikExecutionNegativeTest {
 
     @Test
     public void invalidEntryPointIsRejected() {
-        Result result = evaluate("func main(a: Integer): Unit {\n  println(a)\n}\n");
+        Result result = evaluate("func main(a: Integer) {\n  println(a)\n}\n");
         assertThat(result.failure).isNotNull();
         assertThat(result.failure.getMessage().contains("SOLV-SEM-001")).isTrue();
         assertThat(result.output).isEqualTo("");

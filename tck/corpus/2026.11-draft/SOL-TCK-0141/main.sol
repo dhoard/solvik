@@ -13,7 +13,7 @@ class OnlyHash {
         this.n = n
     }
 
-    override func hashCode(): Integer {
+    method override hashCode(): Integer {
         return this.n
     }
 }

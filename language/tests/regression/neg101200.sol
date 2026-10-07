@@ -5,7 +5,7 @@ func identity<T>(value: T): T {
     return value
 }
 
-func use(): Unit {
-    var ambiguous = identity
+func use() {
+    var ambiguous: Any = identity
 }
 use()

@@ -60,12 +60,12 @@ def BAD(tid, cat, req, src, diag, quotes, note):
 
 # ---------------------------------------------------------------- matches()
 OK("SOL-TCK-0105", "regex", "REQ-1100", "true false false true",
-   'var digit = Regex(r#"^\\d+$"#)\n'
+   'var digit: Regex = Regex(r#"^\\d+$"#)\n'
    'print(digit.matches("123"))\n'
    'print(" ")\n'
    'print(digit.matches("12a"))\n'
    'print(" ")\n'
-   'var bare = Regex(r#"\\d+"#)\n'
+   'var bare: Regex = Regex(r#"\\d+"#)\n'
    'print(bare.matches("12a"))\n'
    'print(" ")\n'
    'print(bare.matches("123"))\n',
@@ -78,10 +78,10 @@ OK("SOL-TCK-0105", "regex", "REQ-1100", "true false false true",
 
 # ------------------------------------------------------------- raw strings
 OK("SOL-TCK-0106", "regex", "REQ-1101", "true true",
-   'var raw = Regex(r#"\\d+"#)\n'
+   'var raw: Regex = Regex(r#"\\d+"#)\n'
    'print(raw.matches("77"))\n'
    'print(" ")\n'
-   'var escaped = Regex("^\\\\d+$")\n'
+   'var escaped: Regex = Regex("^\\\\d+$")\n'
    'print(escaped.matches("77"))\n',
    ["Regex construction accepts raw strings"],
    "The sentence fixes only that construction accepts raw strings, so the test uses the same "
@@ -110,11 +110,11 @@ OK("SOL-TCK-0107", "regex", "REQ-1102",
 
 # -------------------------------------------- findAll order, offsets, spans
 OK("SOL-TCK-0108", "regex", "REQ-1103", "3 1:1:2 22:3:5 333:6:9 2 1",
-   'var r = Regex(r#"\\d+"#)\n'
-   'var all = r.findAll("a1b22c333")\n'
+   'var r: Regex = Regex(r#"\\d+"#)\n'
+   'var all: List<RegexMatch> = r.findAll("a1b22c333")\n'
    'print(all.size)\n'
    'for (i in 0..<all.size) {\n'
-   '  var m = all.get(i)\n'
+   '  var m: RegexMatch = all.get(i)\n'
    '  print(" ")\n'
    '  print(m.value)\n'
    '  print(":")\n'
@@ -139,7 +139,7 @@ OK("SOL-TCK-0108", "regex", "REQ-1103", "3 1:1:2 22:3:5 333:6:9 2 1",
 
 # ------------------------------------------------------ literal replacement
 OK("SOL-TCK-0109", "regex", "REQ-1104", "[$1] $0 & [$1] $0 & abc",
-   'var r = Regex(r#"(\\w+)"#)\n'
+   'var r: Regex = Regex(r#"(\\w+)"#)\n'
    'print(r.replace("ab cd", "[$1] $0 &"))\n'
    'print(" ")\n'
    'print(Regex(r#"\\s"#).replace("abc", "#"))\n',
@@ -180,7 +180,7 @@ BAD("SOL-TCK-0112", "regex", "REQ-1105",
 # One complete program per test, each driving the specification's own example with all
 # three inputs in a different order, so every arm and `default` is exercised in more than
 # one position and each oracle is a distinct bracketed sequence.
-SWITCH = ('var %s = "%s"\n'
+SWITCH = ('var %s: String = "%s"\n'
           'switch (%s) {\n'
           '  case regex r#"^\\d+$"# {\n'
           '    print("[number] ")\n'
@@ -220,8 +220,8 @@ OK("SOL-TCK-0117", "regex", "REQ-1106", "[other] [number] [word] ",
 
 # ------------------------------------------ nullable receiver needs narrowing
 BAD("SOL-TCK-0114", "types", "REQ-1107",
-    'var r = Regex(r#"\\d+"#)\n'
-    'var m = r.find("ab12y")\n'
+    'var r: Regex = Regex(r#"\\d+"#)\n'
+    'var m: RegexMatch? = r.find("ab12y")\n'
     'print(m.value)\n', {"family": "TYPE"},
     ["`null` is assignable only to nullable types. If `S` is a subtype of `T`, then `S` is "
      "assignable to `T?` and `S?` is assignable to `T?`; `S?` is not assignable to non-null `T`."],
@@ -234,8 +234,8 @@ BAD("SOL-TCK-0114", "types", "REQ-1107",
 
 # --------------------------------------- expression switch requires default
 BAD("SOL-TCK-0115", "control", "REQ-1108",
-    'var input = "42"\n'
-    'var v = switch (input) {\n'
+    'var input: String = "42"\n'
+    'var v: String = switch (input) {\n'
     '  case regex r#"^\\d+$"# {\n'
     '    "number"\n'
     '  }\n'
@@ -261,7 +261,7 @@ OK("SOL-TCK-0118", "equality", "REQ-1109", "true false true false",
    'print(" ")\n'
    'print(Regex(r#"\\d+"#) == Regex(r#"\\w+"#))\n'
    'print(" ")\n'
-   'var r = Regex(r#"\\d+"#)\n'
+   'var r: Regex = Regex(r#"\\d+"#)\n'
    'print(r.find("ab12y") == r.find("ab12y"))\n'
    'print(" ")\n'
    'print(r.find("ab12y") == r.find("zzab12y"))\n',

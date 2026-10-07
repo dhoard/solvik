@@ -26,7 +26,7 @@ import java.util.Set;
  * <p>Only values that carry Solvik allocation identity may name an identity operator. Those are the
  * user-defined class types (including abstract classes and parameterized applications), the interface
  * types whose runtime values are class instances (including parameterized applications), the four
- * mutable built-in collections and their applications, function types, and the nullable forms of any
+ * mutable built-in collections and their applications, and the nullable forms of any
  * of these. Every
  * other type is not identity-bearing: the built-in scalars and {@code Unit}, enums, {@code Regex}
  * and {@code RegexMatch}, {@code Any}, unbounded type parameters, and the bottom and
@@ -80,13 +80,6 @@ public final class IdentityDomain {
         // identity-bearing exactly when their nominal base is.
         if (peeled instanceof ParameterizedType parameterized) {
             peeled = parameterized.base();
-        }
-        // A function type is identity-bearing (docs/LANGUAGE_SPEC.md section 3). It is not added to
-        // `identityBases`, which is a set of nominal bases assembled from declared symbols and is
-        // also what `bases()` reports to tests: a function type has no name to look up and interned
-        // instances would make membership a reference accident.
-        if (peeled instanceof FunctionType) {
-            return true;
         }
         return identityBases.contains(peeled);
     }

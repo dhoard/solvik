@@ -1,7 +1,7 @@
 // expected: SOLV-SEM-055
 class AppError extends RuntimeException {
 }
-func run(): Unit {
+func run() {
     try {
     }
 

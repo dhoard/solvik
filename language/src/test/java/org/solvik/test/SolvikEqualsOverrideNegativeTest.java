@@ -58,10 +58,11 @@ public final class SolvikEqualsOverrideNegativeTest {
     public void missingOverrideIsRejected() {
         String text = """
                 class Point {
-                    func equals(other: Any?): Boolean {
+                    method equals(other: Any?): Boolean {
                         return true
                     }
                 }
+
                 """;
         assertThat(first(checkFails(text)).code()).isEqualTo(DiagnosticCode.SEM_ACCIDENTAL_OVERRIDE);
     }
@@ -70,10 +71,11 @@ public final class SolvikEqualsOverrideNegativeTest {
     public void wrongArityIsRejected() {
         String text = """
                 class Point {
-                    override func equals(other: Any?, extra: Any?): Boolean {
+                    method override equals(other: Any?, extra: Any?): Boolean {
                         return true
                     }
                 }
+
                 """;
         assertThat(first(checkFails(text)).code()).isEqualTo(DiagnosticCode.SEM_OVERRIDE_SIGNATURE);
     }
@@ -82,10 +84,11 @@ public final class SolvikEqualsOverrideNegativeTest {
     public void parameterTypeOtherThanAnyNullableIsRejected() {
         String text = """
                 class Point {
-                    override func equals(other: Integer): Boolean {
+                    method override equals(other: Integer): Boolean {
                         return true
                     }
                 }
+
                 """;
         assertThat(first(checkFails(text)).code()).isEqualTo(DiagnosticCode.SEM_OVERRIDE_SIGNATURE);
     }
@@ -94,10 +97,11 @@ public final class SolvikEqualsOverrideNegativeTest {
     public void returnTypeOtherThanBooleanIsRejected() {
         String text = """
                 class Point {
-                    override func equals(other: Any?): Integer {
+                    method override equals(other: Any?): Integer {
                         return 1
                     }
                 }
+
                 """;
         assertThat(first(checkFails(text)).code()).isEqualTo(DiagnosticCode.SEM_OVERRIDE_SIGNATURE);
     }
@@ -106,8 +110,9 @@ public final class SolvikEqualsOverrideNegativeTest {
     public void interfaceCannotDeclareEquals() {
         String text = """
                 interface Named {
-                    func equals(other: Any?): Boolean
+                    method equals(other: Any?): Boolean
                 }
+
                 """;
         assertThat(first(checkFails(text)).code()).isEqualTo(DiagnosticCode.SEM_RESERVED_MEMBER);
     }
@@ -116,10 +121,11 @@ public final class SolvikEqualsOverrideNegativeTest {
     public void interfaceCannotDeclareDefaultEquals() {
         String text = """
                 interface Named {
-                    func equals(other: Any?): Boolean {
+                    method equals(other: Any?): Boolean {
                         return true
                     }
                 }
+
                 """;
         assertThat(first(checkFails(text)).code()).isEqualTo(DiagnosticCode.SEM_RESERVED_MEMBER);
     }
@@ -143,25 +149,27 @@ public final class SolvikEqualsOverrideNegativeTest {
         // Both classes pair equals with hashCode so the equals/hashCode pairing rule does not fire and
         // the diagnostic under test is the final-override violation alone.
         String text = """
-                mutable class Base {
-                    override func equals(other: Any?): Boolean {
+                class mutable Base {
+                    method override equals(other: Any?): Boolean {
                         return true
                     }
 
-                    override func hashCode(): Integer {
+                    method override hashCode(): Integer {
                         return 1
                     }
                 }
 
                 class Derived extends Base {
-                    override func equals(other: Any?): Boolean {
+                    method override equals(other: Any?): Boolean {
                         return false
                     }
 
-                    override func hashCode(): Integer {
+                    method override hashCode(): Integer {
                         return 2
                     }
                 }
+
+
                 """;
         assertThat(first(checkFails(text)).code()).isEqualTo(DiagnosticCode.SEM_OVERRIDE_FINAL);
     }
@@ -176,10 +184,11 @@ public final class SolvikEqualsOverrideNegativeTest {
                 }
 
                 func f(): Boolean {
-                    var p = Point()
-                    var read = p.equals
+                    var p: Point = Point()
+                    var read: Any = p.equals
                     return true
                 }
+
                 """;
         assertThat(first(checkFails(text)).code()).isEqualTo(DiagnosticCode.TYPE_FUNCTION_AS_VALUE);
     }
@@ -190,20 +199,21 @@ public final class SolvikEqualsOverrideNegativeTest {
         // the behavior for the case where the member does resolve to a declared method.
         String text = """
                 class Point {
-                    override func equals(other: Any?): Boolean {
+                    method override equals(other: Any?): Boolean {
                         return true
                     }
 
-                    override func hashCode(): Integer {
+                    method override hashCode(): Integer {
                         return 1
                     }
                 }
 
                 func f(): Boolean {
-                    var p = Point()
-                    var read = p.equals
+                    var p: Point = Point()
+                    var read: Any = p.equals
                     return true
                 }
+
                 """;
         assertThat(first(checkFails(text)).code()).isEqualTo(DiagnosticCode.TYPE_FUNCTION_AS_VALUE);
     }
@@ -212,13 +222,14 @@ public final class SolvikEqualsOverrideNegativeTest {
     public void bareEqualsMemberReadIsRejectedOnAnInterfaceReceiver() {
         String text = """
                 interface Named {
-                    func name(): String
+                    method name(): String
                 }
 
                 func f(named: Named): Boolean {
-                    var read = named.equals
+                    var read: Any = named.equals
                     return true
                 }
+
                 """;
         assertThat(first(checkFails(text)).code()).isEqualTo(DiagnosticCode.TYPE_FUNCTION_AS_VALUE);
     }
@@ -227,16 +238,17 @@ public final class SolvikEqualsOverrideNegativeTest {
     public void delegateCannotBeNamedEquals() {
         String text = """
                 interface Greeter {
-                    func greet(): String
+                    method greet(): String
                 }
 
                 class Service implements Greeter {
-                    delegate var equals: Greeter
+                    delegate  equals: Greeter
 
                     Service(greeter: Greeter) {
                         this.equals = greeter
                     }
                 }
+
                 """;
         DiagnosticBag bag = checkFails(text);
         assertThat(bag.all()).anySatisfy(d -> assertThat(d.code()).isEqualTo(DiagnosticCode.SEM_RESERVED_MEMBER));

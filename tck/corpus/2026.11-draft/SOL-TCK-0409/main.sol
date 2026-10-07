@@ -5,7 +5,7 @@
 //   - A static declaration initializer that is not assignable to the declared type is `SOLV-TYPE-001`.
 //
 class C {
-    static var mutable n: Integer = "wrong"
+    var static mutable n: Integer = "wrong"
 
     C() {
     }

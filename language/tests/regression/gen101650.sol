@@ -15,14 +15,14 @@ println(kind1('z'))
 
 println(kind1('z') is String)
 
-mutable class A2 {
-    mutable func v4(): Integer {
+class mutable A2 {
+    method mutable v4(): Integer {
         return 20
     }
 }
 
 class B3 extends A2 {
-    override func v4(): Integer {
+    method override v4(): Integer {
         return 33
     }
 }

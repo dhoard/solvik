@@ -85,6 +85,24 @@ public enum DiagnosticCode {
      */
     PARSER_SEMI_ENDS_LINE("SOLV-PARS-012"),
 
+    /**
+     * A declaration shape the current revision retired was written: {@code func} as a class or
+     * interface member, a local declaration without a type, {@code delegate var}, a file-level
+     * {@code module} header, an {@code include ... alias ...} suffix, a modifier written before the
+     * construct keyword, or a modifier sequence in a non-canonical order. The diagnostic names the
+     * replacement (docs/LANGUAGE_SPEC.md sections 2, 6, 7, 9, 20) rather than reinterpreting the old
+     * shape. Reported by {@code SolvikParser} through the parse-only {@code removed*} productions.
+     */
+    PARSER_REMOVED_DECLARATION("SOLV-PARS-013"),
+
+    /**
+     * Function-value syntax was written: an anonymous function expression - with or without the
+     * retired capture list - or a function type reference. Functions are declarations rather than
+     * values in the current model, so the diagnostic names the replacement rather than interpreting
+     * the shape (docs/LANGUAGE_SPEC.md section 6).
+     */
+    PARSER_REMOVED_FUNCTION_VALUE("SOLV-PARS-014"),
+
     /** Name resolution: no declaration is visible for the referenced name. */
     RESOL_UNKNOWN_NAME("SOLV-RESOL-001"),
     /** Name resolution: the same name is declared twice in one scope. */
@@ -195,13 +213,9 @@ public enum DiagnosticCode {
     /** File inclusion: the include graph contains a cycle. */
     RESOL_INCLUDE_CYCLE("SOLV-RESOL-011"),
 
-    /** Modules: a {@code module} or {@code alias} name does not match the required lowercase, underscore-separated form. */
+    /** Modules: a {@code module} name does not match the required lowercase, underscore-separated form. */
     RESOL_MODULE_INVALID_NAME("SOLV-RESOL-012"),
-    /** Modules: a file binds the same prefix twice, or two visible prefixes collide. */
-    RESOL_ALIAS_DUPLICATE("SOLV-RESOL-013"),
-    /** Modules: {@code alias} names a file that belongs to the implicit default module, which has no name to bind. */
-    RESOL_ALIAS_DEFAULT_MODULE("SOLV-RESOL-014"),
-    /** Modules: a qualified reference names a module prefix that is not visible in this file. */
+    /** Modules: a qualified reference names a module the program does not declare. */
     RESOL_UNKNOWN_MODULE("SOLV-RESOL-015"),
 
     /** Semantic validation: an explicit {@code main} is declared although the entry point is implicit. */
@@ -319,35 +333,7 @@ public enum DiagnosticCode {
     /** Error handling: a {@code catch} handler can never run because an earlier handler matches it. */
     SEM_UNREACHABLE_CATCH("SOLV-SEM-055"),
     /** Error handling: a {@code try} has neither a catch clause nor a finally clause. */
-    SEM_TRY_NEEDS_HANDLER("SOLV-SEM-056"),
-
-    /**
-     * Function values: an anonymous function body reads or writes an outer local, parameter, or
-     * {@code this} that its capture list omits (docs/LANGUAGE_SPEC.md section 6, "Explicit immutable
-     * closure capture"). Reported on the body reference, never on the capture list, because the defect is
-     * the use: "the compiler never silently converts it into a capture".
-     */
-    SEM_UNLISTED_CAPTURE("SOLV-SEM-058"),
-
-    /**
-     * Function values: a capture item names a mutable ({@code var mutable}) binding, or an anonymous function
-     * body reads or writes a name that its own capture list named as such a binding
-     * (docs/LANGUAGE_SPEC.md section 6, "Explicit immutable closure capture"). The item reports this on
-     * the capture item and the body use reports it on the body reference; both placements are specified
-     * and both report this one code. Only a name the list itself named reaches the body placement — a
-     * body use of a {@code var mutable} the list never named is the unlisted-capture diagnostic instead, since
-     * no capture of it was ever written. Capture is immutable by rule, so mutable state is shared
-     * through a captured immutable object reference instead.
-     */
-    SEM_MUTABLE_CAPTURE("SOLV-SEM-057"),
-
-    /**
-     * Function values: a capture item resolves to something other than an eligible immutable local,
-     * immutable parameter, or {@code this} (docs/LANGUAGE_SPEC.md section 6, "Explicit immutable closure
-     * capture"). Reported on the capture item. An item naming nothing is the unknown-name diagnostic
-     * rather than this one, which is reserved for an item that does resolve but is not capturable.
-     */
-    SEM_INVALID_CAPTURE("SOLV-SEM-059");
+    SEM_TRY_NEEDS_HANDLER("SOLV-SEM-056");
 
     private final String stableCode;
 

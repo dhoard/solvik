@@ -64,7 +64,7 @@ public final class SolvikSwitchNegativeTest {
     @Test
     public void aVariableCaseLabelIsNotAConstant() {
         assertThat(first(checkFails("""
-                func run(value: Integer, other: Integer): Unit {
+                func run(value: Integer, other: Integer) {
                     switch (value) {
                         case other {
                             print("same")
@@ -74,13 +74,14 @@ public final class SolvikSwitchNegativeTest {
                         }
                     }
                 }
+
                 """)).code()).isEqualTo(DiagnosticCode.SEM_SWITCH_CASE_NOT_CONSTANT);
     }
 
     @Test
     public void aComputedCaseLabelIsNotAConstant() {
         assertThat(first(checkFails("""
-                func run(value: Integer): Unit {
+                func run(value: Integer) {
                     switch (value) {
                         case 1 + 2 {
                             print("three")
@@ -90,13 +91,14 @@ public final class SolvikSwitchNegativeTest {
                         }
                     }
                 }
+
                 """)).code()).isEqualTo(DiagnosticCode.SEM_SWITCH_CASE_NOT_CONSTANT);
     }
 
     @Test
     public void aCaseLabelOfTheWrongTypeIsRejected() {
         assertThat(first(checkFails("""
-                func run(value: Integer): Unit {
+                func run(value: Integer) {
                     switch (value) {
                         case "a" {
                             print("a")
@@ -106,6 +108,7 @@ public final class SolvikSwitchNegativeTest {
                         }
                     }
                 }
+
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_CASE_LABEL_MISMATCH);
     }
 
@@ -114,7 +117,7 @@ public final class SolvikSwitchNegativeTest {
         // Each label of a shared (`case a, b:`) case is checked independently against the switched
         // type, so a single non-assignable label among otherwise valid labels is still a mismatch.
         assertThat(first(checkFails("""
-                func run(value: Integer): Unit {
+                func run(value: Integer) {
                     switch (value) {
                         case 1, "a", 3 {
                             print("hit")
@@ -124,6 +127,7 @@ public final class SolvikSwitchNegativeTest {
                         }
                     }
                 }
+
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_CASE_LABEL_MISMATCH);
     }
 
@@ -131,7 +135,7 @@ public final class SolvikSwitchNegativeTest {
     public void aNonConstantLabelInASharedCaseIsRejected() {
         // The constant-expression requirement is likewise enforced per label within a shared case.
         assertThat(first(checkFails("""
-                func run(value: Integer, other: Integer): Unit {
+                func run(value: Integer, other: Integer) {
                     switch (value) {
                         case 1, other {
                             print("hit")
@@ -141,13 +145,14 @@ public final class SolvikSwitchNegativeTest {
                         }
                     }
                 }
+
                 """)).code()).isEqualTo(DiagnosticCode.SEM_SWITCH_CASE_NOT_CONSTANT);
     }
 
     @Test
     public void aRegexCaseRequiresAStringScrutinee() {
         assertThat(first(checkFails("""
-                func run(value: Integer): Unit {
+                func run(value: Integer) {
                     switch (value) {
                         case regex r#"\\d+"# {
                             print("number")
@@ -157,6 +162,7 @@ public final class SolvikSwitchNegativeTest {
                         }
                     }
                 }
+
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_REGEX_CASE_REQUIRES_STRING);
     }
 
@@ -168,7 +174,7 @@ public final class SolvikSwitchNegativeTest {
     @Test
     public void aRegexCaseRequiresANonNullableStringScrutinee() {
         assertThat(first(checkFails("""
-                func run(input: String?): Unit {
+                func run(input: String?) {
                     switch (input) {
                         case regex r#"^\\d+$"# {
                             print("number")
@@ -178,6 +184,7 @@ public final class SolvikSwitchNegativeTest {
                         }
                     }
                 }
+
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_REGEX_CASE_REQUIRES_STRING);
     }
 
@@ -201,7 +208,7 @@ public final class SolvikSwitchNegativeTest {
     @Test
     public void anInvalidConstantRegexPatternIsRejected() {
         assertThat(first(checkFails("""
-                func run(input: String): Unit {
+                func run(input: String) {
                     switch (input) {
                         case regex r#"("# {
                             print("bad")
@@ -211,13 +218,14 @@ public final class SolvikSwitchNegativeTest {
                         }
                     }
                 }
+
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_REGEX_PATTERN);
     }
 
     @Test
     public void aDefaultFollowedByACaseIsRejected() {
         assertThat(first(checkFails("""
-                func run(value: Integer): Unit {
+                func run(value: Integer) {
                     switch (value) {
                         default {
                             print("other")
@@ -227,13 +235,14 @@ public final class SolvikSwitchNegativeTest {
                         }
                     }
                 }
+
                 """)).code()).isEqualTo(DiagnosticCode.SEM_SWITCH_DEFAULT_NOT_LAST);
     }
 
     @Test
     public void twoDefaultsAreRejected() {
         DiagnosticBag bag = checkFails("""
-                func run(value: Integer): Unit {
+                func run(value: Integer) {
                     switch (value) {
                         case 1 {
                             print("one")
@@ -246,6 +255,7 @@ public final class SolvikSwitchNegativeTest {
                         }
                     }
                 }
+
                 """);
         assertThat(hasCode(bag, DiagnosticCode.SEM_SWITCH_DUPLICATE_DEFAULT)).isTrue();
     }
@@ -253,7 +263,7 @@ public final class SolvikSwitchNegativeTest {
     @Test
     public void aBreakDirectlyInACaseInsideALoopIsRejected() {
         assertThat(first(checkFails("""
-                func run(value: Integer): Unit {
+                func run(value: Integer) {
                     while (true) {
                         switch (value) {
                             case 1 {
@@ -265,13 +275,14 @@ public final class SolvikSwitchNegativeTest {
                         }
                     }
                 }
+
                 """)).code()).isEqualTo(DiagnosticCode.SEM_BREAK_IN_SWITCH_CASE);
     }
 
     @Test
     public void aBreakDirectlyInACaseWithoutALoopIsRejected() {
         assertThat(first(checkFails("""
-                func run(value: Integer): Unit {
+                func run(value: Integer) {
                     switch (value) {
                         case 1 {
                             break
@@ -281,13 +292,14 @@ public final class SolvikSwitchNegativeTest {
                         }
                     }
                 }
+
                 """)).code()).isEqualTo(DiagnosticCode.SEM_LOOP_CONTROL_OUTSIDE_LOOP);
     }
 
     @Test
     public void aContinueDirectlyInACaseWithoutALoopIsRejected() {
         assertThat(first(checkFails("""
-                func run(value: Integer): Unit {
+                func run(value: Integer) {
                     switch (value) {
                         case 1 {
                             continue
@@ -297,6 +309,7 @@ public final class SolvikSwitchNegativeTest {
                         }
                     }
                 }
+
                 """)).code()).isEqualTo(DiagnosticCode.SEM_LOOP_CONTROL_OUTSIDE_LOOP);
     }
 
@@ -306,7 +319,7 @@ public final class SolvikSwitchNegativeTest {
                 func compute(): Integer {
                     return 1
                 }
-                func run(value: Integer): Unit {
+                func run(value: Integer) {
                     switch (value) {
                         case compute() {
                             print("one")
@@ -316,13 +329,14 @@ public final class SolvikSwitchNegativeTest {
                         }
                     }
                 }
+
                 """)).code()).isEqualTo(DiagnosticCode.SEM_SWITCH_CASE_NOT_CONSTANT);
     }
 
     @Test
     public void aNullLabelDoesNotMatchANonNullableScrutinee() {
         assertThat(first(checkFails("""
-                func run(value: Integer): Unit {
+                func run(value: Integer) {
                     switch (value) {
                         case null {
                             print("none")
@@ -332,13 +346,14 @@ public final class SolvikSwitchNegativeTest {
                         }
                     }
                 }
+
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_CASE_LABEL_MISMATCH);
     }
 
     @Test
     public void misplacedDefaultReportsASingleDiagnostic() {
         DiagnosticBag bag = checkFails("""
-                func run(value: Integer): Unit {
+                func run(value: Integer) {
                     switch (value) {
                         default {
                             print("other")
@@ -351,6 +366,7 @@ public final class SolvikSwitchNegativeTest {
                         }
                     }
                 }
+
                 """);
         assertThat(bag.all()).extracting(Diagnostic::code).containsExactly(
                 DiagnosticCode.SEM_SWITCH_DEFAULT_NOT_LAST);

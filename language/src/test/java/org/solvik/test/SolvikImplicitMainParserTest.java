@@ -65,7 +65,7 @@ public final class SolvikImplicitMainParserTest {
 
     @Test
     public void declarationsAndStatementsInterleaveInSourceOrder() {
-        String src = "helper()\nfunc helper(): Unit {\n    println(\"x\")\n}\nhelper()\n";
+        String src = "helper()\nfunc helper() {\n    println(\"x\")\n}\nhelper()\n";
         CompilationUnitNode cu = parseOk("mixed.sol", src);
         assertThat(cu.declarations().size()).isEqualTo(1);
         assertThat(((FunctionDeclNode) cu.declarations().get(0)).name()).isEqualTo("helper");
@@ -81,7 +81,7 @@ public final class SolvikImplicitMainParserTest {
 
     @Test
     public void aDeclarationOnlyFileHasNoImplicitMain() {
-        CompilationUnitNode cu = parseOk("decl.sol", "func f(): Unit {\n}\n");
+        CompilationUnitNode cu = parseOk("decl.sol", "func f() {\n}\n");
         assertThat(cu.declarations().size()).isEqualTo(1);
         assertThat(cu.hasImplicitMain()).isFalse();
         assertThat(cu.statements()).isEqualTo(List.of());
@@ -89,7 +89,7 @@ public final class SolvikImplicitMainParserTest {
 
     @Test
     public void topLevelStatementsSeparatedBySemicolonsOnOneLineParse() {
-        String src = "var a = 1; var b = 2; println(a + b)\n";
+        String src = "var a: Integer = 1; var b: Integer = 2; println(a + b)\n";
         CompilationUnitNode cu = parseOk("explicit.sol", src);
         assertThat(cu.statements().size()).isEqualTo(3);
     }

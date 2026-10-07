@@ -6,12 +6,12 @@ class Money {
         this.cents = cents
     }
 
-    override func toString(): String {
+    method override toString(): String {
         return "$" .. this.cents
     }
 }
 
-var price = Money(1250)
+var price: Money = Money(1250)
 println(price)
 println(price.toString())
 println("price=" .. price)

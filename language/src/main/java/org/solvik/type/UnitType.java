@@ -18,19 +18,20 @@ package org.solvik.type;
 import java.util.Optional;
 
 /**
- * The single-valued result type of a function that returns normally without a value
- * (docs/LANGUAGE_SPEC.md section 4).
+ * The internal no-value sentinel of a callable that completes without producing a value
+ * (docs/LANGUAGE_SPEC.md section 6). It has no source-level spelling: a callable that writes no
+ * {@code : Type} produces no value, and an expression whose type is this sentinel cannot be used
+ * where a value is required.
+ *
+ * <p>It is deliberately not a subtype of {@code Any}: "produces no value" means the expression has no
+ * value to pass on, so {@code var x: Any = f()} where {@code f} declares no result is rejected by
+ * ordinary assignability rather than being silently treated as a value.
  */
 public final class UnitType extends Type {
 
     public static final UnitType INSTANCE = new UnitType();
 
     private UnitType() {
-        super("Unit");
-    }
-
-    @Override
-    public Optional<Type> superType() {
-        return Optional.of(AnyType.INSTANCE);
+        super("no value");
     }
 }

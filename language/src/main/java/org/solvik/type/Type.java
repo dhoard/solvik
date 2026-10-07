@@ -155,9 +155,8 @@ public abstract class Type {
      * the single-inheritance superclass chain and the declared interface edges. The walk is
      * cycle-safe so a malformed declaration graph cannot loop forever.
      *
-     * <p>It is intentionally overridable: {@link FunctionType} overrides it so its assignability is
-     * structural (contravariant parameters, covariant result) rather than a walk of the nominal
-     * hierarchy.
+     * <p>It is overridable so a type with structural assignability can define its own rule rather
+     * than walking the nominal hierarchy.
      */
     public boolean isSubtypeOf(Type other) {
         Objects.requireNonNull(other, "other");

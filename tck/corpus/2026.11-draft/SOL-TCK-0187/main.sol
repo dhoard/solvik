@@ -3,7 +3,7 @@ enum Result<T, E> {
     Err(E)
 }
 var r: Result<Integer, String> = Result.Ok(42)
-var m = match r {
+var m: String = match r {
     Ok(v) => "ok" .. v
     Err(e) => "err" .. e
 }

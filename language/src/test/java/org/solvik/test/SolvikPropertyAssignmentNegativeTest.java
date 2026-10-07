@@ -38,8 +38,8 @@ public final class SolvikPropertyAssignmentNegativeTest {
 
     private static final String REGEX_MATCH = """
             func use() {
-                var pattern = Regex(r"a")
-                var found = pattern.find("a")
+                var pattern: Regex = Regex(r"a")
+                var found: RegexMatch? = pattern.find("a")
                 if (found != null) {
             %s
                 }
@@ -86,12 +86,12 @@ public final class SolvikPropertyAssignmentNegativeTest {
 
     @Test
     public void assigningToARegexMethodIsRejected() {
-        assertThat(codeOf("func f() {\n    var mutable r = Regex(r\"a\")\n    r.matches = 5\n}\n")).isEqualTo(DiagnosticCode.TYPE_INVALID_ASSIGNMENT_TARGET);
+        assertThat(codeOf("func f() {\n    var mutable r: Regex = Regex(r\"a\")\n    r.matches = 5\n}\n")).isEqualTo(DiagnosticCode.TYPE_INVALID_ASSIGNMENT_TARGET);
     }
 
     @Test
     public void assigningToAnUnknownRegexMemberIsRejected() {
-        assertThat(codeOf("func f() {\n    var mutable r = Regex(r\"a\")\n    r.value = \"x\"\n}\n")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_MEMBER);
+        assertThat(codeOf("func f() {\n    var mutable r: Regex = Regex(r\"a\")\n    r.value = \"x\"\n}\n")).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_MEMBER);
     }
 
     @Test
@@ -113,14 +113,15 @@ public final class SolvikPropertyAssignmentNegativeTest {
     public void assigningToAClassMethodIsRejected() {
         assertThat(codeOf("""
                 class C {
-                    func g(): Integer {
+                    method g(): Integer {
                         return 1
                     }
 
-                    func h() {
+                    method h() {
                         this.g = 5
                     }
                 }
+
                 """)).isEqualTo(DiagnosticCode.TYPE_INVALID_ASSIGNMENT_TARGET);
     }
 
@@ -128,10 +129,11 @@ public final class SolvikPropertyAssignmentNegativeTest {
     public void assigningToAnUnknownClassPropertyIsRejected() {
         assertThat(codeOf("""
                 class C {
-                    func h() {
+                    method h() {
                         this.missing = 5
                     }
                 }
+
                 """)).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_MEMBER);
     }
 
@@ -141,26 +143,28 @@ public final class SolvikPropertyAssignmentNegativeTest {
                 class C {
                     var mutable x: Integer = 0
 
-                    func h() {
+                    method h() {
                         var mutable c: C? = null
                         c.x = 5
                     }
                 }
+
                 """)).isEqualTo(DiagnosticCode.TYPE_NULLABLE_DEREFERENCE);
     }
 
     @Test
     public void readingAnInheritedSuperPropertyResolves() {
         SemanticResult result = SolvikSemanticAnalyzer.analyze(parseOk("super.sol", """
-                mutable class B {
+                class mutable B {
                     var mutable p: Integer = 3
                 }
 
                 class C extends B {
-                    func h(): Integer {
+                    method h(): Integer {
                         return super.p
                     }
                 }
+
                 """));
         assertThat(result.isSuccess()).as("expected success but got " + result.diagnostics().all()).isTrue();
     }
@@ -168,14 +172,15 @@ public final class SolvikPropertyAssignmentNegativeTest {
     @Test
     public void readingAnUnknownSuperMemberIsRejected() {
         assertThat(codeOf("""
-                mutable class B {
+                class mutable B {
                 }
 
                 class C extends B {
-                    func h(): Integer {
+                    method h(): Integer {
                         return super.missing
                     }
                 }
+
                 """)).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_MEMBER);
     }
 }

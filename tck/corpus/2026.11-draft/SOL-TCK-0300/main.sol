@@ -1,2 +1,2 @@
-var a = 1 // note
+var a: Integer = 1 // note
 print("lc" .. a)

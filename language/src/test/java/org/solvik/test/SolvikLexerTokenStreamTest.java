@@ -131,7 +131,8 @@ public final class SolvikLexerTokenStreamTest {
 
     @Test
     public void ordinaryTokensCarryExactOffsetsAndPositions() {
-        assertThat(rendered("var x = 1")).isEqualTo("VAR(var)@0..2:1:0 Identifier(x)@4..4:1:4 ASSIGN(=)@6..6:1:6 INTEGER_LITERAL(1)@8..8:1:8");
+        assertThat(rendered("var x: Integer = 1")).isEqualTo("VAR(var)@0..2:1:0 Identifier(x)@4..4:1:4 COLON(:)@5..5:1:5 "
+                + "Identifier(Integer)@7..13:1:7 ASSIGN(=)@15..15:1:15 INTEGER_LITERAL(1)@17..17:1:17");
     }
 
     @Test
@@ -141,11 +142,11 @@ public final class SolvikLexerTokenStreamTest {
 
     @Test
     public void endOfInputReportsTheLineAndOffsetAfterTheLastToken() {
-        Lexed lexed = lex("var x = 1");
-        assertThat(lexed.tokens()).hasSize(4);
+        Lexed lexed = lex("var x: Integer = 1");
+        assertThat(lexed.tokens()).hasSize(6);
         assertThat(lexed.eofLine()).isEqualTo(1);
-        assertThat(lexed.eofColumn()).isEqualTo(9);
-        assertThat(lexed.eofOffset()).isEqualTo(9);
+        assertThat(lexed.eofColumn()).isEqualTo(18);
+        assertThat(lexed.eofOffset()).isEqualTo(18);
         assertThat(lexed.errors()).isEmpty();
     }
 
@@ -450,8 +451,9 @@ public final class SolvikLexerTokenStreamTest {
         Set<String> expected = new LinkedHashSet<>(List.of( //
                 // `SEALED`, `OPEN`, and `VAL` are reserved tokens with no parser production: they are
                 // the keywords removed in 2026.11-draft, kept reserved so old source fails with
-                // SOLV-PARS-006 instead of lexing as an identifier. `ABSTRACT`, `MUTABLE`, and `VAR` replace them.
-                "FUNC", "STATIC", "INCLUDE", "MODULE", "ALIAS", "CLASS", "INTERFACE", "ENUM", "MUTABLE", "ABSTRACT", "SEALED", "DELEGATE", "IMPLEMENTS", "OPEN", "EXTENDS", "OVERRIDE", "THIS", "SUPER", "VAL", "VAR", "IF", "ELSE", //
+                // SOLV-PARS-006 instead of lexing as an identifier. `ABSTRACT`, `MUTABLE`, and `VAR` replace them,
+                // and `METHOD` is the member-declaration keyword that pairs with the module-scope `FUNC`.
+                "FUNC", "METHOD", "STATIC", "INCLUDE", "MODULE", "ALIAS", "CLASS", "INTERFACE", "ENUM", "MUTABLE", "ABSTRACT", "SEALED", "DELEGATE", "IMPLEMENTS", "OPEN", "EXTENDS", "OVERRIDE", "THIS", "SUPER", "VAL", "VAR", "IF", "ELSE", //
                 "WHILE", "FOR", "IN", "BREAK", "CONTINUE", "RETURN", "MATCH", "ARROW", "SWITCH", "CASE", "DEFAULT", "REGEX_KW", "THROW", "TRY", "CATCH", "FINALLY", "NULL", "IS", "AS", "BOOL_LITERAL", "Identifier", "INTEGER_LITERAL", "LONG_LITERAL", "FLOATING_LITERAL", "CHARACTER_LITERAL", "STRING_LITERAL", "RAW_STRING_LITERAL", //
                 "LPAREN", "RPAREN", "LBRACE", "RBRACE", "SEMI", "ASSIGN", "COLON", "COLONCOLON", "COMMA", //
                 "DOT", "DOTDOT", "DOTDOTDOT", "DOTDOTLT", "DOTDOTGT", "NULLABLE_DOT", "NULL_COALESCE", "QUESTION", "LBRACKET", "RBRACKET", "ADD", "SUB", "MUL", "DIV", "BANG", "EQEQ", "NEQEQ", "EQ", "NEQ", //

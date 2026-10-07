@@ -92,14 +92,14 @@ public class SolvikHashTotalityTest {
                             this.id = id
                         }
 
-                        override func equals(other: Any?): Boolean {
+                        method override equals(other: Any?): Boolean {
                             if (other is Key) {
                                 return this.id == other.id
                             }
                             return false
                         }
 
-                        override func hashCode(): Integer {
+                        method override hashCode(): Integer {
                             return this.id
                         }
                     }
@@ -108,6 +108,7 @@ public class SolvikHashTotalityTest {
                     keys.add(Key(1))
                     println(keys.contains(Key(1)))
                     println(keys.contains(Key(2)))
+
                     """).isNull()).isTrue();
             assertThat(out.toString(StandardCharsets.UTF_8)).isEqualTo("true\nfalse\n");
         }

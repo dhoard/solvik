@@ -41,8 +41,10 @@ Declared subset (everything else is refused)
 compile : whole-program include resolution and module-name shape checking, using
           only diagnostics the specification's own required-diagnostics registry
           names (`SOLV-RESOL-008`, `SOLV-RESOL-012`).
-execute : top-level `var NAME = <literal>`, `print(<literal|NAME>)` and
-          `println(<literal|NAME>)` over `String` and `Integer` literals only.
+execute : top-level `var NAME: Type = <literal>`, `print(<literal|NAME>)` and
+          `println(<literal|NAME>)` over `String` and `Integer` literals only. The
+          declaration always writes its type, so the written type and the literal kind
+          must agree (`Integer` with an integer literal, `String` with a string).
 
 Refusals that come from specification gaps
 ------------------------------------------
@@ -123,8 +125,13 @@ LIMITS = {
 # illegal name, which is exactly the false-accept this check exists to prevent.
 MODULE_NAME_RE = re.compile(r"[a-z][a-z0-9]*(_[a-z0-9]+)*\Z")
 
-# A `module` declaration must be the first item in the file (section 20).
-MODULE_DECL_RE = re.compile(r"^\s*module\s+(\S+)\s*(?:;|\r|\n|$)")
+# A module declaration is a braced block naming a single identifier (section 20). It is
+# one item of a file, so a file may carry several and may also hold default-module items.
+MODULE_DECL_RE = re.compile(r"^\s*module\s+([A-Za-z_][A-Za-z0-9_]*)\s*\{\s*$")
+# A line that starts a module declaration but is not the declared shape (a dotted name, a
+# missing brace) is a parse error in the language, not a naming violation, so it is
+# refused rather than judged.
+MODULE_STARTS_RE = re.compile(r"^\s*module\b")
 
 # An `include` directive: `include <string-literal>` with an optional
 # `alias <name>`, terminated by an explicit or inserted SEMI.
@@ -224,16 +231,15 @@ def _in_int32_range(token):
 # it still equals that extraction, so it cannot silently drift from the document. Over-refusal
 # costs this partner coverage and cannot produce a wrong verdict; over-acceptance can.
 _RESERVEDISH = frozenset({
-    "abstract", "add", "alias", "any", "as", "attempts", "break", "case", "catch",
-    "class", "code", "common", "const", "contains", "continue", "default", "deferred",
-    "delegate", "else", "end", "enum", "equals", "error", "exit", "expect",
-    "extends", "factor", "fallthrough", "false", "final", "finally", "find", "for",
-    "format", "func", "get", "if", "ignore", "in", "include", "instance",
-    "instanceof", "interface", "is", "left", "main", "match", "matches", "message",
-    "module", "must", "mutable", "null", "open", "override", "peek", "pop",
-    "print", "println", "put", "remove", "replace", "return", "right", "root",
-    "sealed", "solvik", "start", "static", "super", "switch", "this", "throw",
-    "true", "try", "unwrap", "val", "value", "var", "while",
+    "abstract", "add", "any", "as", "attempts", "break", "case", "catch", "class", "code",
+    "common", "const", "contains", "continue", "default", "deferred", "delegate", "else",
+    "end", "enum", "equals", "error", "exit", "expect", "extends", "fallthrough", "false",
+    "final", "finally", "find", "for", "func", "get", "if", "ignore", "in", "include",
+    "instance", "instanceof", "interface", "is", "left", "main", "match", "matches",
+    "message", "method", "module", "must", "mutable", "null", "open", "override", "peek",
+    "pop", "print", "println", "put", "remove", "replace", "return", "right", "root",
+    "sealed", "solvik", "start", "static", "super", "switch", "this", "throw", "true",
+    "try", "unwrap", "val", "value", "var", "while"
 })
 _IDENT_RE = re.compile(r"\A[A-Za-z_][A-Za-z0-9_]*\Z")
 # Raw string literal, section 1's general rule: r + N '#' + '"' + content + '"' +
@@ -354,29 +360,32 @@ def expand(root_dir, entry_rel):
     active = []
 
     def check_module_decl(rel, lines):
-        """Validate a leading `module` declaration name, if the file has one.
+        """Validate every `module NAME {` declaration name in the file.
 
-        Section 20 makes the declaration optional and requires it to be the *first*
-        item in the file, so only the first non-blank line is examined: a `module`
-        keyword anywhere else is not a declaration, and the item analyzer refuses it
-        rather than treating it as one. Only the character-form half of the naming
-        rule is enforceable -- the specification's "is not a reserved word" clause has
-        no word list anywhere in the document, so this front end never rejects on that
-        basis and records the gap instead of guessing a list.
+        Section 20 makes module declarations optional items of a file rather than a header,
+        so every line is examined and a file may declare none, one, or several. Only the
+        character-form half of the naming rule is enforceable -- the specification's "is
+        not a reserved word" clause has no word list anywhere in the document, so this
+        front end never rejects on that basis and records the gap instead of guessing a
+        list.
         """
         for raw in lines:
             code = strip_comment(raw).strip()
             if not code:
                 continue
             m = MODULE_DECL_RE.match(code)
-            if not m:
-                return                      # no module declaration: default module
-            name = m.group(1).rstrip(";").strip()
-            if not MODULE_NAME_RE.match(name):
-                raise DiagnosticError([(RESOL_MODULE_INVALID_NAME, rel,
-                                        "module name %r is not a single lowercase "
-                                        "identifier" % name)])
-            return
+            if m:
+                name = m.group(1)
+                if not MODULE_NAME_RE.match(name):
+                    raise DiagnosticError([(RESOL_MODULE_INVALID_NAME, rel,
+                                            "module name %r is not a single lowercase "
+                                            "identifier" % name)])
+                continue
+            if MODULE_STARTS_RE.match(code):
+                # `module` written in a shape this subset does not model (a dotted name, a
+                # missing brace): the language rejects it at parse time, which is not a
+                # naming verdict, so refuse instead of judging it.
+                raise Refusal("module declaration shape outside the subset: %r" % code[:60])
 
     def walk(rel, including_rel, shown):
         canon = _canonical(root_dir, rel)
@@ -449,7 +458,7 @@ def expand(root_dir, entry_rel):
 
 # ----------------------------------------------------------------- value model
 # Top-level items the execute subset understands. Each is (kind, payload).
-_VAL_RE = re.compile(r"\Avar\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+?)\s*;?\s*\Z")
+_VAL_RE = re.compile(r"\Avar\s+([A-Za-z_][A-Za-z0-9_]*)\s*:\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+?)\s*;?\s*\Z")
 _PRINT_RE = re.compile(r"\A(print|println)\s*\(\s*(.+?)\s*\)\s*;?\s*\Z")
 # Literals whose display section 6 states outright: "Boolean values as `true` or
 # `false`" and "`null` displays as `null`". Spelled as tokens rather than values so
@@ -493,15 +502,15 @@ def analyze(items):
         if INCLUDE_RE.match(code):
             continue                       # spliced away; the directive is not an item
         if MODULE_DECL_RE.match(code):
-            if declared:
-                # Section 20: the declaration must be the first item in the file. A
-                # `module` keyword after other items is not a declaration, and this
-                # front end cannot verify what it means, so it refuses.
-                raise Refusal("'module' is not the first item of its file")
+            # A module block is a container for declarations, and this subset models only
+            # default-module executable statements. Its name has already been checked; the
+            # block's presence alone carries no executable statement, and any line inside it
+            # is refused individually below unless the subset understands it, so the block
+            # opener is skipped here.
             continue
         m = _VAL_RE.match(code)
         if m:
-            name, rhs = m.group(1), m.group(2)
+            name, declared_type, rhs = m.group(1), m.group(2), m.group(3)
             if name in declared:
                 # Refused rather than judged: the redeclaration rules for top-level
                 # bindings of the implicit main are not implemented here, so claiming
@@ -519,9 +528,15 @@ def analyze(items):
                 if not _in_int32_range(rhs):
                     raise Refusal("integer literal %r is outside the signed 32-bit range; "
                                   "section 1 forbids it but names no diagnostic" % rhs)
+                if declared_type != "Integer":
+                    raise Refusal("declared type %r does not match an integer literal, which "
+                                  "the subset does not model" % declared_type)
                 ops.append(("var", rel, name, int(rhs)))
                 continue
             if _starts_literal(rhs):
+                if declared_type != "String":
+                    raise Refusal("declared type %r does not match a string literal, which "
+                                  "the subset does not model" % declared_type)
                 ops.append(("var", rel, name, decode_string_literal(rhs)))
                 continue
             raise Refusal("initializer outside the subset: %r" % rhs[:80])

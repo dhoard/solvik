@@ -6,10 +6,10 @@
 // then its own static property initializers before its block, an unused class is never initialized, and
 // the result never depends on the order classes are declared (docs/LANGUAGE_SPEC.md section 7).
 
-mutable class Registry {
-    static var mutable entries: Integer = 0
+class mutable Registry {
+    var static mutable entries: Integer = 0
 
-    static func add(): Integer {
+    method static add(): Integer {
         Registry.entries = Registry.entries + 1
         return Registry.entries
     }
@@ -20,10 +20,10 @@ mutable class Registry {
 }
 
 class Session extends Registry {
-    static var mutable id: Integer
-    static var mutable seen: Integer = 0
+    var static mutable id: Integer
+    var static mutable seen: Integer = 0
 
-    static func label(): String {
+    method static label(): String {
         return "session"
     }
 
@@ -34,10 +34,10 @@ class Session extends Registry {
 }
 
 class Defaults {
-    static var mutable count: Integer
-    static var mutable ratio: Double
-    static var mutable enabled: Boolean
-    static var mutable name: String?
+    var static mutable count: Integer
+    var static mutable ratio: Double
+    var static mutable enabled: Boolean
+    var static mutable name: String?
 }
 
 println(Registry.entries)
@@ -55,7 +55,7 @@ println(Registry.entries)
 // uses, is never initialized, so nothing is printed for it. First touching Unused below would run its
 // block; not touching it leaves it silent.
 class Unused {
-    static var mutable marker: Integer = 0
+    var static mutable marker: Integer = 0
     static {
         println("unused class initialized")
     }

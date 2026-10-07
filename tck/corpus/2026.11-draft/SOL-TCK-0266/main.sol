@@ -2,11 +2,11 @@ class Q {
     Q() {
     }
 
-    func equals(other: Any?): Boolean {
+    method equals(other: Any?): Boolean {
         return true
     }
 
-    override func hashCode(): Integer {
+    method override hashCode(): Integer {
         return 1
     }
 }

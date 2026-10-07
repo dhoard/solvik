@@ -6,7 +6,7 @@
   "profile": "full-language",
   "status": "required",
   "requirements": [
-    "REQ-1001"
+    "REQ-1008"
   ],
   "entryPoint": "main.sol",
   "fixtureRoot": ".",

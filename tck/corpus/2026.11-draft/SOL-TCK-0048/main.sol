@@ -1,5 +1,5 @@
-mutable class Animal {
-    func speak(): String {
+class mutable Animal {
+    method speak(): String {
         return "generic"
     }
 }

@@ -49,11 +49,12 @@ public final class SolvikStaticMemberParserTest {
     public void aStaticPropertyAndAStaticMethodAreRepresentedAsStaticMembers() {
         String src = """
                 class Counter {
-                    static var limit: Integer = 10
-                    static func reset() {
+                    var static limit: Integer = 10
+                    method static reset() {
                         println("reset")
                     }
                 }
+
                 """;
         ClassDeclNode counter = onlyClass(parseOk("counter.sol", src));
 
@@ -64,13 +65,13 @@ public final class SolvikStaticMemberParserTest {
         // The member span begins at `static`, so the keyword cannot vanish from a diagnostic that
         // points at the member. The inserted terminating SEMI is not part of the span, matching how
         // instance properties are spanned.
-        assertNode(limit, AstKind.PROPERTY_DECL, src, "static var limit: Integer = 10");
+        assertNode(limit, AstKind.PROPERTY_DECL, src, "var static limit: Integer = 10");
 
         assertThat(counter.staticMethods()).hasSize(1);
         FunctionDeclNode reset = counter.staticMethods().get(0);
         assertThat(reset.isStatic()).isTrue();
         assertThat(reset.name()).isEqualTo("reset");
-        assertNode(reset, AstKind.FUNCTION_DECL, src, "static func reset() {\n        println(\"reset\")\n    }");
+        assertNode(reset, AstKind.FUNCTION_DECL, src, "method static reset() {\n        println(\"reset\")\n    }");
 
         assertThat(counter.members()).hasSize(2);
     }
@@ -80,14 +81,15 @@ public final class SolvikStaticMemberParserTest {
         String src = """
                 class Counter {
                     var instanceCount: Integer
-                    static var limit: Integer = 10
-                    func describe(): String {
+                    var static limit: Integer = 10
+                    method describe(): String {
                         return "counter"
                     }
-                    static func reset() {
+                    method static reset() {
                         println("reset")
                     }
                 }
+
                 """;
         ClassDeclNode counter = onlyClass(parseOk("counter.sol", src));
 
@@ -108,14 +110,15 @@ public final class SolvikStaticMemberParserTest {
     public void aStaticBlockIsAPreservedStatementListInSourceOrder() {
         String src = """
                 class Counter {
-                    static var limit: Integer = 10
+                    var static limit: Integer = 10
                     static {
                         println("initializing")
                     }
-                    static func reset() {
+                    method static reset() {
                         println("reset")
                     }
                 }
+
                 """;
         ClassDeclNode counter = onlyClass(parseOk("counter.sol", src));
 
@@ -162,12 +165,11 @@ public final class SolvikStaticMemberParserTest {
 
     @Test
     public void aStaticPropertyStillRequiresAnExplicitTypeAnnotation() {
-        // The `static` prefix does not relax the declaration rule: `propertyDecl` mandates
-        // `: type`, so the missing annotation is a parse error exactly as it is for an instance
-        // property (docs/LANGUAGE_SPEC.md sections 6 and 7).
+        // The `static` modifier does not relax the declaration rule: a property declaration always
+        // writes `: type` (docs/LANGUAGE_SPEC.md sections 2, 6, and 7).
         parseFails("counter.sol", """
                 class Counter {
-                    static var limit = 10
+                    var static limit = 10
                 }
                 """);
     }
@@ -176,11 +178,12 @@ public final class SolvikStaticMemberParserTest {
     public void aStaticDelegateIsAParseErrorBecauseOnlyPropertiesAndMethodsMayBeStatic() {
         parseFails("speaker.sol", """
                 interface Greeter {
-                    func greet(): String
+                    method greet(): String
                 }
                 class Speaker {
                     static delegate impl: Greeter
                 }
+
                 """);
     }
 
@@ -233,10 +236,11 @@ public final class SolvikStaticMemberParserTest {
         // override rules can report the precise SOLV-SEM-047 diagnostic instead of a bare parse error.
         String src = """
                 class Counter {
-                    static mutable func reset() {
+                    method static mutable reset() {
                         println("reset")
                     }
                 }
+
                 """;
         ClassDeclNode counter = onlyClass(parseOk("counter.sol", src));
         List<FunctionDeclNode> statics = counter.staticMethods();

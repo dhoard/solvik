@@ -53,14 +53,14 @@ public final class SolvikInheritanceExecutionTest {
     @Test
     public void inheritedPropertyAndMethodAreAvailable() {
         assertThat(run("""
-                mutable class Animal {
+                class mutable Animal {
                     var name: String
 
                     Animal(name: String) {
                         this.name = name
                     }
 
-                    func describe(): String {
+                    method describe(): String {
                         return this.name
                     }
                 }
@@ -69,71 +69,79 @@ public final class SolvikInheritanceExecutionTest {
                         super("Rex")
                     }
                 }
-                    var dog = Dog()
+                    var dog: Dog = Dog()
                     println(dog.describe())
+
+
                 """)).isEqualTo("Rex\n");
     }
 
     @Test
     public void overrideDispatchesVirtuallyThroughASupertypeVariable() {
         assertThat(run("""
-                mutable class Animal {
-                    mutable func speak(): String {
+                class mutable Animal {
+                    method mutable speak(): String {
                         return "..."
                     }
                 }
                 class Dog extends Animal {
-                    override func speak(): String {
+                    method override speak(): String {
                         return "woof"
                     }
                 }
                     var animal: Animal = Dog()
                     println(animal.speak())
+
+
                 """)).isEqualTo("woof\n");
     }
 
     @Test
     public void virtualDispatchReachesAnOverrideFromAnInheritedMethod() {
         assertThat(run("""
-                mutable class Animal {
-                    mutable func speak(): String {
+                class mutable Animal {
+                    method mutable speak(): String {
                         return "..."
                     }
 
-                    func announce(): String {
+                    method announce(): String {
                         return "I say " .. this.speak()
                     }
                 }
                 class Dog extends Animal {
-                    override func speak(): String {
+                    method override speak(): String {
                         return "woof"
                     }
                 }
                     println(Dog().announce())
+
+
                 """)).isEqualTo("I say woof\n");
     }
 
     @Test
     public void superMethodCallRunsTheSuperclassImplementation() {
         assertThat(run("""
-                mutable class Animal {
-                    mutable func speak(): String {
+                class mutable Animal {
+                    method mutable speak(): String {
                         return "..."
                     }
                 }
                 class Dog extends Animal {
-                    override func speak(): String {
+                    method override speak(): String {
                         return super.speak() .. " woof"
                     }
                 }
                     println(Dog().speak())
+
+
                 """)).isEqualTo("... woof\n");
     }
 
     @Test
     public void explicitSuperConstructorRunsBeforeSubclassInitialization() {
         assertThat(run("""
-                mutable class Animal {
+                class mutable Animal {
                     var legs: Integer
 
                     Animal(legs: Integer) {
@@ -148,16 +156,17 @@ public final class SolvikInheritanceExecutionTest {
                         this.name = name
                     }
                 }
-                    var dog = Dog("Rex")
+                    var dog: Dog = Dog("Rex")
                     println(dog.legs)
                     println(dog.name)
+
                 """)).isEqualTo("4\nRex\n");
     }
 
     @Test
     public void implicitSuperConstructorRunsForAZeroArgumentSuperclass() {
         assertThat(run("""
-                mutable class Animal {
+                class mutable Animal {
                     var kind: String
 
                     Animal() {
@@ -169,13 +178,14 @@ public final class SolvikInheritanceExecutionTest {
                     }
                 }
                     println(Dog().kind)
+
                 """)).isEqualTo("animal\n");
     }
 
     @Test
     public void superPropertyReadsTheInheritedField() {
         assertThat(run("""
-                mutable class Animal {
+                class mutable Animal {
                     var name: String
 
                     Animal(name: String) {
@@ -187,27 +197,29 @@ public final class SolvikInheritanceExecutionTest {
                         super("Rex")
                     }
 
-                    func describe(): String {
+                    method describe(): String {
                         return super.name
                     }
                 }
                     println(Dog().describe())
+
                 """)).isEqualTo("Rex\n");
     }
 
    @Test
     public void declarationInitializersRunAfterTheSuperConstructor() {
         assertThat(run("""
-                mutable class Animal {
+                class mutable Animal {
                     var mutable energy: Integer = 10
                 }
                 class Dog extends Animal {
                     var name: String = "Rex"
                 }
-                    var dog = Dog()
+                    var dog: Dog = Dog()
                     dog.energy = dog.energy + 5
                     println(dog.energy)
                     println(dog.name)
+
                 """)).isEqualTo("15\nRex\n");
     }
 
@@ -222,7 +234,7 @@ public final class SolvikInheritanceExecutionTest {
     @Test
     public void anAbstractClassIsNotConstructibleButItsSubtypeIs() {
         String shared = """
-                abstract class Shape {
+                class abstract Shape {
                     var sides: Integer
 
                     Shape(sides: Integer) {
@@ -234,11 +246,12 @@ public final class SolvikInheritanceExecutionTest {
                         super(1)
                     }
                 }
+
                 """;
         assertThatExceptionOfType(PolyglotException.class)
-                .isThrownBy(() -> run(shared + "    var s = Shape()\n    println(s.sides)\n"))
+                .isThrownBy(() -> run(shared + "    var s: Shape = Shape()\n    println(s.sides)\n"))
                 .withMessageContaining("SOLV-SEM-028");
-        assertThat(run(shared + "    var c = Circle()\n    println(c.sides)\n")).isEqualTo("1\n");
+        assertThat(run(shared + "    var c: Circle = Circle()\n    println(c.sides)\n")).isEqualTo("1\n");
     }
 
     /**
@@ -253,7 +266,7 @@ public final class SolvikInheritanceExecutionTest {
     @Test
     public void aSubclassReachesAnAbstractSuperclassConstructorThroughSuper() {
         assertThat(run("""
-                abstract class Shape {
+                class abstract Shape {
                     var sides: Integer
                     var label: String
 
@@ -262,7 +275,7 @@ public final class SolvikInheritanceExecutionTest {
                         this.label = label
                     }
 
-                    func describe(): String {
+                    method describe(): String {
                         return this.label
                     }
                 }
@@ -271,8 +284,10 @@ public final class SolvikInheritanceExecutionTest {
                         super(0, "shape")
                     }
                 }
-                    var c = Circle()
+                    var c: Circle = Circle()
                     println(c.sides .. " / " .. c.describe())
+
+
                 """)).isEqualTo("0 / shape\n");
     }
 }

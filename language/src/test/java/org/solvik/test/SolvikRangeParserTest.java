@@ -36,7 +36,7 @@ public final class SolvikRangeParserTest {
 
     @Test
     public void inclusiveRangeShapeAndSpan() {
-        String src = "func f(): Unit {\n    for (i in 1...5) {\n    }\n}\n";
+        String src = "func f() {\n    for (i in 1...5) {\n    }\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("range.sol", src));
         ForInStmtNode loop = (ForInStmtNode) body(fn).statements().get(0);
         assertNode(loop, AstKind.FOR_IN_STMT, src, "for (i in 1...5) {\n    }");
@@ -48,7 +48,7 @@ public final class SolvikRangeParserTest {
 
     @Test
     public void ascendingExclusiveRangeShape() {
-        String src = "func f(): Unit {\n    for (n in 0 ..< 10) {\n    }\n}\n";
+        String src = "func f() {\n    for (n in 0 ..< 10) {\n    }\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("range.sol", src));
         ForInStmtNode loop = (ForInStmtNode) body(fn).statements().get(0);
         assertThat(loop.variableName()).isEqualTo("n");
@@ -57,7 +57,7 @@ public final class SolvikRangeParserTest {
 
     @Test
     public void descendingExclusiveRangeShape() {
-        String src = "func f(): Unit {\n    for (n in 10..>0) {\n    }\n}\n";
+        String src = "func f() {\n    for (n in 10..>0) {\n    }\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("range.sol", src));
         ForInStmtNode loop = (ForInStmtNode) body(fn).statements().get(0);
         assertThat(loop.operator()).isEqualTo(RangeOperator.EXCLUSIVE_DESCENDING);
@@ -65,16 +65,16 @@ public final class SolvikRangeParserTest {
 
     @Test
     public void rangeBodyIsTheLoopBody() {
-        String src = "func f(): Unit {\n    for (i in 1...3) {\n        var doubled = i + i\n    }\n}\n";
+        String src = "func f() {\n    for (i in 1...3) {\n        var doubled: Integer = i + i\n    }\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("range.sol", src));
         ForInStmtNode loop = (ForInStmtNode) body(fn).statements().get(0);
         assertThat(loop.body().statements().size()).isEqualTo(1);
-        assertNode(loop.body().statements().get(0), AstKind.LOCAL_DECL, src, "var doubled = i + i");
+        assertNode(loop.body().statements().get(0), AstKind.LOCAL_DECL, src, "var doubled: Integer = i + i");
     }
 
     @Test
     public void nestedRangeLoopsNest() {
-        String src = "func f(): Unit {\n    for (i in 1...2) {\n        for (j in 1..<3) {\n        }\n    }\n}\n";
+        String src = "func f() {\n    for (i in 1...2) {\n        for (j in 1..<3) {\n        }\n    }\n}\n";
         FunctionDeclNode fn = onlyFunction(parseOk("range.sol", src));
         ForInStmtNode outer = (ForInStmtNode) body(fn).statements().get(0);
         ForInStmtNode inner = (ForInStmtNode) outer.body().statements().get(0);

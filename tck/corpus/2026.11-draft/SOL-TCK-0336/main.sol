@@ -17,5 +17,5 @@ class C {
     C() {
     }
 }
-var c = C()
+var c: C = C()
 print("EXECUTED-INVALID")

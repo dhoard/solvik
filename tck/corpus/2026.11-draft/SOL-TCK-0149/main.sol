@@ -1,4 +1,4 @@
-mutable class CodeError extends RuntimeException {
+class mutable CodeError extends RuntimeException {
     var code: Integer
 
     CodeError(code: Integer) {

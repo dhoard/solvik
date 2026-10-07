@@ -135,20 +135,20 @@ public final class SolvikEnumExecutionTest {
     @Test
     public void sealedHierarchyDispatchesThroughTheSealedType() {
         assertThat(run("""
-                abstract class Shape {
-                    mutable func name(): String {
+                class abstract Shape {
+                    method mutable name(): String {
                         return "shape"
                     }
                 }
 
                 class Circle extends Shape {
-                    override func name(): String {
+                    method override name(): String {
                         return "circle"
                     }
                 }
 
                 class Square extends Shape {
-                    override func name(): String {
+                    method override name(): String {
                         return "square"
                     }
                 }
@@ -161,6 +161,8 @@ public final class SolvikEnumExecutionTest {
                     var square: Shape = Square()
                     println(describe(circle))
                     println(describe(square))
+
+
                 """)).isEqualTo("circle\nsquare\n");
     }
 

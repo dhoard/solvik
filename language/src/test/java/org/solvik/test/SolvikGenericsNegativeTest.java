@@ -65,70 +65,78 @@ public final class SolvikGenericsNegativeTest {
     @Test
     public void rawGenericTypeIsRejected() {
         assertThat(first(checkFails(BOX + """
-                func f(): Unit {
+                func f() {
                     var box: Box = Box(5)
                 }
+
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_RAW_GENERIC_TYPE);
     }
 
     @Test
     public void rawBuiltinListIsRejected() {
         assertThat(first(checkFails("""
-                func f(values: List): Unit {
+                func f(values: List) {
                 }
+
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_RAW_GENERIC_TYPE);
     }
 
     @Test
     public void wrongTypeArgumentCountIsRejected() {
         assertThat(first(checkFails(BOX + """
-                func f(): Unit {
+                func f() {
                     var box: Box<Integer, String> = Box(5)
                 }
+
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_TYPE_ARGUMENT_ARITY);
     }
 
     @Test
     public void typeArgumentsOnANonGenericTypeAreRejected() {
         assertThat(first(checkFails("""
-                func f(): Unit {
+                func f() {
                     var x: Integer<String> = 5
                 }
+
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_NOT_GENERIC);
     }
 
     @Test
     public void unknownTypeArgumentIsRejected() {
         assertThat(first(checkFails(BOX + """
-                func f(): Unit {
+                func f() {
                     var box: Box<Widget> = Box(5)
                 }
+
                 """)).code()).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_TYPE);
     }
 
     @Test
     public void aTypeParameterCannotTakeTypeArguments() {
         assertThat(first(checkFails("""
-                func f<T>(x: T<Integer>): Unit {
+                func f<T>(x: T<Integer>) {
                 }
+
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_NOT_GENERIC);
     }
 
     @Test
     public void typeArgumentsAreInvariant() {
         assertThat(first(checkFails(BOX + """
-                func f(): Unit {
+                func f() {
                     var box: Box<Integer> = Box("x")
                 }
+
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
 
     @Test
     public void typeArgumentsAreNotCovariant() {
         assertThat(first(checkFails(BOX + """
-                func f(): Unit {
+                func f() {
                     var box: Box<Any> = Box("x")
                 }
+
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
 
@@ -190,9 +198,10 @@ public final class SolvikGenericsNegativeTest {
     @Test
     public void listSizeIsImmutable() {
         assertThat(first(checkFails("""
-                func f(values: List<Integer>): Unit {
+                func f(values: List<Integer>) {
                     values.size = 5
                 }
+
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_ASSIGN_TO_IMMUTABLE);
     }
 
@@ -217,9 +226,10 @@ public final class SolvikGenericsNegativeTest {
     @Test
     public void listIsInvariantInItsElementType() {
         assertThat(first(checkFails("""
-                func f(values: List<String>): Unit {
+                func f(values: List<String>) {
                     var ints: List<Integer> = values
                 }
+
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
 
@@ -236,10 +246,11 @@ public final class SolvikGenericsNegativeTest {
     public void genericInterfaceRequirementMustBeImplemented() {
         assertThat(first(checkFails("""
                 interface Container<T> {
-                    func get(): T
+                    method get(): T
                 }
                 class StringBox implements Container<String> {
                 }
+
                 """)).code()).isEqualTo(DiagnosticCode.SEM_MISSING_INTERFACE_IMPLEMENTATION);
     }
 
@@ -247,13 +258,14 @@ public final class SolvikGenericsNegativeTest {
     public void genericInterfaceImplementationReturnTypeIsChecked() {
         assertThat(first(checkFails("""
                 interface Container<T> {
-                    func get(): T
+                    method get(): T
                 }
                 class StringBox implements Container<String> {
-                    func get(): Integer {
+                    method get(): Integer {
                         return 1
                     }
                 }
+
                 """)).code()).isEqualTo(DiagnosticCode.SEM_IMPLEMENTATION_SIGNATURE);
     }
 
@@ -261,12 +273,13 @@ public final class SolvikGenericsNegativeTest {
     public void genericInterfaceImplementationParameterTypeIsChecked() {
         assertThat(first(checkFails("""
                 interface Consumer<T> {
-                    func accept(value: T): Unit
+                    method accept(value: T)
                 }
                 class StringConsumer implements Consumer<String> {
-                    func accept(value: Integer): Unit {
+                    method accept(value: Integer) {
                     }
                 }
+
                 """)).code()).isEqualTo(DiagnosticCode.SEM_IMPLEMENTATION_SIGNATURE);
     }
 
@@ -274,13 +287,14 @@ public final class SolvikGenericsNegativeTest {
     public void typeArgumentCountMismatchInImplementsIsRejected() {
         assertThat(first(checkFails("""
                 interface Container<T> {
-                    func get(): T
+                    method get(): T
                 }
                 class StringBox implements Container<String, Integer> {
-                    func get(): String {
+                    method get(): String {
                         return "x"
                     }
                 }
+
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_TYPE_ARGUMENT_ARITY);
     }
 
@@ -290,9 +304,10 @@ public final class SolvikGenericsNegativeTest {
                 func identity<T>(x: T): T {
                     return x
                 }
-                func f(): Unit {
+                func f() {
                     var y: Integer = identity("x")
                 }
+
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
 }

@@ -17,14 +17,14 @@
 //     statement emits `|cast-ok`.
 // Total expected stdout: `fetched|cast-ok`. Uses print, so no platform line separator
 // can enter the expected bytes.
-mutable class Animal {
-    func speak(): String {
+class mutable Animal {
+    method speak(): String {
         return "animal"
     }
 }
 
 class Dog extends Animal {
-    func fetch(): String {
+    method fetch(): String {
         return "fetched"
     }
 }
@@ -33,5 +33,5 @@ var v: Animal = Dog()
 if (v is Dog) {
     print(v.fetch())
 }
-var cast = v as Dog
+var cast: Dog = v as Dog
 print("|cast-ok")

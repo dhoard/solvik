@@ -30,9 +30,9 @@ class Box<T> {
     }
 }
 
-var b = Box<String>("hi")
+var b: Box<String> = Box<String>("hi")
 print(b.value)
 print(" ")
-var mutable c = Box<Integer>(7)
+var mutable c: Box<Integer> = Box<Integer>(7)
 c.value = c.value + 1
 print(c.value)

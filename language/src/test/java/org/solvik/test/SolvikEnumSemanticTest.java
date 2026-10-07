@@ -169,12 +169,13 @@ public final class SolvikEnumSemanticTest {
                 enum Color {
                     Red
                 }
-                func describe(color: Color): Unit {
+                func describe(color: Color) {
                 }
-                func use(): Unit {
+                func use() {
                     var color: Color = Color.Red
                     describe(color)
                 }
+
                 """);
         Type initializerType = program.typeOf(initializer(program, "use", 0)).orElseThrow();
         assertThat(initializerType).isEqualTo(program.enumSymbol("Color").orElseThrow().type());
@@ -217,9 +218,9 @@ public final class SolvikEnumSemanticTest {
     @Test
     public void abstractClassRecordsSubclassRelationsWithoutAClosedSubtypeSet() {
         CheckedProgram program = check("""
-                abstract class Shape {
+                class abstract Shape {
                 }
-                mutable class Circle extends Shape {
+                class mutable Circle extends Shape {
                 }
                 class UnitCircle extends Circle {
                 }
@@ -227,6 +228,7 @@ public final class SolvikEnumSemanticTest {
                 }
                 class Unrelated {
                 }
+
                 """);
         ClassSymbol shape = program.classSymbol("Shape").orElseThrow();
         assertThat(shape.isAbstract()).isTrue();
@@ -250,19 +252,21 @@ public final class SolvikEnumSemanticTest {
     @Test
     public void anAbstractClassIsNotConstructedButItsSubtypesAre() {
         CheckedProgram program = check("""
-                abstract class Shape {
-                    mutable func name(): String {
+                class abstract Shape {
+                    method mutable name(): String {
                         return "shape"
                     }
                 }
                 class Circle extends Shape {
-                    override func name(): String {
+                    method override name(): String {
                         return "circle"
                     }
                 }
                 func make(): Shape {
                     return Circle()
                 }
+
+
                 """);
         Type constructed = typeOfReturn(program, "make", 0);
         assertThat(constructed).isEqualTo(program.classSymbol("Circle").orElseThrow().type());

@@ -13,5 +13,5 @@ class U {
         }
     }
 }
-var u = U(true)
+var u: U = U(true)
 print("EXECUTED-INVALID")

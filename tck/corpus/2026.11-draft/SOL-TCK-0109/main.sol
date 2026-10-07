@@ -4,7 +4,7 @@
 // Oracle quotations verified verbatim against docs/LANGUAGE_SPEC.md:
 //   - `replace` replaces all non-overlapping matches and treats the replacement as literal text
 //
-var r = Regex(r#"(\w+)"#)
+var r: Regex = Regex(r#"(\w+)"#)
 print(r.replace("ab cd", "[$1] $0 &"))
 print(" ")
 print(Regex(r#"\s"#).replace("abc", "#"))

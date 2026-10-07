@@ -1,5 +1,5 @@
 // expected: SOLV-SEM-054
-func run(): Unit {
+func run() {
     try {
     }
 

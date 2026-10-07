@@ -1,7 +1,7 @@
 interface I {
-    func hashCode(): Integer
+    method hashCode(): Integer
 }
-var x = 1
+var x: Integer = 1
 print(x)
 
 print("EXECUTED-INVALID")

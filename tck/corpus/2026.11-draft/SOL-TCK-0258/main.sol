@@ -2,14 +2,14 @@ class Loud {
     Loud() {
     }
 
-    override func equals(other: Any?): Boolean {
+    method override equals(other: Any?): Boolean {
         print("u")
         return false
     }
 
-    override func hashCode(): Integer {
+    method override hashCode(): Integer {
         return 4
     }
 }
-var p = Loud()
+var p: Loud = Loud()
 print("sc" .. (p == p) .. p.equals(p))

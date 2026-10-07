@@ -64,19 +64,19 @@ public final class PhysicalLineTokenStreamTest {
 
     @Test
     public void aLineEndingInAValueCarriesOneBoundary() {
-        assertThat(boundaries("var x = 1\n")).isEqualTo(1);
-        assertThat(boundaries("var x = 1\nvar y = 2\n")).isEqualTo(2);
+        assertThat(boundaries("var x: Integer = 1\n")).isEqualTo(1);
+        assertThat(boundaries("var x: Integer = 1\nvar y: Integer = 2\n")).isEqualTo(2);
     }
 
     @Test
     public void endOfFileTerminatesTheLastLineOnce() {
-        assertThat(boundaries("var x = 1")).isEqualTo(1);
-        assertThat(delivered("var x = 1").get(delivered("var x = 1").size() - 1).getType()).isNotEqualTo(SolvikLexer.NEWLINE);
+        assertThat(boundaries("var x: Integer = 1")).isEqualTo(1);
+        assertThat(delivered("var x: Integer = 1").get(delivered("var x: Integer = 1").size() - 1).getType()).isNotEqualTo(SolvikLexer.NEWLINE);
     }
 
     @Test
     public void aBodyAndItsClosingBraceEachEndTheirLine() {
-        String source = "func f(): Unit {\n    println(1)\n}\n";
+        String source = "func f() {\n    println(1)\n}\n";
         List<Token> tokens = delivered(source);
         List<Integer> breaks = new ArrayList<>();
         for (int i = 0; i < tokens.size(); i++) {
@@ -93,8 +93,8 @@ public final class PhysicalLineTokenStreamTest {
 
     @Test
     public void blankAndCommentLinesNeverAddASecondBoundary() {
-        assertThat(boundaries("var a = 1\n\n\nvar b = 2\n")).isEqualTo(2);
-        assertThat(boundaries("var a = 1\n// a comment\nvar b = 2\n")).isEqualTo(2);
+        assertThat(boundaries("var a: Integer = 1\n\n\nvar b: Integer = 2\n")).isEqualTo(2);
+        assertThat(boundaries("var a: Integer = 1\n// a comment\nvar b: Integer = 2\n")).isEqualTo(2);
     }
 
     @Test
@@ -109,10 +109,10 @@ public final class PhysicalLineTokenStreamTest {
         // `(` and after `1,` carry none, because `(` and `,` cannot end a line; the line holding `2`
         // ends on its value and the line holding `)` ends on the closer, so the grammar absorbs the
         // break before the `)` from its own `NEWLINE*`.
-        assertThat(boundaries("var xs = foo(\n    1,\n    2\n)\n")).isEqualTo(2);
+        assertThat(boundaries("var xs: Any = foo(\n    1,\n    2\n)\n")).isEqualTo(2);
         // The line broken after `=` carries no boundary - an assignment line cannot end there - and only
         // the line the value closes ends.
-        assertThat(boundaries("var x =\n    1\n")).isEqualTo(1);
+        assertThat(boundaries("var x: Integer =\n    1\n")).isEqualTo(1);
     }
 
     @Test
@@ -142,12 +142,12 @@ public final class PhysicalLineTokenStreamTest {
 
     @Test
     public void anExplicitSeparatorClosingALineCarriesOneBoundary() {
-        assertThat(boundaries("var a = 1\n")).isEqualTo(1);
-        assertThat(boundaries("var a = 1\nvar b = 2\n")).isEqualTo(2);
+        assertThat(boundaries("var a: Integer = 1\n")).isEqualTo(1);
+        assertThat(boundaries("var a: Integer = 1\nvar b: Integer = 2\n")).isEqualTo(2);
         // Two constructs on one line separated by `;` and one line break: one boundary, one `;`.
-        List<Token> tokens = delivered("var a = 1; var b = 2\n");
+        List<Token> tokens = delivered("var a: Integer = 1; var b: Integer = 2\n");
         assertThat(tokens.stream().filter(t -> t.getType() == SolvikLexer.SEMI).count()).isEqualTo(1);
-        assertThat(boundaries("var a = 1; var b = 2\n")).isEqualTo(1);
+        assertThat(boundaries("var a: Integer = 1; var b: Integer = 2\n")).isEqualTo(1);
     }
 
     @Test
@@ -160,7 +160,7 @@ public final class PhysicalLineTokenStreamTest {
 
     @Test
     public void aBoundaryIsIdentifiableAsPlacedByThisStage() {
-        List<Token> tokens = delivered("var x = 1\n");
+        List<Token> tokens = delivered("var x: Integer = 1\n");
         Token boundary = tokens.stream().filter(t -> t.getType() == SolvikLexer.NEWLINE).findFirst().orElseThrow();
         assertThat(PhysicalLineTokenSource.isLineBoundary(boundary)).isTrue();
         assertThat(boundary.getChannel()).isEqualTo(Token.DEFAULT_CHANNEL);

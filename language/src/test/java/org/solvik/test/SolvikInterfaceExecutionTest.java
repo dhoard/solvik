@@ -54,7 +54,7 @@ public final class SolvikInterfaceExecutionTest {
     public void implementingMethodRunsThroughAnInterfaceTypedParameter() {
         String output = run("""
                 interface Named {
-                    func name(): String
+                    method name(): String
                 }
                 class User implements Named {
                     var label: String
@@ -63,7 +63,7 @@ public final class SolvikInterfaceExecutionTest {
                         this.label = label
                     }
 
-                    func name(): String {
+                    method name(): String {
                         return this.label
                     }
                 }
@@ -71,6 +71,7 @@ public final class SolvikInterfaceExecutionTest {
                     return named.name()
                 }
                     println(greet(User("Doug")))
+
                 """);
         assertThat(output.strip()).isEqualTo("Doug");
     }
@@ -79,9 +80,9 @@ public final class SolvikInterfaceExecutionTest {
     public void defaultMethodRunsForAClassThatImplementsOnlyTheRequirement() {
         String output = run("""
                 interface Named {
-                    func name(): String
+                    method name(): String
 
-                    func greeting(): String {
+                    method greeting(): String {
                         return "Hello " .. name()
                     }
                 }
@@ -92,11 +93,12 @@ public final class SolvikInterfaceExecutionTest {
                         this.label = label
                     }
 
-                    func name(): String {
+                    method name(): String {
                         return this.label
                     }
                 }
                     println(User("Doug").greeting())
+
                 """);
         assertThat(output.strip()).isEqualTo("Hello Doug");
     }
@@ -105,19 +107,19 @@ public final class SolvikInterfaceExecutionTest {
     public void defaultMethodDispatchesVirtuallyToTheConcreteRequirement() {
         String output = run("""
                 interface Named {
-                    func name(): String
+                    method name(): String
 
-                    func greeting(): String {
+                    method greeting(): String {
                         return "Hello " .. name()
                     }
                 }
-                mutable class Base implements Named {
-                    func name(): String {
+                class mutable Base implements Named {
+                    method name(): String {
                         return "base"
                     }
                 }
                 class Derived implements Named {
-                    func name(): String {
+                    method name(): String {
                         return "derived"
                     }
                 }
@@ -126,6 +128,8 @@ public final class SolvikInterfaceExecutionTest {
                 }
                     println(shout(Base()))
                     println(shout(Derived()))
+
+
                 """);
         assertThat(output.split("\n")[0].strip()).isEqualTo("Hello base");
         assertThat(output.split("\n")[1].strip()).isEqualTo("Hello derived");
@@ -135,23 +139,24 @@ public final class SolvikInterfaceExecutionTest {
     public void explicitMethodOverridesAnInheritedDefault() {
         String output = run("""
                 interface Named {
-                    func name(): String
+                    method name(): String
 
-                    func greeting(): String {
+                    method greeting(): String {
                         return "Hello " .. name()
                     }
                 }
                 class User implements Named {
-                    func name(): String {
+                    method name(): String {
                         return "Doug"
                     }
 
-                    func greeting(): String {
+                    method greeting(): String {
                         return "Hi " .. name()
                     }
                 }
                     var named: Named = User()
                     println(named.greeting())
+
                 """);
         assertThat(output.strip()).isEqualTo("Hi Doug");
     }
@@ -160,27 +165,28 @@ public final class SolvikInterfaceExecutionTest {
     public void multipleInterfacesDispatchIndependently() {
         String output = run("""
                 interface Named {
-                    func name(): String
+                    method name(): String
                 }
                 interface Aged {
-                    func age(): Integer
+                    method age(): Integer
                 }
                 class User implements Named, Aged {
-                    func name(): String {
+                    method name(): String {
                         return "Doug"
                     }
 
-                    func age(): Integer {
+                    method age(): Integer {
                         return 42
                     }
                 }
-                func describe(named: Named, aged: Aged): Unit {
+                func describe(named: Named, aged: Aged) {
                     print(named.name())
                     print(" ")
                     println(aged.age())
                 }
-                    var user = User()
+                    var user: User = User()
                     describe(user, user)
+
                 """);
         assertThat(output.strip()).isEqualTo("Doug 42");
     }
@@ -189,17 +195,17 @@ public final class SolvikInterfaceExecutionTest {
     public void conflictingDefaultsResolvedExplicitlyRunTheClassMethod() {
         String output = run("""
                 interface A {
-                    func greet(): String {
+                    method greet(): String {
                         return "a"
                     }
                 }
                 interface B {
-                    func greet(): String {
+                    method greet(): String {
                         return "b"
                     }
                 }
                 class C implements A, B {
-                    func greet(): String {
+                    method greet(): String {
                         return "c"
                     }
                 }
@@ -209,9 +215,10 @@ public final class SolvikInterfaceExecutionTest {
                 func viaB(b: B): String {
                     return b.greet()
                 }
-                    var c = C()
+                    var c: C = C()
                     println(viaA(c))
                     println(viaB(c))
+
                 """);
         assertThat(output.split("\n")[0].strip()).isEqualTo("c");
         assertThat(output.split("\n")[1].strip()).isEqualTo("c");
@@ -221,13 +228,13 @@ public final class SolvikInterfaceExecutionTest {
     public void interfaceFromAnExtendedInterfaceIsAcceptedAsAParameterType() {
         String output = run("""
                 interface Readable {
-                    func read(): String
+                    method read(): String
                 }
                 interface Writable {
-                    func write(value: String): String
+                    method write(value: String): String
                 }
                 interface Stream extends Readable, Writable {
-                    func copy(): String {
+                    method copy(): String {
                         return write(read())
                     }
                 }
@@ -238,11 +245,11 @@ public final class SolvikInterfaceExecutionTest {
                         this.contents = contents
                     }
 
-                    func read(): String {
+                    method read(): String {
                         return this.contents
                     }
 
-                    func write(value: String): String {
+                    method write(value: String): String {
                         return "wrote " .. value
                     }
                 }
@@ -250,6 +257,7 @@ public final class SolvikInterfaceExecutionTest {
                     return stream.copy()
                 }
                     println(roundTrip(Buffer("x")))
+
                 """);
         assertThat(output.strip()).isEqualTo("wrote x");
     }
@@ -258,10 +266,10 @@ public final class SolvikInterfaceExecutionTest {
     public void classInheritsConformanceAndDispatchesThroughTheSuperclassMethod() {
         String output = run("""
                 interface Named {
-                    func name(): String
+                    method name(): String
                 }
-                mutable class Base implements Named {
-                    func name(): String {
+                class mutable Base implements Named {
+                    method name(): String {
                         return "base"
                     }
                 }
@@ -271,6 +279,8 @@ public final class SolvikInterfaceExecutionTest {
                     return named.name()
                 }
                     println(viaInterface(Derived()))
+
+
                 """);
         assertThat(output.strip()).isEqualTo("base");
     }
@@ -279,16 +289,17 @@ public final class SolvikInterfaceExecutionTest {
     public void interfaceRequirementIsReachedThroughAnAnyTypedBuiltinArgument() {
         String output = run("""
                 interface Named {
-                    func name(): String
+                    method name(): String
                 }
                 class User implements Named {
-                    func name(): String {
+                    method name(): String {
                         return "Doug"
                     }
                 }
-                    var user = User()
+                    var user: User = User()
                     print(user.name())
                     println("")
+
                 """);
         assertThat(output.strip()).isEqualTo("Doug");
     }
@@ -297,17 +308,17 @@ public final class SolvikInterfaceExecutionTest {
     public void interfaceMethodRunsInsideALoopOnAnInterfaceTypedLocal() {
         String output = run("""
                 interface Counter {
-                    func tick(value: Integer): Integer
+                    method tick(value: Integer): Integer
                 }
                 class Doubler implements Counter {
-                    func tick(value: Integer): Integer {
+                    method tick(value: Integer): Integer {
                         return value * 2
                     }
                 }
                 func total(counter: Counter, limit: Integer): Integer {
-                    var mutable sum = 0
+                    var mutable sum: Integer = 0
                     {
-                        var mutable i = 0
+                        var mutable i: Integer = 0
                         while (i < limit) {
                             sum = sum + counter.tick(i)
                             i = i + 1
@@ -317,6 +328,7 @@ public final class SolvikInterfaceExecutionTest {
                 }
                     var counter: Counter = Doubler()
                     println(total(counter, 4))
+
                 """);
         assertThat(output.strip()).isEqualTo("12");
     }
@@ -325,22 +337,23 @@ public final class SolvikInterfaceExecutionTest {
     public void aDefaultMethodMayCallAnotherDefaultMethod() {
         String output = run("""
                 interface Named {
-                    func name(): String
+                    method name(): String
 
-                    func greeting(): String {
+                    method greeting(): String {
                         return "Hello " .. name()
                     }
 
-                    func announcement(): String {
+                    method announcement(): String {
                         return greeting() .. "!"
                     }
                 }
                 class User implements Named {
-                    func name(): String {
+                    method name(): String {
                         return "Doug"
                     }
                 }
                     println(User().announcement())
+
                 """);
         assertThat(output.strip()).isEqualTo("Hello Doug!");
     }
@@ -349,11 +362,12 @@ public final class SolvikInterfaceExecutionTest {
     public void compileErrorInAnInterfaceProgramSuppressesAllOutput() {
         String program = """
                 interface Named {
-                    func name(): String
+                    method name(): String
                 }
                 class User implements Named {
                 }
                     println("unreachable")
+
                 """;
         PolyglotException failure = expectThrows(PolyglotException.class, () -> run(program));
         assertThat(failure.getMessage().contains("SOLV-SEM-020")).as(failure.getMessage()).isTrue();

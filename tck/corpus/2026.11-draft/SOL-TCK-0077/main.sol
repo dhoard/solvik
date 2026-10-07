@@ -21,7 +21,7 @@
 // Note the element order is unspecified, which is exactly why every value asserted here
 // is order-independent. Executed as top-level statements (section 20). Uses print, so no
 // platform line separator can enter the expected bytes.
-var ids = Set<Integer>(1, 2, 2, 3)
+var ids: Set<Integer> = Set<Integer>(1, 2, 2, 3)
 print(ids.size)
 print(" ")
 print(ids.add(1))

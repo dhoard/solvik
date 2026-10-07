@@ -142,7 +142,7 @@ public final class SolvikExceptionExecutionTest {
     @Test
     public void rootExceptionHandlerCatchesATransitivelyDerivedClass() {
         Result result = evaluate(
-                "mutable class ParseError extends RuntimeException {\n"
+                "class mutable ParseError extends RuntimeException {\n"
                         + "}\n"
                         + "class DeepError extends ParseError {\n"
                         + "}\n"
@@ -427,7 +427,7 @@ public final class SolvikExceptionExecutionTest {
                         + "}\n"
                         + "func caller(): Result<Integer, String> {\n"
                         + "  try {\n"
-                        + "    var v = maybeFail()?\n"
+                        + "    var v: Integer = maybeFail()?\n"
                         + "    println(\"got-\" .. v)\n"
                         + "  }\n"
                         + "  finally {\n"
@@ -435,7 +435,7 @@ public final class SolvikExceptionExecutionTest {
                         + "  }\n"
                         + "  return Result.Ok(0)\n"
                         + "}\n"
-                        + "var r = caller()\n"
+                        + "var r: Result<Integer, String> = caller()\n"
                         + "println(\"isErr-\" .. r.isErr())\n");
         assertThat(result.failure).as(result.output).isNull();
         assertThat(result.output).isEqualTo("finally-on-prop\nisErr-true\n");
@@ -655,7 +655,7 @@ public final class SolvikExceptionExecutionTest {
         // overwrite the outer value: rethrowing the outer binding still delivers the original
         // Sub instance, not the Fatal one caught in between.
         Result result = evaluate(
-                "mutable class Boom extends RuntimeException {\n"
+                "class mutable Boom extends RuntimeException {\n"
                         + "}\n"
                         + "class Sub extends Boom {\n"
                         + "}\n"
@@ -697,7 +697,7 @@ public final class SolvikExceptionExecutionTest {
                         + "    throw AppError()\n"
                         + "  }\n"
                         + "  catch (e: AppError) {\n"
-                        + "    var saved = e\n"
+                        + "    var saved: AppError = e\n"
                         + "    throw saved\n"
                         + "  }\n"
                         + "}\n"
@@ -751,7 +751,7 @@ public final class SolvikExceptionExecutionTest {
         // The message is a trailing optional argument rather than a declared constructor parameter, so a
         // subclass keeps its own parameters and its super(...) forwarding unchanged.
         Result result = evaluate(
-                "mutable class BaseError extends RuntimeException {\n"
+                "class mutable BaseError extends RuntimeException {\n"
                         + "  var code: Integer\n"
                         + "  BaseError(code: Integer) {\n"
                         + "    this.code = code\n"
@@ -891,7 +891,7 @@ public final class SolvikExceptionExecutionTest {
 
         Result accessor = evaluate(
                 "class AppError extends RuntimeException {\n"
-                        + "  func getMessage(): String {\n"
+                        + "  method getMessage(): String {\n"
                         + "    return \"mine\"\n"
                         + "  }\n"
                         + "}\n");
@@ -905,11 +905,11 @@ public final class SolvikExceptionExecutionTest {
         Result result = evaluate(
                 "class Note {\n"
                         + "  var message: String = \"fine\"\n"
-                        + "  func getMessage(): String {\n"
+                        + "  method getMessage(): String {\n"
                         + "    return \"fine\"\n"
                         + "  }\n"
                         + "}\n"
-                        + "var note = Note()\n"
+                        + "var note: Note = Note()\n"
                         + "println(note.message)\n"
                         + "println(note.getMessage())\n");
         assertThat(result.failure).as(result.output).isNull();

@@ -38,12 +38,13 @@ public final class SolvikInterfaceParserTest {
     public void specificationInterfaceShapeParses() {
         CompilationUnitNode unit = parseOk("named.sol", """
                 interface Named {
-                    func name(): String
+                    method name(): String
 
-                    func greeting(): String {
+                    method greeting(): String {
                         return "Hello " .. name()
                     }
                 }
+
                 """);
         InterfaceDeclNode named = (InterfaceDeclNode) unit.declarations().get(0);
         assertThat(named.name()).isEqualTo("Named");
@@ -53,7 +54,7 @@ public final class SolvikInterfaceParserTest {
         SignatureDeclNode name = named.signatures().get(0);
         assertThat(name.name()).isEqualTo("name");
         assertThat(name.hasBody()).isFalse();
-        assertThat(name.returnType().name()).isEqualTo("String");
+        assertThat(name.declaredReturnType().orElseThrow().name()).isEqualTo("String");
 
         FunctionDeclNode greeting = named.defaultMethods().get(0);
         assertThat(greeting.name()).isEqualTo("greeting");
@@ -65,20 +66,21 @@ public final class SolvikInterfaceParserTest {
     public void multipleImplementsIsParsedInSourceOrder() {
         CompilationUnitNode unit = parseOk("multi.sol", """
                 interface A {
-                    func a(): Integer
+                    method a(): Integer
                 }
                 interface B {
-                    func b(): Integer
+                    method b(): Integer
                 }
                 class C implements A, B {
-                    func a(): Integer {
+                    method a(): Integer {
                         return 1
                     }
 
-                    func b(): Integer {
+                    method b(): Integer {
                         return 2
                     }
                 }
+
                 """);
         ClassDeclNode c = (ClassDeclNode) unit.declarations().get(2);
         assertThat(c.interfaces().stream().map(t -> t.name()).toList()).isEqualTo(List.of("A", "B"));
@@ -89,16 +91,17 @@ public final class SolvikInterfaceParserTest {
     public void interfaceExtendsMultipleInterfaces() {
         CompilationUnitNode unit = parseOk("extend.sol", """
                 interface Readable {
-                    func read(): String
+                    method read(): String
                 }
                 interface Writable {
-                    func write(value: String): Unit
+                    method write(value: String)
                 }
                 interface Stream extends Readable, Writable {
-                    func describe(): String {
+                    method describe(): String {
                         return read()
                     }
                 }
+
                 """);
         InterfaceDeclNode stream = (InterfaceDeclNode) unit.declarations().get(2);
         assertThat(stream.superInterfaces().stream().map(t -> t.name()).toList()).isEqualTo(List.of("Readable", "Writable"));
@@ -111,9 +114,9 @@ public final class SolvikInterfaceParserTest {
     public void classCombinesExtendsAndImplements() {
         CompilationUnitNode unit = parseOk("both.sol", """
                 interface Named {
-                    func name(): String
+                    method name(): String
                 }
-                mutable class Base {
+                class mutable Base {
                     var id: Integer
 
                     Base(id: Integer) {
@@ -125,10 +128,11 @@ public final class SolvikInterfaceParserTest {
                         super(1)
                     }
 
-                    func name(): String {
+                    method name(): String {
                         return "user"
                     }
                 }
+
                 """);
         ClassDeclNode user = (ClassDeclNode) unit.declarations().get(2);
         assertThat(user.superClass().orElseThrow().name()).isEqualTo("Base");
@@ -139,7 +143,7 @@ public final class SolvikInterfaceParserTest {
     public void interfaceMembersTerminateOnTheirLineBoundary() {
         // A signature ends where its line ends; a default method body ends in a standalone `}` that
         // ends its own line, so neither member needs an explicit `;`.
-        CompilationUnitNode unit = parseOk("terminators.sol", "interface I {\n    func a(): Integer\n    func b(): Integer {\n        return 1\n    }\n\n    func c(): Integer {\n        return 2\n    }\n}\n");
+        CompilationUnitNode unit = parseOk("terminators.sol", "interface I {\n    method a(): Integer\n    method b(): Integer {\n        return 1\n    }\n\n    method c(): Integer {\n        return 2\n    }\n}\n");
         InterfaceDeclNode declaration = (InterfaceDeclNode) unit.declarations().get(0);
         assertThat(declaration.signatures().size()).isEqualTo(1);
         assertThat(declaration.defaultMethods().size()).isEqualTo(2);
@@ -147,7 +151,7 @@ public final class SolvikInterfaceParserTest {
 
     @Test
     public void declarationOrderIsPreservedAcrossFunctionsClassesAndInterfaces() {
-        CompilationUnitNode unit = parseOk("order.sol", "interface I {\n    func f(): Integer\n}\nfunc g(): Integer {\n    return 1\n}\nclass C implements I {\n    func f(): Integer {\n        return 2\n    }\n}\n");
+        CompilationUnitNode unit = parseOk("order.sol", "interface I {\n    method f(): Integer\n}\nfunc g(): Integer {\n    return 1\n}\nclass C implements I {\n    method f(): Integer {\n        return 2\n    }\n}\n");
         assertThat(unit.declarations().stream().map(d -> d instanceof InterfaceDeclNode i ? i.name() : d instanceof ClassDeclNode c ? c.name() : ((FunctionDeclNode) d).name()).toList()).isEqualTo(List.of("I", "g", "C"));
     }
 
@@ -163,24 +167,24 @@ public final class SolvikInterfaceParserTest {
 
     @Test
     public void interfaceMemberCarriesNoOverrideModifier() {
-        parseFails("modifier.sol", "interface I {\n    override func f(): Integer {\n        return 1\n    }\n}\n");
+        parseFails("modifier.sol", "interface I {\n    method override f(): Integer {\n        return 1\n    }\n}\n");
     }
 
     @Test
     public void implementsIsNotValidOnAnInterface() {
-        parseFails("implements.sol", "interface A {\n    func a(): Integer\n}\ninterface B implements A {\n}\n");
+        parseFails("implements.sol", "interface A {\n    method a(): Integer\n}\ninterface B implements A {\n}\n");
     }
 
     @Test
     public void interfaceMemberMayOmitItsReturnType() {
-        CompilationUnitNode unit = parseOk("notype.sol", "interface I {\n    func f()\n}\n");
+        CompilationUnitNode unit = parseOk("notype.sol", "interface I {\n    method f()\n}\n");
         InterfaceDeclNode i = (InterfaceDeclNode) unit.declarations().get(0);
-        // An omitted return type is Unit (docs/LANGUAGE_SPEC.md section 6).
-        assertThat(i.signatures().get(0).returnType().name()).isEqualTo("Unit");
+        // An omitted return type declares that the member produces no value (section 6).
+        assertThat(i.signatures().get(0).declaredReturnType()).isEmpty();
     }
 
     @Test
     public void interfaceMemberReturnTypeColonRequiresAType() {
-        parseFails("notype2.sol", "interface I {\n    func f():\n}\n");
+        parseFails("notype2.sol", "interface I {\n    method f():\n}\n");
     }
 }

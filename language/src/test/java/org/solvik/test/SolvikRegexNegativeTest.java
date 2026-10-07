@@ -55,73 +55,84 @@ public final class SolvikRegexNegativeTest {
     @Test
     public void regexConstructionRequiresExactlyOneArgument() {
         assertThat(first(checkFails("""
-                    var re = Regex()
+                        var re: Regex = Regex()
+
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_ARITY_MISMATCH);
         assertThat(first(checkFails("""
-                    var re = Regex("a", "b")
+                        var re: Regex = Regex("a", "b")
+
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_ARITY_MISMATCH);
     }
 
     @Test
     public void regexConstructionRequiresAString() {
         assertThat(first(checkFails("""
-                    var re = Regex(1)
+                        var re: Regex = Regex(1)
+
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
 
     @Test
     public void regexConstructionRejectsANullableString() {
         assertThat(first(checkFails("""
-                    var re = Regex(null)
+                        var re: Regex = Regex(null)
+
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
 
     @Test
     public void anInvalidConstantPatternIsACompileTimeDiagnostic() {
         assertThat(first(checkFails("""
-                    var re = Regex("(")
+                        var re: Regex = Regex("(")
+
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_REGEX_PATTERN);
     }
 
     @Test
     public void aReversedRepetitionConstantIsRejected() {
         assertThat(first(checkFails("""
-                    var re = Regex("a{2,1}")
+                        var re: Regex = Regex("a{2,1}")
+
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_REGEX_PATTERN);
     }
 
     @Test
     public void lookaroundInAConstantPatternIsRejected() {
         assertThat(first(checkFails("""
-                    var re = Regex(r"(?=a)")
+                        var re: Regex = Regex(r"(?=a)")
+
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_REGEX_PATTERN);
     }
 
     @Test
     public void aBackreferenceInAConstantPatternIsRejected() {
         assertThat(first(checkFails("""
-                    var re = Regex(r"(a)\\1")
+                        var re: Regex = Regex(r"(a)\\1")
+
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_REGEX_PATTERN);
     }
 
     @Test
     public void embeddedFlagsInAConstantPatternAreRejected() {
         assertThat(first(checkFails("""
-                    var re = Regex(r"(?i)abc")
+                        var re: Regex = Regex(r"(?i)abc")
+
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_REGEX_PATTERN);
     }
 
     @Test
     public void regexMatchCannotBeConstructed() {
         assertThat(first(checkFails("""
-                    var m = RegexMatch()
+                        var m: Any = RegexMatch()
+
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_CONVERSION);
     }
 
     @Test
     public void regexCannotBeUsedAsABareValue() {
         assertThat(first(checkFails("""
-                    var r = Regex
+                        var r: Any = Regex
+
                 """)).code()).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_NAME);
     }
 
@@ -155,18 +166,20 @@ public final class SolvikRegexNegativeTest {
     @Test
     public void aRegexMethodNameCannotBeUsedAsAValue() {
         assertThat(first(checkFails("""
-                func test(re: Regex): Unit {
-                    var f = re.matches
+                func test(re: Regex) {
+                    var f: Any = re.matches
                 }
+
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_FUNCTION_AS_VALUE);
     }
 
     @Test
     public void assigningToARegexMethodIsRejected() {
         assertThat(first(checkFails("""
-                func test(re: Regex): Unit {
+                func test(re: Regex) {
                     re.matches = "a"
                 }
+
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_ASSIGNMENT_TARGET);
     }
 
@@ -200,32 +213,36 @@ public final class SolvikRegexNegativeTest {
     @Test
     public void regexMatchPropertiesAreImmutable() {
         assertThat(first(checkFails("""
-                func test(m: RegexMatch): Unit {
+                func test(m: RegexMatch) {
                     m.value = "x"
                 }
+
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_ASSIGN_TO_IMMUTABLE);
         assertThat(first(checkFails("""
-                func test(m: RegexMatch): Unit {
+                func test(m: RegexMatch) {
                     m.start = 0
                 }
+
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_ASSIGN_TO_IMMUTABLE);
     }
 
     @Test
     public void aRegexMatchMethodNameCannotBeUsedAsAValue() {
         assertThat(first(checkFails("""
-                func test(m: RegexMatch): Unit {
-                    var f = m.group
+                func test(m: RegexMatch) {
+                    var f: Any = m.group
                 }
+
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_FUNCTION_AS_VALUE);
     }
 
     @Test
     public void assigningToARegexMatchMethodIsRejected() {
         assertThat(first(checkFails("""
-                func test(m: RegexMatch): Unit {
+                func test(m: RegexMatch) {
                     m.group = 0
                 }
+
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_ASSIGNMENT_TARGET);
     }
 

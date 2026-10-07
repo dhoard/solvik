@@ -1,2 +1,2 @@
-var a = 1 /* c
+var a: Integer = 1 /* c
 */ print("bc" .. a)

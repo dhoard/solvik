@@ -56,7 +56,10 @@ public final class SolvikExecutionTest {
 
     @Test
     public void printsEveryScalarType() {
-        assertThat(runMain("println(42)\nprintln(true)\nprintln(\"hello\")\nprintln(println(1))")).isEqualTo("42\ntrue\nhello\n1\nUnit\n");
+        // A call that produces no value is not a value, so `println(...)` cannot be nested as an
+        // argument; the scalar types are what this test covers.
+        assertThat(runMain("println(42)\nprintln(true)\nprintln(\"hello\")\nprintln('a')\nprintln(1.5)"))
+                .isEqualTo("42\ntrue\nhello\na\n1.5\n");
     }
 
     @Test
@@ -96,17 +99,18 @@ public final class SolvikExecutionTest {
     @Test
     public void localsInferenceAndMutation() {
         assertThat(runMain("""
-                var a = 1
-                var mutable b = 2
+                var a: Integer = 1
+                var mutable b: Integer = 2
                 b = b + a
                 println(b)
+
                 """)).isEqualTo("3\n");
     }
 
     @Test
     public void ifElseChains() {
         assertThat(runMain("""
-                var x = 5
+                var x: Integer = 5
                 if (x < 3) {
                     println("tiny")
                 }
@@ -116,7 +120,7 @@ public final class SolvikExecutionTest {
                 else {
                     println("big")
                 }
-                var y = 50
+                var y: Integer = 50
                 if (y < 3) {
                     println("tiny")
                 }
@@ -126,13 +130,14 @@ public final class SolvikExecutionTest {
                 else {
                     println("medium")
                 }
+
                 """)).isEqualTo("small\nmedium\n");
     }
 
     @Test
     public void whileLoopWithBreakAndContinue() {
         assertThat(runMain("""
-                var mutable i = 0
+                var mutable i: Integer = 0
                 while (i < 6) {
                     i = i + 1
                     if (i == 2) {
@@ -143,6 +148,7 @@ public final class SolvikExecutionTest {
                     }
                     println(i)
                 }
+
                 """)).isEqualTo("1\n3\n4\n");
     }
 
@@ -153,7 +159,7 @@ public final class SolvikExecutionTest {
         // and the induction step always runs as the body's final item.
         assertThat(runMain("""
                 {
-                    var mutable i = 0
+                    var mutable i: Integer = 0
                     while (i < 3) {
                         if (i != 1) {
                             println(i)
@@ -161,6 +167,7 @@ public final class SolvikExecutionTest {
                         i = i + 1
                     }
                 }
+
                 """)).isEqualTo("0\n2\n");
     }
 
@@ -168,7 +175,7 @@ public final class SolvikExecutionTest {
     public void whileLoopBreakStopsIteration() {
         assertThat(runMain("""
                 {
-                    var mutable i = 0
+                    var mutable i: Integer = 0
                     while (i < 100) {
                         if (i == 2) {
                             break
@@ -177,6 +184,7 @@ public final class SolvikExecutionTest {
                         i = i + 1
                     }
                 }
+
                 """)).isEqualTo("0\n1\n");
     }
 
@@ -288,19 +296,20 @@ public final class SolvikExecutionTest {
         // at runtime (both short-circuit branches), confirming the lowering pipeline
         // for complex while conditions rather than only scalar conditions.
         assertThat(runMain("""
-                var mutable i = 0
-                var mutable j = 0
+                var mutable i: Integer = 0
+                var mutable j: Integer = 0
                 while (i < 3 && j < 3) {
                     i = i + 1
                     j = j + 1
                 }
                 println(i)
                 println(j)
+
                 """)).isEqualTo("3\n3\n");
 
         assertThat(runMain("""
-                var mutable i = 0
-                var mutable j = 0
+                var mutable i: Integer = 0
+                var mutable j: Integer = 0
                 while (i < 3 || j < 2) {
                     i = i + 1
                     if (i > 2) {
@@ -310,6 +319,7 @@ public final class SolvikExecutionTest {
                 }
                 println(i)
                 println(j)
+
                 """)).isEqualTo("3\n2\n");
     }
 
@@ -318,7 +328,7 @@ public final class SolvikExecutionTest {
         // The scope-plus-while idiom covers both shapes the removed three-clause
         // `for` used to reach: an infinite loop and a bare update-only loop.
         assertThat(runMain("""
-                var mutable i = 0
+                var mutable i: Integer = 0
                 while (true) {
                     i = i + 1
                     if (i >= 4) {
@@ -326,10 +336,11 @@ public final class SolvikExecutionTest {
                     }
                 }
                 println(i)
+
                 """)).isEqualTo("4\n");
 
         assertThat(runMain("""
-                var mutable i = 0
+                var mutable i: Integer = 0
                 {
                     while (true) {
                         if (i >= 3) {
@@ -339,6 +350,7 @@ public final class SolvikExecutionTest {
                     }
                 }
                 println(i)
+
                 """)).isEqualTo("3\n");
     }
 }

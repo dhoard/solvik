@@ -1,11 +1,11 @@
 interface Shape {
-    func sides(): Integer
+    method sides(): Integer
 }
 class Sq implements Shape {
     Sq() {
     }
 
-    func sides(): Integer {
+    method sides(): Integer {
         return 4
     }
 }

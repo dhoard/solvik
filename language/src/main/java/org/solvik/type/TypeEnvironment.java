@@ -25,12 +25,16 @@ import java.util.Optional;
  * numeric/class hierarchy metadata lives here rather than in reflection over JVM classes
  * (docs/ARCHITECTURE.md "Type System").
  *
- * <p>The complete root hierarchy is predeclared, with Phase 14 adding the built-in
- * {@code Regex} and {@code RegexMatch} types: {@code Any} at the top, {@code Number} with its six
- * numeric subtypes, {@code Boolean}, {@code Character}, {@code String}, {@code Unit}, {@code Regex},
- * {@code RegexMatch}, and the bottom type {@code Nothing}. A class declaration registers its
- * nominal {@link ClassType} here during semantic collection so property, parameter, and return
- * types may reference classes in any declaration order.
+ * <p>The complete root hierarchy is predeclared: {@code Any} at the top, {@code Number} with its six
+ * numeric subtypes, {@code Boolean}, {@code Character}, {@code String}, {@code Regex},
+ * {@code RegexMatch}, and the bottom type {@code Nothing}. A class declaration registers its nominal
+ * {@link ClassType} here during semantic collection so property, parameter, and return types may
+ * reference classes in any declaration order.
+ *
+ * <p>{@code Unit} is deliberately absent. The compiler still represents "this callable produces no
+ * value" internally with {@link UnitType}, but there is no source-level {@code Unit} type: a callable
+ * that writes no {@code : Type} produces no value, so writing {@code Unit} anywhere a type may be
+ * written is reported as an unknown type (docs/LANGUAGE_SPEC.md section 6).
  */
 public final class TypeEnvironment {
 
@@ -50,7 +54,6 @@ public final class TypeEnvironment {
         register(BooleanType.INSTANCE);
         register(CharacterType.INSTANCE);
         register(StringType.INSTANCE);
-        register(UnitType.INSTANCE);
         register(RegexType.INSTANCE);
         register(RegexMatchType.INSTANCE);
         register(ExceptionBases.EXCEPTION);

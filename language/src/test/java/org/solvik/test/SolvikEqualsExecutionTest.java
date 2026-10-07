@@ -72,10 +72,7 @@ public final class SolvikEqualsExecutionTest {
                         println(true.equals(true))
                         println(Byte(1).equals(Byte(1)))
                         println(Short(-3).equals(Short(-3)))
-                        func noop() {
-                        }
-                        println(noop().equals(noop()))
-                        """)).isEqualTo("true\nfalse\ntrue\ntrue\ntrue\ntrue\ntrue\ntrue\ntrue\ntrue\n");
+                        """)).isEqualTo("true\nfalse\ntrue\ntrue\ntrue\ntrue\ntrue\ntrue\ntrue\n");
     }
 
     @Test
@@ -84,10 +81,11 @@ public final class SolvikEqualsExecutionTest {
         assertThat(run("""
                         class Box {
                         }
-                        var same = Box()
-                        var other = Box()
+                        var same: Box = Box()
+                        var other: Box = Box()
                         println(same.equals(same))
                         println(same.equals(other))
+
                         """)).isEqualTo("true\nfalse\n");
     }
 
@@ -121,13 +119,14 @@ public final class SolvikEqualsExecutionTest {
     public void equalsMemberFailureFromOverridePropagates() {
         Throwable thrown = catchThrowable(() -> run("""
                         class Bad {
-                            override func equals(other: Any?): Boolean {
+                            method override equals(other: Any?): Boolean {
                                 return 1 / 0 == 0
                             }
                         }
-                        var a = Bad()
-                        var b = Bad()
+                        var a: Bad = Bad()
+                        var b: Bad = Bad()
                         println(a.equals(b))
+
                         """));
         assertThat(thrown).isNotNull();
     }

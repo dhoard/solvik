@@ -47,7 +47,7 @@ public final class SolvikInheritanceSemanticTest {
 
     @Test
     public void subclassJoinsTheNominalHierarchy() {
-        CheckedProgram program = check("mutable class Animal {\n}\nclass Dog extends Animal {\n}\n");
+        CheckedProgram program = check("class mutable Animal {\n}\nclass Dog extends Animal {\n}\n");
         ClassSymbol animal = program.classSymbol("Animal").orElseThrow();
         ClassSymbol dog = program.classSymbol("Dog").orElseThrow();
         assertThat(dog.superClass().orElseThrow()).isEqualTo(animal);
@@ -60,14 +60,14 @@ public final class SolvikInheritanceSemanticTest {
     @Test
     public void inheritedPropertiesAndMethodsAreVisible() {
         check("""
-                mutable class Animal {
+                class mutable Animal {
                     var name: String
 
                     Animal(name: String) {
                         this.name = name
                     }
 
-                    func describe(): String {
+                    method describe(): String {
                         return this.name
                     }
                 }
@@ -77,25 +77,29 @@ public final class SolvikInheritanceSemanticTest {
                     }
                 }
                 func f(): String {
-                    var dog = Dog()
+                    var dog: Dog = Dog()
                     return dog.describe()
                 }
+
+
                 """);
     }
 
     @Test
     public void overrideReplacesTheInheritedMethodInTheDispatchTable() {
         CheckedProgram program = check("""
-                mutable class Animal {
-                    mutable func speak(): String {
+                class mutable Animal {
+                    method mutable speak(): String {
                         return "..."
                     }
                 }
                 class Dog extends Animal {
-                    override func speak(): String {
+                    method override speak(): String {
                         return "woof"
                     }
                 }
+
+
                 """);
         ClassSymbol animal = program.classSymbol("Animal").orElseThrow();
         ClassSymbol dog = program.classSymbol("Dog").orElseThrow();
@@ -110,7 +114,7 @@ public final class SolvikInheritanceSemanticTest {
     @Test
     public void explicitSuperConstructorCallIsRecognized() {
         CheckedProgram program = check("""
-                mutable class Animal {
+                class mutable Animal {
                     var legs: Integer
                     Animal(legs: Integer) {
                         this.legs = legs
@@ -121,6 +125,7 @@ public final class SolvikInheritanceSemanticTest {
                         super(4)
                     }
                 }
+
                 """);
         ClassDeclNode dog = (ClassDeclNode) program.unit().declarations().get(1);
         ExprStmtNode first = (ExprStmtNode) dog.constructor().orElseThrow().body().statements().get(0);
@@ -131,7 +136,7 @@ public final class SolvikInheritanceSemanticTest {
     @Test
     public void implicitSuperConstructorCallIsAcceptedForAZeroArgumentSuperclass() {
         check("""
-                mutable class Animal {
+                class mutable Animal {
                     var legs: Integer = 4
                 }
                 class Dog extends Animal {
@@ -140,22 +145,25 @@ public final class SolvikInheritanceSemanticTest {
                         this.name = name
                     }
                 }
+
                 """);
     }
 
     @Test
     public void superMemberAccessTargetsTheSuperclassImplementation() {
         CheckedProgram program = check("""
-                mutable class Animal {
-                    mutable func speak(): String {
+                class mutable Animal {
+                    method mutable speak(): String {
                         return "..."
                     }
                 }
                 class Dog extends Animal {
-                    override func speak(): String {
+                    method override speak(): String {
                         return super.speak()
                     }
                 }
+
+
                 """);
         ClassDeclNode dog = (ClassDeclNode) program.unit().declarations().get(1);
         org.solvik.ast.statement.ReturnStmtNode statement = (org.solvik.ast.statement.ReturnStmtNode) dog.methods().get(0).body().statements().get(0);
@@ -171,16 +179,17 @@ public final class SolvikInheritanceSemanticTest {
         // built-in root calls so lowering emits the identity comparison and identity hash rather than
         // re-dispatching (section 3). `equals` and `hashCode` must be overridden together.
         CheckedProgram program = check("""
-                mutable class Base {
+                class mutable Base {
                 }
                 class Derived extends Base {
-                    override func equals(other: Any?): Boolean {
+                    method override equals(other: Any?): Boolean {
                         return super.equals(other)
                     }
-                    override func hashCode(): Integer {
+                    method override hashCode(): Integer {
                         return super.hashCode()
                     }
                 }
+
                 """);
         ClassDeclNode derived = (ClassDeclNode) program.unit().declarations().get(1);
         CallExprNode equalsCall = (CallExprNode) ((org.solvik.ast.statement.ReturnStmtNode) derived.methods().get(0).body().statements().get(0)).value().orElseThrow();
@@ -215,7 +224,7 @@ public final class SolvikInheritanceSemanticTest {
 
     @Test
     public void userDeclaredObjectIsAnOrdinaryNominalTypeUnderAny() {
-        CheckedProgram program = check("mutable class Object {\n}\nclass User extends Object {\n}\n");
+        CheckedProgram program = check("class mutable Object {\n}\nclass User extends Object {\n}\n");
         ClassSymbol object = program.classSymbol("Object").orElseThrow();
         ClassSymbol user = program.classSymbol("User").orElseThrow();
         assertThat(object.superClass().isEmpty()).isTrue();
@@ -229,13 +238,14 @@ public final class SolvikInheritanceSemanticTest {
     public void interfaceNamedObjectIsAnOrdinaryNominalType() {
         CheckedProgram program = check("""
                 interface Object {
-                    func size(): Integer
+                    method size(): Integer
                 }
                 class Bag implements Object {
-                    func size(): Integer {
+                    method size(): Integer {
                         return 0
                     }
                 }
+
                 """);
         Type object = program.interfaceSymbol("Object").orElseThrow().type();
         ClassSymbol bag = program.classSymbol("Bag").orElseThrow();

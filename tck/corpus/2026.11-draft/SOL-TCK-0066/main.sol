@@ -7,17 +7,17 @@
 // class must reach the delegate's implementation. `greet` is declared nowhere on `Host`,
 // so producing "hello" can only come through synthesized forwarding.
 interface Greeter {
-    func greet(): String
+    method greet(): String
 }
 
 class English implements Greeter {
-    func greet(): String {
+    method greet(): String {
         return "hello"
     }
 }
 
 class Host implements Greeter {
-    delegate var impl: Greeter
+    delegate impl: Greeter
 
     Host(impl: Greeter) {
         this.impl = impl

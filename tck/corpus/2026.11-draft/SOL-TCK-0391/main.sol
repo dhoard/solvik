@@ -4,7 +4,7 @@
 // Oracle quotations verified verbatim against docs/LANGUAGE_SPEC.md:
 //   - a top-level `var`, whether or not it is `mutable`, is therefore a local of the implicit main, not a global.
 //
-var x = 1
+var x: Integer = 1
 func f(): Integer {
     return x
 }

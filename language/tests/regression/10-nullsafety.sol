@@ -5,14 +5,14 @@ class Holder {
     }
 }
 func show(h: Holder): String {
-    var name = h.name
+    var name: String? = h.name
     if (name == null) {
         return "none"
     }
     return name.toString()
 }
-var present = Holder("abc")
-var missing = Holder(null)
+var present: Holder = Holder("abc")
+var missing: Holder = Holder(null)
 println(show(present))
 println(show(missing))
 println(missing.name ?? "none")

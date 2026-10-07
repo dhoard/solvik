@@ -21,14 +21,14 @@ func cmp2(a: Double, b: Double): Boolean {
 
 println(cmp2(92.0, 98.0))
 
-mutable class A3 {
-    mutable func v5(): Integer {
+class mutable A3 {
+    method mutable v5(): Integer {
         return 22
     }
 }
 
 class B4 extends A3 {
-    override func v5(): Integer {
+    method override v5(): Integer {
         return 19
     }
 }

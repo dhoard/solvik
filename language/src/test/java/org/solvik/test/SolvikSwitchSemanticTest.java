@@ -59,7 +59,7 @@ public final class SolvikSwitchSemanticTest {
     @Test
     public void constantLabelsAreTypedAndRecorded() {
         CheckedProgram program = check("""
-                func run(value: Integer): Unit {
+                func run(value: Integer) {
                     switch (value) {
                         case 1 {
                             print("one")
@@ -69,6 +69,7 @@ public final class SolvikSwitchSemanticTest {
                         }
                     }
                 }
+
                 """);
         ConstantCaseLabelNode label = (ConstantCaseLabelNode) switchInFunction(program, "run").cases().get(0).labels().get(0);
         Type type = program.typeOf(label.expression()).orElseThrow();
@@ -78,7 +79,7 @@ public final class SolvikSwitchSemanticTest {
     @Test
     public void groupedLabelsAndNegativeConstantsAreAccepted() {
         CheckedProgram program = check("""
-                func run(value: Integer): Unit {
+                func run(value: Integer) {
                     switch (value) {
                         case -1, 0, 1 {
                             print("unit")
@@ -88,6 +89,7 @@ public final class SolvikSwitchSemanticTest {
                         }
                     }
                 }
+
                 """);
         SwitchStmtNode statement = switchInFunction(program, "run");
         assertThat(statement.cases().get(0).labels().size()).isEqualTo(3);
@@ -97,7 +99,7 @@ public final class SolvikSwitchSemanticTest {
     @Test
     public void longConstantsRequireALongScrutinee() {
         CheckedProgram program = check("""
-                func run(value: Long): Unit {
+                func run(value: Long) {
                     switch (value) {
                         case 1L {
                             print("one")
@@ -107,6 +109,7 @@ public final class SolvikSwitchSemanticTest {
                         }
                     }
                 }
+
                 """);
         ConstantCaseLabelNode label = (ConstantCaseLabelNode) switchInFunction(program, "run").cases().get(0).labels().get(0);
         assertThat(program.typeOf(label.expression()).orElseThrow()).isSameAs(LongType.INSTANCE);
@@ -115,7 +118,7 @@ public final class SolvikSwitchSemanticTest {
     @Test
     public void aNullLabelMatchesAGNullableScrutinee() {
         CheckedProgram program = check("""
-                func run(value: String?): Unit {
+                func run(value: String?) {
                     switch (value) {
                         case null {
                             print("none")
@@ -128,6 +131,7 @@ public final class SolvikSwitchSemanticTest {
                         }
                     }
                 }
+
                 """);
         SwitchStmtNode statement = switchInFunction(program, "run");
         assertThat(((ConstantCaseLabelNode) statement.cases().get(0).labels().get(0)).expression().kind()).isSameAs(AstKind.NULL_LITERAL);
@@ -137,7 +141,7 @@ public final class SolvikSwitchSemanticTest {
     @Test
     public void aRegexCaseCompilesItsConstantPatternOnce() {
         CheckedProgram program = check("""
-                func run(input: String): Unit {
+                func run(input: String) {
                     switch (input) {
                         case regex r#"^\\d+$"# {
                             print("number")
@@ -147,6 +151,7 @@ public final class SolvikSwitchSemanticTest {
                         }
                     }
                 }
+
                 """);
         RegexCaseLabelNode label = (RegexCaseLabelNode) switchInFunction(program, "run").cases().get(0).labels().get(0);
         assertThat(program.regexCasePatternOf(label).orElseThrow().source()).isEqualTo("^\\d+$");
@@ -155,7 +160,7 @@ public final class SolvikSwitchSemanticTest {
     @Test
     public void aRegexCaseWorksOnAConstantStringPatternToo() {
         CheckedProgram program = check("""
-                func run(input: String): Unit {
+                func run(input: String) {
                     switch (input) {
                         case regex "[a-z]+" {
                             print("word")
@@ -165,6 +170,7 @@ public final class SolvikSwitchSemanticTest {
                         }
                     }
                 }
+
                 """);
         RegexCaseLabelNode label = (RegexCaseLabelNode) switchInFunction(program, "run").cases().get(0).labels().get(0);
         assertThat(program.regexCasePatternOf(label).orElseThrow().source()).isEqualTo("[a-z]+");
@@ -173,7 +179,7 @@ public final class SolvikSwitchSemanticTest {
     @Test
     public void anEmptyDefaultIsAccepted() {
         CheckedProgram program = check("""
-                func run(value: Integer): Unit {
+                func run(value: Integer) {
                     switch (value) {
                         case 1 {
                             print("one")
@@ -182,6 +188,7 @@ public final class SolvikSwitchSemanticTest {
                         }
                     }
                 }
+
                 """);
         assertThat(switchInFunction(program, "run").cases().size()).isEqualTo(2);
     }
@@ -189,7 +196,7 @@ public final class SolvikSwitchSemanticTest {
     @Test
     public void aBreakInsideALoopNestedInACaseIsAccepted() {
         check("""
-                func run(value: Integer): Unit {
+                func run(value: Integer) {
                     switch (value) {
                         case 1 {
                             while (true) {
@@ -201,15 +208,16 @@ public final class SolvikSwitchSemanticTest {
                         }
                     }
                 }
+
                 """);
     }
 
     @Test
     public void aContinueInACaseTargetsAnEnclosingLoop() {
         check("""
-                func run(value: Integer): Unit {
+                func run(value: Integer) {
                     {
-                        var mutable i = 0
+                        var mutable i: Integer = 0
                         while (i < 3) {
                             i = i + 1
 
@@ -225,13 +233,14 @@ public final class SolvikSwitchSemanticTest {
                         }
                     }
                 }
+
                 """);
     }
 
     @Test
     public void aSwitchOverAConstantStringValueIsTyped() {
         CheckedProgram program = check("""
-                func run(value: String): Unit {
+                func run(value: String) {
                     switch (value) {
                         case "a" {
                             print("a")
@@ -244,6 +253,7 @@ public final class SolvikSwitchSemanticTest {
                         }
                     }
                 }
+
                 """);
         assertThat(program.typeOf(switchInFunction(program, "run").scrutinee()).orElseThrow()).isSameAs(StringType.INSTANCE);
     }

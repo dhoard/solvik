@@ -21,8 +21,6 @@ import java.util.ArrayList;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.IdentityHashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -31,7 +29,7 @@ import java.util.Set;
 import org.solvik.ast.AstNode;
 import org.solvik.ast.CompilationUnitNode;
 import org.solvik.ast.declaration.IncludeDeclNode;
-import org.solvik.ast.declaration.ModuleDeclNode;
+import org.solvik.ast.declaration.ModuleBlockNode;
 import org.solvik.ast.expression.RawStringLiteralNode;
 import org.solvik.ast.expression.StringLiteralNode;
 import org.solvik.diagnostic.Diagnostic;
@@ -44,15 +42,16 @@ import org.solvik.source.StringEscapes;
 
 /**
  * Resolves compile-time {@code include} directives into one flattened syntax AST
- * (docs/LANGUAGE_SPEC.md section 20). Each physical file is parsed once, its resolved items are
- * spliced in depth-first, left-to-right order, and a canonical file is expanded at most once per
- * root compilation. The resolver produces no executable nodes and performs no runtime file I/O.
+ * (docs/LANGUAGE_SPEC.md section 20). Each physical file is parsed once, its items are spliced in
+ * depth-first, left-to-right order at the position of the directive that included it, and a canonical
+ * file is expanded at most once per root compilation. The resolver produces no executable nodes and
+ * performs no runtime file I/O.
  *
- * <p>Phase 17 also records each file's module declaration and the file-local module prefixes it
- * makes visible through {@code include ... alias p} and unaliased inclusion of a module-declaring
- * file. Every resolved top-level item carries the {@link FileScope} of the physical file that
- * declared it, so semantic analysis can resolve names against the declaring file's module and
- * prefixes. Module prefixes are file-local and non-transitive.
+ * <p>A file is a source container rather than a namespace, so splicing preserves each file's
+ * {@code module Name { ... }} blocks exactly as written: two blocks with one name — in one file or in
+ * two included files — become two blocks of the one module, which semantic analysis merges. An
+ * include binds no name, so the resolver records no module or prefix scope; the module a declaration
+ * belongs to is structural, through the block that contains it.
  *
  * <p>The traversal keeps a distinct {@code ACTIVE}, {@code COMPLETE}, or {@code FAILED} state per
  * canonical source. An {@code ACTIVE} target is a cycle, a {@code COMPLETE} target is a no-op, and a
@@ -68,22 +67,9 @@ public final class IncludeResolver {
         FAILED
     }
 
-    /** A resolved top-level item paired with the physical file's module/namespace context. */
-    private static final class Scoped {
-        final AstNode node;
-        FileScope scope;
-
-        Scoped(AstNode node, FileScope scope) {
-            this.node = node;
-            this.scope = scope;
-        }
-    }
-
     private final IncludeSourceAccess access;
     private final DiagnosticBag.Builder diagnostics = DiagnosticBag.builder();
     private final Map<URI, State> states = new HashMap<>();
-    /** Declared module name per canonical file; a {@code null} value means the default module. */
-    private final Map<URI, String> moduleByKey = new HashMap<>();
     private final Deque<LoadedSource> activeStack = new ArrayDeque<>();
     private final SourceCatalog.Builder catalog = SourceCatalog.builder();
     private final Set<Integer> catalogIds = new HashSet<>();
@@ -100,74 +86,37 @@ public final class IncludeResolver {
     }
 
     /**
-     * Validates a parsed file's own {@code module} declaration and returns the
-     * {@code RESOL_MODULE_INVALID_NAME} diagnostic when its name breaks the module naming rule, or
-     * empty for a valid or absent declaration. It performs no filesystem access, so a caller that
+     * Validates the {@code module Name} blocks of a parsed program and returns the
+     * {@code RESOL_MODULE_INVALID_NAME} diagnostics for the names that break the module naming rule;
+     * the list is empty when every name is valid. It performs no filesystem access, so a caller that
      * compiles an include-free root without an {@link IncludeSourceAccess} still reports the same
-     * diagnostic at the same stage as an expanded program.
+     * diagnostics at the same stage as an expanded program.
      */
-    public static Optional<Diagnostic> invalidModuleDeclaration(CompilationUnitNode unit) {
+    public static List<Diagnostic> invalidModuleDeclarations(CompilationUnitNode unit) {
         Objects.requireNonNull(unit, "unit");
-        Optional<ModuleDeclNode> declaration = unit.moduleDeclaration();
-        if (declaration.isEmpty() || ModuleNames.isValid(declaration.get().name())) {
-            return Optional.empty();
+        List<Diagnostic> reported = new ArrayList<>();
+        for (ModuleBlockNode module : unit.modules()) {
+            if (!ModuleNames.isValid(module.name())) {
+                reported.add(Diagnostic.error(DiagnosticCode.RESOL_MODULE_INVALID_NAME, module.span(), //
+                                ModuleNames.invalidNameMessage(module.name())));
+            }
         }
-        ModuleDeclNode module = declaration.get();
-        return Optional.of(Diagnostic.error(DiagnosticCode.RESOL_MODULE_INVALID_NAME, module.span(), //
-                        ModuleNames.invalidNameMessage("module", module.name())));
-    }
-
-    /**
-     * The {@link FileScope} of a parsed file that belongs to a named module and has no includes: its
-     * own declared module name, and no other visible prefix. It performs no filesystem access, so a
-     * caller compiling an include-free root without an {@link IncludeSourceAccess} still gives that
-     * file the same module and prefix visibility an expanded program gives it.
-     *
-     * <p>Returns empty for the implicit default module and for a name that
-     * {@link #invalidModuleDeclaration} rejects, so a caller reports the diagnostic rather than
-     * compiling a file whose module name is invalid.
-     */
-    public static Optional<FileScope> includeFreeFileScope(CompilationUnitNode unit) {
-        Objects.requireNonNull(unit, "unit");
-        Optional<ModuleDeclNode> declaration = unit.moduleDeclaration();
-        if (declaration.isEmpty() || !ModuleNames.isValid(declaration.get().name())) {
-            return Optional.empty();
-        }
-        return Optional.of(new FileScope(declaration.get().name(), ownModulePrefixes(declaration.get().name())));
-    }
-
-    /**
-     * The starting prefix bindings of a file: its own module name bound to itself, or nothing for the
-     * implicit default module. Aliases resolved from `include` directives are added to the returned
-     * map, which is mutable and order-preserving so declaration order is kept.
-     */
-    private static Map<String, String> ownModulePrefixes(String moduleName) {
-        Map<String, String> prefixes = new LinkedHashMap<>();
-        if (moduleName != null) {
-            prefixes.put(moduleName, moduleName);
-        }
-        return prefixes;
+        return List.copyOf(reported);
     }
 
     private IncludeResolutionResult run(CompilationUnitNode root) {
         LoadedSource rootSource = access.root();
         register(rootSource.file());
-        List<Scoped> items = expand(rootSource, root);
+        List<AstNode> nodes = expand(rootSource, root);
         SourceCatalog builtCatalog = catalog.build();
         DiagnosticBag bag = diagnostics.build();
         if (failed || bag.hasErrors()) {
             return IncludeResolutionResult.failure(bag, builtCatalog);
         }
-        Map<AstNode, FileScope> itemScopes = new IdentityHashMap<>();
-        List<AstNode> nodes = new ArrayList<>(items.size());
-        for (Scoped scoped : items) {
-            nodes.add(scoped.node);
-            itemScopes.put(scoped.node, scoped.scope);
-        }
-        return IncludeResolutionResult.success(new CompilationUnitNode(nodes, root.span()), itemScopes, builtCatalog);
+        return IncludeResolutionResult.success(new CompilationUnitNode(nodes, root.span()), builtCatalog);
     }
 
-    private List<Scoped> expand(LoadedSource loaded, CompilationUnitNode preparsed) {
+    private List<AstNode> expand(LoadedSource loaded, CompilationUnitNode preparsed) {
         URI key = loaded.canonicalKey();
         State state = states.get(key);
         if (state == State.COMPLETE) {
@@ -196,27 +145,22 @@ public final class IncludeResolver {
             parsed = parseResult.requireAst();
         }
 
-        String moduleName = validateModule(parsed);
-        moduleByKey.put(key, moduleName);
-
-        List<Scoped> output = new ArrayList<>();
-        // Reserve the file's own module name before binding aliases, so an alias cannot silently
-        // shadow it; a file may always reference its own module through its declared name.
-        Map<String, String> prefixes = ownModulePrefixes(moduleName);
+        // The file's own module names are validated here, where an invalid name is reported once for
+        // every physical file the program was built from.
         boolean success = true;
-        for (AstNode item : parsed.items()) {
-            if (!(item instanceof IncludeDeclNode include)) {
-                output.add(new Scoped(item, null));
-                continue;
-            }
-            if (!expandInclude(loaded, include, output, prefixes)) {
-                success = false;
-            }
+        for (Diagnostic invalid : invalidModuleDeclarations(parsed)) {
+            diagnostics.add(invalid);
+            success = false;
         }
-        FileScope scope = new FileScope(moduleName, prefixes);
-        for (Scoped scoped : output) {
-            if (scoped.scope == null) {
-                scoped.scope = scope;
+
+        List<AstNode> output = new ArrayList<>();
+        for (AstNode item : parsed.items()) {
+            if (item instanceof IncludeDeclNode include) {
+                if (!expandInclude(loaded, include, output)) {
+                    success = false;
+                }
+            } else {
+                output.add(item);
             }
         }
 
@@ -230,22 +174,8 @@ public final class IncludeResolver {
         return output;
     }
 
-    /** Resolves the optional module declaration of a physical file, reporting an invalid name. */
-    private String validateModule(CompilationUnitNode parsed) {
-        Optional<ModuleDeclNode> declaration = parsed.moduleDeclaration();
-        if (declaration.isEmpty()) {
-            return null;
-        }
-        ModuleDeclNode module = declaration.get();
-        if (!ModuleNames.isValid(module.name())) {
-            error(DiagnosticCode.RESOL_MODULE_INVALID_NAME, module.span(), ModuleNames.invalidNameMessage("module", module.name()));
-            return null;
-        }
-        return module.name();
-    }
-
     /** Resolves one include directive, appending its expansion; returns whether it succeeded. */
-    private boolean expandInclude(LoadedSource including, IncludeDeclNode include, List<Scoped> output, Map<String, String> prefixes) {
+    private boolean expandInclude(LoadedSource including, IncludeDeclNode include, List<AstNode> output) {
         String decoded;
         if (include.pathLiteral() instanceof StringLiteralNode string) {
             Optional<String> invalid = StringEscapes.invalidEscape(string.lexeme());
@@ -277,44 +207,9 @@ public final class IncludeResolver {
             // A prior expansion of this physical file already reported its diagnostics.
             return false;
         }
-        List<Scoped> targetItems = expand(target, null);
+        List<AstNode> targetItems = expand(target, null);
         if (states.get(target.canonicalKey()) != State.COMPLETE) {
             return false;
-        }
-        String targetModule = moduleByKey.get(target.canonicalKey());
-
-        if (include.hasAlias()) {
-            String alias = include.alias();
-            if (!ModuleNames.isValid(alias)) {
-                error(DiagnosticCode.RESOL_MODULE_INVALID_NAME, include.span(), ModuleNames.invalidNameMessage("alias", alias));
-                return false;
-            }
-            if (targetModule == null) {
-                error(DiagnosticCode.RESOL_ALIAS_DEFAULT_MODULE, include.span(), //
-                                "cannot alias a file in the default module; declare 'module' in the included file");
-                return false;
-            }
-            if (prefixes.containsKey(alias)) {
-                error(DiagnosticCode.RESOL_ALIAS_DUPLICATE, include.span(), "prefix '" + alias + "' is already bound in this file");
-                return false;
-            }
-            prefixes.put(alias, targetModule);
-            output.addAll(targetItems);
-            return true;
-        }
-
-        if (targetModule != null) {
-            // An unaliased include makes the included module visible under its own name. Binding that
-            // prefix again to a different module is the same SOLV-RESOL-013 collision the aliased path
-            // reports, in either declaration order (docs/LANGUAGE_SPEC.md section 20). Repeating a
-            // prefix that already denotes this same module is not a collision: files of one module
-            // merge, and a file may re-include its own module.
-            String bound = prefixes.get(targetModule);
-            if (bound != null && !bound.equals(targetModule)) {
-                error(DiagnosticCode.RESOL_ALIAS_DUPLICATE, include.span(), "prefix '" + targetModule + "' is already bound in this file");
-                return false;
-            }
-            prefixes.putIfAbsent(targetModule, targetModule);
         }
         output.addAll(targetItems);
         return true;

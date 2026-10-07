@@ -4,7 +4,7 @@
 // Oracle quotations verified verbatim against docs/LANGUAGE_SPEC.md:
 //   - Constant case expressions must be compile-time constants assignable to the switched value's type.
 //
-var x = 1
+var x: Integer = 1
 switch (x) {
     case x {
         print("same")

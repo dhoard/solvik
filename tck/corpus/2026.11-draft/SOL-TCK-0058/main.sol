@@ -4,14 +4,14 @@
 // `override` keyword is rejected statically. The specification states the requirement but
 // names no stable code for it, so only the semantic diagnostic family is asserted (see
 // ORACLE_REVIEW.md); the code the current implementation emits is not adopted.
-mutable class Base {
-    mutable func label(): String {
+class mutable Base {
+    method mutable label(): String {
         return "base"
     }
 }
 
 class Sub extends Base {
-    func label(): String {
+    method label(): String {
         return "sub"
     }
 }

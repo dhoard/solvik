@@ -232,155 +232,196 @@ def BAD(tid, req, src, code, note):
 
 # --- REQ-2000: success payload as a T, evaluated exactly once.
 OK("SOL-TCK-0309", "REQ-2000",
-   RESULT
-   + 'func get(ok: Boolean): Result<Integer, String> {\n'
-     '    if (ok) {\n'
-     '        return Result.Ok(41)\n'
-     '    }\n'
-     '    return Result.Err("bad")\n'
-     '}\n'
-     'func use(ok: Boolean): Result<Integer, String> {\n'
-     '    var v = get(ok)? + 1\n'
-     '    return Result.Ok(v)\n'
-     '}\n'
-     'var r = use(true)\n'
-     'print("ok=" .. r.isOk() .. " v=" .. r.unwrap())\n',
+   ('enum Result<T, E> {\n'
+    '    Ok(T)\n'
+    '    Err(E)\n'
+    '}\n'
+    'func get(ok: Boolean): Result<Integer, String> {\n'
+    '    if (ok) {\n'
+    '        return Result.Ok(41)\n'
+    '    }\n'
+    '    return Result.Err("bad")\n'
+    '}\n'
+    'func use(ok: Boolean): Result<Integer, String> {\n'
+    '    var v: Integer = get(ok)? + 1\n'
+    '    return Result.Ok(v)\n'
+    '}\n'
+    'var r: Result<Integer, String> = use(true)\n'
+    'print("ok=" .. r.isOk() .. " v=" .. r.unwrap())\n'
+    ''),
    "ok=true v=42",
    "The unary `?` yields the `Integer` payload 41, so `+ 1` produces 42; the payload is used as "
    "a value of its declared type `T`, not merely rendered.")
 
 OK("SOL-TCK-0310", "REQ-2000",
-   RESULT
-   + 'func probe(): Result<Integer, String> {\n'
-     '    print("p")\n'
-     '    return Result.Ok(7)\n'
-     '}\n'
-     'func use(): Result<Integer, String> {\n'
-     '    var v = probe()?\n'
-     '    return Result.Ok(v)\n'
-     '}\n'
-     'var r = use()\n'
-     'print("v=" .. r.unwrap())\n',
+   ('enum Result<T, E> {\n'
+    '    Ok(T)\n'
+    '    Err(E)\n'
+    '}\n'
+    'func probe(): Result<Integer, String> {\n'
+    '    print("p")\n'
+    '    return Result.Ok(7)\n'
+    '}\n'
+    'func use(): Result<Integer, String> {\n'
+    '    var v: Integer = probe()?\n'
+    '    return Result.Ok(v)\n'
+    '}\n'
+    'var r: Result<Integer, String> = use()\n'
+    'print("v=" .. r.unwrap())\n'
+    ''),
    "pv=7",
    "`probe` prints `p` once, so the operand was evaluated exactly once on the success path.")
 
 OK("SOL-TCK-0311", "REQ-2000",
-   RESULT
-   + 'func probe(): Result<Integer, String> {\n'
-     '    print("p")\n'
-     '    return Result.Err("e")\n'
-     '}\n'
-     'func use(): Result<Integer, String> {\n'
-     '    var v = probe()?\n'
-     '    print("AFTER")\n'
-     '    return Result.Ok(v)\n'
-     '}\n'
-     'var r = use()\n'
-     'print("err=" .. r.isErr())\n',
+   ('enum Result<T, E> {\n'
+    '    Ok(T)\n'
+    '    Err(E)\n'
+    '}\n'
+    'func probe(): Result<Integer, String> {\n'
+    '    print("p")\n'
+    '    return Result.Err("e")\n'
+    '}\n'
+    'func use(): Result<Integer, String> {\n'
+    '    var v: Integer = probe()?\n'
+    '    print("AFTER")\n'
+    '    return Result.Ok(v)\n'
+    '}\n'
+    'var r: Result<Integer, String> = use()\n'
+    'print("err=" .. r.isErr())\n'
+    ''),
    "perr=true",
    "The operand runs once and then returns from `use`, so `p` appears once and `AFTER` does not "
    "appear; the expected bytes are `perr=true`.")
 
 # --- REQ-2001: Err returns from the function immediately and composes.
 OK("SOL-TCK-0312", "REQ-2001",
-   RESULT
-   + 'func get(ok: Boolean): Result<Integer, String> {\n'
-     '    if (ok) {\n'
-     '        return Result.Ok(41)\n'
-     '    }\n'
-     '    return Result.Err("bad")\n'
-     '}\n'
-     'func use(ok: Boolean): Result<Integer, String> {\n'
-     '    var v = get(ok)?\n'
-     '    return Result.Ok(v + 1)\n'
-     '}\n'
-     'var r = use(false)\n'
-     'print("err=" .. r.isErr() .. " e=" .. r.unwrapErr())\n',
+   ('enum Result<T, E> {\n'
+    '    Ok(T)\n'
+    '    Err(E)\n'
+    '}\n'
+    'func get(ok: Boolean): Result<Integer, String> {\n'
+    '    if (ok) {\n'
+    '        return Result.Ok(41)\n'
+    '    }\n'
+    '    return Result.Err("bad")\n'
+    '}\n'
+    'func use(ok: Boolean): Result<Integer, String> {\n'
+    '    var v: Integer = get(ok)?\n'
+    '    return Result.Ok(v + 1)\n'
+    '}\n'
+    'var r: Result<Integer, String> = use(false)\n'
+    'print("err=" .. r.isErr() .. " e=" .. r.unwrapErr())\n'
+    ''),
    "err=true e=bad",
    "The `Err` is returned from `use` unchanged; the caller observes the same `bad` error and the "
    "process exits 0, so the transition is a return rather than a fault.")
 
 OK("SOL-TCK-0313", "REQ-2001",
-   RESULT
-   + 'func get(): Result<Integer, String> {\n'
-     '    return Result.Err("x")\n'
-     '}\n'
-     'func use(): Result<Integer, String> {\n'
-     '    var v = get()?\n'
-     '    print("AFTER")\n'
-     '    return Result.Ok(v)\n'
-     '}\n'
-     'var r = use()\n'
-     'print("err=" .. r.isErr())\n',
+   ('enum Result<T, E> {\n'
+    '    Ok(T)\n'
+    '    Err(E)\n'
+    '}\n'
+    'func get(): Result<Integer, String> {\n'
+    '    return Result.Err("x")\n'
+    '}\n'
+    'func use(): Result<Integer, String> {\n'
+    '    var v: Integer = get()?\n'
+    '    print("AFTER")\n'
+    '    return Result.Ok(v)\n'
+    '}\n'
+    'var r: Result<Integer, String> = use()\n'
+    'print("err=" .. r.isErr())\n'
+    ''),
    "err=true",
    "The statement after the `?` is not evaluated once the `Err` returns; the output is exactly "
    "`err=true`, so an implementation that continued the body would emit an extra `AFTER`.")
 
 OK("SOL-TCK-0314", "REQ-2001",
-   RESULT
-   + 'func a(): Result<Integer, String> {\n'
-     '    return Result.Err("deep")\n'
-     '}\n'
-     'func b(): Result<Integer, String> {\n'
-     '    var v = a()?\n'
-     '    return Result.Ok(v + 1)\n'
-     '}\n'
-     'func c(): Result<Integer, String> {\n'
-     '    var v = b()?\n'
-     '    return Result.Ok(v + 1)\n'
-     '}\n'
-     'var r = c()\n'
-     'print("err=" .. r.isErr() .. " e=" .. r.unwrapErr())\n',
+   ('enum Result<T, E> {\n'
+    '    Ok(T)\n'
+    '    Err(E)\n'
+    '}\n'
+    'func a(): Result<Integer, String> {\n'
+    '    return Result.Err("deep")\n'
+    '}\n'
+    'func b(): Result<Integer, String> {\n'
+    '    var v: Integer = a()?\n'
+    '    return Result.Ok(v + 1)\n'
+    '}\n'
+    'func c(): Result<Integer, String> {\n'
+    '    var v: Integer = b()?\n'
+    '    return Result.Ok(v + 1)\n'
+    '}\n'
+    'var r: Result<Integer, String> = c()\n'
+    'print("err=" .. r.isErr() .. " e=" .. r.unwrapErr())\n'
+    ''),
    "err=true e=deep",
    "The `Err` returns through `b` and then `c` unchanged, so the return composes across two call "
    "frames and the deepest error text is preserved.")
 
 # --- REQ-2002 .. REQ-2004: the specification-named diagnostics.
 BAD("SOL-TCK-0315", "REQ-2002",
-    'func use(): Result<Integer, String> {\n'
-    '    var v = 1?\n'
+    ('func use(): Result<Integer, String> {\n'
+    '    var v: Integer = 1?\n'
     '    return Result.Ok(v)\n'
     '}\n'
-    + NEG,
+    '\n'
+    'print("EXECUTED-INVALID")\n'
+    ''),
     "SOLV-SEM-049",
     "An `Integer` operand in a position that does have a `Result` boundary is the negated operand "
     "rule; the specification names `SOLV-SEM-049` for it.")
 
 BAD("SOL-TCK-0316", "REQ-2003",
-    RESULT
-    + 'func get(): Result<Integer, String> {\n'
-      '    return Result.Ok(1)\n'
-      '}\n'
-      'var v = get()?\n'
-      + NEG,
+    ('enum Result<T, E> {\n'
+    '    Ok(T)\n'
+    '    Err(E)\n'
+    '}\n'
+    'func get(): Result<Integer, String> {\n'
+    '    return Result.Ok(1)\n'
+    '}\n'
+    'var v: Integer = get()?\n'
+    '\n'
+    'print("EXECUTED-INVALID")\n'
+    ''),
     "SOLV-SEM-050",
     "The operand is a genuine `Result`, so only the missing boundary is wrong; the implicit "
     "top-level `main` does not return a `Result`, and the specification names `SOLV-SEM-050`.")
 
 BAD("SOL-TCK-0317", "REQ-2004",
-    RESULT
-    + 'func get(): Result<String, String> {\n'
-      '    return Result.Ok("s")\n'
-      '}\n'
-      'func use(): Result<Integer, String> {\n'
-      '    var v = get()?\n'
-      '    return Result.Ok(v)\n'
-      '}\n'
-      + NEG,
+    ('enum Result<T, E> {\n'
+    '    Ok(T)\n'
+    '    Err(E)\n'
+    '}\n'
+    'func get(): Result<String, String> {\n'
+    '    return Result.Ok("s")\n'
+    '}\n'
+    'func use(): Result<Integer, String> {\n'
+    '    var v: String = get()?\n'
+    '    return Result.Ok(v)\n'
+    '}\n'
+    '\n'
+    'print("EXECUTED-INVALID")\n'
+    ''),
     "SOLV-SEM-051",
     "The success type `String` is not assignable to the boundary success type `Integer`; only "
     "that clause differs from an accepted program, and the specification names `SOLV-SEM-051`.")
 
 BAD("SOL-TCK-0318", "REQ-2004",
-    RESULT
-    + 'func get(): Result<Integer, String> {\n'
-      '    return Result.Err("s")\n'
-      '}\n'
-      'func use(): Result<Integer, Integer> {\n'
-      '    var v = get()?\n'
-      '    return Result.Ok(v)\n'
-      '}\n'
-      + NEG,
+    ('enum Result<T, E> {\n'
+    '    Ok(T)\n'
+    '    Err(E)\n'
+    '}\n'
+    'func get(): Result<Integer, String> {\n'
+    '    return Result.Err("s")\n'
+    '}\n'
+    'func use(): Result<Integer, Integer> {\n'
+    '    var v: Integer = get()?\n'
+    '    return Result.Ok(v)\n'
+    '}\n'
+    '\n'
+    'print("EXECUTED-INVALID")\n'
+    ''),
     "SOLV-SEM-051",
     "The propagated error type `String` is not assignable to the boundary error type `Integer`; "
     "only that clause differs from an accepted program, and the specification names "
@@ -388,40 +429,50 @@ BAD("SOL-TCK-0318", "REQ-2004",
 
 # --- REQ-2005: control-flow transition, not a throw.
 OK("SOL-TCK-0319", "REQ-2005",
-   RESULT
-   + 'func get(): Result<Integer, String> {\n'
-     '    return Result.Err("x")\n'
-     '}\n'
-     'func use(): Result<Integer, String> {\n'
-     '    try {\n'
-     '        var v = get()?\n'
-     '        return Result.Ok(v)\n'
-     '    }\n    catch (e: Exception) {\n'
-     '        print("CAUGHT")\n'
-     '        return Result.Ok(0)\n'
-     '    }\n'
-     '}\n'
-     'var r = use()\n'
-     'print("err=" .. r.isErr() .. " e=" .. r.unwrapErr())\n',
+   ('enum Result<T, E> {\n'
+    '    Ok(T)\n'
+    '    Err(E)\n'
+    '}\n'
+    'func get(): Result<Integer, String> {\n'
+    '    return Result.Err("x")\n'
+    '}\n'
+    'func use(): Result<Integer, String> {\n'
+    '    try {\n'
+    '        var v: Integer = get()?\n'
+    '        return Result.Ok(v)\n'
+    '    }\n'
+    '    catch (e: Exception) {\n'
+    '        print("CAUGHT")\n'
+    '        return Result.Ok(0)\n'
+    '    }\n'
+    '}\n'
+    'var r: Result<Integer, String> = use()\n'
+    'print("err=" .. r.isErr() .. " e=" .. r.unwrapErr())\n'
+    ''),
    "err=true e=x",
    "A `catch (e: Exception)` around the propagation must not intercept a return; if `?` were a "
    "guest throw the handler would print `CAUGHT`, but the expected bytes are `err=true e=x`.")
 
 OK("SOL-TCK-0320", "REQ-2005",
-   RESULT
-   + 'func get(): Result<Integer, String> {\n'
-     '    return Result.Err("x")\n'
-     '}\n'
-     'func use(): Result<Integer, String> {\n'
-     '    try {\n'
-     '        var v = get()?\n'
-     '        return Result.Ok(v)\n'
-     '    }\n    finally {\n'
-     '        print("fin")\n'
-     '    }\n'
-     '}\n'
-     'var r = use()\n'
-     'print("err=" .. r.isErr() .. " e=" .. r.unwrapErr())\n',
+   ('enum Result<T, E> {\n'
+    '    Ok(T)\n'
+    '    Err(E)\n'
+    '}\n'
+    'func get(): Result<Integer, String> {\n'
+    '    return Result.Err("x")\n'
+    '}\n'
+    'func use(): Result<Integer, String> {\n'
+    '    try {\n'
+    '        var v: Integer = get()?\n'
+    '        return Result.Ok(v)\n'
+    '    }\n'
+    '    finally {\n'
+    '        print("fin")\n'
+    '    }\n'
+    '}\n'
+    'var r: Result<Integer, String> = use()\n'
+    'print("err=" .. r.isErr() .. " e=" .. r.unwrapErr())\n'
+    ''),
    "finerr=true e=x",
    "The `finally` runs on the propagation exit path before the caller observes the `Err`, so "
    "`fin` precedes `err=true e=x`; a transition that skipped `finally` would print neither or "
@@ -429,21 +480,25 @@ OK("SOL-TCK-0320", "REQ-2005",
 
 # --- REQ-2006: propagation and the section 23 operations coexist.
 OK("SOL-TCK-0321", "REQ-2006",
-   RESULT
-   + 'func get(ok: Boolean): Result<Integer, String> {\n'
-     '    if (ok) {\n'
-     '        return Result.Ok(41)\n'
-     '    }\n'
-     '    return Result.Err("bad")\n'
-     '}\n'
-     'func use(ok: Boolean): Result<Integer, String> {\n'
-     '    var v = get(ok)? + 1\n'
-     '    return Result.Ok(v)\n'
-     '}\n'
-     'var a = use(true)\n'
-     'print("a=" .. a.isOk() .. "," .. a.unwrap())\n'
-     'var b = use(false)\n'
-     'print(" b=" .. b.isErr() .. "," .. b.unwrapErr())\n',
+   ('enum Result<T, E> {\n'
+    '    Ok(T)\n'
+    '    Err(E)\n'
+    '}\n'
+    'func get(ok: Boolean): Result<Integer, String> {\n'
+    '    if (ok) {\n'
+    '        return Result.Ok(41)\n'
+    '    }\n'
+    '    return Result.Err("bad")\n'
+    '}\n'
+    'func use(ok: Boolean): Result<Integer, String> {\n'
+    '    var v: Integer = get(ok)? + 1\n'
+    '    return Result.Ok(v)\n'
+    '}\n'
+    'var a: Result<Integer, String> = use(true)\n'
+    'print("a=" .. a.isOk() .. "," .. a.unwrap())\n'
+    'var b: Result<Integer, String> = use(false)\n'
+    'print(" b=" .. b.isErr() .. "," .. b.unwrapErr())\n'
+    ''),
    "a=true,42 b=true,bad",
    "The `Ok` path propagates a value that `isOk`/`unwrap` then read, and the `Err` path propagates "
    "an error that `isErr`/`unwrapErr` then read, so the operator and the operations both work on "

@@ -71,16 +71,17 @@ public final class SolvikClassSemanticNegativeTest {
                 class C {
                     var x: Integer = 1
                 }
-                func f(): Unit {
+                func f() {
                     C().y = 2
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_MEMBER);
     }
 
     @Test
     public void memberAccessOnABuiltinIsRejected() {
-        Diagnostic diagnostic = first(checkFails("func f(s: String): Unit {\n    var x = s.length\n}\n"));
+        Diagnostic diagnostic = first(checkFails("func f(s: String) {\n    var x: Any = s.length\n}\n"));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_MEMBER);
     }
 
@@ -92,10 +93,11 @@ public final class SolvikClassSemanticNegativeTest {
                     C() {
                         this.x = 1
                     }
-                    func reset(): Unit {
+                    method reset() {
                         this.x = 2
                     }
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_ASSIGN_TO_IMMUTABLE);
     }
@@ -133,10 +135,11 @@ public final class SolvikClassSemanticNegativeTest {
                 class C {
                     var x: Integer
                     C() {
-                        var before = this.x
+                        var before: Integer = this.x
                         this.x = 1
                     }
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_UNINITIALIZED_PROPERTY);
     }
@@ -214,12 +217,13 @@ public final class SolvikClassSemanticNegativeTest {
     public void wrongMethodArgumentTypeIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 class C {
-                    func set(x: Integer): Unit {
+                    method set(x: Integer) {
                     }
                 }
-                func f(): Unit {
+                func f() {
                     C().set("s")
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
     }
@@ -230,9 +234,10 @@ public final class SolvikClassSemanticNegativeTest {
                 class C {
                     var x: Integer = 1
                 }
-                func f(): Unit {
+                func f() {
                     C().missing()
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_MEMBER);
     }
@@ -243,9 +248,10 @@ public final class SolvikClassSemanticNegativeTest {
                 class C {
                     var x: Integer = 1
                 }
-                func f(): Unit {
+                func f() {
                     C().x()
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_NOT_CALLABLE);
     }
@@ -254,12 +260,13 @@ public final class SolvikClassSemanticNegativeTest {
     public void assigningToAMethodIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 class C {
-                    func f(): Unit {
+                    method f() {
                     }
                 }
-                func g(): Unit {
+                func g() {
                     C().f = 1
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_INVALID_ASSIGNMENT_TARGET);
     }
@@ -277,10 +284,11 @@ public final class SolvikClassSemanticNegativeTest {
                         this.n = 7
                     }
 
-                    func get(): Integer {
+                    method get(): Integer {
                         return n
                     }
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_NAME);
     }
@@ -305,22 +313,23 @@ public final class SolvikClassSemanticNegativeTest {
     @Test
     public void aBareInheritedPropertyReadIsAnUnknownName() {
         Diagnostic diagnostic = first(checkFails("""
-                mutable class Base {
+                class mutable Base {
                     var id: Integer = 5
                 }
 
                 class Derived extends Base {
-                    func show(): Integer {
+                    method show(): Integer {
                         return id
                     }
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_NAME);
     }
 
     @Test
     public void thisOutsideAClassIsRejected() {
-        Diagnostic diagnostic = first(checkFails("func f(): Unit {\n    var x = this\n}\n"));
+        Diagnostic diagnostic = first(checkFails("func f() {\n    var x: Any = this\n}\n"));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_THIS_OUTSIDE_CLASS);
     }
 
@@ -331,9 +340,10 @@ public final class SolvikClassSemanticNegativeTest {
                     var x: Integer = 1
                 }
                 func f(): C {
-                    var c = C
+                    var c: Any = C
                     return c
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_CLASS_AS_VALUE);
     }
@@ -348,11 +358,12 @@ public final class SolvikClassSemanticNegativeTest {
     public void duplicateMethodIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 class C {
-                    func f(): Unit {
+                    method f() {
                     }
-                    func f(): Unit {
+                    method f() {
                     }
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_DUPLICATE_NAME);
     }
@@ -362,10 +373,11 @@ public final class SolvikClassSemanticNegativeTest {
         Diagnostic diagnostic = first(checkFails("""
                 class C {
                     var x: Integer = 1
-                    func x(): Integer {
+                    method x(): Integer {
                         return 1
                     }
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_DUPLICATE_NAME);
     }
@@ -429,10 +441,11 @@ public final class SolvikClassSemanticNegativeTest {
     public void methodNamedAfterItsClassIsRejected() {
         Diagnostic diagnostic = first(checkFails("""
                 class C {
-                    func C(): Integer {
+                    method C(): Integer {
                         return 1
                     }
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_MEMBER_NAMED_AFTER_CLASS);
     }
@@ -451,12 +464,13 @@ public final class SolvikClassSemanticNegativeTest {
     public void valueReturningMethodNeedsReturnOnEveryPath() {
         Diagnostic diagnostic = first(checkFails("""
                 class C {
-                    func f(): Integer {
+                    method f(): Integer {
                         if (true) {
                             return 1
                         }
                     }
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_MISSING_RETURN_PATH);
     }

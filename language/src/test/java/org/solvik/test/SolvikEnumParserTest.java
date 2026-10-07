@@ -111,12 +111,13 @@ public final class SolvikEnumParserTest {
     @Test
     public void sealedAndOpenClassModifiersAreRecorded() {
         CompilationUnitNode unit = parseOk("e.sol", """
-                abstract class Shape {
+                class abstract Shape {
                 }
-                mutable class Base {
+                class mutable Base {
                 }
                 class Plain {
                 }
+
                 """);
         assertThat(((ClassDeclNode) unit.declarations().get(0)).isAbstract()).isTrue();
         assertThat(((ClassDeclNode) unit.declarations().get(0)).isMutable()).isFalse();
@@ -185,8 +186,9 @@ public final class SolvikEnumParserTest {
     public void abstractIsRejectedOnAFunction() {
         assertThat(parseFails("e.sol", """
                 // `abstract` marks a class only, never a method. // solvik-keyword: abstract
-                abstract func f(): Unit {
+                abstract func f() {
                 }
+
                 """).hasErrors()).isTrue();
     }
 

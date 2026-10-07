@@ -2,5 +2,5 @@ enum Color {
     RED
     GREEN
 }
-var c = RED
+var c: Any = RED
 print("EXECUTED-INVALID")

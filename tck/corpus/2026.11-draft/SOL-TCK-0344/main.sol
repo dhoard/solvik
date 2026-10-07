@@ -4,7 +4,7 @@
 // Oracle quotations verified verbatim against docs/LANGUAGE_SPEC.md:
 //   - An implementing method must use the same parameter types and a covariant return type.
 //
-mutable class Animal {
+class mutable Animal {
     Animal() {
     }
 }
@@ -13,13 +13,13 @@ class Rock {
     }
 }
 interface Maker {
-    func make(): Animal
+    method make(): Animal
 }
 class RockMaker implements Maker {
     RockMaker() {
     }
 
-    func make(): Rock {
+    method make(): Rock {
         return Rock()
     }
 }

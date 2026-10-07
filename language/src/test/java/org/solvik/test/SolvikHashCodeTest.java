@@ -170,46 +170,39 @@ public final class SolvikHashCodeTest {
                 """)).isEqualTo("true\ntrue\nnull\n");
     }
 
-    @Test
-    public void unitHashesConsistently() {
-        assertThat(run("""
-                    var mutable u: Unit = println("a")
-                    var mutable v: Unit = println("b")
-                    println(u.hashCode() == v.hashCode())
-                """)).isEqualTo("a\nb\ntrue\n");
-    }
-
     // ---------------------------------------------------------------- user dispatch
 
     @Test
     public void userOverrideIsUsedForEqualObjectsAndThroughAnyReceivers() {
         assertThat(run("""
-                    mutable class Point {
-                        var x: Integer
-                        var y: Integer
-                        Point(x: Integer, y: Integer) {
-                            this.x = x
-                            this.y = y
-                        }
-                        mutable override func equals(other: Any?): Boolean {
-                            if (other is Point) {
-                                return this.x == other.x && this.y == other.y
-                            }
-                            return false
-                        }
-                        mutable override func hashCode(): Integer {
-                            return 31 * this.x + this.y
-                        }
-                    }
-                    var mutable a: Point = Point(1, 2)
-                    var mutable b: Point = Point(1, 2)
-                    var mutable c: Point = Point(9, 9)
-                    println(a == b)
-                    println(a.hashCode() == b.hashCode())
-                    println(a == c)
-                    var mutable o: Any = a
-                    var mutable p: Any = b
-                    println(o.hashCode() == p.hashCode())
+                                class mutable Point {
+                                    var x: Integer
+                                    var y: Integer
+                                    Point(x: Integer, y: Integer) {
+                                        this.x = x
+                                        this.y = y
+                                    }
+                                    method override mutable equals(other: Any?): Boolean {
+                                        if (other is Point) {
+                                            return this.x == other.x && this.y == other.y
+                                        }
+                                        return false
+                                    }
+                                    method override mutable hashCode(): Integer {
+                                        return 31 * this.x + this.y
+                                    }
+                                }
+                                var mutable a: Point = Point(1, 2)
+                                var mutable b: Point = Point(1, 2)
+                                var mutable c: Point = Point(9, 9)
+                                println(a == b)
+                                println(a.hashCode() == b.hashCode())
+                                println(a == c)
+                                var mutable o: Any = a
+                                var mutable p: Any = b
+                                println(o.hashCode() == p.hashCode())
+
+
                 """)).isEqualTo("true\ntrue\nfalse\ntrue\n");
     }
 
@@ -217,25 +210,26 @@ public final class SolvikHashCodeTest {
     public void equalUserObjectsCollapseInASetAndMap() {
         // The invariant, exercised through the containers that need it.
         assertThat(run("""
-                    class Point {
-                        var x: Integer
-                        Point(x: Integer) {
-                            this.x = x
-                        }
-                        override func equals(other: Any?): Boolean {
-                            if (other is Point) {
-                                return this.x == other.x
+                        class Point {
+                            var x: Integer
+                            Point(x: Integer) {
+                                this.x = x
                             }
-                            return false
+                            method override equals(other: Any?): Boolean {
+                                if (other is Point) {
+                                    return this.x == other.x
+                                }
+                                return false
+                            }
+                            method override hashCode(): Integer {
+                                return this.x
+                            }
                         }
-                        override func hashCode(): Integer {
-                            return this.x
-                        }
-                    }
-                    var mutable s: Set<Point> = Set(Point(1), Point(1), Point(2))
-                    println(s.size)
-                    println(s.contains(Point(1)))
-                    println(s.contains(Point(3)))
+                        var mutable s: Set<Point> = Set(Point(1), Point(1), Point(2))
+                        println(s.size)
+                        println(s.contains(Point(1)))
+                        println(s.contains(Point(3)))
+
                 """)).isEqualTo("2\ntrue\nfalse\n");
     }
 
@@ -258,25 +252,26 @@ public final class SolvikHashCodeTest {
     @Test
     public void hashCodeOverrideIsReachedFromAnAnyReceiver() {
         assertThat(run("""
-                    class Wrapped {
-                        var v: Integer
-                        Wrapped(v: Integer) {
-                            this.v = v
-                        }
-                        override func equals(other: Any?): Boolean {
-                            if (other is Wrapped) {
-                                return this.v == other.v
+                        class Wrapped {
+                            var v: Integer
+                            Wrapped(v: Integer) {
+                                this.v = v
                             }
-                            return false
+                            method override equals(other: Any?): Boolean {
+                                if (other is Wrapped) {
+                                    return this.v == other.v
+                                }
+                                return false
+                            }
+                            method override hashCode(): Integer {
+                                return this.v * 7
+                            }
                         }
-                        override func hashCode(): Integer {
-                            return this.v * 7
-                        }
-                    }
-                    var mutable typed: Wrapped = Wrapped(6)
-                    var mutable erased: Any = Wrapped(6)
-                    println(typed.hashCode())
-                    println(erased.hashCode())
+                        var mutable typed: Wrapped = Wrapped(6)
+                        var mutable erased: Any = Wrapped(6)
+                        println(typed.hashCode())
+                        println(erased.hashCode())
+
                 """)).isEqualTo("42\n42\n");
     }
 
@@ -284,21 +279,23 @@ public final class SolvikHashCodeTest {
     public void inheritedOverrideAppliesToASubclassWithoutItsOwn() {
         // Inheritance satisfies the pairing: the subclass inherits both members from its superclass.
         assertThat(run("""
-                    mutable class Base {
-                        mutable override func equals(other: Any?): Boolean {
-                            return true
-                        }
-                        mutable override func hashCode(): Integer {
-                            return 5
-                        }
-                    }
-                    class Derived extends Base {
-                    }
-                    var mutable a: Derived = Derived()
-                    var mutable b: Derived = Derived()
-                    println(a == b)
-                    println(a.hashCode() == b.hashCode())
-                    println(a.hashCode())
+                                class mutable Base {
+                                    method override mutable equals(other: Any?): Boolean {
+                                        return true
+                                    }
+                                    method override mutable hashCode(): Integer {
+                                        return 5
+                                    }
+                                }
+                                class Derived extends Base {
+                                }
+                                var mutable a: Derived = Derived()
+                                var mutable b: Derived = Derived()
+                                println(a == b)
+                                println(a.hashCode() == b.hashCode())
+                                println(a.hashCode())
+
+
                 """)).isEqualTo("true\ntrue\n5\n");
     }
 
@@ -309,46 +306,47 @@ public final class SolvikHashCodeTest {
         // receivers each take a different path through member resolution, and a fixed hash on a
         // widened numeric receiver is the case most likely to be silently mishandled.
         assertThat(run("""
-                    interface Shape {
-                        func name(): String
-                    }
-
-                    class Square implements Shape {
-                        var side: Integer
-
-                        Square(side: Integer) {
-                            this.side = side
+                        interface Shape {
+                            method name(): String
                         }
 
-                        func name(): String {
-                            return "square"
-                        }
+                        class Square implements Shape {
+                            var side: Integer
 
-                        override func equals(other: Any?): Boolean {
-                            if (other is Square) {
-                                return this.side == other.side
+                            Square(side: Integer) {
+                                this.side = side
                             }
-                            return false
+
+                            method name(): String {
+                                return "square"
+                            }
+
+                            method override equals(other: Any?): Boolean {
+                                if (other is Square) {
+                                    return this.side == other.side
+                                }
+                                return false
+                            }
+
+                            method override hashCode(): Integer {
+                                return this.side
+                            }
                         }
 
-                        override func hashCode(): Integer {
-                            return this.side
+                        func hashOf<T>(item: T): Integer {
+                            return item.hashCode()
                         }
-                    }
 
-                    func hashOf<T>(item: T): Integer {
-                        return item.hashCode()
-                    }
+                        var mutable iface: Shape = Square(3)
+                        println(iface.hashCode() == Square(3).hashCode())
+                        var mutable concrete: Square = Square(4)
+                        println(concrete.hashCode() == Square(4).hashCode())
+                        var mutable num: Number = 5
+                        println(num.hashCode() == 5.hashCode())
+                        println(hashOf(Square(5)) == Square(5).hashCode())
+                        println(hashOf(7) == 7.hashCode())
+                        println(hashOf("ab") == "ab".hashCode())
 
-                    var mutable iface: Shape = Square(3)
-                    println(iface.hashCode() == Square(3).hashCode())
-                    var mutable concrete: Square = Square(4)
-                    println(concrete.hashCode() == Square(4).hashCode())
-                    var mutable num: Number = 5
-                    println(num.hashCode() == 5.hashCode())
-                    println(hashOf(Square(5)) == Square(5).hashCode())
-                    println(hashOf(7) == 7.hashCode())
-                    println(hashOf("ab") == "ab".hashCode())
                 """)).isEqualTo("true\ntrue\ntrue\ntrue\ntrue\ntrue\n");
     }
 
@@ -362,39 +360,41 @@ public final class SolvikHashCodeTest {
         // invariant still holds because the same inherited rule answers both questions. A programmer who
         // wants the new field to matter overrides both members in the subclass.
         assertThat(run("""
-                    mutable class Base {
-                        var x: Integer
+                                class mutable Base {
+                                    var x: Integer
 
-                        Base(x: Integer) {
-                            this.x = x
-                        }
+                                    Base(x: Integer) {
+                                        this.x = x
+                                    }
 
-                        override func equals(other: Any?): Boolean {
-                            if (other is Base) {
-                                return this.x == other.x
-                            }
-                            return false
-                        }
+                                    method override equals(other: Any?): Boolean {
+                                        if (other is Base) {
+                                            return this.x == other.x
+                                        }
+                                        return false
+                                    }
 
-                        override func hashCode(): Integer {
-                            return this.x
-                        }
-                    }
+                                    method override hashCode(): Integer {
+                                        return this.x
+                                    }
+                                }
 
-                    class Derived extends Base {
-                        var extra: Integer
+                                class Derived extends Base {
+                                    var extra: Integer
 
-                        Derived(x: Integer, extra: Integer) {
-                            super(x)
-                            this.extra = extra
-                        }
-                    }
+                                    Derived(x: Integer, extra: Integer) {
+                                        super(x)
+                                        this.extra = extra
+                                    }
+                                }
 
-                    var mutable a: Derived = Derived(1, 100)
-                    var mutable b: Derived = Derived(1, 200)
-                    println(a == b)
-                    println(a.hashCode() == b.hashCode())
-                    println(a == Derived(2, 100))
+                                var mutable a: Derived = Derived(1, 100)
+                                var mutable b: Derived = Derived(1, 200)
+                                println(a == b)
+                                println(a.hashCode() == b.hashCode())
+                                println(a == Derived(2, 100))
+
+
                 """)).isEqualTo("true\ntrue\nfalse\n");
     }
 
@@ -403,28 +403,30 @@ public final class SolvikHashCodeTest {
     @Test
     public void superHashCodeDispatchesToTheInheritedOverride() {
         assertThat(run("""
-                    mutable class Base {
-                        mutable override func equals(other: Any?): Boolean {
-                            return true
-                        }
-                        mutable override func hashCode(): Integer {
-                            return 1
-                        }
-                    }
-                    class Derived extends Base {
-                        override func equals(other: Any?): Boolean {
-                            return false
-                        }
-                        override func hashCode(): Integer {
-                            return 2
-                        }
-                        func hashViaSuper(): Integer {
-                            return super.hashCode()
-                        }
-                    }
-                    var mutable d: Derived = Derived()
-                    println(d.hashCode())
-                    println(d.hashViaSuper())
+                                class mutable Base {
+                                    method override mutable equals(other: Any?): Boolean {
+                                        return true
+                                    }
+                                    method override mutable hashCode(): Integer {
+                                        return 1
+                                    }
+                                }
+                                class Derived extends Base {
+                                    method override equals(other: Any?): Boolean {
+                                        return false
+                                    }
+                                    method override hashCode(): Integer {
+                                        return 2
+                                    }
+                                    method hashViaSuper(): Integer {
+                                        return super.hashCode()
+                                    }
+                                }
+                                var mutable d: Derived = Derived()
+                                println(d.hashCode())
+                                println(d.hashViaSuper())
+
+
                 """)).isEqualTo("2\n1\n");
     }
 
@@ -433,22 +435,23 @@ public final class SolvikHashCodeTest {
         // No class in the hierarchy overrides the member, so super.hashCode() is the identity default
         // and must not re-dispatch to the current class's own override (which would recurse).
         assertThat(run("""
-                    mutable class Base {
-                    }
-                    class Derived extends Base {
-                        override func equals(other: Any?): Boolean {
-                            return super.equals(other)
+                        class mutable Base {
                         }
-                        override func hashCode(): Integer {
-                            return super.hashCode()
+                        class Derived extends Base {
+                            method override equals(other: Any?): Boolean {
+                                return super.equals(other)
+                            }
+                            method override hashCode(): Integer {
+                                return super.hashCode()
+                            }
                         }
-                    }
-                    var mutable a: Derived = Derived()
-                    var mutable b: Derived = Derived()
-                    println(a == a)
-                    println(a == b)
-                    println(a.hashCode() == a.hashCode())
-                    println(a.hashCode() == b.hashCode())
+                        var mutable a: Derived = Derived()
+                        var mutable b: Derived = Derived()
+                        println(a == a)
+                        println(a == b)
+                        println(a.hashCode() == a.hashCode())
+                        println(a.hashCode() == b.hashCode())
+
                 """)).isEqualTo("true\nfalse\ntrue\nfalse\n");
     }
 
@@ -457,40 +460,42 @@ public final class SolvikHashCodeTest {
         // A subclass that adds an equality-relevant field mixes the superclass hash with it, so the
         // two decisions remain aligned across the hierarchy.
         assertThat(run("""
-                    mutable class Base {
-                        var id: Integer
-                        Base(id: Integer) {
-                            this.id = id
-                        }
-                        mutable override func equals(other: Any?): Boolean {
-                            if (other is Base) {
-                                return this.id == other.id
-                            }
-                            return false
-                        }
-                        mutable override func hashCode(): Integer {
-                            return this.id
-                        }
-                    }
-                    class Derived extends Base {
-                        var extra: Integer
-                        Derived(id: Integer, extra: Integer) {
-                            super(id)
-                            this.extra = extra
-                        }
-                        override func equals(other: Any?): Boolean {
-                            if (other is Derived) {
-                                return super.equals(other) && this.extra == other.extra
-                            }
-                            return false
-                        }
-                        override func hashCode(): Integer {
-                            return 31 * super.hashCode() + this.extra
-                        }
-                    }
-                    println(Derived(1, 2) == Derived(1, 2))
-                    println(Derived(1, 2).hashCode() == Derived(1, 2).hashCode())
-                    println(Derived(1, 2) == Derived(1, 3))
+                                class mutable Base {
+                                    var id: Integer
+                                    Base(id: Integer) {
+                                        this.id = id
+                                    }
+                                    method override mutable equals(other: Any?): Boolean {
+                                        if (other is Base) {
+                                            return this.id == other.id
+                                        }
+                                        return false
+                                    }
+                                    method override mutable hashCode(): Integer {
+                                        return this.id
+                                    }
+                                }
+                                class Derived extends Base {
+                                    var extra: Integer
+                                    Derived(id: Integer, extra: Integer) {
+                                        super(id)
+                                        this.extra = extra
+                                    }
+                                    method override equals(other: Any?): Boolean {
+                                        if (other is Derived) {
+                                            return super.equals(other) && this.extra == other.extra
+                                        }
+                                        return false
+                                    }
+                                    method override hashCode(): Integer {
+                                        return 31 * super.hashCode() + this.extra
+                                    }
+                                }
+                                println(Derived(1, 2) == Derived(1, 2))
+                                println(Derived(1, 2).hashCode() == Derived(1, 2).hashCode())
+                                println(Derived(1, 2) == Derived(1, 3))
+
+
                 """)).isEqualTo("true\ntrue\nfalse\n");
     }
 
@@ -545,18 +550,19 @@ public final class SolvikHashCodeTest {
                     println(maybe.hashCode())
                 """)).containsExactly(DiagnosticCode.TYPE_NULLABLE_DEREFERENCE);
         assertThat(errorCodes("""
-                    class Key {
-                        override func equals(other: Any?): Boolean {
-                            return false
+                        class Key {
+                            method override equals(other: Any?): Boolean {
+                                return false
+                            }
+
+                            method override hashCode(): Integer {
+                                return 1
+                            }
                         }
 
-                        override func hashCode(): Integer {
-                            return 1
-                        }
-                    }
+                        var mutable maybe: Key? = null
+                        println(maybe.hashCode())
 
-                    var mutable maybe: Key? = null
-                    println(maybe.hashCode())
                 """)).containsExactly(DiagnosticCode.TYPE_NULLABLE_DEREFERENCE);
     }
 
@@ -568,10 +574,11 @@ public final class SolvikHashCodeTest {
                     Point(x: Integer) {
                         this.x = x
                     }
-                    override func equals(other: Any?): Boolean {
+                    method override equals(other: Any?): Boolean {
                         return other is Point
                     }
                 }
+
                 """;
         assertThat(firstCode(text)).isEqualTo(DiagnosticCode.SEM_EQUALS_WITHOUT_HASHCODE);
     }
@@ -584,10 +591,11 @@ public final class SolvikHashCodeTest {
                     Point(x: Integer) {
                         this.x = x
                     }
-                    override func hashCode(): Integer {
+                    method override hashCode(): Integer {
                         return this.x
                     }
                 }
+
                 """;
         assertThat(firstCode(text)).isEqualTo(DiagnosticCode.SEM_HASHCODE_WITHOUT_EQUALS);
     }
@@ -598,17 +606,19 @@ public final class SolvikHashCodeTest {
         // message names the member that is actually unpaired.
         assertThat(errorCodes("""
                 class A {
-                    override func equals(other: Any?): Boolean {
+                    method override equals(other: Any?): Boolean {
                         return true
                     }
                 }
+
                 """)).containsExactly(DiagnosticCode.SEM_EQUALS_WITHOUT_HASHCODE);
         assertThat(errorCodes("""
                 class A {
-                    override func hashCode(): Integer {
+                    method override hashCode(): Integer {
                         return 1
                     }
                 }
+
                 """)).containsExactly(DiagnosticCode.SEM_HASHCODE_WITHOUT_EQUALS);
     }
 
@@ -618,13 +628,14 @@ public final class SolvikHashCodeTest {
         // the class that pairs it with an equals override still reports the missing hashCode.
         String text = """
                 class A {
-                    func hashCode(): Integer {
+                    method hashCode(): Integer {
                         return 1
                     }
-                    override func equals(other: Any?): Boolean {
+                    method override equals(other: Any?): Boolean {
                         return true
                     }
                 }
+
                 """;
         assertThat(errorCodes(text)).contains(DiagnosticCode.SEM_ACCIDENTAL_OVERRIDE, DiagnosticCode.SEM_EQUALS_WITHOUT_HASHCODE);
     }
@@ -633,23 +644,25 @@ public final class SolvikHashCodeTest {
     public void hashCodeSignatureMustMatchTheRootMember() {
         assertThat(firstCode("""
                 class A {
-                    override func hashCode(): Long {
+                    method override hashCode(): Long {
                         return 1
                     }
-                    override func equals(other: Any?): Boolean {
+                    method override equals(other: Any?): Boolean {
                         return true
                     }
                 }
+
                 """)).isEqualTo(DiagnosticCode.SEM_OVERRIDE_SIGNATURE);
         String withArgument = """
                 class A {
-                    override func equals(other: Any?): Boolean {
+                    method override equals(other: Any?): Boolean {
                         return true
                     }
-                    override func hashCode(seed: Integer): Integer {
+                    method override hashCode(seed: Integer): Integer {
                         return seed
                     }
                 }
+
                 """;
         assertThat(errorCodes(withArgument)).contains(DiagnosticCode.SEM_OVERRIDE_SIGNATURE);
     }
@@ -658,8 +671,9 @@ public final class SolvikHashCodeTest {
     public void hashCodeIsReservedForInterfacesAndProperties() {
         assertThat(firstCode("""
                 interface I {
-                    func hashCode(): Integer
+                    method hashCode(): Integer
                 }
+
                 """)).isEqualTo(DiagnosticCode.SEM_RESERVED_MEMBER);
         assertThat(firstCode("""
                 class A {
@@ -679,13 +693,14 @@ public final class SolvikHashCodeTest {
                     Point(x: Integer) {
                         this.x = x
                     }
-                    override func equals(other: Any?): Boolean {
+                    method override equals(other: Any?): Boolean {
                         return other is Point
                     }
-                    override func hashCode(): Integer {
+                    method override hashCode(): Integer {
                         return 1
                     }
                 }
+
                 """;
         CompilationUnitNode unit = parseOk("hashcode.sol", text);
         SemanticResult result = SolvikSemanticAnalyzer.analyze(unit);
@@ -696,15 +711,16 @@ public final class SolvikHashCodeTest {
     public void callingHashCodeWithAnArgumentIsRejected() {
         String text = """
                 class Point {
-                    override func equals(other: Any?): Boolean {
+                    method override equals(other: Any?): Boolean {
                         return true
                     }
-                    override func hashCode(): Integer {
+                    method override hashCode(): Integer {
                         return 1
                     }
                 }
-                var p = Point()
-                var h = p.hashCode(1)
+                var p: Point = Point()
+                var h: Any = p.hashCode(1)
+
                 """;
         assertThat(errorCodes(text)).contains(DiagnosticCode.TYPE_ARITY_MISMATCH);
     }
@@ -719,10 +735,11 @@ public final class SolvikHashCodeTest {
                 }
 
                 func f(): Integer {
-                    var p = Point()
-                    var read = p.hashCode
+                    var p: Point = Point()
+                    var read: Any = p.hashCode
                     return 0
                 }
+
                 """;
         assertThat(errorCodes(text)).contains(DiagnosticCode.TYPE_FUNCTION_AS_VALUE);
     }
@@ -734,15 +751,16 @@ public final class SolvikHashCodeTest {
             try {
                 context.eval(build(Source.newBuilder("solvik", """
                         class Bad {
-                            override func equals(other: Any?): Boolean {
+                            method override equals(other: Any?): Boolean {
                                 return false
                             }
-                            override func hashCode(): Integer {
+                            method override hashCode(): Integer {
                                 return 1 / 0
                             }
                         }
-                        var a = Bad()
+                        var a: Bad = Bad()
                         println(a.hashCode())
+
                         """, "hashcode.sol")));
             } catch (PolyglotException e) {
                 failure = e;
@@ -759,35 +777,36 @@ public final class SolvikHashCodeTest {
         // scanning rather than wrong answers. Today `Set` and `Map` always scan by equality; this is the
         // guard that an index must keep that property even at its worst-case distribution.
         assertThat(run("""
-                    class Violator {
-                        var id: Integer
+                        class Violator {
+                            var id: Integer
 
-                        Violator(id: Integer) {
-                            this.id = id
-                        }
-
-                        override func equals(other: Any?): Boolean {
-                            if (other is Violator) {
-                                return this.id == other.id
+                            Violator(id: Integer) {
+                                this.id = id
                             }
-                            return false
+
+                            method override equals(other: Any?): Boolean {
+                                if (other is Violator) {
+                                    return this.id == other.id
+                                }
+                                return false
+                            }
+
+                            method override hashCode(): Integer {
+                                // Legal but pathological: every distinct id hashes alike.
+                                return 1
+                            }
                         }
 
-                        override func hashCode(): Integer {
-                            // Legal but pathological: every distinct id hashes alike.
-                            return 1
-                        }
-                    }
+                        var mutable s: Set<Violator> = Set(Violator(1), Violator(1), Violator(2))
+                        println(s.size)
+                        println(s.contains(Violator(2)))
+                        println(s.contains(Violator(3)))
+                        var mutable m: Map<Violator, String> = Map()
+                        m.put(Violator(1), "one")
+                        m.put(Violator(1), "uno")
+                        println(m.size)
+                        println(m.get(Violator(1)))
 
-                    var mutable s: Set<Violator> = Set(Violator(1), Violator(1), Violator(2))
-                    println(s.size)
-                    println(s.contains(Violator(2)))
-                    println(s.contains(Violator(3)))
-                    var mutable m: Map<Violator, String> = Map()
-                    m.put(Violator(1), "one")
-                    m.put(Violator(1), "uno")
-                    println(m.size)
-                    println(m.get(Violator(1)))
                 """)).isEqualTo("2\ntrue\nfalse\n1\nuno\n");
     }
 
@@ -803,38 +822,39 @@ public final class SolvikHashCodeTest {
         // was measured returning false here, because the equal element was skipped before the scan ever
         // ran. Confirming a hit does not protect against skipping a candidate. See docs/ARCHITECTURE.md.
         assertThat(run("""
-                    class Inconsistent {
-                        var id: Integer
-                        var mutable noise: Integer
+                        class Inconsistent {
+                            var id: Integer
+                            var mutable noise: Integer
 
-                        Inconsistent(id: Integer, noise: Integer) {
-                            this.id = id
-                            this.noise = noise
-                        }
-
-                        override func equals(other: Any?): Boolean {
-                            // Equality deliberately ignores `noise` ...
-                            if (other is Inconsistent) {
-                                return this.id == other.id
+                            Inconsistent(id: Integer, noise: Integer) {
+                                this.id = id
+                                this.noise = noise
                             }
-                            return false
+
+                            method override equals(other: Any?): Boolean {
+                                // Equality deliberately ignores `noise` ...
+                                if (other is Inconsistent) {
+                                    return this.id == other.id
+                                }
+                                return false
+                            }
+
+                            method override hashCode(): Integer {
+                                // ... while the hash is driven entirely by it.
+                                return this.noise
+                            }
                         }
 
-                        override func hashCode(): Integer {
-                            // ... while the hash is driven entirely by it.
-                            return this.noise
-                        }
-                    }
+                        var mutable s: Set<Inconsistent> = Set()
+                        s.add(Inconsistent(1, 3))
+                        println(s.contains(Inconsistent(1, 4)))
+                        println(s.contains(Inconsistent(1, 3)))
+                        println(s.size)
+                        var mutable m: Map<Inconsistent, String> = Map()
+                        m.put(Inconsistent(1, 3), "stored")
+                        println(m.get(Inconsistent(1, 4)))
+                        println(m.size)
 
-                    var mutable s: Set<Inconsistent> = Set()
-                    s.add(Inconsistent(1, 3))
-                    println(s.contains(Inconsistent(1, 4)))
-                    println(s.contains(Inconsistent(1, 3)))
-                    println(s.size)
-                    var mutable m: Map<Inconsistent, String> = Map()
-                    m.put(Inconsistent(1, 3), "stored")
-                    println(m.get(Inconsistent(1, 4)))
-                    println(m.size)
                 """)).isEqualTo("true\ntrue\n1\nstored\n1\n");
     }
 

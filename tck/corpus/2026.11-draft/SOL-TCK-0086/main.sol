@@ -16,5 +16,5 @@
 // asserted, and TCK.md section 6 forbids promoting the implementation's enum entry to
 // normative status. Sentinel per TCK.md section 10: the print would be observable if this
 // invalid construction were accepted.
-var nums = List<Integer>("x")
+var nums: List<Integer> = List<Integer>("x")
 print(nums.size)

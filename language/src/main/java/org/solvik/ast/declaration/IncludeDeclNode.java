@@ -34,34 +34,18 @@ import org.solvik.source.SourceSpan;
 public final class IncludeDeclNode extends AstNode {
 
     private final LiteralNode path;
-    private final String alias;
 
     public IncludeDeclNode(LiteralNode path, SourceSpan span) {
-        this(path, null, span);
-    }
-
-    public IncludeDeclNode(LiteralNode path, String alias, SourceSpan span) {
         super(AstKind.INCLUDE_DECL, span);
         if (!(path instanceof StringLiteralNode) && !(path instanceof RawStringLiteralNode)) {
             throw new IllegalArgumentException("include path must be a string literal but was " + path.getClass().getSimpleName());
         }
         this.path = path;
-        this.alias = alias;
     }
 
     /** The written path literal, still in its source spelling. */
     public LiteralNode pathLiteral() {
         return path;
-    }
-
-    /** The written {@code alias <name>} prefix, or {@code null} when the include is unaliased. */
-    public String alias() {
-        return alias;
-    }
-
-    /** Whether this include binds a file-local namespace prefix. */
-    public boolean hasAlias() {
-        return alias != null;
     }
 
     @Override

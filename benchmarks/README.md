@@ -9,7 +9,7 @@ Run them with:
 ```bash
 ./benchmarks/run.sh                 # every benchmark, 3 rounds, prints a table
 ./benchmarks/run.sh set-build       # one benchmark by name
-./benchmarks/run.sh call-direct call-named    # any subset
+./benchmarks/run.sh call-direct list-get    # any subset
 ```
 
 `run.sh` uses the same GraalVM discovery rules as `build.sh` and runs against
@@ -40,43 +40,17 @@ the workloads are identical and only the resolved element type differs.
 | `map-lookup` | `Map.get` over a populated map |
 | `stack-push-pop` | `Stack.push`/`pop`, which should stay constant time |
 
-### Function-value calls
+### Callable calls
 
-Every row in this group performs the same body of work — add one to an accumulator once per iteration —
-and differs only in how the callee is reached. `call-direct` is the baseline of the group, and it exists
-for one reason: a statically resolved call must keep its existing lowering path when function values
-exist, so a row that stays close to it is evidence that the value forms did not replace direct calls.
+`call-direct` measures a statically resolved call to a top-level function. The function-value rows this
+section used to hold (`call-named`, `call-anonymous`, `call-closure`, `call-bound`, and
+`call-polymorphic`) were removed with the 2026.11-draft revision, which makes a callable a declaration
+rather than a value: there is no indirect call path to measure, and a direct call is the only form the
+language has.
 
 | Name | Measures |
 | --- | --- |
-| `call-direct` | a statically resolved call to a top-level function: the baseline of this group |
-| `call-named` | the same call through a binding holding a named function's canonical value |
-| `call-anonymous` | the same call through a non-capturing anonymous function value |
-| `call-closure` | the same call through a closure whose captured value is a primitive |
-| `call-bound` | the same call through a bound method value, whose hidden argument is the receiver |
-| `call-polymorphic` | one call site that keeps meeting four distinct values, where the dispatch can no longer hold a single cached target |
-
-The five monomorphic rows are the acceptance evidence for the calling convention: they reach the same
-target every iteration, so a value form that boxed primitives or rebuilt state per call would separate
-from `call-direct` visibly rather than subtly. `call-polymorphic` is deliberately not monomorphic — its
-call site sees four distinct values, one per kind, and its four addends differ so a site that kept
-serving the first target after the second arrived prints a different checksum instead of passing.
-
-This is the group `FIRST_CLASS_FUNCTIONS.md` section 7.7 asks for, and its acceptance requirement has two
-halves: a statically resolved call must keep its existing lowering path once values exist, and a
-function-value call must not force boxed primitive storage in guest frames. The first half is not a timing
-claim and is asserted structurally, by
-`SolvikFunctionValueTest.takingAFunctionAsAValueDoesNotRouteItsDirectCallsThroughAValue`. The second half
-has no structural witness either — guest code cannot observe the storage form of a value, which is why
-section 7.7 points at benchmarks for it — and `call-closure` is the row shaped to expose it: a captured
-`Integer` read out of the frame array on every iteration would separate from `call-direct` if reading it
-boxed. What the table can show is only whether these rows stay together; their distance from each other
-is not a language rule.
-
-A measured run of the group, best of three rounds on the development machine, reads `call-direct` 1.5 s,
-`call-named` 1.5 s, `call-anonymous` 1.5 s, `call-closure` 1.6 s, `call-bound` 1.7 s, and
-`call-polymorphic` 6.4 s. These figures are evidence about the implementation, not language semantics:
-nothing in `docs/LANGUAGE_SPEC.md` fixes a ratio between these rows, and no test asserts one.
+| `call-direct` | a statically resolved call to a top-level function, one accumulator add per iteration |
 
 ## Scaling guards
 

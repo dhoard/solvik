@@ -28,6 +28,11 @@ import org.solvik.source.SourceSpan;
  * parts interface conformance compares — name, parameter types, and return type — so the semantic
  * layer can treat an implemented method and a required signature uniformly.
  *
+ * <p>The return type reference is optional: a callable that writes no {@code : Type} produces no
+ * value, and there is no source-level {@code Unit} type to write instead. The semantic layer maps an
+ * absent reference to its internal no-value sentinel, which never appears in source syntax or in a
+ * diagnostic.
+ *
  * <p>Whether the declaration supplies an implementation is the {@link #hasBody()} distinction: an
  * abstract signature requires an implementation elsewhere, while a function, method, or default
  * method provides one.
@@ -37,6 +42,7 @@ public abstract class CallableDeclNode extends DeclarationNode {
     private final String name;
     private final List<TypeParameterNode> typeParameters;
     private final List<ParameterNode> parameters;
+    /** The written return type, or {@code null} when the callable produces no value. */
     private final TypeRef returnType;
 
     protected CallableDeclNode(AstKind kind, String name, List<TypeParameterNode> typeParameters, List<ParameterNode> parameters, TypeRef returnType, SourceSpan span) {
@@ -44,7 +50,7 @@ public abstract class CallableDeclNode extends DeclarationNode {
         this.name = Objects.requireNonNull(name);
         this.typeParameters = List.copyOf(typeParameters);
         this.parameters = List.copyOf(parameters);
-        this.returnType = Objects.requireNonNull(returnType);
+        this.returnType = returnType;
     }
 
     public final String name() {
@@ -60,8 +66,9 @@ public abstract class CallableDeclNode extends DeclarationNode {
         return parameters;
     }
 
-    public final TypeRef returnType() {
-        return returnType;
+    /** The written return type reference, or empty when the callable produces no value. */
+    public final java.util.Optional<TypeRef> declaredReturnType() {
+        return java.util.Optional.ofNullable(returnType);
     }
 
     /** Whether this declaration supplies an implementation body. */
@@ -71,7 +78,9 @@ public abstract class CallableDeclNode extends DeclarationNode {
     public List<AstNode> children() {
         ArrayList<AstNode> kids = new ArrayList<>(typeParameters);
         kids.addAll(parameters);
-        kids.add(returnType);
+        if (returnType != null) {
+            kids.add(returnType);
+        }
         return List.copyOf(kids);
     }
 }

@@ -5,7 +5,7 @@ class A {
         this.v = n
     }
 
-    func get(): Integer {
+    method get(): Integer {
         return this.v
     }
 }

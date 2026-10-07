@@ -14,7 +14,7 @@ func get(): Result<Integer, String> {
 }
 func use(): Result<Integer, String> {
     try {
-        var v = get()?
+        var v: Integer = get()?
         return Result.Ok(v)
     }
     catch (e: Exception) {
@@ -22,5 +22,5 @@ func use(): Result<Integer, String> {
         return Result.Ok(0)
     }
 }
-var r = use()
+var r: Result<Integer, String> = use()
 print("err=" .. r.isErr() .. " e=" .. r.unwrapErr())

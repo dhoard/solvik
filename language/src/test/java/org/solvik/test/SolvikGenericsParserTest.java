@@ -74,23 +74,24 @@ public final class SolvikGenericsParserTest {
         assertThat(identity.typeParameters().size()).isEqualTo(1);
         assertThat(identity.typeParameters().get(0).name()).isEqualTo("T");
         assertThat(identity.parameters().get(0).type().name()).isEqualTo("T");
-        assertThat(identity.returnType().name()).isEqualTo("T");
+        assertThat(identity.declaredReturnType().orElseThrow().name()).isEqualTo("T");
     }
 
     @Test
     public void interfaceAndSignatureTypeParametersAreRecorded() {
         CompilationUnitNode unit = parseOk("g.sol", """
                 interface Container<T> {
-                    func get(): T
-                    func replace<U>(value: U): U {
+                    method get(): T
+                    method replace<U>(value: U): U {
                         return value
                     }
                 }
+
                 """);
         InterfaceDeclNode container = (InterfaceDeclNode) unit.declarations().get(0);
         assertThat(container.typeParameters().size()).isEqualTo(1);
         SignatureDeclNode get = container.signatures().get(0);
-        assertThat(get.returnType().name()).isEqualTo("T");
+        assertThat(get.declaredReturnType().orElseThrow().name()).isEqualTo("T");
         FunctionDeclNode replace = container.defaultMethods().get(0);
         assertThat(replace.typeParameters().size()).isEqualTo(1);
         assertThat(replace.typeParameters().get(0).name()).isEqualTo("U");
@@ -100,10 +101,11 @@ public final class SolvikGenericsParserTest {
     public void methodTypeParameterListIsRecorded() {
         CompilationUnitNode unit = parseOk("g.sol", """
                 class Box<T> {
-                    func replaceWith<U>(value: U): U {
+                    method replaceWith<U>(value: U): U {
                         return value
                     }
                 }
+
                 """);
         ClassDeclNode box = (ClassDeclNode) unit.declarations().get(0);
         FunctionDeclNode method = box.methods().get(0);
@@ -125,7 +127,7 @@ public final class SolvikGenericsParserTest {
         assertThat(parameter.arguments().get(0).name()).isEqualTo("String");
         assertThat(parameter.isNullable()).isFalse();
 
-        TypeRefNode returnType = (TypeRefNode) f.returnType();
+        TypeRefNode returnType = (TypeRefNode) f.declaredReturnType().orElseThrow();
         assertThat(returnType.name()).isEqualTo("Box");
         assertThat(returnType.arguments().size()).isEqualTo(1);
         assertThat(returnType.arguments().get(0).name()).isEqualTo("Integer");
@@ -134,8 +136,9 @@ public final class SolvikGenericsParserTest {
     @Test
     public void nestedTypeApplicationsNestStructurally() {
         CompilationUnitNode unit = parseOk("g.sol", """
-                func f(xs: List<Box<String>>): Unit {
+                func f(xs: List<Box<String>>) {
                 }
+
                 """);
         FunctionDeclNode f = (FunctionDeclNode) unit.declarations().get(0);
         TypeRefNode list = (TypeRefNode) f.parameters().get(0).type();
@@ -148,10 +151,11 @@ public final class SolvikGenericsParserTest {
     @Test
     public void nullableMarkerCombinesWithTypeApplications() {
         CompilationUnitNode unit = parseOk("g.sol", """
-                func outer(values: List<String>?): Unit {
+                func outer(values: List<String>?) {
                 }
-                func inner(values: List<String?>): Unit {
+                func inner(values: List<String?>) {
                 }
+
                 """);
         TypeRefNode outer = (TypeRefNode) ((FunctionDeclNode) unit.declarations().get(0)).parameters().get(0).type();
         assertThat(outer.isNullable()).isTrue();
@@ -166,13 +170,14 @@ public final class SolvikGenericsParserTest {
     public void typeArgumentsInExtendsAndImplementsAreRecorded() {
         CompilationUnitNode unit = parseOk("g.sol", """
                 interface Repository<T> {
-                    func find(id: Integer): T
+                    method find(id: Integer): T
                 }
                 class UserService implements Repository<String> {
-                    func find(id: Integer): String {
+                    method find(id: Integer): String {
                         return "x"
                     }
                 }
+
                 """);
         InterfaceDeclNode repository = (InterfaceDeclNode) unit.declarations().get(0);
         ClassDeclNode service = (ClassDeclNode) unit.declarations().get(1);

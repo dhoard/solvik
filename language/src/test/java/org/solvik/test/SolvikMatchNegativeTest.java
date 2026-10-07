@@ -73,7 +73,7 @@ public final class SolvikMatchNegativeTest {
     @Test
     public void aMissingSealedSubtypeIsNotExhaustive() {
         assertThat(first(checkFails("""
-                abstract class Shape {
+                class abstract Shape {
                 }
                 class Circle extends Shape {
                 }
@@ -84,6 +84,7 @@ public final class SolvikMatchNegativeTest {
                         circle: Circle => "circle"
                     }
                 }
+
                 """)).code()).isEqualTo(DiagnosticCode.SEM_MATCH_NOT_EXHAUSTIVE);
     }
 
@@ -226,26 +227,28 @@ public final class SolvikMatchNegativeTest {
     @Test
     public void aNullableBindingPatternTypeIsRejected() {
         assertThat(first(checkFails("""
-                abstract class Shape {
+                class abstract Shape {
                 }
                 func name(shape: Shape): String {
                     return match shape {
                         maybe: Shape? => "maybe"
                     }
                 }
+
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_INVALID_TYPE_OPERAND);
     }
 
     @Test
     public void anErasedGenericBindingPatternTypeIsRejected() {
         assertThat(first(checkFails("""
-                abstract class Shape {
+                class abstract Shape {
                 }
                 func name(shape: Shape): String {
                     return match shape {
                         box: List<Integer> => "box"
                     }
                 }
+
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_ERASED_TYPE_TEST);
     }
 
@@ -256,7 +259,7 @@ public final class SolvikMatchNegativeTest {
                 }
                 interface B {
                 }
-                abstract class Root {
+                class abstract Root {
                 }
                 class Left extends Root implements A, B {
                 }
@@ -269,6 +272,7 @@ public final class SolvikMatchNegativeTest {
                         _ => root
                     }
                 }
+
                 """)).code()).isEqualTo(DiagnosticCode.TYPE_MATCH_RESULT);
     }
 }

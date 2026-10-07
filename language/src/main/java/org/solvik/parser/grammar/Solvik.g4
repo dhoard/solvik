@@ -14,13 +14,34 @@
  * limitations under the License.
  */
 // Solvik front-end grammar.
-// Generated sources are produced by generate_parser.sh; do not edit generated files by hand.
+// Generated sources are produced by the `antlr4-maven-plugin` during the build; do not edit
+// generated parser output by hand.
 //
-// Phase 1 supported constructs: top-level `func` declarations with typed parameters and explicit
-// return types; blocks; `var` and `var mutable` locals with initializers; call-expression
-// statements; integer, Boolean, and normal-string literals; name references,
-// ordinary member access, calls, parentheses, and `+`, `-`, `*`, `/`; `if`/`else`; `return`.
-// SimpleLanguage `function` is intentionally not accepted.
+// The syntax model (docs/LANGUAGE_SPEC.md sections 2, 6, 7, 8, 9, 20):
+//
+//   * A physical file is a source container, not a namespace. It holds file-level `include`
+//     directives, `module Name { ... }` blocks, default-module declarations, and the executable
+//     top-level statements that form the implicit entry point. A file may declare zero, one, or
+//     many modules; several blocks with the same name - in one file or across included files -
+//     contribute to the same module. A module is declaration-only and never nests, and an include
+//     is file-level only: it includes source and binds no name.
+//   * `func name(...) [: Type] { ... }` declares a function at default-module or module scope.
+//     `method name(...) [: Type] { ... }` declares a class method, and an interface member is a
+//     `method` signature or a `method` default body. `func` as a class or interface member and
+//     `method` outside one are parse errors. A constructor is still named after its class and uses
+//     no keyword.
+//   * Functions are declarations, never values: there are no function types, no function-valued
+//     bindings, parameters, returns or delegates, no anonymous functions, and no bound method
+//     references. No production of this grammar admits any of them.
+//   * Variables are data with explicit types: `var [mutable] name: Type = expression` binds a
+//     local and `var [static] [mutable] name: Type [= expression]` declares a class property. A
+//     local initializer never infers a type.
+//   * A modifier follows the keyword of the construct it modifies, in one canonical order:
+//     `class mutable Name`, `class abstract Name`, `method static name`, `method override name`,
+//     `method override mutable name`, `var static name`, `var static mutable name`. A reordered or
+//     repeated modifier matches no production.
+//   * `delegate name: InterfaceType [= expression]` is its own class-member declaration.
+//   * There is no source-level `Unit` type: a callable that writes no `: Type` produces no value.
 //
 // Statements are separated by physical lines (docs/LANGUAGE_SPEC.md section 16):
 //   * the lexer keeps physical newlines as hidden NEWLINE tokens and comments as hidden comment
@@ -34,152 +55,20 @@
 //     stand-alone closing brace is rejected after parsing by PhysicalLineRules (SOLV-PARS-012),
 //     so the grammar stays line-shape free while no line-final `;` is ever accepted;
 //   * NULLABLE_DOT ('?.') is lexed as one token so a line cannot break between `?` and `.`.
-//     Nullable member access itself is not grammar until Phase 10, so '?.' is lexed and then
-//     rejected by the parser.
-//   * LBRACKET/RBRACKET exist for the anonymous-function capture list and for rejection: bracket
-//     indexing syntax is not in the language, so programs using it are lexed and then rejected
-//     by the parser.
 //
-// Phase 3 adds Rust-style raw strings (docs/LANGUAGE_SPEC.md section 15):
-//   * the RAW_STRING_LITERAL lexer rule matches the contiguous opening delimiter 'r' + N '#' + '"'
-//     and its action scans the counted body, because ANTLR cannot express an arbitrary counted '#'
-//     delimiter directly;
-//   * the body closes on the first '"' followed by exactly N '#' characters, so the whole literal
-//     is one token and its internal physical newlines can never end a line;
-//   * an unterminated raw string consumes to end of input and reports a lexical diagnostic at the
-//     opening delimiter naming the expected closing delimiter.
+// Retired syntax is matched only by the `removed*` productions at the end of this file. Each of
+// them exists so a program written against the previous syntax model is reported with a dedicated
+// diagnostic that names the replacement (SOLV-PARS-013, SOLV-PARS-014) instead of a generic
+// unexpected-token error; SolvikAstBuilder builds no node for any of them and SolvikParser fails the
+// compilation before the builder runs. They carry no executable meaning and must not be extended.
 //
-// Phase 4 adds the remaining statement forms of the static core: assignment statements, `while`,
-// three-clause `for`, `break`, and `continue` (docs/LANGUAGE_SPEC.md sections 2, 3, 17). It also
-// adds the operator set that the static type checker types: unary `-` and `!`, ordering
-// comparisons, equality, and short-circuit `&&`/`||` (docs/LANGUAGE_SPEC.md section 3). Operators
-// that depend on later phases stay absent: `??`, `?.`, `is`, and `as` (nullability/type tests) are
-// not lexed as operators here.
-//   * assignment is a statement, never an expression: `exprStmt` accepts one optional `=`, and the
-//     `for` clause rules accept the same shape. The static semantic pass rejects an assignment
-//     whose target is not a mutable local.
-//   * `BREAK` and `CONTINUE` are words that end their physical line; the line-end token table lives
-//     in org.solvik.parser.PhysicalLineTokenSource.
-//
-// Phase 6 adds classes and objects (docs/LANGUAGE_SPEC.md section 7): a class declaration with
-// property declarations, at most one constructor, and instance methods, plus the `this` expression.
-//   * `classDecl` joins `functionDecl` at the top level; class members are `propertyDecl`,
-//     `constructorDecl`, or a method declaration. A class body tolerates
-//     boundary tokens because a method/constructor body ends in `}` on its own line, whose boundary
-//     token therefore sits between the member and the class's closing `}`.
-//   * `thisExpr` joins `primary`, so `this`, `this.name`, and `this.method(...)` parse through the
-//     ordinary postfix suffix machinery (member access and calls).
-//   * property declarations require an explicit type annotation, matching the specification's rule
-//     that only local variables may infer a type from an initializer.
-//   * `this` is a value-producing atom, so a line ending in `this` ends its line like one ending
-//     in an identifier or a literal.
-//
-// Phase 7 adds the root type hierarchy and single inheritance (docs/LANGUAGE_SPEC.md sections 4
-// and 7):
-//   * `classDecl` accepts at most one leading class modifier — `mutable` to open the class for
-//     extension, or `abstract` to make it non-constructible and extendable — and an optional
-//     `extends typeRef`; the grammar itself already enforces at most one superclass, so multiple
-//     inheritance is a parse error. The `(ABSTRACT | MUTABLE)?` alternation is what makes
-//     `mutable abstract class` and `abstract mutable class` parse errors rather than semantic ones:
-//     `abstract` already grants extension, so no bit remains for `mutable` to flip.
-//   * `methodDecl` is a class-only method declaration with optional `mutable`/`override` modifiers;
-//     a top-level `functionDecl` accepts no modifiers because top-level functions are never
-//     overridable.
-//   * `superExpr` joins `primary` so `super(arguments)` and `super.member(...)` parse through the
-//     ordinary call/member suffix machinery; the semantic layer restricts where they may appear.
-//   * `LONG_LITERAL`, `FLOATING_LITERAL`, and `CHARACTER_LITERAL` join the literal forms. `Byte` and
-//     `Short` values have no literal form and are produced by explicit conversions.
-// Phase 8 adds interfaces and default methods (docs/LANGUAGE_SPEC.md section 8):
-//   * `interfaceDecl` joins `classDecl` at the top level. An interface may `extends` a
-//     comma-separated list of interfaces, so interface extension is multiple while class
-//     inheritance stays single.
-//   * an interface body holds only `signatureDecl` (an abstract signature terminated by `;`) and
-//     `defaultMethodDecl` (a `func` with a body). Interfaces contain methods, not stored
-//     properties, so `propertyDecl` and `constructorDecl` are absent from `interfaceMember` and are
-//     rejected by the parser inside an interface body.
-//   * `classDecl` accepts `implements typeRef, ...` (after its optional `extends`), which is the
-//     multiple-interface surface of nominal conformance. `implements` is not part of `interfaceDecl`
-//     because an interface extends interfaces; it never implements them.
-//   * interface members carry no `mutable`/`override` modifiers: an interface method is inherited by
-//     every implementor, and a class implementing method needs no modifier.
-//
-// Phase 9 adds composition through delegation (docs/LANGUAGE_SPEC.md section 9):
-//   * `delegateDecl` joins `classMember` as `delegate var name: InterfaceType`. A delegate is a
-//     property declaration whose type annotation is required (there is no inference), and which may
-//     carry a declaration initializer like any other property: a delegate binds immutably and it
-//     is initialized under the normal constructor rules.
-//   * a delegate's declared type must be an interface, because delegation forwards interface
-//     members; the semantic layer, not the grammar, decides which members a delegate supplies and
-//     rejects a non-interface, class-typed, or ambiguous delegate.
-//   * `delegate` opens a declaration and never ends a line (like `class`, `implements`, and
-//     `mutable`): a delegate declaration ends at its physical line's boundary.
-// Phase 11 adds nominal generics (docs/LANGUAGE_SPEC.md section 11):
-//   * `classDecl`, `interfaceDecl`, `functionDecl`, `methodDecl`, `signatureDecl`, and
-//     `defaultMethodDecl` accept a `typeParameterList` after the declared name, so a generic
-//     declaration carries its own type parameters;
-//   * `typeRef` accepts an optional `typeArguments` list, so a written type may be a generic type
-//     application such as `List<String>` or `Box<User>`. A bare name of a generic declaration is
-//     syntactically valid and is rejected by the semantic layer as a raw generic type.
-//   * A call may spell its type arguments with `Name<T>(...)` immediately before the argument list,
-//     so a generic construction, function, or method call can bind its type parameters explicitly
-//     instead of inferring them. The type arguments sit inside the call suffix that requires `(`,
-//     which keeps the `LT`/`GT` tokens unambiguous with relational operators.
-//   * Call sites that omit explicit type arguments still infer them from value arguments.
-//   * Enums, regex, and switch remain absent and are rejected by the parser.
-//
-// Phase 12 adds enums and exhaustive match, and the 2026.11-draft revision's `abstract` classes
-// (docs/LANGUAGE_SPEC.md section 12):
-//   * `enumDecl` joins the top-level declarations: `enum Name<T, ...> { Variant(Type, ...) ... }`.
-//     Each `enumVariant` is a positional, value-carrying nested constructor name terminated by a
-//     own physical line, exactly like an interface signature. A variant with no values omits the
-//     parentheses.
-//   * `classDecl` accepts an optional leading `abstract` modifier. An abstract class is never
-//     constructible (SOLV-SEM-028) and, with `mutable`, is one of the two declaration kinds a
-//     subclass may extend. Unlike the `sealed` keyword it replaced, it carries no closed subtype set
-//     and no same-file extension boundary: an abstract class may be extended from any file, so no
-//     class type has a knowable subtype set and `match` over a class type requires a wildcard.
-//   * `enum`, `abstract`, and a variant name end no line: `enum` and
-//     `abstract` open a construct, and a variant already ends in `)` or an identifier, both of which
-//     end their line already.
-//
-// Phase 10 adds null safety (docs/LANGUAGE_SPEC.md sections 5 and 18):
-//   * `typeRef` accepts an optional `?`, so `T?` is a written nullable type. The type name resolves
-//     as before and the semantic layer wraps the resolved type in `NullableType`, which keeps
-//     identity comparison reliable because the view is canonical per type instance.
-//   * `null` joins the literal forms as a keyword. It is a value-producing atom, so a line ending
-//     in `null` ends its line.
-//   * `?.` is now a member-suffix operator and a token that cannot end a line; a nullable
-//     receiver may only be dereferenced through `?.` or after a null check.
-//   * `??` is the lowest-precedence binary operator, below `||`, and is lexed as one token so it can
-//     never be confused with a nullable type reference.
-//   * `is` and `as` join the ordering tier as keywords whose right operand is a type reference, not an
-//     expression. Neither ends a line, but QUESTION does: a newline after `T?` terminates the
-//     statement the type reference belongs to.
-//
-// Phase 13 adds exhaustive `match` (docs/LANGUAGE_SPEC.md section 12):
-//   * `matchExpr` joins `primary` as an expression: `match <expression> { <branch>* }`. A branch is
-//     `pattern => expression`; its result expression is a value-producing expression. Newlines
-//     after a branch result already carry a boundary because a result ends in an identifier, literal,
-//     or `)`, so the branch list is separated by boundary tokens exactly like a block.
-//   * `pattern` is `Identifier (':' typeRef | '(' patternList? ')')?`. The semantic layer interprets
-//     a colon form as a subtype binding, a parenthesized form as an enum variant pattern,
-//     and a bare name as a value-less variant at the top level or a binding inside a variant. The
-//     wildcard `_` is the bare name `_`, matching the specification's identifier grammar rather
-//     than reserving a new keyword.
-//   * `ARROW` and `MATCH` are new tokens; neither ends a line (`match`
-//     opens a construct and `=>` is always followed by the branch expression).
-//
-// Phase 15 adds the non-fallthrough `switch` statement (docs/LANGUAGE_SPEC.md section 13):
-//   * `switchStmt` joins `statement`: `switch (value) { cases }`. A case body is an implicit block,
-//     written as a `(statement | NEWLINE)*` sequence that ends where the next `case`, `default`, or
-//     the switch's closing `}` begins, because neither `case` nor `default` can start a statement.
-//   * a non-default case carries one or more comma-separated labels (`case 1, 2:`), and `default`
-//     is its own alternative so the semantic layer can enforce "at most one and last".
-//   * `regexCaseLabel` is `regex <string literal>`: the reserved `regex` keyword plus a normal or
-//     raw string pattern, matching the specification's `case regex r#"..."#` surface.
-//   * `SWITCH`, `CASE`, `DEFAULT`, and `REGEX_KW` are new tokens. `switch`, `case`, and `default`
-//     open a construct, and `regex` is followed by a string literal, so
-//     none of the four ever ends a line.
+// The remaining comments record the token-level facts of the features that are in the language:
+// raw strings (section 15), the operator tiers (section 3), classes and objects (section 7), the
+// root type hierarchy and single inheritance (section 4), interfaces and default methods
+// (section 8), delegation (section 9), generics (section 11), enums, abstract classes and
+// exhaustive match (section 12), null safety (sections 5 and 18), the non-fallthrough `switch`
+// (section 13), expression-oriented constructs (section 21), and error handling (sections 21.7
+// and 23).
 grammar Solvik;
 
 @lexer::members {
@@ -251,28 +140,35 @@ grammar Solvik;
 // Phase 16 adds compile-time `include` (docs/LANGUAGE_SPEC.md section 20): a top-level-only
 // directive `include <string literal>` whose target file is parsed and spliced into the program
 // before semantic analysis. `include` is reserved so it can no longer be an identifier.
-compilationUnit: moduleDecl? (includeDecl | functionDecl separator | classDecl separator | interfaceDecl separator | enumDecl separator | errorDecl separator | statement | separator)* EOF ;
+compilationUnit: (includeDecl | moduleBlock | functionDecl separator | classDecl separator | interfaceDecl separator | enumDecl separator | errorDecl separator | statement | separator | removedModuleHeader | removedClassModifierPrefix | removedIncludeAlias)* EOF ;
 
-// Phase 17: an optional module declaration naming the file's namespace. It must be the first item in
-// a physical file and is terminated by its line's separator. The written name is a
-// single identifier with no dots; the semantic layer enforces the lowercase, underscore-separated
-// naming rule and rejects a reserved word.
-moduleDecl: MODULE Identifier separator ;
+// A named module: a braced block of declarations that introduces a namespace. A file may hold any
+// number of blocks, and blocks with one name - in one file or across included files - contribute to
+// the same module. The block is declaration-only and never nests (moduleMember holds no module
+// block), so a nested module or an executable statement inside one is a parse error. A block closes
+// on its own `}` and needs no trailing separator.
+moduleBlock: MODULE Identifier NEWLINE? LBRACE (moduleMember separator | separator)* RBRACE ;
+
+// One declaration inside a named module. `func`, `class`, `interface`, `enum`, and `error` are the
+// declarations the default module accepts too; an `include` is a file-level directive and a
+// statement belongs to the default module's implicit entry point, so neither is a module member.
+moduleMember: functionDecl | classDecl | interfaceDecl | enumDecl | errorDecl | removedClassModifierPrefix ;
 
 // A compile-time include directive. It takes a normal or raw string path and is terminated by its
-// line's separator. It is not a statement and may only appear at the top level. Phase 17
-// adds an optional `alias <name>` suffix that binds a file-local prefix to the included file's
-// module instead of splicing its declarations into the flat program scope.
-includeDecl: INCLUDE (stringLiteral | rawStringLiteral) (ALIAS Identifier)? separator ;
+// line's separator. It is not a statement and may only appear at file level: it includes source, and
+// it binds no name, because a module is named by its own `module` block.
+includeDecl: INCLUDE (stringLiteral | rawStringLiteral) separator ;
 
 // A callable's return type is optional (docs/LANGUAGE_SPEC.md section 6): a declaration that
-// returns a value writes `: Type`, while a declaration that returns no value omits it and is
-// typed `Unit`. The AST builder synthesizes the omitted `Unit` reference, so the parser and the
-// semantic layer see a return type on every callable and need no special case. Parameter types
-// remain mandatory.
+// produces a value writes `: Type`, while a declaration that produces no value omits it and has no
+// source type at all. The AST carries an empty declared return type for the omitted form, so the
+// parser and the semantic layer need no special case. Parameter types remain mandatory.
 functionDecl: FUNC Identifier typeParameterList? LPAREN parameterList? RPAREN (COLON typeRef)? NEWLINE? block ;
 
-classDecl: (ABSTRACT | MUTABLE)? CLASS Identifier typeParameterList? (EXTENDS typeRef)? (IMPLEMENTS typeRefList)? NEWLINE? LBRACE (classMember separator | separator)* RBRACE ;
+// `class`, optionally followed by exactly one modifier: `class mutable` opens the class to extension
+// and `class abstract` makes it non-constructible. Because the modifier follows the keyword and is
+// single, `mutable class`, `abstract class`, and `class mutable abstract` match no production.
+classDecl: CLASS (ABSTRACT | MUTABLE)? Identifier typeParameterList? (EXTENDS typeRef)? (IMPLEMENTS typeRefList)? NEWLINE? LBRACE (classMember separator | separator)* RBRACE ;
 
 interfaceDecl: INTERFACE Identifier typeParameterList? (EXTENDS typeRefList)? NEWLINE? LBRACE (interfaceMember separator | separator)* RBRACE ;
 
@@ -288,46 +184,44 @@ errorVariant: Identifier (LPAREN typeRefList? RPAREN)? ;
 
 enumVariant: Identifier (LPAREN typeRefList? RPAREN)? ;
 
-interfaceMember: signatureDecl | defaultMethodDecl ;
+interfaceMember: signatureDecl | defaultMethodDecl | removedFuncMember ;
 
-// An abstract interface signature: no body, so no scope and no braces; its line's separator ends
-// it. A default-method body's `}` and this separator are the two interface-member terminators. Like
-// every callable, its return type is optional and defaults to `Unit`.
-signatureDecl: FUNC Identifier typeParameterList? LPAREN parameterList? RPAREN (COLON typeRef)? ;
+// An abstract interface signature: `method name(...)` with no body, so no scope and no braces; its
+// line's separator ends it. Like every callable, its return type is optional: a signature that
+// writes no `: Type` declares a method that produces no value.
+// `func` is not an interface member, so a `func` written here matches only `removedFuncMember`.
+signatureDecl: METHOD Identifier typeParameterList? LPAREN parameterList? RPAREN (COLON typeRef)? ;
 
-defaultMethodDecl: FUNC Identifier typeParameterList? LPAREN parameterList? RPAREN (COLON typeRef)? NEWLINE? block ;
+defaultMethodDecl: METHOD Identifier typeParameterList? LPAREN parameterList? RPAREN (COLON typeRef)? NEWLINE? block ;
 
 typeRefList: typeRef (NEWLINE* COMMA NEWLINE* typeRef)* ;
 
-classMember: propertyDecl | delegateDecl | constructorDecl | methodDecl | staticMember | staticBlock ;
+classMember: propertyDecl | delegateDecl | constructorDecl | methodDecl | staticBlock | removedFuncMember | removedDelegateVar | removedMemberModifierPrefix ;
 
-// A static member (docs/LANGUAGE_SPEC.md section 7, "Static members and class initialization"):
-// the reserved `static` keyword applied to a property or a method declaration. The grammar admits
-// exactly those two forms, so `static delegate ...` and a static constructor are parse errors
-// rather than semantic ones. Method modifiers remain grammatical after `static` so `mutable` and
-// `override` on a static member are reported by the semantic pass as SOLV-SEM-047; the modifier
-// order `mutable static` is a parse error because `static` always leads.
-//
-// These two productions sit inside `classMember` rather than beside it, so the AST builder's single
-// member loop necessarily covers them and a static member can never parse and then be discarded.
-staticMember: STATIC (propertyDecl | methodDecl) ;
+// A property: `var [static] [mutable] name: Type [= expression]`. The type annotation is always
+// written; a modifier follows `var`, and the single canonical order is `static` then `mutable`, so
+// `var mutable static x: Integer` and a repeated modifier match no production. A static property
+// belongs to the class rather than to an instance.
+propertyDecl: VAR STATIC? MUTABLE? Identifier COLON typeRef (ASSIGN expression)? ;
+
+// A class method: `method [static] [override] [mutable] name(...)`. The keywords `func` and
+// `method` keep exactly one meaning each - `method` declares a class or interface member and `func`
+// does not - and the canonical modifier order is the order written here. A static method is not
+// overridable, which the semantic layer enforces on a static method that also writes `override` or
+// `mutable` (SOLV-SEM-047).
+methodDecl: METHOD STATIC? OVERRIDE? MUTABLE? Identifier typeParameterList? LPAREN parameterList? RPAREN (COLON typeRef)? NEWLINE? block ;
+
+// A delegate (docs/LANGUAGE_SPEC.md section 9): an immutable, explicitly typed member that the
+// compiler forwards unresolved interface members to. `delegate name: InterfaceType` is its own
+// declaration - never `delegate var` and never `var delegate` - and the optional initializer is
+// permitted because a delegate is initialized under the normal constructor rules. The type
+// annotation is required and must name an interface.
+delegateDecl: DELEGATE Identifier COLON typeRef (ASSIGN expression)? ;
 
 // The class initializer: a statement list in a block, at most one per class (SOLV-SEM-046). A
-// block ends in `}`, which ends its own line, so the block needs no
-// trailing separator and the class body's stand-alone separator tolerance covers an explicit one.
+// block ends in `}`, which ends its own line, so the block needs no trailing separator and the
+// class body's stand-alone separator tolerance covers an explicit one.
 staticBlock: STATIC NEWLINE? block ;
-
-// A delegate (docs/LANGUAGE_SPEC.md section 9): an immutable, explicitly typed property that the
-// compiler forwards unresolved interface members to. The type annotation is required and must name
-// an interface; the optional initializer is permitted because a delegate is initialized under the
-// normal constructor rules, exactly like any other property.
-delegateDecl: DELEGATE VAR Identifier COLON typeRef (ASSIGN expression)? ;
-
-methodDecl: methodModifier* FUNC Identifier typeParameterList? LPAREN parameterList? RPAREN (COLON typeRef)? NEWLINE? block ;
-
-methodModifier: MUTABLE | OVERRIDE ;
-
-propertyDecl: bindingKind Identifier COLON typeRef (ASSIGN expression)? ;
 
 // A constructor (docs/LANGUAGE_SPEC.md section 7): a class member named after the enclosing class
 // with no `func` keyword and no return type. Calling the class name invokes it. The grammar accepts
@@ -348,16 +242,7 @@ typeParameterList: LT NEWLINE* Identifier (NEWLINE* COMMA NEWLINE* Identifier)* 
 // deliberately distinct from `.` member access so a module-qualified type can never be confused
 // with a member access. The semantic layer decides whether a bare generic name is a raw-type error
 // or a declared type parameter.
-typeRef: Identifier (COLONCOLON Identifier)? typeArguments? QUESTION?
-    | functionTypeRef
-    | LPAREN functionTypeRef RPAREN QUESTION? ;
-
-// A function type reference: `func` over a comma-separated parameter list with an optional return
-// type. An omitted return type names `Unit`, exactly as a declaration does (the builder synthesizes
-// a `Unit` type ref). Nullability of the whole function value is a separate grammar element handled
-// by the grouped form below, so `func(...): T?` always means a function whose result is nullable,
-// never a nullable function; `(func(...): T)?` is the only way to spell a nullable function value.
-functionTypeRef: FUNC LPAREN NEWLINE* typeRefList? NEWLINE* RPAREN (COLON typeRef)? ;
+typeRef: Identifier (COLONCOLON Identifier)? typeArguments? QUESTION? | removedFunctionTypeRef ;
 
 typeArguments: LT NEWLINE* typeRef (NEWLINE* COMMA NEWLINE* typeRef)* NEWLINE* GT ;
 
@@ -385,9 +270,11 @@ statement: statementCore separator ;
 // only: it lets a program that writes its last statement on the closing brace's line still parse,
 // so the layout stage can name the mistake as the dedicated SOLV-PARS-007 or SOLV-PARS-010
 // diagnostic instead of the parser's generic complaint. Every other position demands its boundary.
-statementCore: localDecl | ifStmt | whileStmt | forInStmt | removedForStmt | switchStmt | block | breakStmt | continueStmt | returnStmt | throwStmt | tryStmt | exprStmt ;
+statementCore: localDecl | ifStmt | whileStmt | forInStmt | removedForStmt | switchStmt | block | breakStmt | continueStmt | returnStmt | throwStmt | tryStmt | exprStmt | removedInferredLocalDecl ;
 
-localDecl: bindingKind Identifier (COLON typeRef)? ASSIGN expression ;
+// Every local writes its type: `var [mutable] name: Type = expression`. The initializer never infers
+// a type, so the annotation is required rather than optional (docs/LANGUAGE_SPEC.md section 2).
+localDecl: VAR MUTABLE? Identifier COLON typeRef ASSIGN expression ;
 
 // The one binding keyword is `var`; `mutable` follows it to permit reassignment
 // (docs/LANGUAGE_SPEC.md section 2). Keyword first, modifier second, so `mutable var` is rejected.
@@ -411,7 +298,7 @@ removedForStmt: FOR LPAREN removedForClause? SEMI removedForClause? SEMI removed
 // One header clause of the removed form: a declaration, or any expression optionally followed by
 // `=` and a value, which covers both the initializer and the update of the old syntax; the middle
 // clause is the old condition, an expression.
-removedForClause: localDecl | assignable ;
+removedForClause: localDecl | removedInferredLocalDecl | assignable ;
 
 // An assignment-shaped clause: an expression optionally followed by `=` and a value. The removed
 // three-clause `for` header is shaped from it; an assignment is a statement and never an expression,
@@ -516,32 +403,7 @@ unary: (BANG | SUB) NEWLINE* unary | postfix ;
 
 postfix: primary suffix* ;
 
-primary: literal | paren | thisExpr | superExpr | matchExpr | ifExpr | switchExpr | blockExpr | anonymousFunctionExpr | name ;
-
-// An anonymous function (docs/LANGUAGE_SPEC.md section 6, "Anonymous functions"): `func`, a
-// parenthesized parameter list, an optional return type, and a body. Parameters must carry explicit
-// types and an omitted return type names `Unit`, exactly as in a declaration, so the same
-// implicit-`Unit` synthesis applies and the body shape is a statement block rather than a
-// value-required block: function bodies never acquire an implicit tail result. The body is checked as
-// its own function boundary, so `break` and `continue` cannot cross it and `return` returns from it.
-//
-// The capture list of section 6 ("Explicit immutable closure capture") is `[item, ...]` between `func`
-// and the parameter list, where each item is an identifier or `this`. Its *shape* is decided here and
-// its *content* is not: an item must resolve at the closure-creation site to an eligible immutable
-// binding, which the parser cannot know, so every rule about what an item may name is enforced by the
-// semantic layer, which can locate the offending item. Section 6 states that "An empty capture list is
-// a parse error, because a non-capturing anonymous function is written `func(...)`", so the non-empty
-// list is required rather than optional and `func [](...)` never parses -- which is also why this rule
-// mirrors `parameterList`, whose comma-separated body is likewise never empty.
-//
-// `this` is a token and not an `Identifier`, so it is named explicitly as an alternative. An item is
-// one token wide, which is what keeps an arbitrary capture expression (`func [base + 1](...)`) out of
-// the language for the same reason capture aliases are out: there is no shape for it here.
-anonymousFunctionExpr: FUNC (LBRACKET NEWLINE* captureItemList NEWLINE* RBRACKET)? LPAREN parameterList? RPAREN (COLON typeRef)? NEWLINE? block ;
-
-captureItemList: captureItem (NEWLINE* COMMA NEWLINE* captureItem)* ;
-
-captureItem: Identifier | THIS ;
+primary: literal | paren | thisExpr | superExpr | matchExpr | ifExpr | switchExpr | blockExpr | removedAnonymousFunctionExpr | name ;
 
 // Phase 13: `match` is expression-oriented and exhaustive for a known closed variant set. A branch
 // result ends its line, which the enclosing branch list consumes as a separator.
@@ -604,17 +466,68 @@ rawStringLiteral: RAW_STRING_LITERAL ;
 // Phase 10: `null` is a keyword literal, not an identifier.
 nullLiteral: NULL ;
 
+// `func` declares a function at default-module or module scope, and `method` declares a class or
+// interface member. Neither ends a line: each opens a callable declaration whose name follows.
+// --- Retired syntax ----------------------------------------------------------------------------
+// The productions below match only syntax the current revision retired. Each exists so
+// `SolvikParser` can report a dedicated, source-located diagnostic that names the replacement
+// instead of a generic unexpected-token error. `SolvikAstBuilder` builds no node for any of them,
+// and the parse fails before the builder runs. They must not be extended or reinterpreted.
+
+// `func` written as a class or interface member. `method` declares members; `func` is not a member
+// keyword.
+removedFuncMember: FUNC Identifier typeParameterList? LPAREN parameterList? RPAREN (COLON typeRef)? NEWLINE? block? ;
+
+// A local declaration that writes no type. Every local writes `: Type`.
+removedInferredLocalDecl: VAR MUTABLE? Identifier ASSIGN expression ;
+
+// `delegate var name: InterfaceType`. A delegate is its own declaration: `delegate name: InterfaceType`.
+removedDelegateVar: DELEGATE VAR Identifier (COLON typeRef)? (ASSIGN expression)? ;
+
+// A file-level module header. A module is a braced block: `module Name { ... }`.
+removedModuleHeader: MODULE Identifier separator ;
+
+// An `include ... alias name` suffix. An include includes source and binds no name.
+removedIncludeAlias: INCLUDE (stringLiteral | rawStringLiteral) ALIAS Identifier separator ;
+
+// A class modified before its keyword. A modifier follows the construct keyword: `class mutable`,
+// `class abstract`.
+removedClassModifierPrefix: (ABSTRACT | MUTABLE) CLASS Identifier typeParameterList? (EXTENDS typeRef)? (IMPLEMENTS typeRefList)? NEWLINE? LBRACE (classMember separator | separator)* RBRACE ;
+
+// A member modified before its declaration keyword. A modifier follows the construct keyword:
+// `method static`, `method override`, `method mutable`, `var static`, `var static mutable`.
+removedMemberModifierPrefix: (STATIC | MUTABLE | OVERRIDE)+ removedMemberDeclaration ;
+
+removedMemberDeclaration: VAR Identifier COLON typeRef (ASSIGN expression)?
+    | FUNC Identifier typeParameterList? LPAREN parameterList? RPAREN (COLON typeRef)? NEWLINE? block ;
+
+// An anonymous function expression, with or without the retired capture list. Functions are
+// declarations, not values.
+removedAnonymousFunctionExpr: FUNC (LBRACKET NEWLINE* removedCaptureItemList NEWLINE* RBRACKET)? LPAREN parameterList? RPAREN (COLON typeRef)? NEWLINE? block ;
+
+// The retired capture list items. A capture list belonged to an anonymous function and names one
+// binding or `this` per item.
+removedCaptureItemList: removedCaptureItem (NEWLINE* COMMA NEWLINE* removedCaptureItem)* ;
+
+removedCaptureItem: Identifier | THIS ;
+
+// A function type reference. Functions are declarations, not values.
+removedFunctionTypeRef: FUNC LPAREN NEWLINE* typeRefList? NEWLINE* RPAREN (COLON typeRef)? ;
+
 FUNC: 'func' ;
-// `static` is reserved for class-level members and the class initializer (docs/LANGUAGE_SPEC.md
-// section 7). It ends no line: `static` opens a member declaration or a
-// block, and neither form can be complete before it.
+METHOD: 'method' ;
+// `static` is the class-level member modifier and the class initializer keyword
+// (docs/LANGUAGE_SPEC.md section 7). It follows the declaration keyword it modifies
+// (`method static`, `var static`) and opens a block as the initializer. It never ends a line.
 STATIC: 'static' ;
 // Phase 16: `include` introduces a compile-time file inclusion; reserved so it cannot be an identifier.
 INCLUDE: 'include' ;
-// Phase 17: `module` names a file's namespace and `alias` binds a file-local include prefix. Both are
-// reserved so they cannot be identifiers. Neither ends a line: a module
-// declaration ends in its name and an include alias ends in its alias name, both identifiers.
+// `module` opens a named-module block and is reserved so it cannot be an identifier. It ends no
+// line: it opens a construct and must be followed by its name.
 MODULE: 'module' ;
+// The include-alias suffix was removed with the file-module header syntax. `alias` stays reserved so
+// a program written against the old revision fails at the keyword with the replacement named
+// (SOLV-PARS-006) rather than silently reinterpreting it as an identifier.
 ALIAS: 'alias' ;
 CLASS: 'class' ;
 INTERFACE: 'interface' ;
@@ -626,8 +539,9 @@ ENUM: 'enum' ;
 // enum it opens a construct, so it ends no line; its variants already
 // end in an identifier or a closing paren, both of which terminate.
 // `mutable` is the language's single unlock marker: `var mutable` for a writable binding,
-// `mutable class` for an extendable class, and `mutable func` for an overridable method. It opens a
-// construct and is never a newline terminator.
+// `class mutable` for an extendable class, `method mutable` for an overridable method, and
+// `var mutable`/`method override mutable` for a writable property or method. It follows the keyword
+// of the construct it modifies and is never a newline terminator.
 MUTABLE: 'mutable' ;
 ABSTRACT: 'abstract' ;
 // Reserved tokens with no parser production (docs/LANGUAGE_SPEC.md, "Lexical basics"). They are the
@@ -716,8 +630,8 @@ NULLABLE_DOT: '?.' ;
 NULL_COALESCE: '??' ;
 // Phase 10: `?` marks a nullable type reference.
 QUESTION: '?' ;
-// Lexed for the anonymous-function capture list. Bracket indexing syntax
-// itself is not in the language, so no grammar rule consumes these tokens otherwise.
+// Lexed for the retired anonymous-function capture list, which only `removedAnonymousFunctionExpr`
+// consumes. Bracket indexing is not in the language, so `[` and `]` appear in no other production.
 LBRACKET: '[' ;
 RBRACKET: ']' ;
 ADD: '+' ;

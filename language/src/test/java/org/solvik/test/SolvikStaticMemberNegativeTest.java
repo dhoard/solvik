@@ -85,10 +85,11 @@ public final class SolvikStaticMemberNegativeTest {
     public void aMutableStaticMethodIsRejected() {
         Diagnostic diagnostic = only(checkFails("""
                 class Counter {
-                    static mutable func reset() {
+                    method static mutable reset() {
                         println("reset")
                     }
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_INVALID_STATIC_MODIFIER);
         assertThat(diagnostic.message()).contains("reset");
@@ -98,10 +99,11 @@ public final class SolvikStaticMemberNegativeTest {
     public void anOverrideStaticMethodIsRejected() {
         Diagnostic diagnostic = only(checkFails("""
                 class Counter {
-                    static override func reset() {
+                    method static override reset() {
                         println("reset")
                     }
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_INVALID_STATIC_MODIFIER);
     }
@@ -111,8 +113,9 @@ public final class SolvikStaticMemberNegativeTest {
         Diagnostic diagnostic = only(checkFails("""
                 class Counter {
                     var count: Integer = 1
-                    static var count: Integer = 2
+                    var static count: Integer = 2
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_DUPLICATE_NAME);
         assertThat(diagnostic.message()).isEqualTo("property 'count' is already declared");
@@ -122,9 +125,10 @@ public final class SolvikStaticMemberNegativeTest {
     public void aStaticPropertyMayNotBeDeclaredTwice() {
         Diagnostic diagnostic = only(checkFails("""
                 class Counter {
-                    static var limit: Integer = 1
-                    static var limit: Integer = 2
+                    var static limit: Integer = 1
+                    var static limit: Integer = 2
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_DUPLICATE_NAME);
         assertThat(diagnostic.message()).isEqualTo("property 'limit' is already declared");
@@ -135,10 +139,11 @@ public final class SolvikStaticMemberNegativeTest {
         Diagnostic diagnostic = only(checkFails("""
                 class Counter {
                     var count: Integer = 1
-                    static func count(): Integer {
+                    method static count(): Integer {
                         return 1
                     }
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_DUPLICATE_NAME);
         assertThat(diagnostic.message()).isEqualTo("member 'count' is already declared");
@@ -148,13 +153,14 @@ public final class SolvikStaticMemberNegativeTest {
     public void aStaticMethodMayNotShareItsNameWithAnInstanceMethod() {
         Diagnostic diagnostic = only(checkFails("""
                 class Counter {
-                    func reset() {
+                    method reset() {
                         println("instance")
                     }
-                    static func reset() {
+                    method static reset() {
                         println("static")
                     }
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_DUPLICATE_NAME);
         assertThat(diagnostic.message()).isEqualTo("member 'reset' is already declared");
@@ -164,13 +170,14 @@ public final class SolvikStaticMemberNegativeTest {
     public void aStaticMethodMayNotBeDeclaredTwice() {
         Diagnostic diagnostic = only(checkFails("""
                 class Counter {
-                    static func reset() {
+                    method static reset() {
                         println("first")
                     }
-                    static func reset() {
+                    method static reset() {
                         println("second")
                     }
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_DUPLICATE_NAME);
         assertThat(diagnostic.message()).isEqualTo("member 'reset' is already declared");
@@ -182,11 +189,12 @@ public final class SolvikStaticMemberNegativeTest {
         // against the static property names it collected immediately before.
         Diagnostic diagnostic = only(checkFails("""
                 class Counter {
-                    static func reset(): Integer {
+                    method static reset(): Integer {
                         return 1
                     }
-                    static var reset: Integer = 2
+                    var static reset: Integer = 2
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_DUPLICATE_NAME);
     }
@@ -201,11 +209,12 @@ public final class SolvikStaticMemberNegativeTest {
         // than a static method: source order must not decide whether the collision is caught.
         Diagnostic diagnostic = only(checkFails("""
                 class Counter {
-                    func reset(): Integer {
+                    method reset(): Integer {
                         return 1
                     }
-                    static var reset: Integer = 2
+                    var static reset: Integer = 2
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_DUPLICATE_NAME);
     }
@@ -214,11 +223,12 @@ public final class SolvikStaticMemberNegativeTest {
     public void aStaticPropertyMayNotShareItsNameWithAnInstanceMethodDeclaredAfterIt() {
         Diagnostic diagnostic = only(checkFails("""
                 class Counter {
-                    static var reset: Integer = 2
-                    func reset(): Integer {
+                    var static reset: Integer = 2
+                    method reset(): Integer {
                         return 1
                     }
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_DUPLICATE_NAME);
     }
@@ -229,10 +239,11 @@ public final class SolvikStaticMemberNegativeTest {
         // resolve; `this` must therefore be refused explicitly rather than typed from that record.
         Diagnostic diagnostic = only(checkFails("""
                 class Counter {
-                    static func reset() {
+                    method static reset() {
                         println(this)
                     }
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_THIS_OUTSIDE_CLASS);
         assertThat(diagnostic.message()).contains("static member");
@@ -254,13 +265,14 @@ public final class SolvikStaticMemberNegativeTest {
     @Test
     public void superIsNotAvailableInsideAStaticMethodBody() {
         Diagnostic diagnostic = first(checkFails("""
-                mutable class Base {
+                class mutable Base {
                 }
                 class Counter extends Base {
-                    static func reset() {
+                    method static reset() {
                         super()
                     }
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_SUPER_OUTSIDE_CLASS);
         assertThat(diagnostic.message()).contains("static member");
@@ -272,13 +284,14 @@ public final class SolvikStaticMemberNegativeTest {
         // whose implicit receiver does not exist, because the enclosing static has none.
         Diagnostic diagnostic = only(checkFails("""
                 class Counter {
-                    func count(): Integer {
+                    method count(): Integer {
                         return 1
                     }
-                    static func total(): Integer {
+                    method static total(): Integer {
                         return count()
                     }
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_NAME);
         assertThat(diagnostic.message()).contains("no receiver").contains("instance method 'count'");
@@ -288,13 +301,14 @@ public final class SolvikStaticMemberNegativeTest {
     public void anUnqualifiedCallInsideAClassInitializerCannotReachAnInstanceMethod() {
         Diagnostic diagnostic = only(checkFails("""
                 class Counter {
-                    func count(): Integer {
+                    method count(): Integer {
                         return 1
                     }
                     static {
                         var ignored: Integer = count()
                     }
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_NAME);
         assertThat(diagnostic.message()).contains("no receiver").contains("instance method 'count'");
@@ -306,10 +320,11 @@ public final class SolvikStaticMemberNegativeTest {
         // nowhere must not claim otherwise.
         Diagnostic diagnostic = only(checkFails("""
                 class Counter {
-                    static func total(): Integer {
+                    method static total(): Integer {
                         return nothing()
                     }
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_NAME);
         assertThat(diagnostic.message()).isEqualTo("unknown name 'nothing'");
@@ -320,11 +335,12 @@ public final class SolvikStaticMemberNegativeTest {
         Diagnostic diagnostic = only(checkFails("""
                 class Box<T> {
                     var value: T
-                    static var fallback: T
+                    var static fallback: T
                     Box(value: T) {
                         this.value = value
                     }
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_TYPE_PARAMETER_IN_STATIC_MEMBER);
         assertThat(diagnostic.message()).contains("'T'");
@@ -337,13 +353,14 @@ public final class SolvikStaticMemberNegativeTest {
         Diagnostic diagnostic = first(checkFails("""
                 class Box<T> {
                     var value: T
-                    static func pick(input: T): T {
+                    method static pick(input: T): T {
                         return input
                     }
                     Box(value: T) {
                         this.value = value
                     }
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_TYPE_PARAMETER_IN_STATIC_MEMBER);
     }
@@ -353,7 +370,7 @@ public final class SolvikStaticMemberNegativeTest {
         Diagnostic diagnostic = first(checkFails("""
                 class Box<T> {
                     var value: T
-                    static func bad(): Integer {
+                    method static bad(): Integer {
                         var converted: Integer = (1 as T)
                         return converted
                     }
@@ -361,6 +378,7 @@ public final class SolvikStaticMemberNegativeTest {
                         this.value = value
                     }
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_TYPE_PARAMETER_IN_STATIC_MEMBER);
     }
@@ -371,8 +389,9 @@ public final class SolvikStaticMemberNegativeTest {
         // member span begins at `static`, so the diagnostic points at the whole declaration.
         Diagnostic diagnostic = only(checkFails("""
                 class Counter {
-                    static var Counter: Integer = 1
+                    var static Counter: Integer = 1
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.SEM_MEMBER_NAMED_AFTER_CLASS);
     }
@@ -381,8 +400,9 @@ public final class SolvikStaticMemberNegativeTest {
     public void aStaticInitializerThatDoesNotMatchItsDeclaredTypeIsRejected() {
         Diagnostic diagnostic = only(checkFails("""
                 class Counter {
-                    static var limit: Integer = "twelve"
+                    var static limit: Integer = "twelve"
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.TYPE_MISMATCH);
         // The message must name a static property, not misattribute the error to instance layout.
@@ -395,8 +415,9 @@ public final class SolvikStaticMemberNegativeTest {
         // the static pass must not both visit the same expression.
         Diagnostic diagnostic = only(checkFails("""
                 class Counter {
-                    static var limit: Integer = missingValue
+                    var static limit: Integer = missingValue
                 }
+
                 """));
         assertThat(diagnostic.code()).isEqualTo(DiagnosticCode.RESOL_UNKNOWN_NAME);
     }

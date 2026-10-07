@@ -234,9 +234,9 @@ public final class SolvikAstStructureTest {
         Deque<AstNode> stack = new ArrayDeque<>();
         stack.push(parse("""
                 func f(n: Integer): Integer {
-                    var mutable total = 0
+                    var mutable total: Integer = 0
                     {
-                        var mutable i = 0
+                        var mutable i: Integer = 0
                         while (i < n) {
                             i = i + 1
                             total = total + i
@@ -249,9 +249,10 @@ public final class SolvikAstStructureTest {
                     while (total > 0) {
                         total = total - 1
                     }
-                    var check = !false && (total == 0 || total <= n)
+                    var check: Boolean = !false && (total == 0 || total <= n)
                     return total
                 }
+
                 """));
         while (!stack.isEmpty()) {
             AstNode n = stack.pop();
@@ -281,10 +282,11 @@ public final class SolvikAstStructureTest {
                         this.name = name
                     }
 
-                    func describe(): String {
+                    method describe(): String {
                         return this.name
                     }
                 }
+
                 """));
         while (!stack.isEmpty()) {
             AstNode n = stack.pop();
@@ -303,22 +305,24 @@ public final class SolvikAstStructureTest {
         Set<AstKind> kinds = new HashSet<>();
         Deque<AstNode> stack = new ArrayDeque<>();
         stack.push(parse("""
-                mutable class Animal {
-                    mutable func speak(): String {
+                class mutable Animal {
+                    method mutable speak(): String {
                         return "..."
                     }
                 }
                 class Dog extends Animal {
-                    override func speak(): String {
+                    method override speak(): String {
                         return super.speak()
                     }
                 }
-                func literals(): Unit {
-                    var l = 1L
-                    var f = 1.5f
-                    var d = 1.5
-                    var c = 'A'
+                func literals() {
+                    var l: Long = 1L
+                    var f: Float = 1.5f
+                    var d: Double = 1.5
+                    var c: Character = 'A'
                 }
+
+
                 """));
         while (!stack.isEmpty()) {
             AstNode node = stack.pop();
@@ -339,9 +343,9 @@ public final class SolvikAstStructureTest {
         Deque<AstNode> stack = new ArrayDeque<>();
         stack.push(parse("""
                 interface Named {
-                    func name(): String
+                    method name(): String
 
-                    func greeting(): String {
+                    method greeting(): String {
                         return "Hello " .. name()
                     }
                 }
@@ -352,10 +356,11 @@ public final class SolvikAstStructureTest {
                         this.label = label
                     }
 
-                    func name(): String {
+                    method name(): String {
                         return this.label
                     }
                 }
+
                 """));
         while (!stack.isEmpty()) {
             AstNode node = stack.pop();
@@ -376,15 +381,16 @@ public final class SolvikAstStructureTest {
         Deque<AstNode> stack = new ArrayDeque<>();
         stack.push(parse("""
                 interface Named {
-                    func name(): String
+                    method name(): String
                 }
                 class Service implements Named {
-                    delegate var named: Named
+                    delegate  named: Named
 
                     Service(named: Named) {
                         this.named = named
                     }
                 }
+
                 """));
         while (!stack.isEmpty()) {
             AstNode node = stack.pop();
@@ -411,16 +417,17 @@ public final class SolvikAstStructureTest {
                     }
                 }
                 func f(box: Box?, v: Any): Integer? {
-                    var missing = null
-                    var safe = box?.value
-                    var fallback = safe ?? 0
-                    var tested = v is Box
-                    var cast = v as Box
+                    var missing: Null = null
+                    var safe: Integer? = box?.value
+                    var fallback: Integer = safe ?? 0
+                    var tested: Boolean = v is Box
+                    var cast: Box = v as Box
                     if (box != null) {
                         return box.value
                     }
                     return fallback
                 }
+
                 """));
         while (!stack.isEmpty()) {
             AstNode node = stack.pop();
@@ -445,7 +452,7 @@ public final class SolvikAstStructureTest {
                     var mutable value: T
                 }
                 interface Container<U> {
-                    func get(): U
+                    method get(): U
                 }
                 func identity<V>(x: V): V {
                     return x
@@ -453,6 +460,7 @@ public final class SolvikAstStructureTest {
                 func f(xs: List<String>): Box<Integer> {
                     return Box(1)
                 }
+
                 """));
         while (!stack.isEmpty()) {
             AstNode node = stack.pop();
@@ -473,7 +481,7 @@ public final class SolvikAstStructureTest {
         Set<AstKind> kinds = new HashSet<>();
         Deque<AstNode> stack = new ArrayDeque<>();
         stack.push(parse("""
-                abstract class Shape {
+                class abstract Shape {
                 }
                 class Circle extends Shape {
                 }
@@ -481,6 +489,7 @@ public final class SolvikAstStructureTest {
                     Ok(T)
                     Error
                 }
+
                 """));
         while (!stack.isEmpty()) {
             AstNode node = stack.pop();
@@ -503,7 +512,7 @@ public final class SolvikAstStructureTest {
                     Ok(Integer)
                     Error(String)
                 }
-                abstract class Shape {
+                class abstract Shape {
                 }
                 class Circle extends Shape {
                 }
@@ -516,6 +525,7 @@ public final class SolvikAstStructureTest {
                         }
                     }
                 }
+
                 """));
         while (!stack.isEmpty()) {
             AstNode node = stack.pop();
@@ -535,7 +545,7 @@ public final class SolvikAstStructureTest {
         Set<AstKind> kinds = new HashSet<>();
         Deque<AstNode> stack = new ArrayDeque<>();
         stack.push(parse("""
-                func classify(value: Integer): Unit {
+                func classify(value: Integer) {
                     switch (value) {
                         case 1, 2 {
                             println("small")
@@ -548,7 +558,7 @@ public final class SolvikAstStructureTest {
                         }
                     }
                 }
-                func matchText(input: String): Unit {
+                func matchText(input: String) {
                     switch (input) {
                         case regex r#"^\\d+$"# {
                             println("number")
@@ -558,6 +568,7 @@ public final class SolvikAstStructureTest {
                         }
                     }
                 }
+
                 """));
         while (!stack.isEmpty()) {
             AstNode node = stack.pop();
@@ -574,7 +585,7 @@ public final class SolvikAstStructureTest {
     /** An interface abstract signature is a distinct node with no body child. */
     @Test
     public void interfaceSignatureHasNoBodyChild() {
-        CompilationUnitNode unit = parse("interface I {\n    func f(): Integer\n}\n");
+        CompilationUnitNode unit = parse("interface I {\n    method f(): Integer\n}\n");
         var declaration = (org.solvik.ast.declaration.InterfaceDeclNode) unit.declarations().get(0);
         var signature = declaration.signatures().get(0);
         assertThat(signature.kind()).isEqualTo(AstKind.SIGNATURE_DECL);

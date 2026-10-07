@@ -29,22 +29,14 @@ SPEC_N = norm(SPEC)
 
 REQS_SPEC = {
     "REQ-3200": dict(
-        section="7. Static members and class initialization",
-        summary="A static `toString` cannot replace the universal `Any.toString()` instance member, "
-                "so an instance still formats through the universal member",
-        kind="runtime",
-        quotes=["Those names are reserved to protect the universal `Any` members, which are instance "
-                "members reached through virtual dispatch; a static member never enters the "
-                "dispatch table, so a `static func toString()` cannot replace `Any.toString()` any "
-                "more than an instance method of another name can, and `instance.toString()` keeps "
-                "reaching the universal member.",
-                "for a class declaring `static var toString: Integer` and inheriting the default "
-                "`Any.toString()`, the expression `C.toString` reads the static cell and `instance` "
-                "formatting still calls `Any.toString()`."],
-        note="A class declares `static func toString` and an instance calls `toString()`. The "
-             "instance reaches the inherited universal member and prints the class name, not the "
-             "static method's text; an implementation that resolved the instance call to the static "
-             "member would print `static`."),
+  section='7. Static members and class initialization',
+  summary='A static `toString` cannot replace the universal `Any.toString()` instance member, so an instance still formats through the universal member',
+  kind='runtime',
+  quotes=[(
+      'for a class declaring `var static toString: Integer` and inheriting the default `Any.toString()`, the\n'
+      'expression `C.toString` reads the static cell and `instance` formatting still calls `Any.toString()`.')],
+  tests=['SOL-TCK-0415'],
+  note="A class declares `static func toString` and an instance calls `toString()`. The instance reaches the inherited universal member and prints the class name, not the static method's text; an implementation that resolved the instance call to the static member would print `static`."),
     "REQ-3201": dict(
         section="18. Type Tests and Casts",
         summary="Safe-cast syntax is deferred, so the `as?` spelling is not part of the language and "
@@ -80,13 +72,30 @@ def BAD(tid, cat, req, src, note):
 
 
 OK("SOL-TCK-0415", "objects", "REQ-3200",
-   'class C {\n    static func toString(): String {\n        return "static"\n    }\n\n'
-   '    C() {\n    }\n}\nvar c = C()\nprint("st" .. c.toString())\n',
+   (('class C {\n'
+    '    method static toString(): String {\n'
+    '        return "static"\n'
+    '    }\n'
+    '\n'
+    '    C() {\n'
+    '    }\n'
+    '}\n'
+    'var c: C = C()\n'
+    'print("st" .. c.toString())\n'
+    '')),
    "stC",
    "The instance call reaches the universal member and prints the class name `C`, not the static "
    "method's text.")
 BAD("SOL-TCK-0416", "types", "REQ-3201",
-    'class A {\n    A() {\n    }\n}\nvar a: A = A()\nvar b = a as? A\n' + NEG,
+    ('class A {\n'
+    '    A() {\n'
+    '    }\n'
+    '}\n'
+    'var a: A = A()\n'
+    'var b: A = a as? A\n'
+    '\n'
+    'print("EXECUTED-INVALID")\n'
+    ''),
     "The deferred `as?` spelling is not defined and is a parse error.")
 
 

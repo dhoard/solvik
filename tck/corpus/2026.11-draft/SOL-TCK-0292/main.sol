@@ -5,6 +5,6 @@ class C {
 
     var sum: Integer
 }
-var c = C(1,
+var c: C = C(1,
     2)
 print("r" .. c.sum)

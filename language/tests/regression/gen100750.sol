@@ -4,7 +4,7 @@ func cmp1(a: Integer, b: Integer): Boolean {
 
 println(cmp1(44, 76))
 
-var re2 = Regex(r#"[a-z]+"#)
+var re2: Regex = Regex(r#"[a-z]+"#)
 
 println(re2.matches("hello"))
 

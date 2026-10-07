@@ -14,7 +14,7 @@ class H2 {
 }
 
 func show3(h: H2): String {
-    var n = h.n
+    var n: String? = h.n
     if (n == null) {
         return "none"
     }

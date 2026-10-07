@@ -8,12 +8,8 @@
 // can enter the expected bytes (section 6 defines println's separator as the platform's).
 // Ordering is fixed by source order: the Unit block runs at its declaration and emits
 // "d", then the final print emits the Integer block's 42. Expected stdout is "d42".
-var base = 20
-var answer = {
-    var inner = base
-    inner + 22
-}
-var logged: Unit = {
+var answer: Integer = {
+    var inner: Integer = 20
     print("d")
 }
 print(answer)

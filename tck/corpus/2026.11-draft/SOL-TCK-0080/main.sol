@@ -16,5 +16,5 @@
 // specification says only that a failure is raised, so asserting a particular process
 // status would invent behavior. Sentinel per TCK.md section 10: any successful output
 // would contradict the oracle.
-var nums = List<Integer>(10, 20, 30)
+var nums: List<Integer> = List<Integer>(10, 20, 30)
 print(nums.get(3))

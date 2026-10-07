@@ -92,9 +92,9 @@ public final class SolvikDiagnosticFrameworkTest {
 
     @Test
     public void sourceSliceAndFormatting() {
-        SourceFile src = new SourceFile("x.sol", "func f(): Unit {\n}\n");
-        int idx = src.text().indexOf("Unit");
-        assertThat(src.slice(SourceSpan.of(idx, idx + 4))).isEqualTo("Unit");
+        SourceFile src = new SourceFile("x.sol", "func f() {\n}\n");
+        int idx = src.text().indexOf("func");
+        assertThat(src.slice(SourceSpan.of(idx, idx + 4))).isEqualTo("func");
         assertThat(src.formatLocation(SourceSpan.of(0, 3))).isEqualTo("x.sol:1:1");
         int brace = src.text().indexOf('}');
         assertThat(src.formatLocation(SourceSpan.of(brace, brace + 1))).isEqualTo("x.sol:2:1");

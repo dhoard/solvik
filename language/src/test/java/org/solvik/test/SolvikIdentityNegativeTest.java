@@ -78,7 +78,7 @@ public final class SolvikIdentityNegativeTest {
 
     @Test
     public void unitHasNoIdentity() {
-        assertThat(first(checkFails("func g(): Unit {\n}\n\nfunc f(): Boolean {\n    return g() === g()\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_IDENTITY_OPERANDS);
+        assertThat(first(checkFails("func g() {\n}\n\nfunc f(): Boolean {\n    return g() === g()\n}\n")).code()).isEqualTo(DiagnosticCode.TYPE_IDENTITY_OPERANDS);
     }
 
     @Test

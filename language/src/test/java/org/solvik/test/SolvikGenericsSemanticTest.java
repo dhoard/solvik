@@ -50,14 +50,15 @@ public final class SolvikGenericsSemanticTest {
                     this.value = value
                 }
 
-                func get(): T {
+                method get(): T {
                     return this.value
                 }
 
-                func replaceWith<U>(value: U): U {
+                method replaceWith<U>(value: U): U {
                     return value
                 }
             }
+
             """;
 
     private static CheckedProgram check(String text) {
@@ -76,7 +77,8 @@ public final class SolvikGenericsSemanticTest {
     @Test
     public void genericClassHasTypeParametersAndApplicationIsCanonical() {
         CheckedProgram program = check(GENERIC_BOX + """
-                    var box = Box(5)
+                        var box: Any = Box(5)
+
                 """);
         ClassType box = (ClassType) program.classSymbol("Box").orElseThrow().type();
         assertThat(box.typeParameters().size()).isEqualTo(1);
@@ -93,7 +95,8 @@ public final class SolvikGenericsSemanticTest {
     @Test
     public void constructionInfersTheTypeArgumentFromTheConstructorArgument() {
         CheckedProgram program = check(GENERIC_BOX + """
-                    var intBox = Box(5)
+                        var intBox: Any = Box(5)
+
                 """);
         LocalDeclNode declaration = (LocalDeclNode) program.unit().statements().get(0);
         Type inferred = program.typeOf(declaration.initializer()).orElseThrow();
@@ -214,10 +217,10 @@ public final class SolvikGenericsSemanticTest {
     public void genericInterfaceConformanceSubstitutesTypeArguments() {
         CheckedProgram program = check("""
                 interface Container<T> {
-                    func get(): T
+                    method get(): T
                 }
                 class StringBox implements Container<String> {
-                    func get(): String {
+                    method get(): String {
                         return "x"
                     }
                 }
@@ -227,6 +230,7 @@ public final class SolvikGenericsSemanticTest {
                 func throughClass(box: StringBox): String {
                     return box.get()
                 }
+
                 """);
         assertThat(typeOfReturn(program, 2, 0)).isEqualTo(StringType.INSTANCE);
         assertThat(typeOfReturn(program, 3, 0)).isEqualTo(StringType.INSTANCE);
@@ -236,7 +240,7 @@ public final class SolvikGenericsSemanticTest {
     public void genericClassImplementsMatchingGenericInterface() {
         CheckedProgram program = check("""
                 interface Container<T> {
-                    func get(): T
+                    method get(): T
                 }
                 class Holder<T> implements Container<T> {
                     var mutable value: T
@@ -245,19 +249,20 @@ public final class SolvikGenericsSemanticTest {
                         this.value = value
                     }
 
-                    func get(): T {
+                    method get(): T {
                         return this.value
                     }
                 }
                 func use(holder: Holder<String>): String {
                     return holder.get()
                 }
+
                 """);
         assertThat(typeOfReturn(program, 2, 0)).isEqualTo(StringType.INSTANCE);
     }
 
     @Test
-    public void functionTypeOfAGenericCallableStillCarriesItsParameterTypes() {
+    public void theDeclaredSignatureOfAGenericCallableIsRecorded() {
         CheckedProgram program = check("""
                 func identity<T>(x: T): T {
                     return x
@@ -265,20 +270,23 @@ public final class SolvikGenericsSemanticTest {
                 """);
         var identity = program.function("identity").orElseThrow();
         assertThat(identity.typeParameters().size()).isEqualTo(1);
-        assertThat(identity.functionType().name()).isEqualTo("func(T): T");
+        // A callable is a declaration rather than a value, so its signature is observable through its
+        // own type parameters and declared return type.
+        assertThat(identity.typeParameters().get(0).name()).isEqualTo("T");
+        assertThat(identity.returnType().name()).isEqualTo("T");
     }
 
     @Test
     public void inheritedGenericMembersSubstituteThroughTheSupertype() {
         CheckedProgram program = check("""
-                mutable class Box<T> {
+                class mutable Box<T> {
                     var mutable value: T
 
                     Box(value: T) {
                         this.value = value
                     }
 
-                    mutable func get(): T {
+                    method mutable get(): T {
                         return this.value
                     }
                 }
@@ -293,6 +301,8 @@ public final class SolvikGenericsSemanticTest {
                 func prop(box: IntBox): Integer {
                     return box.value
                 }
+
+
                 """);
         assertThat(typeOfReturn(program, 2, 0)).isEqualTo(IntegerType.INSTANCE);
         assertThat(typeOfReturn(program, 3, 0)).isEqualTo(IntegerType.INSTANCE);
@@ -301,7 +311,7 @@ public final class SolvikGenericsSemanticTest {
     @Test
     public void genericSubclassSubstitutesThroughAGenericSupertype() {
         CheckedProgram program = check("""
-                mutable class Box<T> {
+                class mutable Box<T> {
                     var mutable value: T
 
                     Box(value: T) {
@@ -316,6 +326,7 @@ public final class SolvikGenericsSemanticTest {
                 func use(wrapper: Wrapper<String>): String {
                     return wrapper.value
                 }
+
                 """);
         assertThat(typeOfReturn(program, 2, 0)).isEqualTo(StringType.INSTANCE);
     }
@@ -330,11 +341,12 @@ public final class SolvikGenericsSemanticTest {
                         this.value = value
                     }
                 }
-                func acceptAny(value: Any): Unit {
+                func acceptAny(value: Any) {
                 }
-                func use(box: Box<String>): Unit {
+                func use(box: Box<String>) {
                     acceptAny(box)
                 }
+
                 """);
         assertThat(program.classes().isEmpty()).isFalse();
     }
@@ -345,9 +357,10 @@ public final class SolvikGenericsSemanticTest {
                 func widen<T>(value: T): Any {
                     return value
                 }
-                func store<T>(value: T): Unit {
+                func store<T>(value: T) {
                     var stored: Any = value
                 }
+
                 """);
         TypeParameterType parameter = program.function("widen").orElseThrow().typeParameters().get(0);
         assertThat(parameter.isSubtypeOf(AnyType.INSTANCE)).as("an unconstrained T is below Any").isTrue();

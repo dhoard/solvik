@@ -87,13 +87,14 @@ public final class SolvikNumericWideningTest {
     @Test
     public void integralChainWidensLosslessly() {
         CheckedProgram program = check("""
-                func f(): Unit {
+                func f() {
                     var l: Long = 1
                     var i: Integer = Short(1)
                     var s: Short = Byte(1)
                     var i2: Integer = Byte(2)
                     var l2: Long = Byte(3)
                 }
+
                 """);
         FunctionDeclNode fn = function(program);
         assertWidenedInitializer(program, fn, 0, LongType.INSTANCE);
@@ -108,11 +109,12 @@ public final class SolvikNumericWideningTest {
         // Byte, Short, and Integer (at most 32 value bits) widen losslessly to Double. Long does not,
         // and is covered by SolvikNumericNegativeTest.longToDoubleIsRejectedAsPrecisionLoss.
         CheckedProgram program = check("""
-                func f(): Unit {
+                func f() {
                     var d1: Double = Byte(1)
                     var d2: Double = Short(2)
                     var d3: Double = 3
                 }
+
                 """);
         FunctionDeclNode fn = function(program);
         assertWidenedInitializer(program, fn, 0, DoubleType.INSTANCE);
@@ -124,10 +126,11 @@ public final class SolvikNumericWideningTest {
     public void smallIntegralWidensToFloat() {
         // Byte and Short have at most 15 value bits, within the Float significand.
         CheckedProgram program = check("""
-                func f(): Unit {
+                func f() {
                     var f1: Float = Byte(1)
                     var f2: Float = Short(2)
                 }
+
                 """);
         FunctionDeclNode fn = function(program);
         assertWidenedInitializer(program, fn, 0, FloatType.INSTANCE);
@@ -137,9 +140,10 @@ public final class SolvikNumericWideningTest {
     @Test
     public void floatWidensToDouble() {
         CheckedProgram program = check("""
-                func f(): Unit {
+                func f() {
                     var d: Double = 1.5f
                 }
+
                 """);
         FunctionDeclNode fn = function(program);
         assertWidenedInitializer(program, fn, 0, DoubleType.INSTANCE);
@@ -148,13 +152,14 @@ public final class SolvikNumericWideningTest {
     @Test
     public void mixedArithmeticProducesTheLeastCommonWidenedType() {
         CheckedProgram program = check("""
-                func f(): Unit {
-                    var a = 1 + 1L
-                    var b = 1L + 1
-                    var c = 1 + 1.5
-                    var d = 1.5f + 2.0
-                    var e = Byte(1) + 2
+                func f() {
+                    var a: Long = 1 + 1L
+                    var b: Long = 1L + 1
+                    var c: Double = 1 + 1.5
+                    var d: Double = 1.5f + 2.0
+                    var e: Integer = Byte(1) + 2
                 }
+
                 """);
         FunctionDeclNode fn = function(program);
         assertThat(program.typeOf(local(fn, 0).initializer()).orElseThrow()).isEqualTo(LongType.INSTANCE);
@@ -169,9 +174,10 @@ public final class SolvikNumericWideningTest {
     @Test
     public void mixedArithmeticWidensBothOperands() {
         CheckedProgram program = check("""
-                func f(): Unit {
-                    var a = 1 + 1L
+                func f() {
+                    var a: Long = 1 + 1L
                 }
+
                 """);
         FunctionDeclNode fn = function(program);
         BinaryExprNode binary = (BinaryExprNode) local(fn, 0).initializer();
@@ -182,10 +188,11 @@ public final class SolvikNumericWideningTest {
     @Test
     public void mixedOrderingProducesBoolean() {
         CheckedProgram program = check("""
-                func f(): Unit {
-                    var a = 1 < 2L
-                    var b = 1.5f > 2.0
+                func f() {
+                    var a: Boolean = 1 < 2L
+                    var b: Boolean = 1.5f > 2.0
                 }
+
                 """);
         FunctionDeclNode fn = function(program);
         assertThat(program.typeOf(local(fn, 0).initializer()).orElseThrow()).isEqualTo(BooleanType.INSTANCE);
@@ -195,10 +202,11 @@ public final class SolvikNumericWideningTest {
     @Test
     public void mixedEqualityProducesBoolean() {
         CheckedProgram program = check("""
-                func f(): Unit {
-                    var a = 1 == 1L
-                    var b = 1.5f != 1.5
+                func f() {
+                    var a: Boolean = 1 == 1L
+                    var b: Boolean = 1.5f != 1.5
                 }
+
                 """);
         FunctionDeclNode fn = function(program);
         assertThat(program.typeOf(local(fn, 0).initializer()).orElseThrow()).isEqualTo(BooleanType.INSTANCE);
@@ -208,15 +216,16 @@ public final class SolvikNumericWideningTest {
     @Test
     public void argumentsAndReturnsWiden() {
         CheckedProgram program = check("""
-                func takes(a: Long, b: Double): Unit {
+                func takes(a: Long, b: Double) {
                     return
                 }
                 func gives(): Double {
                     return 1
                 }
-                func calls(): Unit {
+                func calls() {
                     takes(1, 1.5f)
                 }
+
                 """);
         // Analysis succeeding is itself the assertion: Integer argument to Long, Float argument to
         // Double, and Integer return to Double are all lossless widenings.
@@ -226,12 +235,13 @@ public final class SolvikNumericWideningTest {
     @Test
     public void argumentWideningRecordsCoercion() {
         CheckedProgram program = check("""
-                func takes(a: Long): Unit {
+                func takes(a: Long) {
                     return
                 }
-                func calls(): Unit {
+                func calls() {
                     takes(1)
                 }
+
                 """);
         assertThat(program.coercions()).as("the Integer argument must record a widening to Long").isNotEmpty();
     }
@@ -264,9 +274,10 @@ public final class SolvikNumericWideningTest {
     @Test
     public void collectionElementsWiden() {
         CheckedProgram program = check("""
-                func f(): Unit {
+                func f() {
                     var xs: List<Long> = List<Long>(1, 2)
                 }
+
                 """);
         assertThat(function(program)).isNotNull();
     }

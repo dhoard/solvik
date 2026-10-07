@@ -16,8 +16,8 @@ func get(ok: Boolean): Result<Integer, String> {
     return Result.Err("bad")
 }
 func use(ok: Boolean): Result<Integer, String> {
-    var v = get(ok)? + 1
+    var v: Integer = get(ok)? + 1
     return Result.Ok(v)
 }
-var r = use(true)
+var r: Result<Integer, String> = use(true)
 print("ok=" .. r.isOk() .. " v=" .. r.unwrap())

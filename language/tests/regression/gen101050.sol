@@ -1,11 +1,11 @@
-mutable class A1 {
-    mutable func v3(): Integer {
+class mutable A1 {
+    method mutable v3(): Integer {
         return 9
     }
 }
 
 class B2 extends A1 {
-    override func v3(): Integer {
+    method override v3(): Integer {
         return 7
     }
 }

@@ -1,20 +1,20 @@
-mutable class Animal {
+class mutable Animal {
     var name: String
     Animal(name: String) {
         this.name = name
     }
-    mutable func speak(): String {
+    method mutable speak(): String {
         return "..."
     }
-    func describe(): String {
+    method describe(): String {
         return this.name .. " says " .. this.speak()
     }
 }
-mutable class Dog extends Animal {
+class mutable Dog extends Animal {
     Dog(name: String) {
         super(name)
     }
-    override mutable func speak(): String {
+    method override mutable speak(): String {
         return "woof"
     }
 }
@@ -22,7 +22,7 @@ class Puppy extends Dog {
     Puppy(name: String) {
         super(name)
     }
-    override mutable func speak(): String {
+    method override mutable speak(): String {
         return "yip"
     }
 }

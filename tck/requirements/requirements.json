@@ -39,8 +39,7 @@
       "diagnosticNormative": true,
       "oracleNotes": "LANGUAGE_SPEC section 3 pairing rule + section 21.9 Required diagnostics table names SEM_EQUALS_WITHOUT_HASHCODE = SOLV-SEM-045. Diagnostic is specification-required, therefore a normative expectation.",
       "normativeQuotes": [
-        "A class that declares override func equals must also declare override func hashCode in the same",
-        "class declaration, and a class that declares override func hashCode must also declare"
+        "A class that declares `method override equals` must also declare `method override hashCode` in the same class declaration, and a class that declares `method override hashCode` must also declare `method override equals`."
       ]
     },
     {
@@ -698,7 +697,7 @@
       "normativeQuotes": [
         "Because display is defined by `toString`, a class override is honored by `print`, `println`, and `..`.",
         "Both accept every value including `null`; `null` displays as `null`.",
-        "A user-defined class inherits the default representation (its class name) and may declare `override func toString(): String` for a class-specific representation (section 7)."
+        "A user-defined class inherits the default representation (its class name) and may declare `method override toString(): String` for a class-specific representation (section 7)."
       ]
     },
     {
@@ -772,9 +771,7 @@
       "lifecycle": "active",
       "oracleNotes": "SOL-TCK-0055 (too few) and SOL-TCK-0056 (too many) pin both directions of the required count. The specification names SOLV-TYPE-003 only for `Result` operation calls (section 23.4), so the general arity diagnostic is NOT adopted from the implementation and only the typing diagnostic family is asserted. The 2026.09-draft sentence this quote came from also asserted that first-class function values do not exist; that clause is superseded in 2026.10-draft, and only the surviving arity clause is quoted.",
       "normativeQuotes": [
-        "For a callable declared with only required parameters, the required count is the number of declared parameters:",
-        "A statically resolved call's arity is verified before its argument types and before generic type-argument inference.",
-        "The initial language has no default parameters and no variadic parameters, so every statically resolved callable has exactly one permitted argument count."
+        "The initial language has no default parameters and no variadic parameters, so every callable has exactly one permitted argument count."
       ]
     },
     {
@@ -992,8 +989,7 @@
       "lifecycle": "active",
       "oracleNotes": "The table is the only normative source for `List` behavior, so it is quoted in full rather than paraphrased. Two of its entries -- `add` and `set` -- take `element: T` and declare no return type, so they are Unit-returning and SOL-TCK-0076 uses them only as statements: section 11 gives them no value that could be printed, and asserting a rendering for `Unit` would invent semantics. The printed stream is therefore restricted to the entries the table types as returning a value. Deliberate scope limit: section 11's table lists `isEmpty` for `List` but gives `List` no way to observe order, so no order-dependent assertion is made.",
       "normativeQuotes": [
-        "List<T>: var isEmpty: Boolean, var size: Integer, func add(element: T), func get(index: Integer): T, func removeAt(index: Integer): T, func set(index: Integer, element: T), func clear(). An invalid index raises a Solvik runtime bounds error.",
-        "A collection is constructed with a class-style call. The type arguments may be written explicitly (List<Integer>(1, 2, 3))"
+        "List<T>: var isEmpty: Boolean, var size: Integer, method add(element: T), method get(index: Integer): T, method removeAt(index: Integer): T, method set(index: Integer, element: T), method clear(). An invalid index raises a Solvik runtime bounds error."
       ]
     },
     {
@@ -1011,8 +1007,7 @@
       "lifecycle": "active",
       "oracleNotes": "The sentence `Set` keeps only the first of equal elements` fixes the cardinality of a set built from a duplicated element, and the table fixes the return type of every operation as Boolean, so each printed value is forced. Section 11 gives `Set` no iteration order, so the oracle asserts only order-independent facts; asserting an element position would invent deferred semantics. `clear` and the `isEmpty` transition to true are not separately exercised because the table gives `clear` no return value and the empty rendering is covered by the Map and Stack tests.",
       "normativeQuotes": [
-        "Set<T>: var isEmpty: Boolean, var size: Integer, func add(element: T): Boolean, func contains(element: T): Boolean, func remove(element: T): Boolean, func clear().",
-        "For List, Set, and Stack, the value arguments are the initial elements and each must be assignable to the element type; Set keeps only the first of equal elements. Map takes key: value entries, each key assignable to K and each value assignable to V; a repeated key keeps its position and takes the latest value. A key: value entry is meaningful only in a Map construction, and a positional value is not valid in a Map construction."
+        "Set<T>: var isEmpty: Boolean, var size: Integer, method add(element: T): Boolean, method contains(element: T): Boolean, method remove(element: T): Boolean, method clear()."
       ]
     },
     {
@@ -1031,9 +1026,7 @@
       "lifecycle": "active",
       "oracleNotes": "SOL-TCK-0078 covers the `put`/`get`/`containsKey`/`remove` sequence on a map built by the empty-construction form; SOL-TCK-0088 covers a repeated key supplied as construction entries, the form the sentence about repeated keys actually describes. Splitting them keeps the two observable consequences of a repeated key -- the entry count does not grow and the value is the latest written -- attributable to construction rather than to `put`. \"keeps its position\" is deliberately not asserted: section 11 gives `Map` no iteration order in this revision, so no position-derived observable exists and asserting one would invent deferred semantics.",
       "normativeQuotes": [
-        "Map<K, V>: var isEmpty: Boolean, var size: Integer, func put(key: K, value: V), func get(key: K): V, func containsKey(key: K): Boolean, func remove(key: K): Boolean, func clear(). get for a missing key raises a Solvik collection error.",
-        "For List, Set, and Stack, the value arguments are the initial elements and each must be assignable to the element type; Set keeps only the first of equal elements. Map takes key: value entries, each key assignable to K and each value assignable to V; a repeated key keeps its position and takes the latest value. A key: value entry is meaningful only in a Map construction, and a positional value is not valid in a Map construction.",
-        "a construction that writes neither is a compile-time error. A call with no value arguments constructs an empty collection (List<Integer>())."
+        "Map<K, V>: var isEmpty: Boolean, var size: Integer, method put(key: K, value: V), method get(key: K): V, method containsKey(key: K): Boolean, method remove(key: K): Boolean, method clear(). get for a missing key raises a Solvik collection error."
       ]
     },
     {
@@ -1051,8 +1044,7 @@
       "lifecycle": "active",
       "oracleNotes": "The table types `peek(): T` and `pop(): T`, so both are printable and the sequence forces `peek` to leave the stack unchanged while `pop` removes the element it reported; that size 2 -> 1 transition is what distinguishes last-in-first-out from a queue without the specification having to name either. The empty-stack failure half of the same sentence is REQ-0905.",
       "normativeQuotes": [
-        "Stack<T>: var isEmpty: Boolean, var size: Integer, func push(element: T), func peek(): T, func pop(): T, func clear(). peek and pop on an empty stack raise a Solvik collection error.",
-        "a construction that writes neither is a compile-time error. A call with no value arguments constructs an empty collection (List<Integer>())."
+        "Stack<T>: var isEmpty: Boolean, var size: Integer, method push(element: T), method peek(): T, method pop(): T, method clear(). peek and pop on an empty stack raise a Solvik collection error."
       ]
     },
     {
@@ -1092,9 +1084,9 @@
       "lifecycle": "active",
       "oracleNotes": "Four tests because the specification states three distinct sentences and the `Stack` sentence names two operations: an implementation that rejects only `pop` while returning a value from `peek` would pass a single-test corpus, so each named operation is tested separately. Each program is static under section 11's own signatures, so the failure cannot be attributed to a different rule. The specification names no stable code for a Solvik runtime bounds error or a Solvik collection error, so the manifests assert the protocol runtime category (protocol.md section 4.1) rather than a SOLV-* code, and record no process exit status: the specification says only that a failure is raised.",
       "normativeQuotes": [
-        "List<T>: var isEmpty: Boolean, var size: Integer, func add(element: T), func get(index: Integer): T, func removeAt(index: Integer): T, func set(index: Integer, element: T), func clear(). An invalid index raises a Solvik runtime bounds error.",
-        "Map<K, V>: var isEmpty: Boolean, var size: Integer, func put(key: K, value: V), func get(key: K): V, func containsKey(key: K): Boolean, func remove(key: K): Boolean, func clear(). get for a missing key raises a Solvik collection error.",
-        "Stack<T>: var isEmpty: Boolean, var size: Integer, func push(element: T), func peek(): T, func pop(): T, func clear(). peek and pop on an empty stack raise a Solvik collection error."
+        "List<T>: var isEmpty: Boolean, var size: Integer, method add(element: T), method get(index: Integer): T, method removeAt(index: Integer): T, method set(index: Integer, element: T), method clear(). An invalid index raises a Solvik runtime bounds error.",
+        "Map<K, V>: var isEmpty: Boolean, var size: Integer, method put(key: K, value: V), method get(key: K): V, method containsKey(key: K): Boolean, method remove(key: K): Boolean, method clear(). get for a missing key raises a Solvik collection error.",
+        "Stack<T>: var isEmpty: Boolean, var size: Integer, method push(element: T), method peek(): T, method pop(): T, method clear(). peek and pop on an empty stack raise a Solvik collection error."
       ]
     },
     {
@@ -1170,8 +1162,8 @@
       "lifecycle": "active",
       "oracleNotes": "Positive path only: `add` returns `2 + 3` under section 3's integral arithmetic, so the exact stream `5` is forced by the two sentences quoted. SOL-TCK-0101 and SOL-TCK-0104 depend on this control: without it, their rejections could be caused by the prefix mechanism being broken in general.",
       "normativeQuotes": [
-        "Including a file that declares a module makes that module's name a visible prefix in the including file.",
-        "The included declarations are reached through the prefix with the :: namespace separator"
+        "A module declaration contributes its name to the whole program: after expansion, Name::member names the declaration of a module Name { ... } block from any file of the program.",
+        "Included declarations are reached through that name with the :: namespace separator:"
       ]
     },
     {
@@ -1182,15 +1174,14 @@
       "kind": "module",
       "profile": "full-language",
       "portable": true,
-      "tests": [
-        "SOL-TCK-0093"
-      ],
-      "status": "tested",
-      "lifecycle": "active",
-      "oracleNotes": "The section's own examples show both a function call and a class construction through a prefix (`var point: math::Point = math::Point(1)`), so the test covers one of each. Constructor argument passes through unchanged, verified against section 7's constructor rule.",
+      "tests": [],
+      "status": "untested-portable",
+      "lifecycle": "withdrawn",
+      "oracleNotes": "The section's own examples show both a function call and a class construction through a prefix (`var point: math::Point = math::Point(1)`), so the test covers one of each. Constructor argument passes through unchanged, verified against section 7's constructor rule. Withdrawn by the 2026.11-draft syntax revision: aliases were removed and a module is named only by its own block.",
       "normativeQuotes": [
-        "include P alias p binds the prefix p to the included file's module instead."
-      ]
+        "An `include` includes source and binds no name. There is no alias clause, and an `include` that writes one is rejected (`SOLV-PARS-013`) rather than reinterpreted: a module is referenced through the name its own `module` block declares."
+      ],
+      "rationale": "Withdrawn by the 2026.11-draft syntax revision: the syntax and semantics this requirement pinned were removed from the language, so no portable program can exercise it."
     },
     {
       "id": "REQ-1002",
@@ -1200,15 +1191,14 @@
       "kind": "compile-time",
       "profile": "full-language",
       "portable": true,
-      "tests": [
-        "SOL-TCK-0094"
-      ],
-      "status": "tested",
-      "lifecycle": "active",
-      "oracleNotes": "The sentence names condition and code together, so the manifest pins the exact code. The negative program differs from the passing SOL-TCK-0093 by exactly one fact: the included file declares no module.",
+      "tests": [],
+      "status": "untested-portable",
+      "lifecycle": "withdrawn",
+      "oracleNotes": "The sentence names condition and code together, so the manifest pins the exact code. The negative program differs from the passing SOL-TCK-0093 by exactly one fact: the included file declares no module. Withdrawn by the 2026.11-draft syntax revision: aliases were removed and a module is named only by its own block.",
       "normativeQuotes": [
-        "alias naming a file in the default module is SOLV-RESOL-014, because the default module has no name to bind."
-      ]
+        "An `include` includes source and binds no name. There is no alias clause, and an `include` that writes one is rejected (`SOLV-PARS-013`) rather than reinterpreted: a module is referenced through the name its own `module` block declares."
+      ],
+      "rationale": "Withdrawn by the 2026.11-draft syntax revision: the syntax and semantics this requirement pinned were removed from the language, so no portable program can exercise it."
     },
     {
       "id": "REQ-1003",
@@ -1218,15 +1208,14 @@
       "kind": "compile-time",
       "profile": "full-language",
       "portable": true,
-      "tests": [
-        "SOL-TCK-0095"
-      ],
-      "status": "tested",
-      "lifecycle": "active",
-      "oracleNotes": "Tested with two explicit aliases colliding. The unaliased-collision half of the sentence needs a file whose module name equals another directive's alias; the quoted clause names one code for both halves, so the tested half certifies the code and the second half shares the identical mechanism (prefix binding at the directive).",
+      "tests": [],
+      "status": "untested-portable",
+      "lifecycle": "withdrawn",
+      "oracleNotes": "Tested with two explicit aliases colliding. The unaliased-collision half of the sentence needs a file whose module name equals another directive's alias; the quoted clause names one code for both halves, so the tested half certifies the code and the second half shares the identical mechanism (prefix binding at the directive). Withdrawn by the 2026.11-draft syntax revision: aliases were removed and a module is named only by its own block.",
       "normativeQuotes": [
-        "Binding one prefix twice in a file, including a collision with a prefix an unaliased include already made visible, is SOLV-RESOL-013."
-      ]
+        "An `include` includes source and binds no name. There is no alias clause, and an `include` that writes one is rejected (`SOLV-PARS-013`) rather than reinterpreted: a module is referenced through the name its own `module` block declares."
+      ],
+      "rationale": "Withdrawn by the 2026.11-draft syntax revision: the syntax and semantics this requirement pinned were removed from the language, so no portable program can exercise it."
     },
     {
       "id": "REQ-1004",
@@ -1300,26 +1289,27 @@
       "lifecycle": "active",
       "oracleNotes": "`Bad_Name` is lexically a single identifier, so only the naming rule can reject it and the registry row for exactly that name-check failure applies. Dotted and reserved-word names are rejected earlier by the lexer/parser; the rule covers them but no code reaches the name check, so they are deliberately unasserted (documented in the test). Probes confirmed the implementation matches: Bad_Name/_leading/com__x/com_ yield 012; 1abc and `module` yield parse errors.",
       "normativeQuotes": [
-        "The written name is a single identifier: lowercase letters and digits with parts joined by exactly one underscore, each part starting with a letter ([a-z][a-z0-9](_[a-z0-9]+)), and it is not a reserved word.",
-        "| RESOL_MODULE_INVALID_NAME | SOLV-RESOL-012 | module declaration or include directive |"
+        "| RESOL_MODULE_INVALID_NAME | SOLV-RESOL-012 | module declaration |"
       ]
     },
     {
       "id": "REQ-1008",
       "specVersion": "2026.11-draft",
       "section": "20. File Inclusion",
-      "summary": "With an alias present the included file's own module name is not bound in the including file (`instead`), so referencing it is rejected",
+      "summary": "An included module is referenced through the name its own `module` block declares: that name is a visible prefix in every file of the program, and a prefix no module declares is unknown",
       "kind": "compile-time",
       "profile": "full-language",
       "portable": true,
       "tests": [
+        "SOL-TCK-0093",
         "SOL-TCK-0101"
       ],
       "status": "tested",
       "lifecycle": "active",
       "oracleNotes": "Family-level assertion (RESOL): the body names no code and the registry maps 015 to 'qualified reference' without stating that the aliased-instead case is an unknown *module*. Controls SOL-TCK-0092/0093 exclude general module-system failure.",
       "normativeQuotes": [
-        "Including a file that declares a module makes that module's name a visible prefix in the including file. include P alias p binds the prefix p to the included file's module instead."
+        "A module declaration contributes its name to the whole program: after expansion, Name::member names the declaration of a module Name { ... } block from any file of the program.",
+        "A prefix that no module declaration of the program declares is unknown and is reported as SOLV-RESOL-015 at the prefix."
       ]
     },
     {
@@ -1366,15 +1356,14 @@
       "kind": "compile-time",
       "profile": "full-language",
       "portable": true,
-      "tests": [
-        "SOL-TCK-0104"
-      ],
-      "status": "tested",
-      "lifecycle": "active",
-      "oracleNotes": "Family-level: the sentence requires rejection without naming a code. The inner include path is written relative to inner.sol, so the not-found alternative is structurally impossible and the rejection is isolable to non-transitivity; SOL-TCK-0092 is the positive control.",
+      "tests": [],
+      "status": "untested-portable",
+      "lifecycle": "withdrawn",
+      "oracleNotes": "Family-level: the sentence requires rejection without naming a code. The inner include path is written relative to inner.sol, so the not-found alternative is structurally impossible and the rejection is isolable to non-transitivity; SOL-TCK-0092 is the positive control. Withdrawn by the 2026.11-draft syntax revision: aliases were removed and a module is named only by its own block.",
       "normativeQuotes": [
-        "Prefixes are file-local and non-transitive: a file does not inherit the prefixes or aliases of the files it includes; it must include a file itself to reference it."
-      ]
+        "An `include` includes source and binds no name. There is no alias clause, and an `include` that writes one is rejected (`SOLV-PARS-013`) rather than reinterpreted: a module is referenced through the name its own `module` block declares."
+      ],
+      "rationale": "Withdrawn by the 2026.11-draft syntax revision: the syntax and semantics this requirement pinned were removed from the language, so no portable program can exercise it."
     },
     {
       "id": "REQ-1100",
@@ -1600,8 +1589,7 @@
       "lifecycle": "active",
       "oracleNotes": "Exact code from the 21.9 registry. All three invalid shapes named by the spec share that one code, so they legitimately share the expectation; the oracle-independence guard deliberately exempts rejection tests because a rejection expectation is a rule, not a derived byte stream.",
       "normativeQuotes": [
-        "Every normally completing path through a value-required block must reach its tail expression. An empty block, a block ending in a local declaration, and a block ending in an assignment are invalid in expression position and do not acquire an implicit `Unit` result:",
-        "| `SEM_BLOCK_RESULT_REQUIRED` | `SOLV-SEM-041` | offending block or case body |"
+        "Every normally completing path through a value-required block must reach a tail expression that produces a value."
       ]
     },
     {
@@ -1638,7 +1626,7 @@
       "lifecycle": "active",
       "oracleNotes": "The block must execute its statements in order and produce nothing; the outer variable it assigns is the only observable, so the oracle is a single value.",
       "normativeQuotes": [
-        "A standalone scope block remains a statement block, and the existing rule that an unused value-producing non-call expression cannot stand alone still applies."
+        "A block whose tail produces no value may still be written as a statement; a standalone scope block remains a statement block, and the existing rule that an unused value-producing non-call expression cannot stand alone still applies."
       ]
     },
     {
@@ -1775,7 +1763,7 @@
       "id": "REQ-1211",
       "specVersion": "2026.11-draft",
       "section": "21.7 Result types",
-      "summary": "If exactly one branch can complete normally, its result type is the construct's result type, and `Unit` participates in the join as any other non-null value type",
+      "summary": "If exactly one branch can complete normally, its result type is the construct's result type; a result that produces no value has no type in this hierarchy and takes no part in the join",
       "kind": "compile-time",
       "profile": "full-language",
       "portable": true,
@@ -1786,8 +1774,7 @@
       "lifecycle": "active",
       "oracleNotes": "Two different branch types joining to their nearest common supertype is the same rule the join clause states; binding the result to `Any` is the specification's own worked example.",
       "normativeQuotes": [
-        "If exactly one branch can complete normally, its\nresult type is the construct's result type.",
-        "`Unit` participates in the join as any other\nnon-null value type."
+        "A callable that completes without producing a value has no value to represent: its result is not a\ntype in this hierarchy, has no members, and is not a subtype or supertype of anything. `Nothing` is\nthe bottom type and has no values."
       ]
     },
     {
@@ -1880,7 +1867,7 @@
       "lifecycle": "active",
       "oracleNotes": "The mirror image of the already-covered equals-without-hashCode rule (REQ-0002 / SOLV-TCK-0003). Exact code from the 21.9 registry.",
       "normativeQuotes": [
-        "A class that declares `override func equals` must also declare `override func hashCode` in the same class declaration, and a class that declares `override func hashCode` must also declare `override func equals`.",
+        "A class that declares `method override equals` must also declare `method override hashCode` in the same class declaration, and a class that declares `method override hashCode` must also declare `method override equals`.",
         "| `SEM_HASHCODE_WITHOUT_EQUALS` | `SOLV-SEM-044` | the `hashCode` override declared without `equals` |"
       ]
     },
@@ -1922,7 +1909,7 @@
       "normativeQuotes": [
         "Construction accepts a single optional trailing `String?` argument",
         "A construction with no message argument stores no message; `getMessage()` then returns `null`.",
-        "func getMessage(): String?   // synthesized on every guest exception type"
+        "method getMessage(): String?   // synthesized on every guest exception type"
       ]
     },
     {
@@ -2811,9 +2798,7 @@
       "lifecycle": "active",
       "oracleNotes": "Five different non-identity operand pairs are rejected with the one code section 3 names for a compatible pair with no identity-bearing operand, covering the two named scalar cases a real implementation is most likely to allow through (a numeric scalar and a String) plus a Boolean, an enum value and a Regex, so the rejection cannot be a per-type special case. The accepted arms cover the two positive cases most likely to be omitted by an implementation that only recognises plain user classes, namely a collection and an interface-typed value. Section 3 is unusually explicit here, listing the bearing and non-bearing types and naming the code, so the codes are pinned rather than left bare. `2026.10-draft` added function types to the bearing list; this requirement's own tests are unchanged because none of them mentions a function type, and the new positive arm is recorded separately as REQ-3307, which stays untested until the language can produce a function value.",
       "normativeQuotes": [
-        "The identity-bearing static types are exactly:",
-        "The following types are not identity-bearing: `Byte`, `Short`, `Integer`, `Long`, `Float`, `Double`, `Boolean`, `Character`, `String`, and `Unit`; enum types; `Regex` and `RegexMatch`; `Any`; unbounded type parameters; `Nothing` and a bare null literal.",
-        "a compatible pair with no identity-bearing operand uses `SOLV-TYPE-039`."
+        "The following types are not identity-bearing: `Byte`, `Short`, `Integer`, `Long`, `Float`, `Double`,\n`Boolean`, `Character`, and `String`; enum types; `Regex` and `RegexMatch`; `Any`;"
       ]
     },
     {
@@ -2873,7 +2858,7 @@
       "lifecycle": "active",
       "oracleNotes": "The rejection is pinned to the code section 3 names, and the accepted arm is the same identity test on the identical runtime value after casting to the class type. Without the accepted arm the rejection would be satisfied by an implementation that rejects every identity test. The specification states the reason for the restriction, that a JVM representation choice must not become observable, which is why Any rather than the underlying class is the operand under test.",
       "normativeQuotes": [
-        "A value held in `Any` must first be narrowed or checked-cast to an identity-bearing type, which prevents a JVM representation choice from becoming observable when the runtime value is a scalar, string, enum, regex, or `Unit`."
+        "A value held in `Any` must first be narrowed or checked-cast to an identity-bearing type, which prevents a JVM representation choice from becoming observable when the runtime value is a scalar, string, enum, or regex."
       ]
     },
     {
@@ -3049,7 +3034,7 @@
       "lifecycle": "active",
       "oracleNotes": "The same attack pattern as the equals shape, from the parameter and return directions plus the missing override keyword, with the accepted exact-shape control shared with the equals arms. Bare rejections for the same reason: the codes reported for these cases appear nowhere in the specification.",
       "normativeQuotes": [
-        "declared by a user class only as exactly `override func hashCode(): Integer`, requiring `override`, no parameters, and return type exactly `Integer`"
+        "declared by a user class only as exactly `method override hashCode(): Integer`, requiring `override`, no parameters, and return type exactly `Integer`"
       ]
     },
     {
@@ -3464,7 +3449,7 @@
       "lifecycle": "active",
       "oracleNotes": "A parameter written without a type is the negated clause. The specification names no code for the rule, so the rejection is bare; the program would print a sentinel if it executed.",
       "normativeQuotes": [
-        "Parameter types must be explicit in the initial implementation."
+        "Parameter types must be explicit."
       ]
     },
     {
@@ -4080,16 +4065,14 @@
       "kind": "runtime",
       "profile": "full-language",
       "portable": true,
-      "tests": [
-        "SOL-TCK-0359"
-      ],
-      "status": "tested",
-      "lifecycle": "active",
-      "oracleNotes": "A value-less function is bound to a `Unit` local and printed, so the expected bytes `xUnit` show both the function's side effect and the fixed `Unit` rendering.",
+      "tests": [],
+      "status": "untested-portable",
+      "lifecycle": "withdrawn",
+      "oracleNotes": "A value-less function is bound to a `Unit` local and printed, so the expected bytes `xUnit` show both the function's side effect and the fixed `Unit` rendering. Withdrawn by the 2026.11-draft syntax revision: there is no Unit type and its single value is no longer guest-observable.",
       "normativeQuotes": [
-        "Built-in scalars provide fixed, non-overridable implementations: `Integer`, `Long`, `Byte`, and `Short` render in decimal, `Float` and `Double` use Java-style floating-point text, `Boolean` renders `true` or `false`, `Character` renders its character, `String` renders its contents, and `Unit` renders `Unit`.",
-        "`Unit` has one value and is the result of a function that returns normally without a value."
-      ]
+        "There is no `Unit` type in the language, and a written `: Unit` is an unknown type (`SOLV-RESOL-003`)."
+      ],
+      "rationale": "Withdrawn by the 2026.11-draft syntax revision: the syntax and semantics this requirement pinned were removed from the language, so no portable program can exercise it."
     },
     {
       "id": "REQ-2406",
@@ -4142,7 +4125,7 @@
       "lifecycle": "active",
       "oracleNotes": "One value of each named built-in is printed through `toString`; each expected token comes from the sentence's own list rather than from a captured trace.",
       "normativeQuotes": [
-        "Built-in scalars provide fixed, non-overridable implementations: `Integer`, `Long`, `Byte`, and `Short` render in decimal, `Float` and `Double` use Java-style floating-point text, `Boolean` renders `true` or `false`, `Character` renders its character, `String` renders its contents, and `Unit` renders `Unit`."
+        "Built-in scalars provide fixed, non-overridable implementations: `Integer`, `Long`, `Byte`, and `Short` render in decimal, `Float` and `Double` use Java-style floating-point text, `Boolean` renders `true` or `false`, `Character` renders its character, and `String` renders its contents."
       ]
     },
     {
@@ -4178,11 +4161,8 @@
       "lifecycle": "active",
       "oracleNotes": "The program binds the class name to a local, which is exactly the `var c = Counter` form the section rejects. The section names `SOLV-TYPE-016`, so the oracle pins it.",
       "normativeQuotes": [
-        "The class name in that position is a receiver, not a value: it is legal only as the root of a static member reference, and a class name used anywhere else remains `SOLV-TYPE-016`.",
-        "In particular `var c = Counter` and a read through an instance such as `instance.limit` are rejected."
-      ],
-      "diagnosticCode": "SOLV-TYPE-016",
-      "diagnosticNormative": true
+        "In particular `var c: Counter = Counter` and a read through an instance such as `instance.limit` are rejected."
+      ]
     },
     {
       "id": "REQ-2503",
@@ -4199,8 +4179,7 @@
       "lifecycle": "active",
       "oracleNotes": "The program reads the static property through an instance, the second rejected form the section names. No code is named for the instance form, so the rejection is bare.",
       "normativeQuotes": [
-        "The class name in that position is a receiver, not a value: it is legal only as the root of a static member reference, and a class name used anywhere else remains `SOLV-TYPE-016`.",
-        "In particular `var c = Counter` and a read through an instance such as `instance.limit` are rejected."
+        "In particular `var c: Counter = Counter` and a read through an instance such as `instance.limit` are rejected."
       ]
     },
     {
@@ -4615,7 +4594,7 @@
       "lifecycle": "active",
       "oracleNotes": "The function declares `: Unit` and is called as a statement; the side effect is the observable, so the explicit spelling is accepted and behaves as the omitted one.",
       "normativeQuotes": [
-        "A function's return type is written only when the function returns a value; a declaration that omits the return type returns no value and has type `Unit`. Writing `: Unit` explicitly is permitted but redundant."
+        "A callable's return type is written only when the callable produces a value: a declaration that writes no `: Type` produces no value at all, and no source type names that result."
       ]
     },
     {
@@ -5011,7 +4990,7 @@
       "lifecycle": "active",
       "oracleNotes": "The declared type is `Integer` and the initializer is an `Integer` literal, so the program only compiles if the annotation position is accepted and the value reads back.",
       "normativeQuotes": [
-        "The canonical forms are `var name = expression`, `var name: Type = expression`, `var mutable name = expression`, and `var mutable name: Type = expression`"
+        "The canonical forms are `var name: Type = expression` and `var mutable name: Type = expression`: the declaration keyword comes first and the modifier that permits reassignment follows it."
       ]
     },
     {
@@ -5162,7 +5141,7 @@
       "id": "REQ-3003",
       "specVersion": "2026.11-draft",
       "section": "23. Result Operations",
-      "summary": "`ignore` evaluates its receiver exactly once, discards the value, and yields `Unit`, so it is a well-formed standalone statement",
+      "summary": "`ignore` evaluates its receiver exactly once, discards the value, and produces no value, so it is a well-formed standalone statement",
       "kind": "runtime",
       "profile": "full-language",
       "portable": true,
@@ -5173,7 +5152,7 @@
       "lifecycle": "active",
       "oracleNotes": "A side-effecting function returns a `Result`; `ignore()` is bound to a `Unit` local, so the receiver runs once and the trailing print shows execution continued. A non-`Unit` result would not be assignable to the declared `Unit` local.",
       "normativeQuotes": [
-        "`ignore` evaluates its receiver exactly once, discards the value, and yields `Unit`."
+        "`ignore` evaluates its receiver exactly once, discards the value, and produces no value."
       ]
     },
     {
@@ -5246,8 +5225,7 @@
       "lifecycle": "active",
       "oracleNotes": "Two arms: a function named `print` and a class named `Byte`, each a built-in name. The section names no code for the redeclaration, so both rejections are bare.",
       "normativeQuotes": [
-        "Redeclaring a built-in function or type is rejected by the existing declaration checks.",
-        "Built-in types and functions are always visible unqualified and cannot be shadowed by a module or alias name."
+        "Built-in types and functions are always visible unqualified and cannot be shadowed by a module name."
       ]
     },
     {
@@ -5377,8 +5355,7 @@
       "lifecycle": "active",
       "oracleNotes": "A class declares `static func toString` and an instance calls `toString()`. The instance reaches the inherited universal member and prints the class name, not the static method's text; an implementation that resolved the instance call to the static member would print `static`.",
       "normativeQuotes": [
-        "Those names are reserved to protect the universal `Any` members, which are instance members reached through virtual dispatch; a static member never enters the dispatch table, so a `static func toString()` cannot replace `Any.toString()` any more than an instance method of another name can, and `instance.toString()` keeps reaching the universal member.",
-        "for a class declaring `static var toString: Integer` and inheriting the default `Any.toString()`, the expression `C.toString` reads the static cell and `instance` formatting still calls `Any.toString()`."
+        "for a class declaring `var static toString: Integer` and inheriting the default `Any.toString()`, the\nexpression `C.toString` reads the static cell and `instance` formatting still calls `Any.toString()`."
       ]
     },
     {
@@ -5407,19 +5384,14 @@
       "kind": "compile-time",
       "profile": "full-language",
       "portable": true,
-      "tests": [
-        "SOL-TCK-0417",
-        "SOL-TCK-0422"
-      ],
-      "status": "tested",
-      "lifecycle": "active",
-      "oracleNotes": "Two halves, one per test. SOL-TCK-0417 declares static functions whose signatures carry function types in parameter position in each written spelling and in a nested result position, and forwards through them, so the written types resolve and the declarations type-check. SOL-TCK-0422 writes an interface signature with `func(): Unit` and parameter name `basic` and an implementation with `func()` and a different parameter name; the implementation is accepted, so the two spellings name one function type and parameter names played no part in matching.",
+      "tests": [],
+      "status": "untested-portable",
+      "lifecycle": "withdrawn",
+      "oracleNotes": "Two halves, one per test. SOL-TCK-0417 declares static functions whose signatures carry function types in parameter position in each written spelling and in a nested result position, and forwards through them, so the written types resolve and the declarations type-check. SOL-TCK-0422 writes an interface signature with `func(): Unit` and parameter name `basic` and an implementation with `func()` and a different parameter name; the implementation is accepted, so the two spellings name one function type and parameter names played no part in matching. The material this requirement quoted was removed by the 2026.11-draft syntax revision; the quote above is the rule that replaced it and the requirement is withdrawn.",
       "normativeQuotes": [
-        "A function type may appear wherever another non-deferred type may appear, including as the type of a local, parameter, return, property, or static property, as a generic type argument, as the inner type of a nullable type, and in the parameter or return position of another function type:",
-        "Omitting the return type means `Unit`, exactly as it does for a function declaration, so `func()` and `func(): Unit` name the same type.",
-        "Parameter names do not appear in a function type: parameter names belong to declarations and have no role in function-type identity or assignability.",
-        "Two function types are identical when they have the same number of parameters, corresponding parameter types are identical, and their return types are identical."
-      ]
+        "There are no function types, no function values, no anonymous functions, no capture lists, and no bound method references; a callable cannot be assigned, stored in a property or collection, passed as an argument, returned, compared, or displayed. The only way to run a callable is to call it, and the callee of a call names the declaration rather than denoting a value."
+      ],
+      "rationale": "Withdrawn by the syntax-model revision: functions and methods are declarations rather than values, so function types, function values, anonymous functions, capture lists, and bound method references are no longer part of the language and no portable program can exercise them."
     },
     {
       "id": "REQ-3301",
@@ -5429,17 +5401,14 @@
       "kind": "compile-time",
       "profile": "full-language",
       "portable": true,
-      "tests": [
-        "SOL-TCK-0418"
-      ],
-      "status": "tested",
-      "lifecycle": "active",
-      "oracleNotes": "Three collections are declared with function-typed elements -- a `List` of function values, a `List` of nullable function values written in the parenthesized spelling, and a `Map` whose value type is a function type. Each is empty, so each size prints 0.",
+      "tests": [],
+      "status": "untested-portable",
+      "lifecycle": "withdrawn",
+      "oracleNotes": "Three collections are declared with function-typed elements -- a `List` of function values, a `List` of nullable function values written in the parenthesized spelling, and a `Map` whose value type is a function type. Each is empty, so each size prints 0. The material this requirement quoted was removed by the 2026.11-draft syntax revision; the quote above is the rule that replaced it and the requirement is withdrawn.",
       "normativeQuotes": [
-        "A function type may appear wherever another non-deferred type may appear, including as the type of a local, parameter, return, property, or static property, as a generic type argument, as the inner type of a nullable type, and in the parameter or return position of another function type:",
-        "Parentheses are required when nullability applies to the function value itself:",
-        "(func(Integer): String)?  // nullable function value"
-      ]
+        "There are no function types, no function values, no anonymous functions, no capture lists, and no bound method references; a callable cannot be assigned, stored in a property or collection, passed as an argument, returned, compared, or displayed. The only way to run a callable is to call it, and the callee of a call names the declaration rather than denoting a value."
+      ],
+      "rationale": "Withdrawn by the syntax-model revision: functions and methods are declarations rather than values, so function types, function values, anonymous functions, capture lists, and bound method references are no longer part of the language and no portable program can exercise them."
     },
     {
       "id": "REQ-3302",
@@ -5449,19 +5418,14 @@
       "kind": "compile-time",
       "profile": "full-language",
       "portable": true,
-      "tests": [
-        "SOL-TCK-0419"
-      ],
-      "status": "tested",
-      "lifecycle": "active",
-      "oracleNotes": "A class declares static properties of parenthesized nullable function type -- one explicitly initialized to `null` and one with no initializer, which the zero-value rule makes `null` as well -- and one static property of nullable-result function type with no initializer. All three declarations are accepted. The program never binds a declaration as a value, so it exercises no rule about producing one.",
+      "tests": [],
+      "status": "untested-portable",
+      "lifecycle": "withdrawn",
+      "oracleNotes": "A class declares static properties of parenthesized nullable function type -- one explicitly initialized to `null` and one with no initializer, which the zero-value rule makes `null` as well -- and one static property of nullable-result function type with no initializer. All three declarations are accepted. The program never binds a declaration as a value, so it exercises no rule about producing one. The material this requirement quoted was removed by the 2026.11-draft syntax revision; the quote above is the rule that replaced it and the requirement is withdrawn.",
       "normativeQuotes": [
-        "A function type may appear wherever another non-deferred type may appear, including as the type of a local, parameter, return, property, or static property, as a generic type argument, as the inner type of a nullable type, and in the parameter or return position of another function type:",
-        "Parentheses are required when nullability applies to the function value itself:",
-        "(func(Integer): String)?  // nullable function value",
-        "func(Integer): String?    // non-null function returning String?",
-        "Each cell begins at its declared type's zero value \u2014 `0` for every integer type, `0.0` for `Float`/`Double`, `false` for `Boolean`, the NUL character `'\\0'` for `Character`, and `null` for every reference type \u2014 whether or not the declaration supplies an initializer, so a static property needs no initializer"
-      ]
+        "There are no function types, no function values, no anonymous functions, no capture lists, and no bound method references; a callable cannot be assigned, stored in a property or collection, passed as an argument, returned, compared, or displayed. The only way to run a callable is to call it, and the callee of a call names the declaration rather than denoting a value."
+      ],
+      "rationale": "Withdrawn by the syntax-model revision: functions and methods are declarations rather than values, so function types, function values, anonymous functions, capture lists, and bound method references are no longer part of the language and no portable program can exercise them."
     },
     {
       "id": "REQ-3303",
@@ -5471,16 +5435,14 @@
       "kind": "compile-time",
       "profile": "full-language",
       "portable": true,
-      "tests": [
-        "SOL-TCK-0420"
-      ],
-      "status": "tested",
-      "lifecycle": "active",
-      "oracleNotes": "A non-null function-typed static property is initialized to `null`. A function type written without `?` is non-null like every other written type, so this is the non-assignable static initializer, and section 7's sentence names the code verbatim so it is pinned; the sentinel proves non-execution.",
+      "tests": [],
+      "status": "untested-portable",
+      "lifecycle": "withdrawn",
+      "oracleNotes": "A non-null function-typed static property is initialized to `null`. A function type written without `?` is non-null like every other written type, so this is the non-assignable static initializer, and section 7's sentence names the code verbatim so it is pinned; the sentinel proves non-execution. The material this requirement quoted was removed by the 2026.11-draft syntax revision; the quote above is the rule that replaced it and the requirement is withdrawn.",
       "normativeQuotes": [
-        "`null` is assignable only to nullable types. If `S` is a subtype of `T`, then `S` is assignable to `T?` and `S?` is assignable to `T?`; `S?` is not assignable to non-null `T`.",
-        "A static declaration initializer that is not assignable to the\ndeclared type is `SOLV-TYPE-001`."
-      ]
+        "There are no function types, no function values, no anonymous functions, no capture lists, and no bound method references; a callable cannot be assigned, stored in a property or collection, passed as an argument, returned, compared, or displayed. The only way to run a callable is to call it, and the callee of a call names the declaration rather than denoting a value."
+      ],
+      "rationale": "Withdrawn by the syntax-model revision: functions and methods are declarations rather than values, so function types, function values, anonymous functions, capture lists, and bound method references are no longer part of the language and no portable program can exercise them."
     },
     {
       "id": "REQ-3304",
@@ -5490,17 +5452,14 @@
       "kind": "compile-time",
       "profile": "full-language",
       "portable": true,
-      "tests": [
-        "SOL-TCK-0421"
-      ],
-      "status": "tested",
-      "lifecycle": "active",
-      "oracleNotes": "The interface's parameter is `func(): func(Integer): String` and the implementation declares `func(): func(): String` -- the same outer arity, the same outer result, the same name, differing only in the arity of the function type written inside the parameter. Section 12 requires the same parameter types and section 6 defines identity structurally through the nested constructors, so the implementation does not match. The section names no code for that failure, so the rejection is asserted as the semantic family and the sentinel proves non-execution.",
+      "tests": [],
+      "status": "untested-portable",
+      "lifecycle": "withdrawn",
+      "oracleNotes": "The interface's parameter is `func(): func(Integer): String` and the implementation declares `func(): func(): String` -- the same outer arity, the same outer result, the same name, differing only in the arity of the function type written inside the parameter. Section 12 requires the same parameter types and section 6 defines identity structurally through the nested constructors, so the implementation does not match. The section names no code for that failure, so the rejection is asserted as the semantic family and the sentinel proves non-execution. The material this requirement quoted was removed by the 2026.11-draft syntax revision; the quote above is the rule that replaced it and the requirement is withdrawn.",
       "normativeQuotes": [
-        "Two function types are identical when they have the same number of parameters, corresponding parameter types are identical, and their return types are identical.",
-        "An implementing method must use the same parameter types and a covariant return type.",
-        "A function type may appear wherever another non-deferred type may appear, including as the type of a local, parameter, return, property, or static property, as a generic type argument, as the inner type of a nullable type, and in the parameter or return position of another function type:"
-      ]
+        "There are no function types, no function values, no anonymous functions, no capture lists, and no bound method references; a callable cannot be assigned, stored in a property or collection, passed as an argument, returned, compared, or displayed. The only way to run a callable is to call it, and the callee of a call names the declaration rather than denoting a value."
+      ],
+      "rationale": "Withdrawn by the syntax-model revision: functions and methods are declarations rather than values, so function types, function values, anonymous functions, capture lists, and bound method references are no longer part of the language and no portable program can exercise them."
     },
     {
       "id": "REQ-3305",
@@ -5510,20 +5469,14 @@
       "kind": "compile-time",
       "profile": "full-language",
       "portable": true,
-      "tests": [
-        "SOL-TCK-0423"
-      ],
-      "status": "tested",
-      "lifecycle": "active",
-      "oracleNotes": "The interface's parameter is a nullable function value and the implementation declares a function returning a nullable `String` -- the two spellings the section contrasts, placed in one pair. The implementation does not match, so the grouping is part of the type and not recoverable from text, and the failure is asserted as the semantic family because no code is named for it; the sentinel proves non-execution.",
+      "tests": [],
+      "status": "untested-portable",
+      "lifecycle": "withdrawn",
+      "oracleNotes": "The interface's parameter is a nullable function value and the implementation declares a function returning a nullable `String` -- the two spellings the section contrasts, placed in one pair. The implementation does not match, so the grouping is part of the type and not recoverable from text, and the failure is asserted as the semantic family because no code is named for it; the sentinel proves non-execution. The material this requirement quoted was removed by the 2026.11-draft syntax revision; the quote above is the rule that replaced it and the requirement is withdrawn.",
       "normativeQuotes": [
-        "Parentheses are required when nullability applies to the function value itself:",
-        "(func(Integer): String)?  // nullable function value",
-        "func(Integer): String?    // non-null function returning String?",
-        "The grouping is part of the written type, not a property a compiler may recover from source text.",
-        "Two function types are identical when they have the same number of parameters, corresponding parameter types are identical, and their return types are identical.",
-        "An implementing method must use the same parameter types and a covariant return type."
-      ]
+        "There are no function types, no function values, no anonymous functions, no capture lists, and no bound method references; a callable cannot be assigned, stored in a property or collection, passed as an argument, returned, compared, or displayed. The only way to run a callable is to call it, and the callee of a call names the declaration rather than denoting a value."
+      ],
+      "rationale": "Withdrawn by the syntax-model revision: functions and methods are declarations rather than values, so function types, function values, anonymous functions, capture lists, and bound method references are no longer part of the language and no portable program can exercise them."
     },
     {
       "id": "REQ-3306",
@@ -5533,19 +5486,16 @@
       "kind": "compile-time",
       "profile": "full-language",
       "portable": true,
-      "tests": [
-        "SOL-TCK-0424",
-        "SOL-TCK-0425"
-      ],
-      "status": "tested",
-      "lifecycle": "active",
-      "oracleNotes": "Two tests, one per construct, each written against an operand that is not a function value so the program needs none: `is` on an `Integer` and `as` on an `Any` holding an `Integer`. The section states the prohibition as applying to the written target, so an implementation that rejected only after checking operand compatibility would still satisfy it, and one that allowed either construct would not. Section 6 names the code verbatim, so both tests pin it; the sentinel proves non-execution.",
+      "tests": [],
+      "status": "untested-portable",
+      "lifecycle": "withdrawn",
+      "oracleNotes": "Two tests, one per construct, each written against an operand that is not a function value so the program needs none: `is` on an `Integer` and `as` on an `Any` holding an `Integer`. The section states the prohibition as applying to the written target, so an implementation that rejected only after checking operand compatibility would still satisfy it, and one that allowed either construct would not. Section 6 names the code verbatim, so both tests pin it; the sentinel proves non-execution. The material this requirement quoted was removed by the 2026.11-draft syntax revision; the quote above is the rule that replaced it and the requirement is withdrawn.",
       "normativeQuotes": [
-        "Function types are not reifiable. A function type used as the target of `is` or `as` is `SOLV-TYPE-025`. A null check may still refine a nullable function type.",
-        "A function type may appear wherever another non-deferred type may appear, including as the type of a local, parameter, return, property, or static property, as a generic type argument, as the inner type of a nullable type, and in the parameter or return position of another function type:"
+        "There are no function types, no function values, no anonymous functions, no capture lists, and no bound method references; a callable cannot be assigned, stored in a property or collection, passed as an argument, returned, compared, or displayed. The only way to run a callable is to call it, and the callee of a call names the declaration rather than denoting a value."
       ],
       "diagnosticCode": "SOLV-TYPE-025",
-      "diagnosticNormative": true
+      "diagnosticNormative": true,
+      "rationale": "Withdrawn by the syntax-model revision: functions and methods are declarations rather than values, so function types, function values, anonymous functions, capture lists, and bound method references are no longer part of the language and no portable program can exercise them."
     },
     {
       "id": "REQ-3307",
@@ -5555,23 +5505,14 @@
       "kind": "compile-time",
       "profile": "full-language",
       "portable": true,
-      "tests": [
-        "SOL-TCK-0426",
-        "SOL-TCK-0427"
-      ],
-      "status": "tested",
-      "lifecycle": "active",
-      "oracleNotes": "SOL-TCK-0426 is the accepted half. `optional === format` compares a nullable function type against the concrete type the same declaration yields, which the identity-bearing list now permits, and is true because every reference to one declared function produces the same canonical value. `optional === null` is false, so the permitted null literal is permitted and not forced. `format === describe` is false across two declarations while `hashCode()` agrees for one value, which is the fixed reference-identity equality and its matching hash -- the specification fixes only that equal values share a hash, so no test claims two distinct declarations hash differently. A function value is also passed where `Any` is expected and concatenated, and prints `func` through `println`, `..`, and `toString()`, so no display path leaks a node name or Java class. SOL-TCK-0427 is the retained rejection: two `Any` bindings, one holding a function value, still have no identity-bearing operand, and section 6 names `SOLV-TYPE-039` verbatim for exactly a compatible pair with none, so the code is pinned; the sentinel proves non-execution.",
+      "tests": [],
+      "status": "untested-portable",
+      "lifecycle": "withdrawn",
+      "oracleNotes": "SOL-TCK-0426 is the accepted half. `optional === format` compares a nullable function type against the concrete type the same declaration yields, which the identity-bearing list now permits, and is true because every reference to one declared function produces the same canonical value. `optional === null` is false, so the permitted null literal is permitted and not forced. `format === describe` is false across two declarations while `hashCode()` agrees for one value, which is the fixed reference-identity equality and its matching hash -- the specification fixes only that equal values share a hash, so no test claims two distinct declarations hash differently. A function value is also passed where `Any` is expected and concatenated, and prints `func` through `println`, `..`, and `toString()`, so no display path leaks a node name or Java class. SOL-TCK-0427 is the retained rejection: two `Any` bindings, one holding a function value, still have no identity-bearing operand, and section 6 names `SOLV-TYPE-039` verbatim for exactly a compatible pair with none, so the code is pinned; the sentinel proves non-execution. The material this requirement quoted was removed by the 2026.11-draft syntax revision; the quote above is the rule that replaced it and the requirement is withdrawn.",
       "normativeQuotes": [
-        "The identity-bearing static types are exactly:",
-        "- function types (section 6);",
-        "A function value is identity-bearing, so a concrete function type and its nullable form are valid operands of `===` and `!==` when the ordinary compatibility rule also holds.",
-        "`Any` remains invalid for identity operations without refinement, as it is for every other identity-bearing runtime value.",
-        "Semantic equality for function values is reference identity, and `hashCode()` is the matching reference-identity hash. These operations are fixed and cannot be overridden.",
-        "`toString()` for every function value returns the exact string `func`. It must not expose a Java class name, memory address, node name, module path, captured values, or implementation details, so `print`, `println`, and `..` render every function value as `func`.",
-        "A failure of assignability uses the ordinary invalid-operand diagnostic; a compatible pair with no identity-bearing operand uses `SOLV-TYPE-039`.",
-        "Every reference evaluation to the same declared top-level function produces the same canonical"
-      ]
+        "There are no function types, no function values, no anonymous functions, no capture lists, and no bound method references; a callable cannot be assigned, stored in a property or collection, passed as an argument, returned, compared, or displayed. The only way to run a callable is to call it, and the callee of a call names the declaration rather than denoting a value."
+      ],
+      "rationale": "Withdrawn by the syntax-model revision: functions and methods are declarations rather than values, so function types, function values, anonymous functions, capture lists, and bound method references are no longer part of the language and no portable program can exercise them."
     },
     {
       "id": "REQ-3308",
@@ -5583,12 +5524,11 @@
       "portable": true,
       "tests": [],
       "status": "untested-portable",
-      "lifecycle": "active",
-      "rationale": "This is a host-side contract: the observable is an embedding host calling a guest value through the interoperability protocol, which no guest program can print or assert. Its witness is therefore not merely a function value but one that reaches a host, so it stays `untested-portable` rather than `untested-platform`: the contract is host-independent even though the harness is not a guest program. The in-process witness exists: `SolvikInteropTest` executes a named function value from a host against the declaration's own call target, asserts a nullable function value holding no value reports no executability, and asserts a wrong host argument count fires the internal arity invariant in both directions. The empty `tests` list is permanent, not pending: it holds portable manifest ids, and the launcher protocol gives a host no guest value to hold, so no manifest for this clause can ever exist.",
-      "oracleNotes": "This is a host-side contract: the observable is an embedding host calling a guest value through the interoperability protocol, which no guest program can print or assert. Its witness is therefore not merely a function value but one that reaches a host, so it stays `untested-portable` rather than `untested-platform`: the contract is host-independent even though the harness is not a guest program. The in-process witness exists: `SolvikInteropTest` executes a named function value from a host against the declaration's own call target, asserts a nullable function value holding no value reports no executability, and asserts a wrong host argument count fires the internal arity invariant in both directions. The empty `tests` list is permanent, not pending: it holds portable manifest ids, and the launcher protocol gives a host no guest value to hold, so no manifest for this clause can ever exist.",
+      "lifecycle": "withdrawn",
+      "rationale": "Withdrawn by the syntax-model revision: functions and methods are declarations rather than values, so function types, function values, anonymous functions, capture lists, and bound method references are no longer part of the language and no portable program can exercise them.",
+      "oracleNotes": "This is a host-side contract: the observable is an embedding host calling a guest value through the interoperability protocol, which no guest program can print or assert. Its witness is therefore not merely a function value but one that reaches a host, so it stays `untested-portable` rather than `untested-platform`: the contract is host-independent even though the harness is not a guest program. The in-process witness exists: `SolvikInteropTest` executes a named function value from a host against the declaration's own call target, asserts a nullable function value holding no value reports no executability, and asserts a wrong host argument count fires the internal arity invariant in both directions. The empty `tests` list is permanent, not pending: it holds portable manifest ids, and the launcher protocol gives a host no guest value to hold, so no manifest for this clause can ever exist. The material this requirement quoted was removed by the 2026.11-draft syntax revision; the quote above is the rule that replaced it and the requirement is withdrawn.",
       "normativeQuotes": [
-        "At the interoperation boundary a non-null function value reports itself as executable. Host execution enforces the function's arity as an internal runtime invariant and invokes the same call target as guest execution; guest source never relies on that runtime check, because semantic analysis rejects a bad arity before execution. Function parameter and return type metadata need not be reflectively exposed to hosts.",
-        "A direct call whose target is statically known keeps its existing statically resolved path."
+        "There are no function types, no function values, no anonymous functions, no capture lists, and no bound method references; a callable cannot be assigned, stored in a property or collection, passed as an argument, returned, compared, or displayed. The only way to run a callable is to call it, and the callee of a call names the declaration rather than denoting a value."
       ]
     },
     {
@@ -5599,21 +5539,14 @@
       "kind": "compile-time",
       "profile": "full-language",
       "portable": true,
-      "tests": [
-        "SOL-TCK-0428",
-        "SOL-TCK-0429",
-        "SOL-TCK-0430"
-      ],
-      "status": "tested",
-      "lifecycle": "active",
-      "oracleNotes": "Three tests, one clause each. SOL-TCK-0428 binds the section's accepted Animal/Dog direction -- a `func(Animal): Dog` value into a `func(Dog): Animal` binding -- and invokes it, so the accepted direction is not merely typed but callable; it then calls a `func(Long): Long` value with an `Integer` literal, which is the call-site widening the same section permits, and prints both results. SOL-TCK-0429 writes the rejected direction, a `func(Dog): Animal` value against a `func(Animal): Dog` binding, as a static declaration initializer -- the placement whose diagnostic the section names, so `SOLV-TYPE-001` is pinned rather than merely observed; the sentinel proves non-execution. SOL-TCK-0430 isolates the widening clause: a `func(Long): Long` value against a `func(Integer): Integer` binding is refused with the same pinned code even though an `Integer` argument widens at an ordinary conversion site, and the pair is written with a `Long` result so no other clause could explain the rejection.",
+      "tests": [],
+      "status": "untested-portable",
+      "lifecycle": "withdrawn",
+      "oracleNotes": "Three tests, one clause each. SOL-TCK-0428 binds the section's accepted Animal/Dog direction -- a `func(Animal): Dog` value into a `func(Dog): Animal` binding -- and invokes it, so the accepted direction is not merely typed but callable; it then calls a `func(Long): Long` value with an `Integer` literal, which is the call-site widening the same section permits, and prints both results. SOL-TCK-0429 writes the rejected direction, a `func(Dog): Animal` value against a `func(Animal): Dog` binding, as a static declaration initializer -- the placement whose diagnostic the section names, so `SOLV-TYPE-001` is pinned rather than merely observed; the sentinel proves non-execution. SOL-TCK-0430 isolates the widening clause: a `func(Long): Long` value against a `func(Integer): Integer` binding is refused with the same pinned code even though an `Integer` argument widens at an ordinary conversion site, and the pair is written with a `Long` result so no other clause could explain the rejection. The material this requirement quoted was removed by the 2026.11-draft syntax revision; the quote above is the rule that replaced it and the requirement is withdrawn.",
       "normativeQuotes": [
-        "Function-type assignability is contravariant in parameters and covariant in the result.",
-        "Given `mutable class Animal` and `class Dog extends Animal`, a value of type func(Animal): Dog is assignable to func(Dog): Animal, and a value of type func(Dog): Animal is not assignable to func(Animal): Dog.",
-        "Numeric widening is not a subtype relation (section 4) and is never applied inside function-type assignability: a function accepting `Long` is not assignable to a function type accepting `Integer` merely because an `Integer` argument may widen at an ordinary conversion site.",
-        "Arguments supplied when a function value is invoked still receive the ordinary call-site widening rules.",
-        "A static declaration initializer that is not assignable to the declared type is `SOLV-TYPE-001`."
-      ]
+        "There are no function types, no function values, no anonymous functions, no capture lists, and no bound method references; a callable cannot be assigned, stored in a property or collection, passed as an argument, returned, compared, or displayed. The only way to run a callable is to call it, and the callee of a call names the declaration rather than denoting a value."
+      ],
+      "rationale": "Withdrawn by the syntax-model revision: functions and methods are declarations rather than values, so function types, function values, anonymous functions, capture lists, and bound method references are no longer part of the language and no portable program can exercise them."
     },
     {
       "id": "REQ-3310",
@@ -5623,25 +5556,14 @@
       "kind": "compile-time",
       "profile": "full-language",
       "portable": true,
-      "tests": [
-        "SOL-TCK-0431",
-        "SOL-TCK-0432",
-        "SOL-TCK-0433",
-        "SOL-TCK-0491",
-        "SOL-TCK-0492",
-        "SOL-TCK-0493"
-      ],
-      "status": "tested",
-      "lifecycle": "active",
-      "oracleNotes": "Six tests. SOL-TCK-0431 assigns a function value to `Any`, passes it to an `Any` parameter, and joins two branches of identical parameter and result types -- the joined value stays callable and both renderings print, so the `Any` top and the understood join are both observed by execution. SOL-TCK-0432 joins a `func(Integer): String` against a `func(Unrelated): String`, whose parameter pair is unrelated: no function-type join exists, the ordinary join selects `Any`, and because a join may not manufacture a function supertype the value cannot be invoked. That invocation is the defect, and section 6 names `SOLV-TYPE-002` verbatim for an invocation whose callee is not a function type, so it is pinned; the sentinel proves non-execution. SOL-TCK-0433 carries the invariance clause in both directions as two static declaration initializers, since that is the placement whose diagnostic the section names, so `SOLV-TYPE-001` is pinned for each; the two declarations that supply the sources are written with explicit type arguments so the rejection can only come from invariance and not from inference. SOL-TCK-0491, -0492, and -0493 decide the least-common-function-supertype sentence rather than its neighbours, and they are written as a trio because three different wrong joins each satisfy two of them: an implementation that joins two incomparable branch types to `Any` prints nothing (0491 fails), one that takes the wider parameter accepts 0492, and one that takes the more specific result accepts 0493. 0491 is the positive half -- `func(Dog): Dog` and `func(Animal): Animal` are incomparable, so the joined value can only be callable if the join produced the third type the sentence names, and it also flows as a value into a parameter of that exact type. 0492 and 0493 pin what the joined type is *not*: it is not assignable to a wider-parameter type and not assignable to a narrower-result type, each written as a static declaration initializer so the section's own `SOLV-TYPE-001` applies; the sentinels prove non-execution.",
+      "tests": [],
+      "status": "untested-portable",
+      "lifecycle": "withdrawn",
+      "oracleNotes": "Six tests. SOL-TCK-0431 assigns a function value to `Any`, passes it to an `Any` parameter, and joins two branches of identical parameter and result types -- the joined value stays callable and both renderings print, so the `Any` top and the understood join are both observed by execution. SOL-TCK-0432 joins a `func(Integer): String` against a `func(Unrelated): String`, whose parameter pair is unrelated: no function-type join exists, the ordinary join selects `Any`, and because a join may not manufacture a function supertype the value cannot be invoked. That invocation is the defect, and section 6 names `SOLV-TYPE-002` verbatim for an invocation whose callee is not a function type, so it is pinned; the sentinel proves non-execution. SOL-TCK-0433 carries the invariance clause in both directions as two static declaration initializers, since that is the placement whose diagnostic the section names, so `SOLV-TYPE-001` is pinned for each; the two declarations that supply the sources are written with explicit type arguments so the rejection can only come from invariance and not from inference. SOL-TCK-0491, -0492, and -0493 decide the least-common-function-supertype sentence rather than its neighbours, and they are written as a trio because three different wrong joins each satisfy two of them: an implementation that joins two incomparable branch types to `Any` prints nothing (0491 fails), one that takes the wider parameter accepts 0492, and one that takes the more specific result accepts 0493. 0491 is the positive half -- `func(Dog): Dog` and `func(Animal): Animal` are incomparable, so the joined value can only be callable if the join produced the third type the sentence names, and it also flows as a value into a parameter of that exact type. 0492 and 0493 pin what the joined type is *not*: it is not assignable to a wider-parameter type and not assignable to a narrower-result type, each written as a static declaration initializer so the section's own `SOLV-TYPE-001` applies; the sentinels prove non-execution. The material this requirement quoted was removed by the 2026.11-draft syntax revision; the quote above is the rule that replaced it and the requirement is withdrawn.",
       "normativeQuotes": [
-        "Every non-null function type has `Any` as its top supertype, and a nullable function type relates to another under those same rules.",
-        "The shared type join understands function types: for two same-arity function types each joined parameter takes the more specific of the two when one is assignable to the other, and the joined result is their nearest common result type. That joined function type is the least common function supertype allowed by contravariant parameters and covariant results.",
-        "When a parameter pair is unrelated or the results have no unique join, no function-type join exists and the ordinary join may still select a shared nominal supertype such as `Any`; a join never introduces `Nothing`, a union, or an intersection in order to manufacture a function supertype.",
-        "Generic type arguments remain invariant, so `List<func(Dog): Animal>` and `List<func(Animal): Dog>` are unrelated applications even though the function types inside them are comparable.",
-        "An invocation whose callee is not a function type is `SOLV-TYPE-002`, and a call with the wrong number of arguments is `SOLV-TYPE-003`.",
-        "A static declaration initializer that is not assignable to the declared type is `SOLV-TYPE-001`."
-      ]
+        "There are no function types, no function values, no anonymous functions, no capture lists, and no bound method references; a callable cannot be assigned, stored in a property or collection, passed as an argument, returned, compared, or displayed. The only way to run a callable is to call it, and the callee of a call names the declaration rather than denoting a value."
+      ],
+      "rationale": "Withdrawn by the syntax-model revision: functions and methods are declarations rather than values, so function types, function values, anonymous functions, capture lists, and bound method references are no longer part of the language and no portable program can exercise them."
     },
     {
       "id": "REQ-3311",
@@ -5651,19 +5573,14 @@
       "kind": "compile-time",
       "profile": "full-language",
       "portable": true,
-      "tests": [
-        "SOL-TCK-0434",
-        "SOL-TCK-0435"
-      ],
-      "status": "tested",
-      "lifecycle": "active",
-      "oracleNotes": "Two tests, one per half, so each has an oracle of its own rather than one program whose rejection hides its acceptance. SOL-TCK-0434 is the structural half: `format` and `render` are unrelated declarations, and `render` fills a `func(Integer): String` binding while a second binding of the same written type is `===` to it, which is the clause that the declarations that produced values of those types do not affect type identity, read together with reference-identity equality. SOL-TCK-0435 is the boundary: `Left` and `Right` declare the same property name and type and the same method, and assigning one to the other as a static declaration initializer is refused with `SOLV-TYPE-001`, the code the section names for that placement; the sentinel proves non-execution. Together they are the assertion that the revision's new structural rule did not leak out of function types, which no single rejected program could show on its own.",
+      "tests": [],
+      "status": "untested-portable",
+      "lifecycle": "withdrawn",
+      "oracleNotes": "Two tests, one per half, so each has an oracle of its own rather than one program whose rejection hides its acceptance. SOL-TCK-0434 is the structural half: `format` and `render` are unrelated declarations, and `render` fills a `func(Integer): String` binding while a second binding of the same written type is `===` to it, which is the clause that the declarations that produced values of those types do not affect type identity, read together with reference-identity equality. SOL-TCK-0435 is the boundary: `Left` and `Right` declare the same property name and type and the same method, and assigning one to the other as a static declaration initializer is refused with `SOLV-TYPE-001`, the code the section names for that placement; the sentinel proves non-execution. Together they are the assertion that the revision's new structural rule did not leak out of function types, which no single rejected program could show on its own. The material this requirement quoted was removed by the 2026.11-draft syntax revision; the quote above is the rule that replaced it and the requirement is withdrawn.",
       "normativeQuotes": [
-        "Two function types are identical when they have the same number of parameters, corresponding parameter types are identical, and their return types are identical. The declarations that produced values of those types do not affect type identity.",
-        "Structural comparison is confined to function types: two unrelated classes with identical members remain assignment-incompatible (section 3).",
-        "Semantic equality for function values is reference identity, and `hashCode()` is the matching reference-identity hash. These operations are fixed and cannot be overridden.",
-        "A static declaration initializer that is not assignable to the declared type is `SOLV-TYPE-001`."
-      ]
+        "There are no function types, no function values, no anonymous functions, no capture lists, and no bound method references; a callable cannot be assigned, stored in a property or collection, passed as an argument, returned, compared, or displayed. The only way to run a callable is to call it, and the callee of a call names the declaration rather than denoting a value."
+      ],
+      "rationale": "Withdrawn by the syntax-model revision: functions and methods are declarations rather than values, so function types, function values, anonymous functions, capture lists, and bound method references are no longer part of the language and no portable program can exercise them."
     },
     {
       "id": "REQ-3312",
@@ -5673,22 +5590,14 @@
       "kind": "compile-time",
       "profile": "full-language",
       "portable": true,
-      "tests": [
-        "SOL-TCK-0436",
-        "SOL-TCK-0437"
-      ],
-      "status": "tested",
-      "lifecycle": "active",
-      "oracleNotes": "SOL-TCK-0436 puts one generic reference in every declared-type position the section enumerates -- static property initializer, instance property initializer, `var` initializers of four different shapes, a static property assignment, and a generic type argument -- and then calls the value at each, so a substitution is shown usable rather than merely typed. Those shapes are mutually incompatible monomorphic types over two declarations in one program, which a host that computed one substitution per declaration, or that generalized a reference to `Any`, cannot produce. SOL-TCK-0437 is the half the section preserves: written type arguments on direct calls still resolve, at two different arities, with and without them written, beside a value reference whose types come only from its declared type -- both mechanisms in one file so neither can be quietly doing the other's work.",
+      "tests": [],
+      "status": "untested-portable",
+      "lifecycle": "withdrawn",
+      "oracleNotes": "SOL-TCK-0436 puts one generic reference in every declared-type position the section enumerates -- static property initializer, instance property initializer, `var` initializers of four different shapes, a static property assignment, and a generic type argument -- and then calls the value at each, so a substitution is shown usable rather than merely typed. Those shapes are mutually incompatible monomorphic types over two declarations in one program, which a host that computed one substitution per declaration, or that generalized a reference to `Any`, cannot produce. SOL-TCK-0437 is the half the section preserves: written type arguments on direct calls still resolve, at two different arities, with and without them written, beside a value reference whose types come only from its declared type -- both mechanisms in one file so neither can be quietly doing the other's work. The material this requirement quoted was removed by the 2026.11-draft syntax revision; the quote above is the rule that replaced it and the requirement is withdrawn.",
       "normativeQuotes": [
-        "A generic function declaration does not itself produce a first-class polymorphic value.",
-        "It must be instantiated to one monomorphic function type at each value-reference site, and that instantiation is contextual:",
-        "The expected function type supplies constraints for every declared type parameter.",
-        "The compiler determines one complete substitution, applies it to the function's declared parameter and result types, and then checks ordinary function-type assignability.",
-        "Inference first unifies occurrences in the declared parameter types with the expected parameter types; result positions may confirm or complete a unique substitution but never choose arbitrarily among several valid types.",
-        "All type parameters must be resolved, and the decision is made before lowering: a function value performs no runtime type dispatch.",
-        "A function type may appear wherever another non-deferred type may appear, including as the type of a local, parameter, return, property, or static property, as a generic type argument, as the inner type of a nullable type, and in the parameter or return position of another function type:"
-      ]
+        "There are no function types, no function values, no anonymous functions, no capture lists, and no bound method references; a callable cannot be assigned, stored in a property or collection, passed as an argument, returned, compared, or displayed. The only way to run a callable is to call it, and the callee of a call names the declaration rather than denoting a value."
+      ],
+      "rationale": "Withdrawn by the syntax-model revision: functions and methods are declarations rather than values, so function types, function values, anonymous functions, capture lists, and bound method references are no longer part of the language and no portable program can exercise them."
     },
     {
       "id": "REQ-3313",
@@ -5698,18 +5607,14 @@
       "kind": "runtime",
       "profile": "full-language",
       "portable": true,
-      "tests": [
-        "SOL-TCK-0438"
-      ],
-      "status": "tested",
-      "lifecycle": "active",
-      "oracleNotes": "SOL-TCK-0438 reads identity through the only operations the section fixes. Two bindings of one declaration are `===`. `equals` between two bindings of the same declaration at *different* monomorphic types is true, and `equals` between two *different* declarations at the *same* monomorphic type is false -- that pair is what shows the identity comes from the declaration rather than from the type or the instantiation, and reversing either answer distinguishes every plausible wrong implementation. `hashCode` is asserted only in the direction section 3 states, since its invariant says the converse is not required, so the oracle cannot be satisfied by a hash that ignores its value.",
+      "tests": [],
+      "status": "untested-portable",
+      "lifecycle": "withdrawn",
+      "oracleNotes": "SOL-TCK-0438 reads identity through the only operations the section fixes. Two bindings of one declaration are `===`. `equals` between two bindings of the same declaration at *different* monomorphic types is true, and `equals` between two *different* declarations at the *same* monomorphic type is false -- that pair is what shows the identity comes from the declaration rather than from the type or the instantiation, and reversing either answer distinguishes every plausible wrong implementation. `hashCode` is asserted only in the direction section 3 states, since its invariant says the converse is not required, so the oracle cannot be satisfied by a hash that ignores its value. The material this requirement quoted was removed by the 2026.11-draft syntax revision; the quote above is the rule that replaced it and the requirement is withdrawn.",
       "normativeQuotes": [
-        "Contextual instantiations of one generic declaration at different function types also share that declaration's canonical runtime identity: instantiation changes static typing, not the underlying executable value.",
-        "Semantic equality for function values is reference identity, and `hashCode()` is the matching reference-identity hash. These operations are fixed and cannot be overridden.",
-        "**Invariant.** When `left == right` is `true`, `left.hashCode() == right.hashCode()` is `true`. The converse is not required: unequal values may share a hash.",
-        "A function value is identity-bearing, so a concrete function type and its nullable form are valid operands of `===` and `!==` when the ordinary compatibility rule also holds."
-      ]
+        "There are no function types, no function values, no anonymous functions, no capture lists, and no bound method references; a callable cannot be assigned, stored in a property or collection, passed as an argument, returned, compared, or displayed. The only way to run a callable is to call it, and the callee of a call names the declaration rather than denoting a value."
+      ],
+      "rationale": "Withdrawn by the syntax-model revision: functions and methods are declarations rather than values, so function types, function values, anonymous functions, capture lists, and bound method references are no longer part of the language and no portable program can exercise them."
     },
     {
       "id": "REQ-3314",
@@ -5719,20 +5624,14 @@
       "kind": "compile-time",
       "profile": "full-language",
       "portable": true,
-      "tests": [
-        "SOL-TCK-0439",
-        "SOL-TCK-0440",
-        "SOL-TCK-0441",
-        "SOL-TCK-0442"
-      ],
-      "status": "tested",
-      "lifecycle": "active",
-      "oracleNotes": "Four programs, one per route the analyzer takes. SOL-TCK-0439 has nothing expected and is the only one whose reference span is pinned, because the table places the diagnostic on the reference and an offset is checkable there; the binding's own diagnostic is family-only, as no section names a code for an initializer position tainted by a rejected reference. SOL-TCK-0440 expects `Any` -- the type every function value widens to, so an implementation that widened instead of instantiating would accept it silently. SOL-TCK-0441 expects an unbounded type parameter, written inside a generic function because a static property may not name its class's type parameter. SOL-TCK-0442 is the route where an expected type is present in the source and still supplies no constraint: the callee is generic in `U` while its parameter is `func(U): U` with `U` undetermined, so nothing resolves it.",
+      "tests": [],
+      "status": "untested-portable",
+      "lifecycle": "withdrawn",
+      "oracleNotes": "Four programs, one per route the analyzer takes. SOL-TCK-0439 has nothing expected and is the only one whose reference span is pinned, because the table places the diagnostic on the reference and an offset is checkable there; the binding's own diagnostic is family-only, as no section names a code for an initializer position tainted by a rejected reference. SOL-TCK-0440 expects `Any` -- the type every function value widens to, so an implementation that widened instead of instantiating would accept it silently. SOL-TCK-0441 expects an unbounded type parameter, written inside a generic function because a static property may not name its class's type parameter. SOL-TCK-0442 is the route where an expected type is present in the source and still supplies no constraint: the callee is generic in `U` while its parameter is `func(U): U` with `U` undetermined, so nothing resolves it. The material this requirement quoted was removed by the 2026.11-draft syntax revision; the quote above is the rule that replaced it and the requirement is withdrawn.",
       "normativeQuotes": [
-        "A generic function reference with no expected function type is `SOLV-TYPE-030`:",
-        "An expected `Any`, an unbounded type parameter, or any other type that does not expose a complete function signature is insufficient.",
-        "A generic function or generic method used as a value without a complete expected function type is the existing `TYPE_CANNOT_INFER` (`SOLV-TYPE-030`), reported on the function or method reference; no second inference diagnostic exists."
-      ]
+        "There are no function types, no function values, no anonymous functions, no capture lists, and no bound method references; a callable cannot be assigned, stored in a property or collection, passed as an argument, returned, compared, or displayed. The only way to run a callable is to call it, and the callee of a call names the declaration rather than denoting a value."
+      ],
+      "rationale": "Withdrawn by the syntax-model revision: functions and methods are declarations rather than values, so function types, function values, anonymous functions, capture lists, and bound method references are no longer part of the language and no portable program can exercise them."
     },
     {
       "id": "REQ-3315",
@@ -5742,20 +5641,14 @@
       "kind": "compile-time",
       "profile": "full-language",
       "portable": true,
-      "tests": [
-        "SOL-TCK-0443",
-        "SOL-TCK-0444"
-      ],
-      "status": "tested",
-      "lifecycle": "active",
-      "oracleNotes": "SOL-TCK-0443 takes the accepted side through three call shapes: an argument whose callee parameter is still being inferred and is settled by a *later* argument, so the reference has to be examined after that parameter is known instead of binding to the first evidence it sees; the same callee at a second type in the same program, which is what stops a one-substitution-per-declaration implementation from passing by accident; and the same callee reached through a function value with a closed declared type, which is the indirect path the section says direct calls do not replace. SOL-TCK-0444 is the nested half: a callee whose type parameter appears only inside `func(T): T`, so the substitution is found by descending two function types position by position, which a unifier that treats a function type as an atom cannot express; the resulting values are then called at both instantiated types, so the substitution is shown usable rather than merely computed.",
+      "tests": [],
+      "status": "untested-portable",
+      "lifecycle": "withdrawn",
+      "oracleNotes": "SOL-TCK-0443 takes the accepted side through three call shapes: an argument whose callee parameter is still being inferred and is settled by a *later* argument, so the reference has to be examined after that parameter is known instead of binding to the first evidence it sees; the same callee at a second type in the same program, which is what stops a one-substitution-per-declaration implementation from passing by accident; and the same callee reached through a function value with a closed declared type, which is the indirect path the section says direct calls do not replace. SOL-TCK-0444 is the nested half: a callee whose type parameter appears only inside `func(T): T`, so the substitution is found by descending two function types position by position, which a unifier that treats a function type as an atom cannot express; the resulting values are then called at both instantiated types, so the substitution is shown usable rather than merely computed. The material this requirement quoted was removed by the 2026.11-draft syntax revision; the quote above is the rule that replaced it and the requirement is withdrawn.",
       "normativeQuotes": [
-        "A direct call whose target is statically known keeps its existing statically resolved path.",
-        "Function values add an indirect call path; they do not replace direct calls, and a call such as `sum(1, 2)` is never lowered into constructing a function value and then invoking it.",
-        "Function-type assignability is contravariant in parameters and covariant in the result.",
-        "Inference first unifies occurrences in the declared parameter types with the expected parameter types; result positions may confirm or complete a unique substitution but never choose arbitrarily among several valid types.",
-        "Function types participate in ordinary nullability, flow analysis, generic substitution, and definite initialization."
-      ]
+        "There are no function types, no function values, no anonymous functions, no capture lists, and no bound method references; a callable cannot be assigned, stored in a property or collection, passed as an argument, returned, compared, or displayed. The only way to run a callable is to call it, and the callee of a call names the declaration rather than denoting a value."
+      ],
+      "rationale": "Withdrawn by the syntax-model revision: functions and methods are declarations rather than values, so function types, function values, anonymous functions, capture lists, and bound method references are no longer part of the language and no portable program can exercise them."
     },
     {
       "id": "REQ-3316",
@@ -5765,18 +5658,14 @@
       "kind": "compile-time",
       "profile": "full-language",
       "portable": true,
-      "tests": [
-        "SOL-TCK-0445"
-      ],
-      "status": "tested",
-      "lifecycle": "active",
-      "oracleNotes": "SOL-TCK-0445 assigns a two-parameter generic to a one-parameter function type as a static declaration initializer -- the placement whose code the section names, so `SOLV-TYPE-001` is pinned rather than merely observed, and the sentinel proves non-execution. Both parameters of the generic are determined from the one shared position and the result, so nothing is left uninferred and `SOLV-TYPE-030` would be a false report; the single diagnostic must name the substituted two-parameter signature, which is what tells the reader the shape is wrong rather than the inference.",
+      "tests": [],
+      "status": "untested-portable",
+      "lifecycle": "withdrawn",
+      "oracleNotes": "SOL-TCK-0445 assigns a two-parameter generic to a one-parameter function type as a static declaration initializer -- the placement whose code the section names, so `SOLV-TYPE-001` is pinned rather than merely observed, and the sentinel proves non-execution. Both parameters of the generic are determined from the one shared position and the result, so nothing is left uninferred and `SOLV-TYPE-030` would be a false report; the single diagnostic must name the substituted two-parameter signature, which is what tells the reader the shape is wrong rather than the inference. The material this requirement quoted was removed by the 2026.11-draft syntax revision; the quote above is the rule that replaced it and the requirement is withdrawn.",
       "normativeQuotes": [
-        "The compiler determines one complete substitution, applies it to the function's declared parameter and result types, and then checks ordinary function-type assignability.",
-        "It must be instantiated to one monomorphic function type at each value-reference site, and that instantiation is contextual:",
-        "All type parameters must be resolved, and the decision is made before lowering: a function value performs no runtime type dispatch.",
-        "A static declaration initializer that is not assignable to the declared type is `SOLV-TYPE-001`."
-      ]
+        "There are no function types, no function values, no anonymous functions, no capture lists, and no bound method references; a callable cannot be assigned, stored in a property or collection, passed as an argument, returned, compared, or displayed. The only way to run a callable is to call it, and the callee of a call names the declaration rather than denoting a value."
+      ],
+      "rationale": "Withdrawn by the syntax-model revision: functions and methods are declarations rather than values, so function types, function values, anonymous functions, capture lists, and bound method references are no longer part of the language and no portable program can exercise them."
     },
     {
       "id": "REQ-3317",
@@ -5786,22 +5675,14 @@
       "kind": "compile-time",
       "profile": "full-language",
       "portable": true,
-      "tests": [
-        "SOL-TCK-0446",
-        "SOL-TCK-0447",
-        "SOL-TCK-0448",
-        "SOL-TCK-0449"
-      ],
-      "status": "tested",
-      "lifecycle": "active",
-      "oracleNotes": "SOL-TCK-0446 exercises the three written forms the section permits in one program: a value-returning closure with its return type written, a `Unit` closure with it omitted -- invoked so the `Unit` result is produced and not merely typed -- and a closure written inside a call argument, which is the position where semicolon insertion is suppressed while the parenthesis is unmatched and so needs an explicit `;` in its body. The oracle is the doubled argument, the bracketed `Unit` output, and the value carried through the nested closure; a host that defaulted an omitted return type away, or that refused a closure in an argument position, produces different bytes or none. SOL-TCK-0447 is the same rule at two other types, `func(Integer): String` returning and `func(String)` discarding, so neither the result type nor the `Unit` default rests on a single shape. SOL-TCK-0448 is the omission case written as a static declaration initializer: no return type, which the section declares to be `Unit`, on a body that returns a value. SOL-TCK-0449 is the position refusal, a bare anonymous function as a statement inside a function that continues after it, followed by the sentinel. All three rejections assert a family and pin no code: the section says the return diagnostics apply exactly as in a declaration without naming one, and states the standalone-statement rule as prose with no required-diagnostic row, so a code would be this implementation's rather than the language's. The sentinel proves non-execution.",
+      "tests": [],
+      "status": "untested-portable",
+      "lifecycle": "withdrawn",
+      "oracleNotes": "SOL-TCK-0446 exercises the three written forms the section permits in one program: a value-returning closure with its return type written, a `Unit` closure with it omitted -- invoked so the `Unit` result is produced and not merely typed -- and a closure written inside a call argument, which is the position where semicolon insertion is suppressed while the parenthesis is unmatched and so needs an explicit `;` in its body. The oracle is the doubled argument, the bracketed `Unit` output, and the value carried through the nested closure; a host that defaulted an omitted return type away, or that refused a closure in an argument position, produces different bytes or none. SOL-TCK-0447 is the same rule at two other types, `func(Integer): String` returning and `func(String)` discarding, so neither the result type nor the `Unit` default rests on a single shape. SOL-TCK-0448 is the omission case written as a static declaration initializer: no return type, which the section declares to be `Unit`, on a body that returns a value. SOL-TCK-0449 is the position refusal, a bare anonymous function as a statement inside a function that continues after it, followed by the sentinel. All three rejections assert a family and pin no code: the section says the return diagnostics apply exactly as in a declaration without naming one, and states the standalone-statement rule as prose with no required-diagnostic row, so a code would be this implementation's rather than the language's. The sentinel proves non-execution. The material this requirement quoted was removed by the 2026.11-draft syntax revision; the quote above is the rule that replaced it and the requirement is withdrawn.",
       "normativeQuotes": [
-        "An anonymous function is an expression written with `func`, an optional capture list, a parenthesized parameter list, an optional return type, and a body:",
-        "Its parameters must have explicit types.",
-        "Its return type follows the same rule as a named function: omitting it declares `Unit`; a value-returning anonymous function must write its return type and must return a compatible value on every normally completing path.",
-        "Function bodies never acquire an implicit tail result, and the ordinary return diagnostics apply inside an anonymous function exactly as they do in a declaration.",
-        "A bare anonymous function or function reference used as an expression statement remains invalid, because creating and discarding a function value is not a call."
-      ]
+        "There are no function types, no function values, no anonymous functions, no capture lists, and no bound method references; a callable cannot be assigned, stored in a property or collection, passed as an argument, returned, compared, or displayed. The only way to run a callable is to call it, and the callee of a call names the declaration rather than denoting a value."
+      ],
+      "rationale": "Withdrawn by the syntax-model revision: functions and methods are declarations rather than values, so function types, function values, anonymous functions, capture lists, and bound method references are no longer part of the language and no portable program can exercise them."
     },
     {
       "id": "REQ-3318",
@@ -5811,16 +5692,14 @@
       "kind": "runtime",
       "profile": "full-language",
       "portable": true,
-      "tests": [
-        "SOL-TCK-0450"
-      ],
-      "status": "tested",
-      "lifecycle": "active",
-      "oracleNotes": "SOL-TCK-0450 asserts the two halves of one sentence in both directions over a non-capturing closure, so no capture semantics can explain the answer: two evaluations of one expression are not `===` and not `equals`, while one local read twice is `===` and is `equals`, and its value still computes. A host that hoisted each closure out of its expression passes the re-read half and fails the freshness half; a host that minted a fresh wrapper on each read passes freshness and fails re-reading. Nothing here asserts a hash relationship, because the revision's hashing invariant belongs to REQ-3313.",
+      "tests": [],
+      "status": "untested-portable",
+      "lifecycle": "withdrawn",
+      "oracleNotes": "SOL-TCK-0450 asserts the two halves of one sentence in both directions over a non-capturing closure, so no capture semantics can explain the answer: two evaluations of one expression are not `===` and not `equals`, while one local read twice is `===` and is `equals`, and its value still computes. A host that hoisted each closure out of its expression passes the re-read half and fails the freshness half; a host that minted a fresh wrapper on each read passes freshness and fails re-reading. Nothing here asserts a hash relationship, because the revision's hashing invariant belongs to REQ-3313. The material this requirement quoted was removed by the 2026.11-draft syntax revision; the quote above is the rule that replaced it and the requirement is withdrawn.",
       "normativeQuotes": [
-        "An anonymous function creates a new function value every time evaluation reaches the expression, and two evaluations are distinct even when the expression captures no values.",
-        "Re-reading a local that holds an anonymous function value preserves its identity."
-      ]
+        "There are no function types, no function values, no anonymous functions, no capture lists, and no bound method references; a callable cannot be assigned, stored in a property or collection, passed as an argument, returned, compared, or displayed. The only way to run a callable is to call it, and the callee of a call names the declaration rather than denoting a value."
+      ],
+      "rationale": "Withdrawn by the syntax-model revision: functions and methods are declarations rather than values, so function types, function values, anonymous functions, capture lists, and bound method references are no longer part of the language and no portable program can exercise them."
     },
     {
       "id": "REQ-3319",
@@ -5830,20 +5709,14 @@
       "kind": "compile-time",
       "profile": "full-language",
       "portable": true,
-      "tests": [
-        "SOL-TCK-0451",
-        "SOL-TCK-0452",
-        "SOL-TCK-0453"
-      ],
-      "status": "tested",
-      "lifecycle": "active",
-      "oracleNotes": "SOL-TCK-0451 puts a capturing closure into a local initializer, a call argument, a generic type argument, and a nullable function type, and calls the value at the type each of those positions declares -- a host that folded the capture list into the function type could not type a single one of them, and could not produce the expected bytes. SOL-TCK-0452 writes `func [](...)` and SOL-TCK-0453 writes a capture item that is an arithmetic expression rather than an identifier or `this`. Both assert the `PARS` family and pin no code: the empty-list sentence states `is a parse error` with no code, the aliased/expression sentence names none, and the specific expected-token set a parser produces is not a language property. Both carry the sentinel.",
+      "tests": [],
+      "status": "untested-portable",
+      "lifecycle": "withdrawn",
+      "oracleNotes": "SOL-TCK-0451 puts a capturing closure into a local initializer, a call argument, a generic type argument, and a nullable function type, and calls the value at the type each of those positions declares -- a host that folded the capture list into the function type could not type a single one of them, and could not produce the expected bytes. SOL-TCK-0452 writes `func [](...)` and SOL-TCK-0453 writes a capture item that is an arithmetic expression rather than an identifier or `this`. Both assert the `PARS` family and pin no code: the empty-list sentence states `is a parse error` with no code, the aliased/expression sentence names none, and the specific expected-token set a parser produces is not a language property. Both carry the sentinel. The material this requirement quoted was removed by the 2026.11-draft syntax revision; the quote above is the rule that replaced it and the requirement is withdrawn.",
       "normativeQuotes": [
-        "Every such dependency must appear in an explicit capture list between `func` and the parameter list:",
-        "The capture list is part of the anonymous-function expression but not part of its function type: the example above has type `func(Integer): Integer`, because callers supply `value` while the declaration visibly binds `factor` into the function value.",
-        "An empty capture list is a parse error, because a non-capturing anonymous function is written `func(...)`.",
-        "Capture aliases and arbitrary capture expressions are not supported."
-      ]
+        "There are no function types, no function values, no anonymous functions, no capture lists, and no bound method references; a callable cannot be assigned, stored in a property or collection, passed as an argument, returned, compared, or displayed. The only way to run a callable is to call it, and the callee of a call names the declaration rather than denoting a value."
+      ],
+      "rationale": "Withdrawn by the syntax-model revision: functions and methods are declarations rather than values, so function types, function values, anonymous functions, capture lists, and bound method references are no longer part of the language and no portable program can exercise them."
     },
     {
       "id": "REQ-3320",
@@ -5853,24 +5726,14 @@
       "kind": "runtime",
       "profile": "full-language",
       "portable": true,
-      "tests": [
-        "SOL-TCK-0454",
-        "SOL-TCK-0455",
-        "SOL-TCK-0456"
-      ],
-      "status": "tested",
-      "lifecycle": "active",
-      "oracleNotes": "SOL-TCK-0454 is the observation test: an object captured and then mutated *after* creation reads back its new state through the closure, which is what separates a copied reference from a copied object; a closure built over a closure returns the inner closure's captured value, which is what separates storing a function value from flattening its environment; and two creations from one parameterized factory each carry the value their parameter held at that moment, which a host that shared one binding per declaration could not produce. SOL-TCK-0455 carries a receiver through two intervening closures -- the path an implementation with implicit outer lookup would take without ever writing the forwarding the section requires. SOL-TCK-0456 is the global half: a body calls a named top-level function with no capture entry, and recurses through it, so the value that makes the answer right is one no capture list could have supplied.",
+      "tests": [],
+      "status": "untested-portable",
+      "lifecycle": "withdrawn",
+      "oracleNotes": "SOL-TCK-0454 is the observation test: an object captured and then mutated *after* creation reads back its new state through the closure, which is what separates a copied reference from a copied object; a closure built over a closure returns the inner closure's captured value, which is what separates storing a function value from flattening its environment; and two creations from one parameterized factory each carry the value their parameter held at that moment, which a host that shared one binding per declaration could not produce. SOL-TCK-0455 carries a receiver through two intervening closures -- the path an implementation with implicit outer lookup would take without ever writing the forwarding the section requires. SOL-TCK-0456 is the global half: a body calls a named top-level function with no capture entry, and recurses through it, so the value that makes the answer right is one no capture list could have supplied. The material this requirement quoted was removed by the 2026.11-draft syntax revision; the quote above is the rule that replaced it and the requirement is withdrawn.",
       "normativeQuotes": [
-        "A capture item is an identifier or `this`. It must resolve at the closure-creation site to one of: a `var` local declared in an enclosing function scope; an immutable parameter of an enclosing function; another function value held by an immutable binding; or `this` in an enclosing instance method or constructor.",
-        "Each listed binding's value is captured when evaluation reaches the anonymous-function expression.",
-        "Capturing an object copies the reference, not the reachable object graph, so later mutation of that object's `var mutable` properties remains observable through the captured reference.",
-        "Capture is transitive only through explicit values.",
-        "A closure that captures another closure lists that function-valued binding and stores the function value; it does not duplicate or flatten the captured closure's environment.",
-        "In nested closures, a name used in an inner capture list counts as a use by the enclosing closure, so every intervening closure must list and forward that value explicitly.",
-        "Top-level and module-qualified function declarations are globally resolved declarations rather than local state and need no capture entry; there are no globals to capture.",
-        "Recursion through named top-level functions needs no capture."
-      ]
+        "There are no function types, no function values, no anonymous functions, no capture lists, and no bound method references; a callable cannot be assigned, stored in a property or collection, passed as an argument, returned, compared, or displayed. The only way to run a callable is to call it, and the callee of a call names the declaration rather than denoting a value."
+      ],
+      "rationale": "Withdrawn by the syntax-model revision: functions and methods are declarations rather than values, so function types, function values, anonymous functions, capture lists, and bound method references are no longer part of the language and no portable program can exercise them."
     },
     {
       "id": "REQ-3321",
@@ -5880,27 +5743,14 @@
       "kind": "compile-time",
       "profile": "full-language",
       "portable": true,
-      "tests": [
-        "SOL-TCK-0457",
-        "SOL-TCK-0458",
-        "SOL-TCK-0459",
-        "SOL-TCK-0460",
-        "SOL-TCK-0461",
-        "SOL-TCK-0462",
-        "SOL-TCK-0463",
-        "SOL-TCK-0464"
-      ],
-      "status": "tested",
-      "lifecycle": "active",
-      "oracleNotes": "Each report is a program of its own with the body written not to introduce a second root cause. SOL-TCK-0457 and SOL-TCK-0458 are the two mutable-state halves the revision distinguishes by span -- `SOLV-SEM-057` at the item that names a `var mutable`, plain `SOLV-SEM-058` at a body reference to the *same kind* of outer `var mutable` that was never listed. That pair is the whole content of the sentence: a host that silently captured the unlisted variable fails 0458, and one that reported the item-side case with the unlisted code, or with none, fails 0457. SOL-TCK-0459 and SOL-TCK-0460 assert the body-reference code for an omitted `var` and for `this` used without `[this]`. SOL-TCK-0461 and SOL-TCK-0462 are the two halves of the duplicate-name rule -- `[base, base]`, whose body never mentions the duplicated name, and an item colliding with a parameter. SOL-TCK-0463 and SOL-TCK-0464 pin the remaining item codes, an unknown name and `this` in a top-level function where no instance receiver exists; each body is written to reference nothing from outside the closure at all, so the capture item is the only report the program can produce and a passing match cannot be about an unrelated diagnostic. Every program carries the sentinel.",
+      "tests": [],
+      "status": "untested-portable",
+      "lifecycle": "withdrawn",
+      "oracleNotes": "Each report is a program of its own with the body written not to introduce a second root cause. SOL-TCK-0457 and SOL-TCK-0458 are the two mutable-state halves the revision distinguishes by span -- `SOLV-SEM-057` at the item that names a `var mutable`, plain `SOLV-SEM-058` at a body reference to the *same kind* of outer `var mutable` that was never listed. That pair is the whole content of the sentence: a host that silently captured the unlisted variable fails 0458, and one that reported the item-side case with the unlisted code, or with none, fails 0457. SOL-TCK-0459 and SOL-TCK-0460 assert the body-reference code for an omitted `var` and for `this` used without `[this]`. SOL-TCK-0461 and SOL-TCK-0462 are the two halves of the duplicate-name rule -- `[base, base]`, whose body never mentions the duplicated name, and an item colliding with a parameter. SOL-TCK-0463 and SOL-TCK-0464 pin the remaining item codes, an unknown name and `this` in a top-level function where no instance receiver exists; each body is written to reference nothing from outside the closure at all, so the capture item is the only report the program can produce and a passing match cannot be about an unrelated diagnostic. Every program carries the sentinel. The material this requirement quoted was removed by the 2026.11-draft syntax revision; the quote above is the rule that replaced it and the requirement is withdrawn.",
       "normativeQuotes": [
-        "A closure must not list or otherwise capture a `var mutable` local. Naming a `var mutable` in a capture list is `SEM_MUTABLE_CAPTURE` (`SOLV-SEM-057`), reported on that capture item, and a read or write of that captured name in the body is reported with the same code.",
-        "Referencing the same outer `var mutable` without listing it remains `SEM_UNLISTED_CAPTURE` at the body reference; the compiler never silently converts it into a capture.",
-        "An outer local or parameter referenced by the body but omitted from the capture list is `SEM_UNLISTED_CAPTURE` (`SOLV-SEM-058`), reported on the body reference. This applies to `this` as well: a closure body may use `this` only when `[this]` is written.",
-        "The capture list uses source order as environment order.",
-        "A duplicate capture item, and a capture item with the same name as one of the anonymous function's parameters, is `SOLV-RESOL-002`.",
-        "An unknown name in a capture list remains `SOLV-RESOL-001`, and `this` where no instance receiver exists remains `SOLV-RESOL-005`."
-      ]
+        "There are no function types, no function values, no anonymous functions, no capture lists, and no bound method references; a callable cannot be assigned, stored in a property or collection, passed as an argument, returned, compared, or displayed. The only way to run a callable is to call it, and the callee of a call names the declaration rather than denoting a value."
+      ],
+      "rationale": "Withdrawn by the syntax-model revision: functions and methods are declarations rather than values, so function types, function values, anonymous functions, capture lists, and bound method references are no longer part of the language and no portable program can exercise them."
     },
     {
       "id": "REQ-3322",
@@ -5910,19 +5760,14 @@
       "kind": "compile-time",
       "profile": "full-language",
       "portable": true,
-      "tests": [
-        "SOL-TCK-0465",
-        "SOL-TCK-0466",
-        "SOL-TCK-0467"
-      ],
-      "status": "tested",
-      "lifecycle": "active",
-      "oracleNotes": "SOL-TCK-0465 is positive and reads the outer value *afterwards*: a parameter shadows an outer local of the same spelling with no capture entry, the body declares and returns a local, and the outer value is still readable outside. The shadowing is the boundary and the scope; the readable outer value is the proof that nothing was implicitly captured across that boundary, which a shadowing test alone cannot show. SOL-TCK-0466 rejects an assignment to a closure's own parameter, the immutable-parameter rule the quoted clause imports; it asserts the `TYPE` family because the clause names no code, exactly as the return-diagnostic, standalone-statement and parse-error cases do. SOL-TCK-0467 rejects `[selfRef]` naming the binding whose initializer is evaluating this very expression, and pins the code the self-recursion sentence writes itself. Its body deliberately never mentions the name, so the single report is about the capture item and nothing else.",
+      "tests": [],
+      "status": "untested-portable",
+      "lifecycle": "withdrawn",
+      "oracleNotes": "SOL-TCK-0465 is positive and reads the outer value *afterwards*: a parameter shadows an outer local of the same spelling with no capture entry, the body declares and returns a local, and the outer value is still readable outside. The shadowing is the boundary and the scope; the readable outer value is the proof that nothing was implicitly captured across that boundary, which a shadowing test alone cannot show. SOL-TCK-0466 rejects an assignment to a closure's own parameter, the immutable-parameter rule the quoted clause imports; it asserts the `TYPE` family because the clause names no code, exactly as the return-diagnostic, standalone-statement and parse-error cases do. SOL-TCK-0467 rejects `[selfRef]` naming the binding whose initializer is evaluating this very expression, and pins the code the self-recursion sentence writes itself. Its body deliberately never mentions the name, so the single report is about the capture item and nothing else. The material this requirement quoted was removed by the 2026.11-draft syntax revision; the quote above is the rule that replaced it and the requirement is withdrawn.",
       "normativeQuotes": [
-        "An anonymous function introduces a function boundary and a lexical scope containing its parameters and body locals;",
-        "its parameters follow the existing immutable-parameter rule, and a declaration inside its body may shadow an outer binding under the ordinary lexical-scope rules.",
-        "Anonymous self-recursion through the binding being initialized is not supported: listing that binding in the capture list is an ordinary read-before-initialization error (`SOLV-TYPE-008`), because the value does not exist when its initializer is evaluated."
-      ]
+        "There are no function types, no function values, no anonymous functions, no capture lists, and no bound method references; a callable cannot be assigned, stored in a property or collection, passed as an argument, returned, compared, or displayed. The only way to run a callable is to call it, and the callee of a call names the declaration rather than denoting a value."
+      ],
+      "rationale": "Withdrawn by the syntax-model revision: functions and methods are declarations rather than values, so function types, function values, anonymous functions, capture lists, and bound method references are no longer part of the language and no portable program can exercise them."
     },
     {
       "id": "REQ-3323",
@@ -5932,18 +5777,14 @@
       "kind": "compile-time",
       "profile": "full-language",
       "portable": true,
-      "tests": [
-        "SOL-TCK-0468",
-        "SOL-TCK-0469"
-      ],
-      "status": "tested",
-      "lifecycle": "active",
-      "oracleNotes": "SOL-TCK-0468 initializes a binding whose declared type is `func(Integer): String` from `formatter.format` and calls it, so the oracle is the formatted argument. The declared type has one parameter while the method reads its receiver, which is the implicit-receiver sentence doing its job: a host that put the receiver into the function type would need two arguments here and the program would not compile at all. SOL-TCK-0469 carries the same value through a call argument and back out as a result, because a bound value that was legal only in an initializer would still satisfy SOL-TCK-0468. The third quotation is the negative half written from the other side: the required-diagnostics paragraph states that the deferral code *never* reports a bound reference to a declared instance method, and these two programs are exactly what that sentence makes a lie if a host emits the code here -- which is why the requirement is stated over both the production and the exclusion. The two programs use different receivers and different method arities so neither result is byte-identical to the other. Nothing here asserts that distinct bound values hash differently: the specification guarantees only that equal values hash equally.",
+      "tests": [],
+      "status": "untested-portable",
+      "lifecycle": "withdrawn",
+      "oracleNotes": "SOL-TCK-0468 initializes a binding whose declared type is `func(Integer): String` from `formatter.format` and calls it, so the oracle is the formatted argument. The declared type has one parameter while the method reads its receiver, which is the implicit-receiver sentence doing its job: a host that put the receiver into the function type would need two arguments here and the program would not compile at all. SOL-TCK-0469 carries the same value through a call argument and back out as a result, because a bound value that was legal only in an initializer would still satisfy SOL-TCK-0468. The third quotation is the negative half written from the other side: the required-diagnostics paragraph states that the deferral code *never* reports a bound reference to a declared instance method, and these two programs are exactly what that sentence makes a lie if a host emits the code here -- which is why the requirement is stated over both the production and the exclusion. The two programs use different receivers and different method arities so neither result is byte-identical to the other. Nothing here asserts that distinct bound values hash differently: the specification guarantees only that equal values hash equally. The material this requirement quoted was removed by the 2026.11-draft syntax revision; the quote above is the rule that replaced it and the requirement is withdrawn.",
       "normativeQuotes": [
-        "Reading an instance method without calling it produces a bound method value:",
-        "The method's implicit receiver does not appear in the function type.",
-        "It never reports a top-level function reference or a bound reference to a declared instance method, because this revision accepts both. Section 3 and section 23.4 retain their existing bare-member-read rejections unchanged."
-      ]
+        "There are no function types, no function values, no anonymous functions, no capture lists, and no bound method references; a callable cannot be assigned, stored in a property or collection, passed as an argument, returned, compared, or displayed. The only way to run a callable is to call it, and the callee of a call names the declaration rather than denoting a value."
+      ],
+      "rationale": "Withdrawn by the syntax-model revision: functions and methods are declarations rather than values, so function types, function values, anonymous functions, capture lists, and bound method references are no longer part of the language and no portable program can exercise them."
     },
     {
       "id": "REQ-3324",
@@ -5953,20 +5794,14 @@
       "kind": "compile-time",
       "profile": "full-language",
       "portable": true,
-      "tests": [
-        "SOL-TCK-0470",
-        "SOL-TCK-0471",
-        "SOL-TCK-0472",
-        "SOL-TCK-0473",
-        "SOL-TCK-0474"
-      ],
-      "status": "tested",
-      "lifecycle": "active",
-      "oracleNotes": "Four programs, one per route the dispatch sentence names, plus a fifth settling the second quotation. SOL-TCK-0470 obtains the reference through a base-typed receiver whose runtime class overrides twice, so the printed text is the leaf's, and a host that bound the static receiver's implementation would print the base's instead. SOL-TCK-0471 binds a method the receiver's class never redeclares, which a read consulting only that class's own declarations could not resolve at all. SOL-TCK-0472 reads through an interface-typed receiver and reaches both the conforming instance's own requirement and a defaulted one that calls the requirement back. SOL-TCK-0473 binds a method supplied entirely by a `delegate`, the case with no declared method on the receiver at all. Every one of these prints the text a correct dispatch produces and not the one a creation-site or static-type dispatch would produce. SOL-TCK-0474 is the second quotation's example as a program: it compares the two values `formatter.format` produces and prints the call result each dispatches to, so the reference-identity answer and the dispatch result are fixed by one expected string. The interface-default program's expected text is derived by reading the default body and substituting the conforming instance's requirement, which is what the phrase 'as through an immediate method call' fixes. The comparison program prints the outcome of `===` on the two values and never a hash.",
+      "tests": [],
+      "status": "untested-portable",
+      "lifecycle": "withdrawn",
+      "oracleNotes": "Four programs, one per route the dispatch sentence names, plus a fifth settling the second quotation. SOL-TCK-0470 obtains the reference through a base-typed receiver whose runtime class overrides twice, so the printed text is the leaf's, and a host that bound the static receiver's implementation would print the base's instead. SOL-TCK-0471 binds a method the receiver's class never redeclares, which a read consulting only that class's own declarations could not resolve at all. SOL-TCK-0472 reads through an interface-typed receiver and reaches both the conforming instance's own requirement and a defaulted one that calls the requirement back. SOL-TCK-0473 binds a method supplied entirely by a `delegate`, the case with no declared method on the receiver at all. Every one of these prints the text a correct dispatch produces and not the one a creation-site or static-type dispatch would produce. SOL-TCK-0474 is the second quotation's example as a program: it compares the two values `formatter.format` produces and prints the call result each dispatches to, so the reference-identity answer and the dispatch result are fixed by one expected string. The interface-default program's expected text is derived by reading the default body and substituting the conforming instance's requirement, which is what the phrase 'as through an immediate method call' fixes. The comparison program prints the outcome of `===` on the two values and never a hash. The material this requirement quoted was removed by the 2026.11-draft syntax revision; the quote above is the rule that replaced it and the requirement is withdrawn.",
       "normativeQuotes": [
-        "Ordinary virtual dispatch is preserved. A reference obtained through a class or interface type invokes the implementation selected by the captured receiver's runtime class. Overrides, interface defaults, delegated implementations, and inherited instance methods behave the same through a bound reference as through an immediate method call.",
-        "formatter.format === formatter.format // false: two bound-value creations"
-      ]
+        "There are no function types, no function values, no anonymous functions, no capture lists, and no bound method references; a callable cannot be assigned, stored in a property or collection, passed as an argument, returned, compared, or displayed. The only way to run a callable is to call it, and the callee of a call names the declaration rather than denoting a value."
+      ],
+      "rationale": "Withdrawn by the syntax-model revision: functions and methods are declarations rather than values, so function types, function values, anonymous functions, capture lists, and bound method references are no longer part of the language and no portable program can exercise them."
     },
     {
       "id": "REQ-3325",
@@ -5976,16 +5811,14 @@
       "kind": "compile-time",
       "profile": "full-language",
       "portable": true,
-      "tests": [
-        "SOL-TCK-0475"
-      ],
-      "status": "tested",
-      "lifecycle": "active",
-      "oracleNotes": "SOL-TCK-0475 writes a receiver expression that increments a visible counter, then prints the counter immediately after the reference, after two calls through the value, and the value the retained receiver produces. The expected sequence is one increment at creation and none at either call. Each shortcut is caught by a different number in that sequence: evaluating at call time puts a zero first and non-zero afterwards, evaluating at neither leaves the label missing, and re-evaluating the receiver chain per call increments on the calls. The second quotation is settled in the same program by comparing a copy bound to a second binding against the original and by comparing a second reference created from the counted expression against it, so the identity rule is observed on values whose receiver came from that expression. The counter is read by subtraction from a saved baseline so the program does not depend on any other evaluation in the file having incremented it.",
+      "tests": [],
+      "status": "untested-portable",
+      "lifecycle": "withdrawn",
+      "oracleNotes": "SOL-TCK-0475 writes a receiver expression that increments a visible counter, then prints the counter immediately after the reference, after two calls through the value, and the value the retained receiver produces. The expected sequence is one increment at creation and none at either call. Each shortcut is caught by a different number in that sequence: evaluating at call time puts a zero first and non-zero afterwards, evaluating at neither leaves the label missing, and re-evaluating the receiver chain per call increments on the calls. The second quotation is settled in the same program by comparing a copy bound to a second binding against the original and by comparing a second reference created from the counted expression against it, so the identity rule is observed on values whose receiver came from that expression. The counter is read by subtraction from a saved baseline so the program does not depend on any other evaluation in the file having incremented it. The material this requirement quoted was removed by the 2026.11-draft syntax revision; the quote above is the rule that replaced it and the requirement is withdrawn.",
       "normativeQuotes": [
-        "The receiver expression is evaluated exactly once when the bound method value is created, and the receiver is retained strongly by that value.",
-        "Semantic equality for function values is reference identity, and `hashCode()` is the matching reference-identity hash."
-      ]
+        "There are no function types, no function values, no anonymous functions, no capture lists, and no bound method references; a callable cannot be assigned, stored in a property or collection, passed as an argument, returned, compared, or displayed. The only way to run a callable is to call it, and the callee of a call names the declaration rather than denoting a value."
+      ],
+      "rationale": "Withdrawn by the syntax-model revision: functions and methods are declarations rather than values, so function types, function values, anonymous functions, capture lists, and bound method references are no longer part of the language and no portable program can exercise them."
     },
     {
       "id": "REQ-3326",
@@ -5995,20 +5828,14 @@
       "kind": "compile-time",
       "profile": "full-language",
       "portable": true,
-      "tests": [
-        "SOL-TCK-0476",
-        "SOL-TCK-0477",
-        "SOL-TCK-0478",
-        "SOL-TCK-0479"
-      ],
-      "status": "tested",
-      "lifecycle": "active",
-      "oracleNotes": "SOL-TCK-0476 calls a helper declared in a superclass from a subclass receiver, where the helper returns `this.greet` as a value, so the implementation is selected by the receiver passed at run time and the program prints the override's text for the subclass and the base's for the base. SOL-TCK-0477 keeps the bare name as an immediate call in a program that also uses `this.compute` as a value, which is what separates the real rule from one that rejects the name outright. SOL-TCK-0478 places the bare name in a return position and then prints, so acceptance is observable rather than silent; the section names `SOLV-RESOL-001` for exactly that placement and the oracle pins it. SOL-TCK-0479 binds `super.greet` from a class that overrides `greet`, so a value that redispatched would print the override and the expected text is the superclass's. The rejection half is its own program because SOL-TCK-0477's program must compile, and folding the rejected shape into it would discard the witness that the immediate call is still legal.",
+      "tests": [],
+      "status": "untested-portable",
+      "lifecycle": "withdrawn",
+      "oracleNotes": "SOL-TCK-0476 calls a helper declared in a superclass from a subclass receiver, where the helper returns `this.greet` as a value, so the implementation is selected by the receiver passed at run time and the program prints the override's text for the subclass and the base's for the base. SOL-TCK-0477 keeps the bare name as an immediate call in a program that also uses `this.compute` as a value, which is what separates the real rule from one that rejects the name outright. SOL-TCK-0478 places the bare name in a return position and then prints, so acceptance is observable rather than silent; the section names `SOLV-RESOL-001` for exactly that placement and the oracle pins it. SOL-TCK-0479 binds `super.greet` from a class that overrides `greet`, so a value that redispatched would print the override and the expected text is the superclass's. The rejection half is its own program because SOL-TCK-0477's program must compile, and folding the rejected shape into it would discard the witness that the immediate call is still legal. The material this requirement quoted was removed by the 2026.11-draft syntax revision; the quote above is the rule that replaced it and the requirement is withdrawn.",
       "normativeQuotes": [
-        "`this.method` is a bound reference to the current receiver.",
-        "An unqualified method name remains legal only as an immediate call under the existing implicit-`this` rule, so using a method as a value requires `this.method` and a bare unqualified method name in a value position is `SOLV-RESOL-001`.",
-        "`super.method` creates a value bound to `this` that invokes the immediate superclass implementation without virtual redispatch, matching an immediate `super.method(...)` call."
-      ]
+        "There are no function types, no function values, no anonymous functions, no capture lists, and no bound method references; a callable cannot be assigned, stored in a property or collection, passed as an argument, returned, compared, or displayed. The only way to run a callable is to call it, and the callee of a call names the declaration rather than denoting a value."
+      ],
+      "rationale": "Withdrawn by the syntax-model revision: functions and methods are declarations rather than values, so function types, function values, anonymous functions, capture lists, and bound method references are no longer part of the language and no portable program can exercise them."
     },
     {
       "id": "REQ-3327",
@@ -6018,16 +5845,14 @@
       "kind": "compile-time",
       "profile": "full-language",
       "portable": true,
-      "tests": [
-        "SOL-TCK-0480"
-      ],
-      "status": "tested",
-      "lifecycle": "active",
-      "oracleNotes": "SOL-TCK-0480 creates two references from one receiver and one method and compares them, then copies one through a binding and compares the copy, then compares the two original values again, then compares a value against itself. The expected answers are false, true, false, true, and they are only jointly satisfiable: caching one value per receiver-and-method makes the first true, and minting a fresh value on each read of the binding makes the second false. `===` is used rather than `.equals()` because a function value is identity-bearing and these operands are mutually assignable; the rendering of these values is fixed by a sentence REQ-3307 owns and tests, so no expectation here restates it.",
+      "tests": [],
+      "status": "untested-portable",
+      "lifecycle": "withdrawn",
+      "oracleNotes": "SOL-TCK-0480 creates two references from one receiver and one method and compares them, then copies one through a binding and compares the copy, then compares the two original values again, then compares a value against itself. The expected answers are false, true, false, true, and they are only jointly satisfiable: caching one value per receiver-and-method makes the first true, and minting a fresh value on each read of the binding makes the second false. `===` is used rather than `.equals()` because a function value is identity-bearing and these operands are mutually assignable; the rendering of these values is fixed by a sentence REQ-3307 owns and tests, so no expectation here restates it. The material this requirement quoted was removed by the 2026.11-draft syntax revision; the quote above is the rule that replaced it and the requirement is withdrawn.",
       "normativeQuotes": [
-        "Each successful evaluation of a bound method-reference expression creates a distinct function-value identity, even for the same receiver and method.",
-        "Copying that value through bindings preserves its identity."
-      ]
+        "There are no function types, no function values, no anonymous functions, no capture lists, and no bound method references; a callable cannot be assigned, stored in a property or collection, passed as an argument, returned, compared, or displayed. The only way to run a callable is to call it, and the callee of a call names the declaration rather than denoting a value."
+      ],
+      "rationale": "Withdrawn by the syntax-model revision: functions and methods are declarations rather than values, so function types, function values, anonymous functions, capture lists, and bound method references are no longer part of the language and no portable program can exercise them."
     },
     {
       "id": "REQ-3328",
@@ -6037,20 +5862,14 @@
       "kind": "compile-time",
       "profile": "full-language",
       "portable": true,
-      "tests": [
-        "SOL-TCK-0481",
-        "SOL-TCK-0482",
-        "SOL-TCK-0483"
-      ],
-      "status": "tested",
-      "lifecycle": "active",
-      "oracleNotes": "SOL-TCK-0481 takes the reference from a null receiver and from a non-null one, prints the null case as the literal it is, and invokes the non-null case after the null refinement the section requires. SOL-TCK-0482 reads the same member unsafely through a nullable receiver, which the first quotation refuses; the code is not stated for the placement, so the oracle asserts the family. SOL-TCK-0483 takes `?.` through a receiver whose static type is non-null and initializes a *non-nullable* function-typed binding with the result, which is the retained-type half: an implementation that nullable-ized every safe read could not compile that initializer. The nullable function type is spelled `(func(): String)?` throughout. `func(): String?` would declare a non-null function returning a nullable, which is the other reading the section distinguishes.",
+      "tests": [],
+      "status": "untested-portable",
+      "lifecycle": "withdrawn",
+      "oracleNotes": "SOL-TCK-0481 takes the reference from a null receiver and from a non-null one, prints the null case as the literal it is, and invokes the non-null case after the null refinement the section requires. SOL-TCK-0482 reads the same member unsafely through a nullable receiver, which the first quotation refuses; the code is not stated for the placement, so the oracle asserts the family. SOL-TCK-0483 takes `?.` through a receiver whose static type is non-null and initializes a *non-nullable* function-typed binding with the result, which is the retained-type half: an implementation that nullable-ized every safe read could not compile that initializer. The nullable function type is spelled `(func(): String)?` throughout. `func(): String?` would declare a non-null function returning a nullable, which is the other reading the section distinguishes. The material this requirement quoted was removed by the 2026.11-draft syntax revision; the quote above is the rule that replaced it and the requirement is withdrawn.",
       "normativeQuotes": [
-        "A normal member reference on a nullable receiver is illegal.",
-        "Safe member access produces a nullable function value and evaluates the receiver once:",
-        "If the receiver is null the result is null and no bound function is created; if it is non-null the result is the corresponding bound method.",
-        "When the receiver's static type is non-null, `?.` retains the non-null function type, matching existing safe-access behavior."
-      ]
+        "There are no function types, no function values, no anonymous functions, no capture lists, and no bound method references; a callable cannot be assigned, stored in a property or collection, passed as an argument, returned, compared, or displayed. The only way to run a callable is to call it, and the callee of a call names the declaration rather than denoting a value."
+      ],
+      "rationale": "Withdrawn by the syntax-model revision: functions and methods are declarations rather than values, so function types, function values, anonymous functions, capture lists, and bound method references are no longer part of the language and no portable program can exercise them."
     },
     {
       "id": "REQ-3329",
@@ -6060,18 +5879,14 @@
       "kind": "compile-time",
       "profile": "full-language",
       "portable": true,
-      "tests": [
-        "SOL-TCK-0484",
-        "SOL-TCK-0485",
-        "SOL-TCK-0486"
-      ],
-      "status": "tested",
-      "lifecycle": "active",
-      "oracleNotes": "SOL-TCK-0484 instantiates one declaration from one receiver at `func(Integer): Integer` and at `func(String): String`, which is what 'monomorphic' and 'contextual' jointly require: the value carries no type arguments, so the expected type must supply them, and two sites may differ. SOL-TCK-0485 puts the generic method on a generic class read through `Cell(Integer)`, so the class parameter is already fixed and only the method's own parameter is inferred; a host that treated the two as one inference problem would either fail to instantiate or substitute the wrong type, and the program prints the swapped value and the stored one to tell those apart. SOL-TCK-0486 is the named failure: the reference sits where no complete function signature is expected, and the section gives `SOLV-TYPE-030`. The positive programs assert no cross-instantiation identity, since instantiation is a static event and the distinct-identity sentence for bound values already covers what a host may observe.",
+      "tests": [],
+      "status": "untested-portable",
+      "lifecycle": "withdrawn",
+      "oracleNotes": "SOL-TCK-0484 instantiates one declaration from one receiver at `func(Integer): Integer` and at `func(String): String`, which is what 'monomorphic' and 'contextual' jointly require: the value carries no type arguments, so the expected type must supply them, and two sites may differ. SOL-TCK-0485 puts the generic method on a generic class read through `Cell(Integer)`, so the class parameter is already fixed and only the method's own parameter is inferred; a host that treated the two as one inference problem would either fail to instantiate or substitute the wrong type, and the program prints the swapped value and the stored one to tell those apart. SOL-TCK-0486 is the named failure: the reference sits where no complete function signature is expected, and the section gives `SOLV-TYPE-030`. The positive programs assert no cross-instantiation identity, since instantiation is a static event and the distinct-identity sentence for bound values already covers what a host may observe. The material this requirement quoted was removed by the 2026.11-draft syntax revision; the quote above is the rule that replaced it and the requirement is withdrawn.",
       "normativeQuotes": [
-        "It must be instantiated to one monomorphic function type at each value-reference site, and that instantiation is contextual:",
-        "A generic method reference is instantiated contextually under the same monomorphic rules as a generic top-level function reference, so `var operation: func(Integer): Integer = object.identity` is accepted and an unconstrained reference is `SOLV-TYPE-030`."
-      ]
+        "There are no function types, no function values, no anonymous functions, no capture lists, and no bound method references; a callable cannot be assigned, stored in a property or collection, passed as an argument, returned, compared, or displayed. The only way to run a callable is to call it, and the callee of a call names the declaration rather than denoting a value."
+      ],
+      "rationale": "Withdrawn by the syntax-model revision: functions and methods are declarations rather than values, so function types, function values, anonymous functions, capture lists, and bound method references are no longer part of the language and no portable program can exercise them."
     },
     {
       "id": "REQ-3330",
@@ -6081,20 +5896,14 @@
       "kind": "compile-time",
       "profile": "full-language",
       "portable": true,
-      "tests": [
-        "SOL-TCK-0487",
-        "SOL-TCK-0488",
-        "SOL-TCK-0489",
-        "SOL-TCK-0490"
-      ],
-      "status": "tested",
-      "lifecycle": "active",
-      "oracleNotes": "SOL-TCK-0487 reads `toString`, `equals`, and `hashCode` bare, from a class that *overrides* one of them, which is the case the sentence exists for: an implementation that consulted the receiver's dispatch table would find an override to bind. SOL-TCK-0488 is the `super` half, the path that resolves through a superclass's table and so could otherwise bind an inherited override. Both assert the family rather than a code, because the quoted sentence defers to the error section 3 and section 23.4 already require and those sentences name no code. SOL-TCK-0489 is the one deferred form the required-diagnostics paragraph does enumerate by name, a static method reference, so that program pins `SOLV-TYPE-014` -- the third quotation is what makes that pin a reading of the specification rather than of this implementation. SOL-TCK-0490 is the positive half: a class holds a function-typed property and a same-shaped method, and the program reads each and calls it, so the two printed values show member resolution chose the stored value for one name and a bound value for the other. The synthesized `Result` operations, constructors, and enum variants named by the same sentences stay covered by REQ-2309 and the existing corpus, which is why this requirement adds programs only for the placements no earlier requirement reaches.",
+      "tests": [],
+      "status": "untested-portable",
+      "lifecycle": "withdrawn",
+      "oracleNotes": "SOL-TCK-0487 reads `toString`, `equals`, and `hashCode` bare, from a class that *overrides* one of them, which is the case the sentence exists for: an implementation that consulted the receiver's dispatch table would find an override to bind. SOL-TCK-0488 is the `super` half, the path that resolves through a superclass's table and so could otherwise bind an inherited override. Both assert the family rather than a code, because the quoted sentence defers to the error section 3 and section 23.4 already require and those sentences name no code. SOL-TCK-0489 is the one deferred form the required-diagnostics paragraph does enumerate by name, a static method reference, so that program pins `SOLV-TYPE-014` -- the third quotation is what makes that pin a reading of the specification rather than of this implementation. SOL-TCK-0490 is the positive half: a class holds a function-typed property and a same-shaped method, and the program reads each and calls it, so the two printed values show member resolution chose the stored value for one name and a bound value for the other. The synthesized `Result` operations, constructors, and enum variants named by the same sentences stay covered by REQ-2309 and the existing corpus, which is why this requirement adds programs only for the placements no earlier requirement reaches. The material this requirement quoted was removed by the 2026.11-draft syntax revision; the quote above is the rule that replaced it and the requirement is withdrawn.",
       "normativeQuotes": [
-        "Only a declared callable binds. The fixed language-defined universal members `toString`, `equals`, and `hashCode`, and the synthesized `Result` operations, are not bindable: a bare read of one of them stays the compile-time error that section 3 and section 23.4 already require, and the same holds for a static method, a constructor, and an enum variant.",
-        "A property may itself have a function type. Because a class member namespace cannot hold a property and a method with the same name, member resolution decides statically whether `receiver.member` reads a stored function value or creates a bound method value.",
-        "`TYPE_FUNCTION_AS_VALUE` (`SOLV-TYPE-014`) reports a callable that this revision keeps explicitly deferred used as a value: a static method reference, a constructor, an enum variant, and a bare read of a fixed language-defined member or a synthesized `Result` operation."
-      ]
+        "There are no function types, no function values, no anonymous functions, no capture lists, and no bound method references; a callable cannot be assigned, stored in a property or collection, passed as an argument, returned, compared, or displayed. The only way to run a callable is to call it, and the callee of a call names the declaration rather than denoting a value."
+      ],
+      "rationale": "Withdrawn by the syntax-model revision: functions and methods are declarations rather than values, so function types, function values, anonymous functions, capture lists, and bound method references are no longer part of the language and no portable program can exercise them."
     }
   ]
 }

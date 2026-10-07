@@ -47,16 +47,12 @@ REQS_SPEC = {
         note="The include is written inside a function body, the first forbidden position. The "
              "section names no code, so the rejection is bare; the sentinel proves non-execution."),
     "REQ-3101": dict(
-        section="20. File Inclusion",
-        summary="Redeclaring a built-in function or type is rejected, and built-in names cannot be "
-                "shadowed by a declaration",
-        kind="compile-time",
-        quotes=["Redeclaring a built-in function or type is rejected by the existing declaration "
-                "checks.",
-                "Built-in types and functions are always visible unqualified and cannot be shadowed "
-                "by a module or alias name."],
-        note="Two arms: a function named `print` and a class named `Byte`, each a built-in name. "
-             "The section names no code for the redeclaration, so both rejections are bare."),
+  section='20. File Inclusion',
+  summary='Redeclaring a built-in function or type is rejected, and built-in names cannot be shadowed by a declaration',
+  kind='compile-time',
+  quotes=['Built-in types and functions are always visible unqualified and cannot be shadowed by a module name.'],
+  tests=['SOL-TCK-0406', 'SOL-TCK-0407'],
+  note='Two arms: a function named `print` and a class named `Byte`, each a built-in name. The section names no code for the redeclaration, so both rejections are bare.'),
     "REQ-3102": dict(
         section="7. Classes",
         summary="Classes are final by default, so extending a class that was not declared `mutable` is "
@@ -155,17 +151,44 @@ BAD("SOL-TCK-0408", "objects", "REQ-3102",
     'print("EXECUTED-INVALID")\n', {},
     "Extending a class that was not declared `mutable` or `abstract` is rejected.")
 BAD("SOL-TCK-0409", "objects", "REQ-3103",
-    'class C {\n    static var mutable n: Integer = "wrong"\n\n    C() {\n    }\n}\n'
-    'print("EXECUTED-INVALID")\n',
+    (('class C {\n'
+    '    var static mutable n: Integer = "wrong"\n'
+    '\n'
+    '    C() {\n'
+    '    }\n'
+    '}\n'
+    'print("EXECUTED-INVALID")\n'
+    '')),
     {"family": "TYPE", "code": "SOLV-TYPE-001"},
     "A String static initializer for an Integer property pins SOLV-TYPE-001.")
 BAD("SOL-TCK-0410", "control", "REQ-3104",
-    'var x = 1\nswitch (x) {\n    case 1 {\n        print("one")\n    }\n    default {\n        print("d")\n    }\n'
-    '    default {\n        print("d2")\n    }\n}\nprint("EXECUTED-INVALID")\n', {},
+    (('var x: Integer = 1\n'
+    'switch (x) {\n'
+    '    case 1 {\n'
+    '        print("one")\n'
+    '    }\n'
+    '    default {\n'
+    '        print("d")\n'
+    '    }\n'
+    '    default {\n'
+    '        print("d2")\n'
+    '    }\n'
+    '}\n'
+    'print("EXECUTED-INVALID")\n'
+    '')), {},
     "A second default is rejected.")
 BAD("SOL-TCK-0411", "control", "REQ-3104",
-    'var x = 1\nswitch (x) {\n    default {\n        print("d")\n    }\n    case 2 {\n        print("two")\n    }\n}\n'
-    'print("EXECUTED-INVALID")\n', {},
+    (('var x: Integer = 1\n'
+    'switch (x) {\n'
+    '    default {\n'
+    '        print("d")\n'
+    '    }\n'
+    '    case 2 {\n'
+    '        print("two")\n'
+    '    }\n'
+    '}\n'
+    'print("EXECUTED-INVALID")\n'
+    '')), {},
     "A default that is not the last clause is rejected.")
 OK("SOL-TCK-0412", "result", "REQ-3105",
    RESULT + 'func get(): Result<Integer, String> {\n    return Result.Ok(9)\n}\n'

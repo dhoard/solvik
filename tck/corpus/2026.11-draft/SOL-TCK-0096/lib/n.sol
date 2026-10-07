@@ -1,5 +1,6 @@
-module shared
+module shared {
 
-func add(a: Integer, b: Integer): Integer {
-    return a + b
+    func add(a: Integer, b: Integer): Integer {
+        return a + b
+    }
 }

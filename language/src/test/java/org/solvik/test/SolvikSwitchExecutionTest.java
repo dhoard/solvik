@@ -270,13 +270,13 @@ public final class SolvikSwitchExecutionTest {
                         this.count = 0
                     }
 
-                    func next(): Integer {
+                    method next(): Integer {
                         this.count = this.count + 1
                         return this.count
                     }
                 }
 
-                    var counter = Counter()
+                    var counter: Counter = Counter()
                     switch (counter.next()) {
                         case 1 {
                             println("one")
@@ -286,31 +286,33 @@ public final class SolvikSwitchExecutionTest {
                         }
                     }
                     println(counter.count)
+
                 """)).isEqualTo("one\n1\n");
     }
 
     @Test
     public void breakInsideALoopNestedInACase() {
         assertThat(run("""
-                    var mutable total = 0
-                    switch (1) {
-                        case 1 {
-                            {
-                                var mutable i = 0
-                                while (i < 5) {
-                                    if (i == 2) {
-                                        break
+                        var mutable total: Integer = 0
+                        switch (1) {
+                            case 1 {
+                                {
+                                    var mutable i: Integer = 0
+                                    while (i < 5) {
+                                        if (i == 2) {
+                                            break
+                                        }
+                                        total = total + i
+                                        i = i + 1
                                     }
-                                    total = total + i
-                                    i = i + 1
                                 }
                             }
+                            default {
+                                total = 0 - 1
+                            }
                         }
-                        default {
-                            total = 0 - 1
-                        }
-                    }
-                    println(total)
+                        println(total)
+
                 """)).isEqualTo("1\n");
     }
 

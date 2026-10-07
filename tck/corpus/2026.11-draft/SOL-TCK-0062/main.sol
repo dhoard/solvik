@@ -15,7 +15,7 @@ class Box {
         this.size = size
     }
 
-    func report(): String {
+    method report(): String {
         var size: Integer = 99
         return "shadow=" .. this.size .. "/" .. size
     }

@@ -11,7 +11,7 @@
 //     three) does NOT close the token and is part of the value.
 // Expected stdout is therefore the literal bytes of both values, `print` appending no
 // line separator (section 5). This is a spec derivation, not a capture from the IUT.
-var json = r#"{"name":"Doug","path":"C:\temp"}"#
+var json: String = r#"{"name":"Doug","path":"C:\temp"}"#
 print(json)
-var hashes = r###"arbitrary "# content"###
+var hashes: String = r###"arbitrary "# content"###
 print(hashes)

@@ -1,2 +1,2 @@
-var a = 'AB'
+var a: Character = 'AB'
 print("EXECUTED-INVALID")

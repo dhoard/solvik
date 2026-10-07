@@ -2,6 +2,6 @@ func f(): Boolean {
     print("c")
     return true
 }
-var r = false && f()
-var s = true && f()
+var r: Boolean = false && f()
+var s: Boolean = true && f()
 print("and" .. r .. s)

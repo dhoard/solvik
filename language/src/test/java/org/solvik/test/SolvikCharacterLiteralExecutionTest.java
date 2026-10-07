@@ -62,15 +62,16 @@ public final class SolvikCharacterLiteralExecutionTest {
     @Test
     public void charactersConcatenateAndDisplay() {
         assertThat(run("""
-                    var letter = 'A'
-                    println(letter)
-                    println(letter .. "B" .. 'C')
+                        var letter: Character = 'A'
+                        println(letter)
+                        println(letter .. "B" .. 'C')
+
                 """)).isEqualTo("A\nABC\n");
     }
 
     @Test
     public void invalidCharacterEscapeIsRejected() {
-        assertThat(firstCode("func f(): Unit {\n    var c = '\\q'\n}\n")).isEqualTo(DiagnosticCode.LEXER_INVALID_ESCAPE);
+        assertThat(firstCode("func f() {\n    var c: Character = '\\q'\n}\n")).isEqualTo(DiagnosticCode.LEXER_INVALID_ESCAPE);
     }
 
     @Test

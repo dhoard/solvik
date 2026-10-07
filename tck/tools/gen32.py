@@ -64,15 +64,12 @@ REQS_SPEC = {
              "one evaluation before the returned payload; a double evaluation would print the "
              "marker twice."),
     "REQ-3003": dict(
-        section="23. Result Operations",
-        summary="`ignore` evaluates its receiver exactly once, discards the value, and yields "
-                "`Unit`, so it is a well-formed standalone statement",
-        kind="runtime",
-        quotes=["`ignore` evaluates its receiver exactly once, discards the value, and yields "
-                "`Unit`."],
-        note="A side-effecting function returns a `Result`; `ignore()` is bound to a `Unit` local, "
-             "so the receiver runs once and the trailing print shows execution continued. A "
-             "non-`Unit` result would not be assignable to the declared `Unit` local."),
+  section='23. Result Operations',
+  summary='`ignore` evaluates its receiver exactly once, discards the value, and produces no value, so it is a well-formed standalone statement',
+  kind='runtime',
+  quotes=['`ignore` evaluates its receiver exactly once, discards the value, and produces no value.'],
+  tests=['SOL-TCK-0402'],
+  note='A side-effecting function returns a `Result`; `ignore()` is bound to a `Unit` local, so the receiver runs once and the trailing print shows execution continued. A non-`Unit` result would not be assignable to the declared `Unit` local.'),
     "REQ-3004": dict(
         section="23. Result Operations",
         summary="`isOk` and `isErr` are complementary variant tests that never fault",
@@ -112,30 +109,66 @@ def RTE(tid, cat, req, src, category, note):
 
 
 OK("SOL-TCK-0399", "result", "REQ-3000",
-   RESULT + 'func get(): Result<Integer, String> {\n    return Result.Ok(5)\n}\n'
-   'var r = get()\nprint("exp" .. r.expect("msg"))\n',
+   ('enum Result<T, E> {\n'
+    '    Ok(T)\n'
+    '    Err(E)\n'
+    '}\n'
+    'func get(): Result<Integer, String> {\n'
+    '    return Result.Ok(5)\n'
+    '}\n'
+    'var r: Result<Integer, String> = get()\n'
+    'print("exp" .. r.expect("msg"))\n'
+    ''),
    "exp5",
    "expect on an Ok returns the success payload and ignores the message.")
 RTE("SOL-TCK-0400", "result", "REQ-3001",
-    RESULT + 'func get(): Result<Integer, String> {\n    return Result.Err("boom")\n}\n'
-    'var r = get()\nprint(r.expect("custom"))\n',
+    ('enum Result<T, E> {\n'
+    '    Ok(T)\n'
+    '    Err(E)\n'
+    '}\n'
+    'func get(): Result<Integer, String> {\n'
+    '    return Result.Err("boom")\n'
+    '}\n'
+    'var r: Result<Integer, String> = get()\n'
+    'print(r.expect("custom"))\n'
+    ''),
     "RESULT_WRONG_VARIANT",
     "expect on an Err faults at run time with the wrong-variant category.")
 OK("SOL-TCK-0401", "result", "REQ-3002",
-   RESULT + 'func msg(): String {\n    print("m")\n    return "x"\n}\n'
-   'func get(): Result<Integer, String> {\n    return Result.Ok(1)\n}\n'
-   'var r = get()\nprint(r.expect(msg()))\n',
+   ('enum Result<T, E> {\n'
+    '    Ok(T)\n'
+    '    Err(E)\n'
+    '}\n'
+    'func msg(): String {\n'
+    '    print("m")\n'
+    '    return "x"\n'
+    '}\n'
+    'func get(): Result<Integer, String> {\n'
+    '    return Result.Ok(1)\n'
+    '}\n'
+    'var r: Result<Integer, String> = get()\n'
+    'print(r.expect(msg()))\n'
+    ''),
    "m1",
    "The message expression prints its marker once before the Ok payload, so it was evaluated "
    "exactly once.")
 OK("SOL-TCK-0402", "result", "REQ-3003",
    RESULT + 'func probe(): Result<Integer, String> {\n    print("p")\n    return Result.Ok(1)\n}\n'
-   'var u: Unit = probe().ignore()\nprint("done")\n',
+   'probe().ignore()\nprint("done")\n',
    "pdone",
-   "ignore evaluates the receiver once and yields Unit, which binds to the declared Unit local.")
+   "ignore evaluates the receiver once and produces no value, so the call is a statement and the trailing print shows execution continued.")
 OK("SOL-TCK-0403", "result", "REQ-3004",
-   RESULT + 'func get(): Result<Integer, String> {\n    return Result.Ok(1)\n}\n'
-   'var r = get()\nprint(r.isOk())\nprint(r.isErr())\n',
+   ('enum Result<T, E> {\n'
+    '    Ok(T)\n'
+    '    Err(E)\n'
+    '}\n'
+    'func get(): Result<Integer, String> {\n'
+    '    return Result.Ok(1)\n'
+    '}\n'
+    'var r: Result<Integer, String> = get()\n'
+    'print(r.isOk())\n'
+    'print(r.isErr())\n'
+    ''),
    "truefalse",
    "isOk and isErr report opposite verdicts on the same value without faulting.")
 OK("SOL-TCK-0404", "result", "REQ-3005",

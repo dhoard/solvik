@@ -37,7 +37,7 @@ public final class SolvikInheritanceParserTest {
 
     @Test
     public void openClassWithSingleSuperclassParses() {
-        CompilationUnitNode unit = parseOk("inherit.sol", "mutable class Animal {\n}\nclass Dog extends Animal {\n}\n");
+        CompilationUnitNode unit = parseOk("inherit.sol", "class mutable Animal {\n}\nclass Dog extends Animal {\n}\n");
         assertThat(unit.declarations().size()).isEqualTo(2);
         ClassDeclNode animal = (ClassDeclNode) unit.declarations().get(0);
         assertThat(animal.isMutable()).isTrue();
@@ -54,16 +54,18 @@ public final class SolvikInheritanceParserTest {
     @Test
     public void methodModifiersAreRecorded() {
         CompilationUnitNode unit = parseOk("mods.sol", """
-                mutable class Animal {
-                    mutable func speak(): String {
+                class mutable Animal {
+                    method mutable speak(): String {
                         return "..."
                     }
                 }
                 class Dog extends Animal {
-                    override func speak(): String {
+                    method override speak(): String {
                         return "woof"
                     }
                 }
+
+
                 """);
         ClassDeclNode animal = (ClassDeclNode) unit.declarations().get(0);
         FunctionDeclNode inherited = animal.methods().get(0);
@@ -79,7 +81,7 @@ public final class SolvikInheritanceParserTest {
     @Test
     public void explicitSuperConstructorCallParsesAsASuperExprCall() {
         CompilationUnitNode unit = parseOk("super.sol", """
-                mutable class Animal {
+                class mutable Animal {
                     var legs: Integer
                     Animal(legs: Integer) {
                         this.legs = legs
@@ -90,6 +92,7 @@ public final class SolvikInheritanceParserTest {
                         super(4)
                     }
                 }
+
                 """);
         ClassDeclNode dog = (ClassDeclNode) unit.declarations().get(1);
         ExprStmtNode first = (ExprStmtNode) dog.constructor().orElseThrow().body().statements().get(0);
@@ -101,16 +104,18 @@ public final class SolvikInheritanceParserTest {
     @Test
     public void superMemberAccessParsesAsASuperExprReceiver() {
         CompilationUnitNode unit = parseOk("supermember.sol", """
-                mutable class Animal {
-                    mutable func speak(): String {
+                class mutable Animal {
+                    method mutable speak(): String {
                         return "..."
                     }
                 }
                 class Dog extends Animal {
-                    override func speak(): String {
+                    method override speak(): String {
                         return super.speak()
                     }
                 }
+
+
                 """);
         ClassDeclNode dog = (ClassDeclNode) unit.declarations().get(1);
         FunctionDeclNode speak = dog.methods().get(0);
@@ -122,7 +127,7 @@ public final class SolvikInheritanceParserTest {
 
     @Test
     public void multipleInheritanceIsRejectedByTheGrammar() {
-        parseFails("multi.sol", "mutable class A {\n}\nmutable class B {\n}\nclass C extends A, B {\n}\n");
+        parseFails("multi.sol", "class mutable A {\n}\nclass mutable B {\n}\nclass C extends A, B {\n}\n");
     }
 
     @Test

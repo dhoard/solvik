@@ -19,5 +19,5 @@
 // pick any of those. TCK.md section 6 likewise forbids promoting an implementation enum
 // entry to normative status. Sentinel per TCK.md section 10: the print would be observable
 // if this invalid construction were accepted.
-var nums = List(1, 2)
+var nums: Any = List(1, 2)
 print(nums.size)

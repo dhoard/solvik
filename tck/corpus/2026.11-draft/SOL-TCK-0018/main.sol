@@ -6,7 +6,7 @@
 // newline immediately after r#" and ends with the newline immediately before the
 // closing "#. `print` appends no line separator (section 5), so the expected stdout is
 // exactly a leading newline, the two SQL lines each terminated by a newline.
-var sql = r#"
+var sql: String = r#"
 SELECT *
 FROM users
 "#
