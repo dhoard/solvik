@@ -64,16 +64,16 @@ class SwitchExecutionTest {
                 func report(method: String) {
                     switch method {
                         case "GET" {
-                            TextWriter(Stdio.stdout()).writeLine(("read") .. "")
+                            solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("read") .. "")
                         }
                         case "POST" {
-                            TextWriter(Stdio.stdout()).writeLine(("write") .. "")
+                            solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("write") .. "")
                         }
                         case "DELETE" {
-                            TextWriter(Stdio.stdout()).writeLine(("remove") .. "")
+                            solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("remove") .. "")
                         }
                         default {
-                            TextWriter(Stdio.stdout()).writeLine(("other") .. "")
+                            solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("other") .. "")
                         }
                     }
                 }
@@ -94,10 +94,10 @@ class SwitchExecutionTest {
                 code := 2
                 switch (code) {
                     case 1 {
-                        TextWriter(Stdio.stdout()).writeLine(("one") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("one") .. "")
                     }
                     case 2 {
-                        TextWriter(Stdio.stdout()).writeLine(("two") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("two") .. "")
                     }
                 }
                 """, directory);
@@ -111,19 +111,19 @@ class SwitchExecutionTest {
         String output = run("""
                 mut n := 2
                 if (n > 1) {
-                    TextWriter(Stdio.stdout()).writeLine(("parenthesized if") .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("parenthesized if") .. "")
                 } else if (n > 0) {
-                    TextWriter(Stdio.stdout()).writeLine(("unreachable branch") .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("unreachable branch") .. "")
                 }
                 while (n > 1) {
                     n = n - 1
                 }
                 switch (n) {
                     case 1 {
-                        TextWriter(Stdio.stdout()).writeLine(("parenthesized switch") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("parenthesized switch") .. "")
                     }
                 }
-                TextWriter(Stdio.stdout()).writeLine(("n: ") .. (n))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("n: ") .. (n))
                 """, directory);
 
         assertThat(output).isEqualTo("parenthesized if\nparenthesized switch\nn: 1\n");
@@ -136,10 +136,10 @@ class SwitchExecutionTest {
                 method := "PATCH"
                 switch method {
                     case "GET" {
-                        TextWriter(Stdio.stdout()).writeLine(("read") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("read") .. "")
                     }
                 }
-                TextWriter(Stdio.stdout()).writeLine(("after") .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("after") .. "")
                 """, directory);
 
         assertThat(output).isEqualTo("after\n");
@@ -152,10 +152,10 @@ class SwitchExecutionTest {
                 func exact(subject: String) {
                     switch subject {
                         case regex "^b$" {
-                            TextWriter(Stdio.stdout()).writeLine(("exact full") .. "")
+                            solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("exact full") .. "")
                         }
                         default {
-                            TextWriter(Stdio.stdout()).writeLine(("exact no") .. "")
+                            solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("exact no") .. "")
                         }
                     }
                 }
@@ -163,10 +163,10 @@ class SwitchExecutionTest {
                 func dotted(subject: String) {
                     switch subject {
                         case regex "a.c" {
-                            TextWriter(Stdio.stdout()).writeLine(("dot full") .. "")
+                            solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("dot full") .. "")
                         }
                         default {
-                            TextWriter(Stdio.stdout()).writeLine(("dot no") .. "")
+                            solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("dot no") .. "")
                         }
                     }
                 }
@@ -193,13 +193,13 @@ class SwitchExecutionTest {
                 func route(path: String) {
                     switch path {
                         case "/health" {
-                            TextWriter(Stdio.stdout()).writeLine(("literal") .. "")
+                            solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("literal") .. "")
                         }
                         case regex "^/.*" {
-                            TextWriter(Stdio.stdout()).writeLine(("regex") .. "")
+                            solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("regex") .. "")
                         }
                         default {
-                            TextWriter(Stdio.stdout()).writeLine(("default") .. "")
+                            solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("default") .. "")
                         }
                     }
                 }
@@ -219,13 +219,13 @@ class SwitchExecutionTest {
                 func kind(path: String) {
                     switch path {
                         case regex "^/api/users/[0-9]+$" {
-                            TextWriter(Stdio.stdout()).writeLine(("user") .. "")
+                            solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("user") .. "")
                         }
                         case regex "^/api/.*" {
-                            TextWriter(Stdio.stdout()).writeLine(("api") .. "")
+                            solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("api") .. "")
                         }
                         default {
-                            TextWriter(Stdio.stdout()).writeLine(("other") .. "")
+                            solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("other") .. "")
                         }
                     }
                 }
@@ -262,16 +262,16 @@ class SwitchExecutionTest {
                 counter := Counter()
                 switch counter.next() {
                     case regex "^no$" {
-                        TextWriter(Stdio.stdout()).writeLine(("first") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("first") .. "")
                     }
                     case regex "^value$" {
-                        TextWriter(Stdio.stdout()).writeLine(("second") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("second") .. "")
                     }
                     default {
-                        TextWriter(Stdio.stdout()).writeLine(("default") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("default") .. "")
                     }
                 }
-                TextWriter(Stdio.stdout()).writeLine((counter.count()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((counter.count()) .. "")
                 """, directory);
 
         assertThat(output).isEqualTo("second\n1\n");
@@ -298,19 +298,19 @@ class SwitchExecutionTest {
                     }
                 }
 
-                TextWriter(Stdio.stdout()).writeLine((name(-1)) .. (" ") .. (name(0)) .. (" ") .. (name(200)) .. (" ") .. (name(7)))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((name(-1)) .. (" ") .. (name(0)) .. (" ") .. (name(200)) .. (" ") .. (name(7)))
 
                 bytes := Byte[3] {0, 127, 5}
                 for small in bytes {
                     switch small {
                         case 0 {
-                            TextWriter(Stdio.stdout()).writeLine(("byte zero") .. "")
+                            solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("byte zero") .. "")
                         }
                         case 127 {
-                            TextWriter(Stdio.stdout()).writeLine(("byte max") .. "")
+                            solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("byte max") .. "")
                         }
                         default {
-                            TextWriter(Stdio.stdout()).writeLine(("byte other") .. "")
+                            solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("byte other") .. "")
                         }
                     }
                 }
@@ -319,10 +319,10 @@ class SwitchExecutionTest {
                 for flag in flags {
                     switch flag {
                         case true {
-                            TextWriter(Stdio.stdout()).writeLine(("true") .. "")
+                            solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("true") .. "")
                         }
                         case false {
-                            TextWriter(Stdio.stdout()).writeLine(("false") .. "")
+                            solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("false") .. "")
                         }
                     }
                 }
@@ -359,7 +359,7 @@ class SwitchExecutionTest {
                         }
                     }
                 }
-                TextWriter(Stdio.stdout()).writeLine((users) .. (" ") .. (api) .. (" ") .. (pages))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((users) .. (" ") .. (api) .. (" ") .. (pages))
                 """, directory);
 
         assertThat(output).isEqualTo("2 1 1\n");
@@ -391,9 +391,9 @@ class SwitchExecutionTest {
                     }
                 }
 
-                TextWriter(Stdio.stdout()).writeLine((Router("/api/users/9").kind()) .. "")
-                TextWriter(Stdio.stdout()).writeLine((Router("/api/status").kind()) .. "")
-                TextWriter(Stdio.stdout()).writeLine((Router("/about").kind()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Router("/api/users/9").kind()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Router("/api/status").kind()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Router("/about").kind()) .. "")
                 """, directory);
 
         assertThat(output).isEqualTo("user\napi\npage\n");
@@ -424,8 +424,8 @@ class SwitchExecutionTest {
                     }
                 }
 
-                TextWriter(Stdio.stdout()).writeLine((Box("numeric", 1).classify()) .. "")
-                TextWriter(Stdio.stdout()).writeLine((Box("word", "text").classify()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Box("numeric", 1).classify()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Box("word", "text").classify()) .. "")
                 """, directory);
 
         assertThat(output).isEqualTo("number-ish\nother\n");
@@ -456,9 +456,9 @@ class SwitchExecutionTest {
                     }
                 }
 
-                TextWriter(Stdio.stdout()).writeLine((describe("http", 200)) .. "")
-                TextWriter(Stdio.stdout()).writeLine((describe("http", 500)) .. "")
-                TextWriter(Stdio.stdout()).writeLine((describe("other", 200)) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((describe("http", 200)) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((describe("http", 500)) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((describe("other", 200)) .. "")
                 """, directory);
 
         assertThat(output).isEqualTo("ok\nhttp 500\nplain\n");

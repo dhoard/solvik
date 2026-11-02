@@ -73,7 +73,7 @@ class BuiltInNameTest {
                 }
                 m::println(1)
                 m::println(m::Integer(1))
-                TextWriter(Stdio.stdout()).writeLine((m::Integer(1)) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((m::Integer(1)) .. "")
                 """);
         assertAccepted("""
                 type Tools {
@@ -85,7 +85,7 @@ class BuiltInNameTest {
 
                     pub func run() -> Long { return Tools.toLong(self.exit()) }
                 }
-                TextWriter(Stdio.stdout()).writeLine((Tools().run()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Tools().run()) .. "")
                 """);
     }
 
@@ -94,7 +94,7 @@ class BuiltInNameTest {
     void print_and_println_are_ordinary_names() {
         assertAccepted("""
                 func println(value: Integer) {
-                    TextWriter(Stdio.stdout()).writeLine((value) .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((value) .. "")
                 }
 
                 func print() { }
@@ -111,7 +111,7 @@ class BuiltInNameTest {
                 type Strings {
                     pub func Strings() { }
                 }
-                TextWriter(Stdio.stdout()).writeLine((Strings()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Strings()) .. "")
                 """);
     }
 }

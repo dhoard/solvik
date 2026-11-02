@@ -34,7 +34,7 @@ module app {
 
 account := app::Account("Ada", 10)
 account.deposit(25)
-TextWriter(Stdio.stdout()).writeLine(account.summary())
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(account.summary())
 ```
 
 Running it prints:
@@ -166,10 +166,7 @@ Java.
 | `solvik::collections` | `List`, `Map`, `Stack` |
 | `solvik::concurrency` | `Task`, `Thread` — `Thread.start` starts a virtual thread; `await()` and `await(milliseconds)` join it |
 | `solvik::util` | `UUID` — version 7 (RFC 9562), written in Solvik rather than bound to Java |
-| top level | `Channel`, `Stdio`, `TextReader`, `TextWriter`, `ByteReader`, `ByteWriter`, `File`, `IoError` |
-
-There are no output built-ins. `TextWriter.writeLine` appends `TextWriter.LINE_ENDING`; `write`
-translates nothing. `File` owns a single-direction channel, and the byte wrappers borrow one.
+| `solvik::io` | `Channel`, `Stdio`, `TextReader`, `TextWriter`, `ByteReader`, `ByteWriter`, `File`, `IoError` |
 
 ## Project layout
 

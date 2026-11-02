@@ -15,7 +15,10 @@ import java.util.Map;
  * or mismatched entry is a build error rather than a reflective guess.
  *
  * <p>Keys use the written Solvik spellings a diagnostic shows ({@code Integer}, {@code Byte[]},
- * {@code Channel}, {@code String}), so a failure names the signature the author wrote.
+ * {@code solvik::io::Channel}, {@code String}), so a failure names the signature the author wrote.
+ * The owner is the declaring type's simple name, because native declarations are resolved from
+ * their parsed declaration; a moved standard-library type spells its parameters and result with
+ * the qualified name its Solvik type reports.
  */
 public final class BuiltinBindings {
 
@@ -55,7 +58,7 @@ public final class BuiltinBindings {
 
     private static final Map<Key, Entry> ENTRIES = Map.ofEntries(
             entry("Channel", "bytes", true, List.of(), new Entry("memory", List.of(),
-                    Conversion.PAYLOAD_RESULT, "Channel")),
+                    Conversion.PAYLOAD_RESULT, "solvik::io::Channel")),
             entry("Channel", "read", false, List.of("Integer"),
                     new Entry("read", List.of(Conversion.NONE), Conversion.NONE, "Byte[]?")),
             entry("Channel", "writeSome", false, List.of("Byte[]", "Integer", "Integer"),
@@ -72,25 +75,25 @@ public final class BuiltinBindings {
             entry("Channel", "canWrite", false, List.of(),
                     new Entry("canWrite", List.of(), Conversion.NONE, "Boolean")),
             entry("Stdio", "stdin", true, List.of(),
-                    new Entry("stdin", List.of(), Conversion.PAYLOAD_RESULT, "Channel")),
+                    new Entry("stdin", List.of(), Conversion.PAYLOAD_RESULT, "solvik::io::Channel")),
             entry("Stdio", "stdout", true, List.of(),
-                    new Entry("stdout", List.of(), Conversion.PAYLOAD_RESULT, "Channel")),
+                    new Entry("stdout", List.of(), Conversion.PAYLOAD_RESULT, "solvik::io::Channel")),
             entry("Stdio", "stderr", true, List.of(),
-                    new Entry("stderr", List.of(), Conversion.PAYLOAD_RESULT, "Channel")),
-            entry("Stdio", "setStdin", true, List.of("Channel"),
+                    new Entry("stderr", List.of(), Conversion.PAYLOAD_RESULT, "solvik::io::Channel")),
+            entry("Stdio", "setStdin", true, List.of("solvik::io::Channel"),
                     new Entry("setStdin", List.of(Conversion.PAYLOAD_ARGUMENT), Conversion.NONE, "Void")),
-            entry("Stdio", "setStdout", true, List.of("Channel"),
+            entry("Stdio", "setStdout", true, List.of("solvik::io::Channel"),
                     new Entry("setStdout", List.of(Conversion.PAYLOAD_ARGUMENT), Conversion.NONE, "Void")),
-            entry("Stdio", "setStderr", true, List.of("Channel"),
+            entry("Stdio", "setStderr", true, List.of("solvik::io::Channel"),
                     new Entry("setStderr", List.of(Conversion.PAYLOAD_ARGUMENT), Conversion.NONE, "Void")),
-            entry("TextReader", "TextReader", false, List.of("Channel"),
+            entry("TextReader", "TextReader", false, List.of("solvik::io::Channel"),
                     new Entry("openReader", List.of(Conversion.PAYLOAD_ARGUMENT),
                             Conversion.NONE, "Void")),
             entry("TextReader", "readLine", false, List.of(),
                     new Entry("readLine", List.of(), Conversion.NONE, "String?")),
             entry("TextReader", "close", false, List.of(),
                     new Entry("closeReader", List.of(), Conversion.NONE, "Void")),
-            entry("TextWriter", "TextWriter", false, List.of("Channel"),
+            entry("TextWriter", "TextWriter", false, List.of("solvik::io::Channel"),
                     new Entry("openWriter", List.of(Conversion.PAYLOAD_ARGUMENT),
                             Conversion.NONE, "Void")),
             entry("TextWriter", "write", false, List.of("String"),
@@ -103,13 +106,13 @@ public final class BuiltinBindings {
                     new Entry("lineSeparator", List.of(), Conversion.NONE, "String")),
             entry("File", "openReadChannel", true, List.of("String"),
                     new Entry("openFileRead", List.of(Conversion.NONE),
-                            Conversion.PAYLOAD_RESULT, "Channel")),
+                            Conversion.PAYLOAD_RESULT, "solvik::io::Channel")),
             entry("File", "openWriteChannel", true, List.of("String"),
                     new Entry("openFileWrite", List.of(Conversion.NONE),
-                            Conversion.PAYLOAD_RESULT, "Channel")),
+                            Conversion.PAYLOAD_RESULT, "solvik::io::Channel")),
             entry("File", "openAppendChannel", true, List.of("String"),
                     new Entry("openFileAppend", List.of(Conversion.NONE),
-                            Conversion.PAYLOAD_RESULT, "Channel")),
+                            Conversion.PAYLOAD_RESULT, "solvik::io::Channel")),
             entry("File", "exists", true, List.of("String"),
                     new Entry("fileExists", List.of(Conversion.NONE), Conversion.NONE,
                             "Boolean")),

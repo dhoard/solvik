@@ -81,11 +81,11 @@ class StaticMemberExecutionTest {
 
                 first := Counter()
                 second := Counter()
-                TextWriter(Stdio.stdout()).writeLine((first.add(1)) .. (" ") .. (second.add(2)) .. (" ") .. (Counter.report()))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((first.add(1)) .. (" ") .. (second.add(2)) .. (" ") .. (Counter.report()))
                 Counter.reset()
-                TextWriter(Stdio.stdout()).writeLine((Counter.report()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Counter.report()) .. "")
                 Counter.limit = 5
-                TextWriter(Stdio.stdout()).writeLine((Counter.kind) .. (Counter.limit))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Counter.kind) .. (Counter.limit))
                 """, directory);
 
         assertThat(output).isEqualTo("1 3 count=3\ncount=0\ncounter5\n");
@@ -117,9 +117,9 @@ class StaticMemberExecutionTest {
                 }
 
                 counter := stats::Counter()
-                TextWriter(Stdio.stdout()).writeLine((counter.add(2)) .. (" ") .. (counter.add(3)) .. (" ") .. (stats::Counter.label()))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((counter.add(2)) .. (" ") .. (counter.add(3)) .. (" ") .. (stats::Counter.label()))
                 stats::Counter.reset()
-                TextWriter(Stdio.stdout()).writeLine((stats::Counter.label()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((stats::Counter.label()) .. "")
                 """, directory);
 
         assertThat(output).isEqualTo("2 5 stats:5\nstats:0\n");
@@ -135,7 +135,7 @@ class StaticMemberExecutionTest {
                     pub func Settings() { }
                 }
 
-                TextWriter(Stdio.stdout()).writeLine((Settings.doubled) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Settings.doubled) .. "")
                 """, directory);
 
         assertThat(output).isEqualTo("20\n");
@@ -161,7 +161,7 @@ class StaticMemberExecutionTest {
                     }
                 }
 
-                TextWriter(Stdio.stdout()).writeLine((Node.of(7).get()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Node.of(7).get()) .. "")
                 """, directory);
 
         assertThat(output).isEqualTo("7\n");
@@ -177,7 +177,7 @@ class StaticMemberExecutionTest {
                 }
 
                 Log.text ..= "-b"
-                TextWriter(Stdio.stdout()).writeLine((Log.text) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Log.text) .. "")
                 """, directory);
 
         assertThat(output).isEqualTo("a-b\n");
@@ -191,7 +191,7 @@ class StaticMemberExecutionTest {
                     static pub func toString() -> String { return "static" }
                 }
 
-                TextWriter(Stdio.stdout()).writeLine((Format.toString()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Format.toString()) .. "")
                 """, directory);
 
         assertThat(output).isEqualTo("static\n");
@@ -209,7 +209,7 @@ class StaticMemberExecutionTest {
                     }
                 }
 
-                TextWriter(Stdio.stdout()).writeLine((jdk::Math.abs(-7)) .. (" ") .. (jdk::Math.max(3, 9)) .. (" ") .. (jdk::Math.sqrt(81.0)) .. (" ") .. (jdk::Math.floor(2.9)))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((jdk::Math.abs(-7)) .. (" ") .. (jdk::Math.max(3, 9)) .. (" ") .. (jdk::Math.sqrt(81.0)) .. (" ") .. (jdk::Math.floor(2.9)))
                 """, directory);
 
         assertThat(output).isEqualTo("7 9 9.0 2.0\n");
@@ -227,7 +227,7 @@ class StaticMemberExecutionTest {
                 }
 
                 text := jdk::Text()
-                TextWriter(Stdio.stdout()).writeLine((jdk::Text.valueOf(123)) .. (" ") .. (text.length()))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((jdk::Text.valueOf(123)) .. (" ") .. (text.length()))
                 """, directory);
 
         assertThat(output).isEqualTo("123 0\n");

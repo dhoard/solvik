@@ -58,7 +58,7 @@ class NativeBindingTest {
         String java = new SolvikCompiler("t.sol").transpile(GOOD + """
                 box := bound::Box<String>()
                 box.add("x")
-                TextWriter(Stdio.stdout()).writeLine((box.size()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((box.size()) .. "")
                 """).get("bound/Box.java");
 
         assertThat(java).contains("package bound;", "public final class Box<T>",
@@ -72,13 +72,13 @@ class NativeBindingTest {
         Map<String, String> files = new SolvikCompiler("t.sol").transpile("""
                 map := solvik::collections::Map<String, Integer>()
                 map.put("a", 1)
-                TextWriter(Stdio.stdout()).writeLine((map.size()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((map.size()) .. "")
                 stack := solvik::collections::Stack<Integer>()
                 stack.push(2)
-                TextWriter(Stdio.stdout()).writeLine((stack.pop()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((stack.pop()) .. "")
                 list := solvik::collections::List<String>()
                 list.add("x")
-                TextWriter(Stdio.stdout()).writeLine((list.get(0)) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((list.get(0)) .. "")
                 """);
 
         assertThat(files).containsKeys("solvik/collections/Map.java",
@@ -163,7 +163,7 @@ class NativeBindingTest {
         Map<String, String> files = new SolvikCompiler("t.sol").transpile(GOOD + """
                 raw := bound::Box()
                 typed := bound::Box<Integer>()
-                TextWriter(Stdio.stdout()).writeLine((raw.type()) .. (" ") .. (typed.type()))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((raw.type()) .. (" ") .. (typed.type()))
                 """);
         assertThat(files.get("Solvik$Program.java"))
                 .contains("Box<Object>", "Box<Any>", "Box<Integer>",
@@ -181,7 +181,7 @@ class NativeBindingTest {
                         pub func Point() { }
                     }
                 }
-                TextWriter(Stdio.stdout()).writeLine((geometry::width()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((geometry::width()) .. "")
                 p := geometry::Point()
                 """);
 
@@ -242,7 +242,7 @@ class NativeBindingTest {
     void an_unknown_embedded_module_is_reported() {
         Diagnostics diagnostics = new Diagnostics();
         ProgramLoader.Loaded loaded = new ProgramLoader(diagnostics)
-                .loadSource("import \"java:nope\"\nTextWriter(Stdio.stdout()).writeLine((1) .. \"\")", "t.sol");
+                .loadSource("import \"java:nope\"\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1) .. \"\")", "t.sol");
         assertThat(diagnostics.all()).extracting(d -> d.code()).contains(ProgramLoader.MISSING_FILE);
         assertThat(loaded.programFileNames()).contains("t.sol");
     }
@@ -254,12 +254,12 @@ class NativeBindingTest {
                 a := BigInteger("12")
                 b := BigInteger("18")
                 shift := 2
-                TextWriter(Stdio.stdout()).writeLine((a.gcd(b)) .. (" ") .. (a.pow(2)) .. (" ") .. (a.signum()) .. (" ") .. (a.bitLength()))
-                TextWriter(Stdio.stdout()).writeLine((a.max(b)) .. (" ") .. (a.shiftLeft(shift)) .. (" ") .. (a.toString(2)))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((a.gcd(b)) .. (" ") .. (a.pow(2)) .. (" ") .. (a.signum()) .. (" ") .. (a.bitLength()))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((a.max(b)) .. (" ") .. (a.shiftLeft(shift)) .. (" ") .. (a.toString(2)))
                 d := BigDecimal("1234.5000")
-                TextWriter(Stdio.stdout()).writeLine((d.scale()) .. (" ") .. (d.stripTrailingZeros()) .. (" ") .. (d.unscaledValue()))
-                TextWriter(Stdio.stdout()).writeLine((d.movePointLeft(2)) .. (" ") .. (d.add(BigDecimal("0.5"))))
-                TextWriter(Stdio.stdout()).writeLine((d.toPlainString()) .. (" ") .. (d.toString()))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((d.scale()) .. (" ") .. (d.stripTrailingZeros()) .. (" ") .. (d.unscaledValue()))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((d.movePointLeft(2)) .. (" ") .. (d.add(BigDecimal("0.5"))))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((d.toPlainString()) .. (" ") .. (d.toString()))
                 """);
         String java = files.get("Solvik$Program.java");
 
@@ -276,10 +276,10 @@ class NativeBindingTest {
 
     @Test
     void unknown_or_unsupported_big_number_methods_are_reported() {
-        rejected("a := BigInteger(\"1\")\nTextWriter(Stdio.stdout()).writeLine((a.nope()) .. \"\")", TypeChecker.TYPE_ERROR);
-        rejected("a := BigInteger(\"1\")\nTextWriter(Stdio.stdout()).writeLine((a.gcd(1)) .. \"\")", TypeChecker.TYPE_ERROR);
-        rejected("a := BigInteger(\"1\")\nTextWriter(Stdio.stdout()).writeLine((a.toByteArray()) .. \"\")", TypeChecker.TYPE_ERROR);
-        rejected("a := BigInteger(\"1\")\nTextWriter(Stdio.stdout()).writeLine((a.pow(\"2\")) .. \"\")", TypeChecker.TYPE_ERROR);
+        rejected("a := BigInteger(\"1\")\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((a.nope()) .. \"\")", TypeChecker.TYPE_ERROR);
+        rejected("a := BigInteger(\"1\")\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((a.gcd(1)) .. \"\")", TypeChecker.TYPE_ERROR);
+        rejected("a := BigInteger(\"1\")\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((a.toByteArray()) .. \"\")", TypeChecker.TYPE_ERROR);
+        rejected("a := BigInteger(\"1\")\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((a.pow(\"2\")) .. \"\")", TypeChecker.TYPE_ERROR);
     }
 
     @Test
@@ -296,7 +296,7 @@ class NativeBindingTest {
                         }
                     }
                 }
-                TextWriter(Stdio.stdout()).writeLine((library::inner::twice(3)) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((library::inner::twice(3)) .. "")
                 p := library::inner::Point()
                 """);
 

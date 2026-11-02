@@ -89,16 +89,16 @@ class BundledIoExecutionTest {
     @DisplayName("read returns at most the requested bytes and Null only at end of input")
     void read_returns_partial_bytes_and_null_at_eof(@TempDir Path directory) throws Exception {
         String output = run("""
-                channel := Channel.bytes()
+                channel := solvik::io::Channel.bytes()
                 written := channel.write(Byte[3] {65, 66, 67})
                 part := channel.read(2)
                 rest := channel.read(2)
                 done := channel.read(1)
                 if part != Null && rest != Null {
-                    TextWriter(Stdio.stdout()).writeLine("part=" .. part .. " rest=" .. rest
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("part=" .. part .. " rest=" .. rest
                         \\ .. " eof=" .. (done == Null))
                 }
-                TextWriter(Stdio.stdout()).writeLine("written=" .. written)
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("written=" .. written)
                 """, directory);
 
         assertThat(output).isEqualTo("part=[65, 66] rest=[67] eof=true\nwritten=3\n");
@@ -108,13 +108,13 @@ class BundledIoExecutionTest {
     @DisplayName("write and writeAll round-trip every byte shape through the array carrier")
     void write_round_trips_all_byte_values(@TempDir Path directory) throws Exception {
         String output = run("""
-                channel := Channel.bytes()
+                channel := solvik::io::Channel.bytes()
                 payload := Byte[4] {0, 127, -128, -1}
                 first := channel.write(payload)
                 channel.writeAll(Byte[2] {65, 66})
                 back := channel.read(6)
                 if back != Null {
-                    TextWriter(Stdio.stdout()).writeLine("first=" .. first .. " bytes=" .. back)
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("first=" .. first .. " bytes=" .. back)
                 }
                 """, directory);
 
@@ -125,15 +125,15 @@ class BundledIoExecutionTest {
     @DisplayName("close is idempotent, shared by aliases, and later operations fail")
     void close_is_shared_by_aliases(@TempDir Path directory) throws Exception {
         String output = run("""
-                channel := Channel.bytes()
+                channel := solvik::io::Channel.bytes()
                 alias := channel
                 channel.close()
                 alias.close()
-                TextWriter(Stdio.stdout()).writeLine("open=" .. channel.isOpen())
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("open=" .. channel.isOpen())
                 try {
                     ignored := alias.read(1)
                 } catch (error: Exception) {
-                    TextWriter(Stdio.stdout()).writeLine("closed=" .. (error.getCode() == IoError.Closed))
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("closed=" .. (error.getCode() == solvik::io::IoError.Closed))
                 }
                 """, directory);
 
@@ -144,14 +144,14 @@ class BundledIoExecutionTest {
     @DisplayName("a standard handle reports its direction and rejects the other operation")
     void capability_violations_are_io_errors(@TempDir Path directory) throws Exception {
         String output = run("""
-                out := Stdio.stdout()
-                TextWriter(Stdio.stdout()).writeLine("readable=" .. out.canRead()
+                out := solvik::io::Stdio.stdout()
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("readable=" .. out.canRead()
                     \\ .. " writable=" .. out.canWrite())
                 try {
                     ignored := out.read(1)
                 } catch (error: Exception) {
-                    TextWriter(Stdio.stdout()).writeLine("unsupported="
-                        \\ .. (error.getCode() == IoError.Unsupported))
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("unsupported="
+                        \\ .. (error.getCode() == solvik::io::IoError.Unsupported))
                 }
                 """, directory);
 
@@ -162,19 +162,19 @@ class BundledIoExecutionTest {
     @DisplayName("Stdio setters redirect, snapshot the binding, and never close a channel")
     void stdio_redirection_snapshots_the_current_channel(@TempDir Path directory) throws Exception {
         String output = run("""
-                saved := Stdio.stdout()
-                captured := Channel.bytes()
+                saved := solvik::io::Stdio.stdout()
+                captured := solvik::io::Channel.bytes()
 
-                writer := TextWriter(saved)
-                Stdio.setStdout(captured)
+                writer := solvik::io::TextWriter(saved)
+                solvik::io::Stdio.setStdout(captured)
                 writer.writeLine("original")
-                TextWriter(Stdio.stdout()).writeLine("redirected")
-                Stdio.setStdout(saved)
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("redirected")
+                solvik::io::Stdio.setStdout(saved)
 
-                reader := TextReader(captured)
-                TextWriter(Stdio.stdout()).writeLine("captured=" .. reader.readLine())
+                reader := solvik::io::TextReader(captured)
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("captured=" .. reader.readLine())
                 reader.close()
-                TextWriter(Stdio.stdout()).writeLine("open=" .. captured.isOpen())
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("open=" .. captured.isOpen())
                 """, directory);
 
         assertThat(output).isEqualTo("original\ncaptured=redirected\nopen=true\n");
@@ -185,12 +185,12 @@ class BundledIoExecutionTest {
     void invalid_standard_replacement_is_rejected(@TempDir Path directory) throws Exception {
         String output = run("""
                 try {
-                    Stdio.setStdout(Stdio.stdin())
+                    solvik::io::Stdio.setStdout(solvik::io::Stdio.stdin())
                 } catch (error: Exception) {
-                    TextWriter(Stdio.stdout()).writeLine("rejected="
-                        \\ .. (error.getCode() == IoError.Unsupported))
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("rejected="
+                        \\ .. (error.getCode() == solvik::io::IoError.Unsupported))
                 }
-                TextWriter(Stdio.stdout()).writeLine("still the original")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("still the original")
                 """, directory);
 
         assertThat(output).isEqualTo("rejected=true\nstill the original\n");
@@ -201,10 +201,10 @@ class BundledIoExecutionTest {
     void standard_channels_cannot_be_closed(@TempDir Path directory) throws Exception {
         String output = run("""
                 try {
-                    Stdio.stderr().close()
+                    solvik::io::Stdio.stderr().close()
                 } catch (error: Exception) {
-                    TextWriter(Stdio.stdout()).writeLine("protected="
-                        \\ .. (error.getCode() == IoError.Unsupported))
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("protected="
+                        \\ .. (error.getCode() == solvik::io::IoError.Unsupported))
                 }
                 """, directory);
 
@@ -216,19 +216,19 @@ class BundledIoExecutionTest {
     void read_line_endings() throws Exception {
         Path directory = Files.createTempDirectory("solvik-lines");
         String output = run("""
-                channel := Channel.bytes()
-                writer := TextWriter(channel)
+                channel := solvik::io::Channel.bytes()
+                writer := solvik::io::TextWriter(channel)
                 writer.write("a\\nb\\r\\nc\\rd\\n\\nlast")
                 writer.close()
-                reader := TextReader(channel)
+                reader := solvik::io::TextReader(channel)
                 mut index := 0
                 mut line: String? = reader.readLine()
                 while line != Null && index < 10 {
                     index = index + 1
-                    TextWriter(Stdio.stdout()).writeLine(index .. "=[" .. line .. "]")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(index .. "=[" .. line .. "]")
                     line = reader.readLine()
                 }
-                TextWriter(Stdio.stdout()).writeLine("done=" .. (line == Null))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("done=" .. (line == Null))
                 reader.close()
                 """, directory);
 
@@ -247,18 +247,18 @@ class BundledIoExecutionTest {
     @DisplayName("empty input returns Null while an empty line returns an empty String")
     void empty_input_is_not_an_empty_line(@TempDir Path directory) throws Exception {
         String output = run("""
-                empty := Channel.bytes()
-                noLines := TextReader(empty)
-                TextWriter(Stdio.stdout()).writeLine("empty=" .. (noLines.readLine() == Null))
+                empty := solvik::io::Channel.bytes()
+                noLines := solvik::io::TextReader(empty)
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("empty=" .. (noLines.readLine() == Null))
                 noLines.close()
 
-                oneNewline := Channel.bytes()
-                writer := TextWriter(oneNewline)
+                oneNewline := solvik::io::Channel.bytes()
+                writer := solvik::io::TextWriter(oneNewline)
                 writer.write("\\n")
                 writer.close()
-                blank := TextReader(oneNewline)
+                blank := solvik::io::TextReader(oneNewline)
                 first := blank.readLine()
-                TextWriter(Stdio.stdout()).writeLine("blank=[" .. first ..
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("blank=[" .. first ..
                     \\ "] eof=" .. (blank.readLine() == Null))
                 blank.close()
                 """, directory);
@@ -270,16 +270,16 @@ class BundledIoExecutionTest {
     @DisplayName("UTF-8 decodes across byte boundaries and round-trips through the writer")
     void utf8_round_trips(@TempDir Path directory) throws Exception {
         String output = run("""
-                channel := Channel.bytes()
-                writer := TextWriter(channel)
+                channel := solvik::io::Channel.bytes()
+                writer := solvik::io::TextWriter(channel)
                 writer.write("héllo 日本 🚀\\nsecond")
                 writer.close()
-                reader := TextReader(channel)
+                reader := solvik::io::TextReader(channel)
                 first := reader.readLine()
                 second := reader.readLine()
                 if first != Null && second != Null {
-                    TextWriter(Stdio.stdout()).writeLine(first)
-                    TextWriter(Stdio.stdout()).writeLine(second)
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(first)
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(second)
                 }
                 reader.close()
                 """, directory);
@@ -288,18 +288,18 @@ class BundledIoExecutionTest {
     }
 
     @Test
-    @DisplayName("malformed UTF-8 raises IoError.Encoding rather than replacing a character")
+    @DisplayName("malformed UTF-8 raises solvik::io::IoError.Encoding rather than replacing a character")
     void malformed_utf8_raises_encoding_error(@TempDir Path directory) throws Exception {
         String output = run("""
-                channel := Channel.bytes()
+                channel := solvik::io::Channel.bytes()
                 written := channel.write(Byte[1] {-1B})
-                reader := TextReader(channel)
+                reader := solvik::io::TextReader(channel)
                 try {
                     line := reader.readLine()
-                    TextWriter(Stdio.stdout()).writeLine("unexpected")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("unexpected")
                 } catch (error: Exception) {
-                    TextWriter(Stdio.stdout()).writeLine("encoding="
-                        \\ .. (error.getCode() == IoError.Encoding) .. " written=" .. written)
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("encoding="
+                        \\ .. (error.getCode() == solvik::io::IoError.Encoding) .. " written=" .. written)
                 }
                 reader.close()
                 """, directory);
@@ -311,15 +311,15 @@ class BundledIoExecutionTest {
     @DisplayName("closing a reader does not close its channel, and reading after close fails")
     void reader_close_leaves_the_channel_open(@TempDir Path directory) throws Exception {
         String output = run("""
-                channel := Channel.bytes()
-                reader := TextReader(channel)
+                channel := solvik::io::Channel.bytes()
+                reader := solvik::io::TextReader(channel)
                 reader.close()
-                TextWriter(Stdio.stdout()).writeLine("channelOpen=" .. channel.isOpen())
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("channelOpen=" .. channel.isOpen())
                 try {
                     line := reader.readLine()
                 } catch (error: Exception) {
-                    TextWriter(Stdio.stdout()).writeLine("closed="
-                        \\ .. (error.getCode() == IoError.Closed))
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("closed="
+                        \\ .. (error.getCode() == solvik::io::IoError.Closed))
                 }
                 """, directory);
 
@@ -330,21 +330,48 @@ class BundledIoExecutionTest {
     @DisplayName("write translates nothing and writeLine appends exactly the platform terminator")
     void write_line_uses_the_published_terminator(@TempDir Path directory) throws Exception {
         String output = run("""
-                channel := Channel.bytes()
-                writer := TextWriter(channel)
+                channel := solvik::io::Channel.bytes()
+                writer := solvik::io::TextWriter(channel)
                 writer.write("a\\nb")
                 writer.writeLine("c")
                 writer.close()
                 back := channel.read(100)
                 if back != Null {
-                    TextWriter(Stdio.stdout()).writeLine("bytes=" .. back)
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("bytes=" .. back)
                 }
-                TextWriter(Stdio.stdout()).writeLine("ending=" .. TextWriter.LINE_ENDING)
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("ending=" .. solvik::io::TextWriter.EOL)
                 """, directory);
 
         String terminator = System.lineSeparator();
         assertThat(output).isEqualTo("bytes=[97, 10, 98, 99" + byteList(terminator) + "]\nending="
                 + terminator.replace("\r\n", "\n") + "\n");
+    }
+
+    @Test
+    @DisplayName("write emits exactly its text and adds no terminator")
+    void write_adds_no_terminator(@TempDir Path directory) throws Exception {
+        String output = run("""
+                out := solvik::io::TextWriter(solvik::io::Stdio.stdout())
+                out.write("no terminator")
+                out.flush()
+                """, directory);
+
+        assertThat(output).isEqualTo("no terminator");
+    }
+
+    @Test
+    @DisplayName("the I/O types require their solvik::io module qualifier")
+    void io_types_are_only_named_through_the_module(@TempDir Path directory) throws Exception {
+        assertThat(compilationError("""
+                out := TextWriter(Stdio.stdout())
+                """, directory))
+                .contains("SOL-T001")
+                .contains("TextWriter");
+        assertThat(compilationError("""
+                memory := Channel.bytes()
+                """, directory))
+                .contains("SOL-T001")
+                .contains("Channel");
     }
 
     private static String byteList(String text) {
@@ -359,14 +386,14 @@ class BundledIoExecutionTest {
     @DisplayName("writeLine exercises a literal newline in the argument and an empty line")
     void write_line_does_not_deduplicate_terminators(@TempDir Path directory) throws Exception {
         String output = run("""
-                channel := Channel.bytes()
-                writer := TextWriter(channel)
+                channel := solvik::io::Channel.bytes()
+                writer := solvik::io::TextWriter(channel)
                 writer.writeLine("a\\n")
                 writer.writeLine("")
                 writer.close()
                 back := channel.read(100)
                 if back != Null {
-                    TextWriter(Stdio.stdout()).writeLine("count=" .. back.size)
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("count=" .. back.size)
                 }
                 """, directory);
 
@@ -379,21 +406,21 @@ class BundledIoExecutionTest {
     @DisplayName("closing a writer is idempotent, leaves the channel open, and rejects a write")
     void writer_close_leaves_the_channel_open(@TempDir Path directory) throws Exception {
         String output = run("""
-                channel := Channel.bytes()
-                writer := TextWriter(channel)
+                channel := solvik::io::Channel.bytes()
+                writer := solvik::io::TextWriter(channel)
                 writer.write("x")
                 writer.close()
                 writer.close()
                 try {
                     writer.write("y")
                 } catch (error: Exception) {
-                    TextWriter(Stdio.stdout()).writeLine("closed="
-                        \\ .. (error.getCode() == IoError.Closed))
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("closed="
+                        \\ .. (error.getCode() == solvik::io::IoError.Closed))
                 }
-                TextWriter(Stdio.stdout()).writeLine("channelOpen=" .. channel.isOpen())
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("channelOpen=" .. channel.isOpen())
                 back := channel.read(10)
                 if back != Null {
-                    TextWriter(Stdio.stdout()).writeLine("bytes=" .. back)
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("bytes=" .. back)
                 }
                 """, directory);
 
@@ -404,11 +431,11 @@ class BundledIoExecutionTest {
     @DisplayName("a very large read request returns the available bytes without a huge allocation")
     void read_bounds_its_chunk(@TempDir Path directory) throws Exception {
         String output = run("""
-                channel := Channel.bytes()
+                channel := solvik::io::Channel.bytes()
                 sent := channel.write(Byte[1] {65})
                 part := channel.read(2147483647)
                 if part != Null {
-                    TextWriter(Stdio.stdout()).writeLine("bytes=" .. part .. " sent=" .. sent)
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("bytes=" .. part .. " sent=" .. sent)
                 }
                 """, directory);
 
@@ -419,7 +446,7 @@ class BundledIoExecutionTest {
     @DisplayName("a temporary writer reaches the standard output without a later flush")
     void temporary_writer_is_visible(@TempDir Path directory) throws Exception {
         String output = run("""
-                TextWriter(Stdio.stdout()).writeLine("hello")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("hello")
                 """, directory);
 
         assertThat(output).isEqualTo("hello\n");
@@ -431,33 +458,33 @@ class BundledIoExecutionTest {
         Map<String, String> plain = transpile("value := 1\n", directory);
         assertThat(plain).doesNotContainKey(GeneratedNames.IO_SOURCE_PATH);
         assertThat(PackagedLibrary.programFiles(plain)).containsExactly("Solvik$Program.java");
-        assertThat(plain).doesNotContainKeys("Channel.java", "Stdio.java", "TextReader.java",
-                "TextWriter.java", "IoError.java", "File.java", "ByteReader.java",
-                "ByteWriter.java");
+        assertThat(plain).doesNotContainKeys("solvik/io/Channel.java", "solvik/io/Stdio.java", "solvik/io/TextReader.java",
+                "solvik/io/TextWriter.java", "solvik/io/IoError.java", "solvik/io/File.java", "solvik/io/ByteReader.java",
+                "solvik/io/ByteWriter.java");
 
         Path ioDirectory = Files.createDirectories(directory.resolve("io"));
         Map<String, String> io = transpile("""
-                out := TextWriter(Stdio.stdout())
+                out := solvik::io::TextWriter(solvik::io::Stdio.stdout())
                 out.writeLine("io")
                 """, ioDirectory);
-        assertThat(io).containsKeys(GeneratedNames.IO_SOURCE_PATH, "TextWriter.java",
-                "Stdio.java", "Channel.java");
+        assertThat(io).containsKeys(GeneratedNames.IO_SOURCE_PATH, "solvik/io/TextWriter.java",
+                "solvik/io/Stdio.java", "solvik/io/Channel.java");
         assertThat(io.get(GeneratedNames.IO_SOURCE_PATH))
                 .contains("public final class Solvik$Io")
                 .contains("public static synchronized Object stdout()");
     }
 
     @Test
-    @DisplayName("LINE_ENDING is a static immutable member, not instance state")
-    void line_ending_access_rules(@TempDir Path directory) throws Exception {
+    @DisplayName("EOL is a static immutable member, not instance state")
+    void eol_access_rules(@TempDir Path directory) throws Exception {
         assertThat(compilationError("""
-                writer := TextWriter(Stdio.stdout())
-                value := writer.LINE_ENDING
+                writer := solvik::io::TextWriter(solvik::io::Stdio.stdout())
+                value := writer.EOL
                 """, directory))
                 .contains("SOL-T001")
                 .contains("is static");
 
-        assertThat(compilationError("TextWriter.LINE_ENDING = \"x\"\n", directory))
+        assertThat(compilationError("solvik::io::TextWriter.EOL = \"x\"\n", directory))
                 .contains("SOL-T010")
                 .contains("immutable");
     }

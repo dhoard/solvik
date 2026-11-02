@@ -120,9 +120,9 @@ class ModuleMergeTest {
                     module tools {
                         pub func sum() -> Integer { return answer() + Right().value() }
                     }
-                    TextWriter(Stdio.stdout()).writeLine(("start") .. "")
-                    TextWriter(Stdio.stdout()).writeLine((tools::sum()) .. (" ") .. (tools::detail::beta()))
-                    TextWriter(Stdio.stdout()).writeLine(("end") .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("start") .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((tools::sum()) .. (" ") .. (tools::detail::beta()))
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("end") .. "")
                     """);
             Map<String, String> files = transpile(entry);
             assertThat(PackagedLibrary.programFiles(files)).containsExactlyInAnyOrder("Solvik$Program.java",
@@ -150,7 +150,7 @@ class ModuleMergeTest {
                 import "right.sol"
                 import "shared.sol"
                 import "./shared.sol"
-                TextWriter(Stdio.stdout()).writeLine((common::left()) .. (" ") .. (common::right()) .. (" ") .. (common::seed()))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((common::left()) .. (" ") .. (common::right()) .. (" ") .. (common::seed()))
                 """);
         assertThat(load("app.sol").programFileNames()).hasSize(4);
         Map<String, String> files = transpile("app.sol");
@@ -172,7 +172,7 @@ class ModuleMergeTest {
         write("app.sol", """
                 import "left.sol"
                 import "right.sol"
-                TextWriter(Stdio.stdout()).writeLine((first::inner::other()) .. (" ") .. (second::inner::other()))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((first::inner::other()) .. (" ") .. (second::inner::other()))
                 """);
         assertThat(run(transpile("app.sol"), "separate")).isEqualTo("1 2\n");
     }
@@ -209,7 +209,7 @@ class ModuleMergeTest {
         write("left.sol", "module shared { pub func value() -> Integer { return 1 } }");
         write("right.sol", "module shared { pub func value(n: Integer) -> Integer { return n } }");
         write("app.sol", "import \"left.sol\"\nimport \"right.sol\"\n"
-                + "TextWriter(Stdio.stdout()).writeLine((shared::value()) .. (\" \") .. (shared::value(2)))");
+                + "solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((shared::value()) .. (\" \") .. (shared::value(2)))");
         assertThat(run(transpile("app.sol"), "merged-overloads")).isEqualTo("1 2\n");
     }
 
@@ -254,7 +254,7 @@ class ModuleMergeTest {
 
     @ParameterizedTest
     @ValueSource(strings = {
-            "TextWriter(Stdio.stdout()).writeLine((shared::secret()) .. \"\")",
+            "solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((shared::secret()) .. \"\")",
             "hidden := shared::Hidden()",
             "module shared { module child { pub func value() -> Integer { return shared::secret() } } }"
     })
@@ -282,7 +282,7 @@ class ModuleMergeTest {
     void module_reopening_does_not_discover_unimported_files() throws Exception {
         write("left.sol", "module shared { pub func value() -> Integer { return 1 } }");
         write("unimported.sol", "module shared { pub func extra() -> Integer { return 2 } }");
-        write("app.sol", "import \"left.sol\"\nTextWriter(Stdio.stdout()).writeLine((shared::extra()) .. \"\")");
+        write("app.sol", "import \"left.sol\"\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((shared::extra()) .. \"\")");
         assertThat(load("app.sol").programFileNames()).hasSize(2);
         assertThat(failure("app.sol")).contains("shared", "extra", "declares no type or function");
     }

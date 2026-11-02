@@ -37,7 +37,7 @@ class IndexAssignmentTest {
         assertAccepted("""
                 x := Integer[2] {1, 0}
                 x[0] = 2
-                TextWriter(Stdio.stdout()).writeLine((x[0]) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((x[0]) .. "")
                 """);
         assertAccepted("""
                 words := String[2] {"a", "b"}

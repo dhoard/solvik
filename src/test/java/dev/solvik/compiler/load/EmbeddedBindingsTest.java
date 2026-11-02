@@ -36,6 +36,10 @@ class EmbeddedBindingsTest {
     private static final String UUID_RESOURCE = "solvik/util/UUID.sol";
     private static final String TASK_RESOURCE = "solvik/concurrency/Task.sol";
     private static final String THREAD_RESOURCE = "solvik/concurrency/Thread.sol";
+    private static final List<String> IO_RESOURCES = List.of(
+            "solvik/io/ByteReader.sol", "solvik/io/ByteWriter.sol", "solvik/io/Channel.sol",
+            "solvik/io/File.sol", "solvik/io/IoError.sol", "solvik/io/Stdio.sol",
+            "solvik/io/TextReader.sol", "solvik/io/TextWriter.sol");
 
     @Test
     @DisplayName("each collection resource declares one native class binding")
@@ -157,7 +161,7 @@ class EmbeddedBindingsTest {
                 scores := solvik::collections::Map<String, Integer>()
                 if id != Null {
                     scores.put("ann", id.toString().size())
-                    TextWriter(Stdio.stdout()).writeLine((scores.get("ann")) .. (" ") .. (id.timestamp()))
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((scores.get("ann")) .. (" ") .. (id.timestamp()))
                 }
                 """, "t.sol");
         assertThat(diagnostics.all()).describedAs("%s", diagnostics.format("t.sol")).isEmpty();
@@ -174,7 +178,7 @@ class EmbeddedBindingsTest {
     @DisplayName("the packaged library loads before the program's own files")
     void packaged_resources_load_before_program_files() {
         Diagnostics diagnostics = new Diagnostics();
-        ProgramLoader.Loaded loaded = new ProgramLoader(diagnostics).loadSource("TextWriter(Stdio.stdout()).writeLine((1) .. \"\")\n", "t.sol");
+        ProgramLoader.Loaded loaded = new ProgramLoader(diagnostics).loadSource("solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1) .. \"\")\n", "t.sol");
         assertThat(diagnostics.all()).describedAs("%s", diagnostics.format("t.sol")).isEmpty();
         assertThat(loaded.fileNames()).startsWith(RESOURCES.toArray(String[]::new)).endsWith("t.sol");
         assertThat(loaded.fileNames()).contains(UUID_RESOURCE);
@@ -199,7 +203,7 @@ class EmbeddedBindingsTest {
         }
         assertThat(onDisk).isNotEmpty().contains(UUID_RESOURCE);
         ProgramLoader.Loaded loaded = new ProgramLoader(new Diagnostics())
-                .loadSource("TextWriter(Stdio.stdout()).writeLine((1) .. \"\")\n", "t.sol");
+                .loadSource("solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1) .. \"\")\n", "t.sol");
         assertThat(loaded.fileNames()).containsExactlyElementsOf(
                 Stream.concat(onDisk.stream(), Stream.of("t.sol")).toList());
     }
@@ -243,11 +247,11 @@ class EmbeddedBindingsTest {
     @DisplayName("a packaged resource is loaded once and keyed by its resource path")
     void packaged_sources_are_keyed_by_resource_path() {
         ProgramLoader.Loaded loaded = new ProgramLoader(new Diagnostics())
-                .loadSource("TextWriter(Stdio.stdout()).writeLine((1) .. \"\")\n", "t.sol");
+                .loadSource("solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1) .. \"\")\n", "t.sol");
         assertThat(loaded.sources().get(RESOURCES.get(1))).contains("pub type Map");
         assertThat(loaded.fingerprint()).contains(RESOURCES.get(1) + '\u0000'
                 + loaded.sources().get(RESOURCES.get(1)) + '\u0000');
-        assertThat(new ProgramLoader(new Diagnostics()).loadSource("TextWriter(Stdio.stdout()).writeLine((1) .. \"\")\n", "t.sol")
+        assertThat(new ProgramLoader(new Diagnostics()).loadSource("solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1) .. \"\")\n", "t.sol")
                 .fingerprint()).isEqualTo(loaded.fingerprint());
     }
 
@@ -255,7 +259,8 @@ class EmbeddedBindingsTest {
     @DisplayName("a packaged type is still named by its full path: nothing brings short names in")
     void packaged_types_stay_qualified() {
         for (String written : List.of("Map()", "collections::Map()", "util::UUID()",
-                "UUID()", "Map<String, Integer>()")) {
+                "UUID()", "Map<String, Integer>()", "TextWriter(Stdio.stdout())",
+                "Channel.bytes()", "io::TextWriter(io::Stdio.stdout())")) {
             assertThatThrownBy(() -> new SolvikCompiler("t.sol").transpile(
                     "value := " + written + "\n"))
                     .describedAs(written)
@@ -264,6 +269,36 @@ class EmbeddedBindingsTest {
         assertThat(new SolvikCompiler("t.sol").transpile(
                 "value := solvik::collections::Map<String, Integer>()\n"))
                 .containsKey("solvik/collections/Map.java");
+        assertThat(new SolvikCompiler("t.sol").transpile(
+                "out := solvik::io::TextWriter(solvik::io::Stdio.stdout())\n"))
+                .containsKeys("solvik/io/TextWriter.java", "solvik/io/Stdio.java",
+                        "solvik/io/Channel.java");
+    }
+
+    @Test
+    @DisplayName("the I/O resources declare public types in solvik::io")
+    void io_resources_declare_public_types_in_solvik_io() throws Exception {
+        for (String resource : IO_RESOURCES) {
+            try (var stream = getClass().getResourceAsStream("/" + resource)) {
+                assertThat(stream).describedAs(resource).isNotNull();
+                String source = new String(stream.readAllBytes(), StandardCharsets.UTF_8);
+                Diagnostics diagnostics = new Diagnostics();
+                Ast.Program program = new Parser(new Lexer(source, diagnostics, resource).tokenize(),
+                        diagnostics).parseProgram();
+                assertThat(diagnostics.all()).describedAs("%s", diagnostics.format(resource))
+                        .isEmpty();
+                assertThat(program.types()).as(resource).isEmpty();
+                assertThat(program.modules()).as(resource).hasSize(1);
+                Ast.ModuleDecl root = program.modules().getFirst();
+                assertThat(root.name()).as(resource).isEqualTo("solvik");
+                assertThat(root.modules()).as(resource).hasSize(1);
+                Ast.ModuleDecl io = root.modules().getFirst();
+                assertThat(io.name()).as(resource).isEqualTo("io");
+                assertThat(io.modules()).as(resource).isEmpty();
+                assertThat(io.types()).as(resource).hasSize(1);
+                assertThat(io.types().getFirst().isPublic()).as(resource).isTrue();
+            }
+        }
     }
 
     @Test
@@ -315,7 +350,7 @@ class EmbeddedBindingsTest {
     @Test
     void bundled_provenance_is_immutable_and_compares_module_identities() {
         ProgramLoader.Loaded loaded = new ProgramLoader(new Diagnostics())
-                .loadSource("TextWriter(Stdio.stdout()).writeLine((1) .. \"\")\n", "t.sol");
+                .loadSource("solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1) .. \"\")\n", "t.sol");
         Ast.ModuleDecl root = loaded.program().modules().getFirst();
         Ast.ModuleDecl copy = new Ast.ModuleDecl(root.name(), root.types(), root.functions(),
                 root.modules(), root.pos());
@@ -349,7 +384,7 @@ class EmbeddedBindingsTest {
 
     @Test
     void packaged_resources_remain_declaration_only() throws Exception {
-        for (String source : List.of("TextWriter(Stdio.stdout()).writeLine((1) .. \"\")\n", "import \"solvik/collections/Map.sol\"\n")) {
+        for (String source : List.of("solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1) .. \"\")\n", "import \"solvik/collections/Map.sol\"\n")) {
             assertThat(loadWithReplacedResource(RESOURCES.getFirst(), source))
                     .contains(ProgramLoader.STATEMENTS_IN_IMPORT, RESOURCES.getFirst());
         }
@@ -383,7 +418,7 @@ class EmbeddedBindingsTest {
                 return super.getResourceAsStream(name);
             }
         }) {
-            return loadProgram(loader, "TextWriter(Stdio.stdout()).writeLine((1) .. \"\")\n");
+            return loadProgram(loader, "solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1) .. \"\")\n");
         }
     }
 }

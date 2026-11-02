@@ -73,7 +73,7 @@ class MemberAccessTest {
 
     @Test
     void a_public_member_is_readable_from_outside() {
-        assertAccepted(ACCOUNT + "account := Account(\"bo\")\nTextWriter(Stdio.stdout()).writeLine((account.owner) .. \"\")\n");
+        assertAccepted(ACCOUNT + "account := Account(\"bo\")\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((account.owner) .. \"\")\n");
     }
 
     @Test
@@ -82,13 +82,13 @@ class MemberAccessTest {
                 account := Account("bo")
                 account.balance = 10
                 account.balance = account.balance + 1
-                TextWriter(Stdio.stdout()).writeLine((account.balance) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((account.balance) .. "")
                 """);
     }
 
     @Test
     void a_private_member_is_not_readable_or_writable_from_outside() {
-        assertRejected(ACCOUNT + "account := Account(\"bo\")\nTextWriter(Stdio.stdout()).writeLine((account.frozen) .. \"\")\n",
+        assertRejected(ACCOUNT + "account := Account(\"bo\")\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((account.frozen) .. \"\")\n",
                 TypeChecker.TYPE_ERROR);
         assertRejected(ACCOUNT + """
                 account := Account("bo")
@@ -99,7 +99,7 @@ class MemberAccessTest {
     @Test
     @DisplayName("pub without mut is readable but immutable from outside")
     void a_public_immutable_member_rejects_outside_writes() {
-        assertAccepted(ACCOUNT + "account := Account(\"bo\")\nTextWriter(Stdio.stdout()).writeLine((account.owner) .. \"\")\n");
+        assertAccepted(ACCOUNT + "account := Account(\"bo\")\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((account.owner) .. \"\")\n");
         assertRejected(ACCOUNT + """
                 account := Account("bo")
                 account.owner = "cy"
@@ -109,12 +109,12 @@ class MemberAccessTest {
     @Test
     @DisplayName("an immutable member may still be set while the constructor runs")
     void construction_may_set_any_member() {
-        assertAccepted(ACCOUNT + "TextWriter(Stdio.stdout()).writeLine((Account(\"bo\").owner) .. \"\")\n");
+        assertAccepted(ACCOUNT + "solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Account(\"bo\").owner) .. \"\")\n");
     }
 
     @Test
     void a_method_may_only_change_mutable_members() {
-        assertAccepted(ACCOUNT + "TextWriter(Stdio.stdout()).writeLine((Account(\"bo\").attempts()) .. \"\")\n");
+        assertAccepted(ACCOUNT + "solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Account(\"bo\").attempts()) .. \"\")\n");
         assertRejected("""
                 type Sealed {
                     state := 0
@@ -150,7 +150,7 @@ class MemberAccessTest {
         assertAccepted(tag + """
                 value := Tag()
                 value.label ..= "?"   // public and mutable, so it may be appended from outside
-                TextWriter(Stdio.stdout()).writeLine((value.label) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((value.label) .. "")
                 """);
         assertRejected(tag + """
                 value := Tag()
@@ -233,7 +233,7 @@ class MemberAccessTest {
                         return Factory()
                     }
                 }
-                TextWriter(Stdio.stdout()).writeLine((Factory().make().type()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Factory().make().type()) .. "")
                 """);
         // No constructor at all still means the type cannot be built.
         assertRejected("""
@@ -264,7 +264,7 @@ class MemberAccessTest {
                         return "widget"
                     }
                 }
-                TextWriter(Stdio.stdout()).writeLine((Widget()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Widget()) .. "")
                 """);
         assertRejected("""
                 type Widget {
@@ -312,7 +312,7 @@ class MemberAccessTest {
         assertAccepted(counter + """
                 mut counter := Counter("hits")
                 counter.add(2)
-                TextWriter(Stdio.stdout()).writeLine((counter.report()) .. (" ") .. (counter.doubled()))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((counter.report()) .. (" ") .. (counter.doubled()))
                 """);
     }
 
@@ -360,7 +360,7 @@ class MemberAccessTest {
 
                     pub func Holder() { }
                 }
-                TextWriter(Stdio.stdout()).writeLine((item) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((item) .. "")
                 """, TypeChecker.TYPE_ERROR);
     }
 
@@ -378,7 +378,7 @@ class MemberAccessTest {
                         return 1
                     }
                 }
-                TextWriter(Stdio.stdout()).writeLine((Quiet().open()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Quiet().open()) .. "")
                 """);
     }
 
@@ -393,7 +393,7 @@ class MemberAccessTest {
                     pub func T() { }
                     pub func f() {
                         y := 2
-                        TextWriter(Stdio.stdout()).writeLine((y) .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((y) .. "")
                     }
                 }
                 """).all()).isEmpty();
@@ -417,15 +417,15 @@ class MemberAccessTest {
 
     @Test
     void a_member_access_on_a_non_type_reports_a_type_error() {
-        assertRejected("a := 1\nTextWriter(Stdio.stdout()).writeLine((a.field) .. \"\")\n", TypeChecker.TYPE_ERROR);
-        assertRejected("items := Integer[1] {1}\nTextWriter(Stdio.stdout()).writeLine((items.field) .. \"\")\n",
+        assertRejected("a := 1\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((a.field) .. \"\")\n", TypeChecker.TYPE_ERROR);
+        assertRejected("items := Integer[1] {1}\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((items.field) .. \"\")\n",
                 TypeChecker.TYPE_ERROR);
     }
 
     @Test
     void an_unknown_member_names_both_the_type_and_the_field() {
         Diagnostics diagnostics = check(ACCOUNT + "account := Account(\"bo\")\n"
-                + "TextWriter(Stdio.stdout()).writeLine((account.nope) .. \"\")\n");
+                + "solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((account.nope) .. \"\")\n");
         assertThat(diagnostics.format("<t>"))
                 .contains("Account")
                 .contains("nope");

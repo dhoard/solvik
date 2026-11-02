@@ -54,9 +54,9 @@ class GenericsTest {
                 words := Box("text")
                 count := numbers.get()          // Integer?
                 if count != Null {
-                    TextWriter(Stdio.stdout()).writeLine((count + 1) .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((count + 1) .. "")
                 }
-                TextWriter(Stdio.stdout()).writeLine((words.get()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((words.get()) .. "")
                 """);
     }
 
@@ -130,7 +130,7 @@ class GenericsTest {
                 }
 
                 bag := Bag("a")
-                TextWriter(Stdio.stdout()).writeLine((bag.first(String[2] {"x", "y"})) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((bag.first(String[2] {"x", "y"})) .. "")
                 """);
     }
 
@@ -152,7 +152,7 @@ class GenericsTest {
                 }
 
                 pair := Pair(1, "one")
-                TextWriter(Stdio.stdout()).writeLine((pair.describe()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((pair.describe()) .. "")
                 """);
     }
 
@@ -161,12 +161,12 @@ class GenericsTest {
     void type_parameters_compose_with_other_types() {
         assertAccepted(BOX + """
                 boxes := Box(Box(1))
-                TextWriter(Stdio.stdout()).writeLine((boxes.get()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((boxes.get()) .. "")
 
                 list := Box(Byte[2] {1, 2})
                 mut values := list.get()        // Byte[2]?
                 if values != Null {
-                    TextWriter(Stdio.stdout()).writeLine((values.size) .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((values.size) .. "")
                 }
                 """);
     }
@@ -176,7 +176,7 @@ class GenericsTest {
         assertAccepted(BOX + """
                 values := Any[2] {Box(1), Box("x")}
                 for value in values {
-                    TextWriter(Stdio.stdout()).writeLine((value.type()) .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((value.type()) .. "")
                 }
                 """);
     }
@@ -240,7 +240,7 @@ class GenericsTest {
                     }
                 }
                 b := Box(1)
-                TextWriter(Stdio.stdout()).writeLine((b.peek() + 1) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((b.peek() + 1) .. "")
                 """);
     }
 
@@ -294,7 +294,7 @@ class GenericsTest {
                     }
                 }
                 bag := Bag(1)
-                TextWriter(Stdio.stdout()).writeLine((bag.first(Integer[2] {4, 5})) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((bag.first(Integer[2] {4, 5})) .. "")
                 """);
     }
 

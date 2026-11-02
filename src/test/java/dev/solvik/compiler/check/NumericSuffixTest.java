@@ -300,10 +300,10 @@ class NumericSuffixTest {
                     b := Byte(1)
                     switch b {
                         case 1B {
-                            TextWriter(Stdio.stdout()).writeLine(("one") .. "")
+                            solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("one") .. "")
                         }
                         case 127I {
-                            TextWriter(Stdio.stdout()).writeLine(("max") .. "")
+                            solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("max") .. "")
                         }
                     }
                     """);
@@ -311,7 +311,7 @@ class NumericSuffixTest {
                     n := 1
                     switch n {
                         case 1I {
-                            TextWriter(Stdio.stdout()).writeLine(("one") .. "")
+                            solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("one") .. "")
                         }
                     }
                     """);
@@ -323,7 +323,7 @@ class NumericSuffixTest {
                     n := 1
                     switch n {
                         case 1L {
-                            TextWriter(Stdio.stdout()).writeLine(("wide") .. "")
+                            solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("wide") .. "")
                         }
                     }
                     """)).containsExactly(TypeChecker.TYPE_ERROR);
@@ -331,7 +331,7 @@ class NumericSuffixTest {
                     n := 1
                     switch n {
                         case 1.5 {
-                            TextWriter(Stdio.stdout()).writeLine(("fraction") .. "")
+                            solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("fraction") .. "")
                         }
                     }
                     """)).containsExactly(TypeChecker.TYPE_ERROR);
@@ -344,10 +344,10 @@ class NumericSuffixTest {
                     n := 1
                     switch n {
                         case 1 {
-                            TextWriter(Stdio.stdout()).writeLine(("plain") .. "")
+                            solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("plain") .. "")
                         }
                         case 1I {
-                            TextWriter(Stdio.stdout()).writeLine(("suffixed") .. "")
+                            solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("suffixed") .. "")
                         }
                     }
                     """)).containsExactly(TypeChecker.TYPE_ERROR);

@@ -86,7 +86,7 @@ class DefaultTraitExecutionTest {
 
                 plain := Plain()
                 plain.empty()
-                TextWriter(Stdio.stdout()).writeLine((plain.label()) .. (" ") .. (show(plain)) .. (" ") .. (plain.format(7)) .. (" ") .. (plain.format("x")) .. (" ") .. (plain.classify("42")) .. (" ") .. (show(Custom())))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((plain.label()) .. (" ") .. (show(plain)) .. (" ") .. (plain.format(7)) .. (" ") .. (plain.format("x")) .. (" ") .. (plain.classify("42")) .. (" ") .. (show(Custom())))
                 """;
         Map<String, String> files = transpile(source);
         assertThat(files.get("Named.java"))
@@ -116,7 +116,7 @@ class DefaultTraitExecutionTest {
                         return "wrapped " .. FriendlyCloseable.description(self)
                     }
                 }
-                TextWriter(Stdio.stdout()).writeLine((Job().description()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Job().description()) .. "")
                 """;
         Map<String, String> files = transpile(source);
         assertThat(files.get("FriendlyCloseable.java"))
@@ -155,7 +155,7 @@ class DefaultTraitExecutionTest {
                     }
                 }
                 func delay(retry: Retry) -> Long { return retry.delayMs(2) }
-                TextWriter(Stdio.stdout()).writeLine((Backoff().delayMs(2)) .. (" ") .. (delay(Backoff())) .. (" ") .. (Combined().delayMs(2)))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Backoff().delayMs(2)) .. (" ") .. (delay(Backoff())) .. (" ") .. (Combined().delayMs(2)))
                 """;
         Map<String, String> files = transpile(source);
         assertThat(files.get("Backoff.java")).contains("Retry.$default$delayMs$0(this, attempt)");
@@ -183,7 +183,7 @@ class DefaultTraitExecutionTest {
                         return Pick.pick(self, Null) .. "/" .. Pick.pick(self, "x")
                     }
                 }
-                TextWriter(Stdio.stdout()).writeLine((Chooser().describe()) .. (" ") .. (Chooser().pick("y")))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Chooser().describe()) .. (" ") .. (Chooser().pick("y")))
                 """;
         Map<String, String> files = transpile(source);
         assertThat(files.get("Pick.java"))
@@ -214,7 +214,7 @@ class DefaultTraitExecutionTest {
                     }
                 }
                 word := contracts::Word("module")
-                TextWriter(Stdio.stdout()).writeLine((Echoer().echo(word).text) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Echoer().echo(word).text) .. "")
                 """;
         assertThat(output(source, directory)).isEqualTo("module\n");
     }

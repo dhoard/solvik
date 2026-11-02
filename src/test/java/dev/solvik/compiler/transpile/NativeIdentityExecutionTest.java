@@ -72,11 +72,11 @@ class NativeIdentityExecutionTest {
         String output = output("""
                 scores := solvik::collections::Map<String, Integer>()
                 scores.put("ann", 10)
-                TextWriter(Stdio.stdout()).writeLine((scores.type()) .. (" ") .. (scores.size()) .. (" ") .. (scores.get("ann")))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((scores.type()) .. (" ") .. (scores.size()) .. (" ") .. (scores.get("ann")))
 
                 plain := solvik::collections::Stack()
                 plain.push(3)
-                TextWriter(Stdio.stdout()).writeLine((plain.type()) .. (" ") .. (plain.pop()))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((plain.type()) .. (" ") .. (plain.pop()))
                 """, directory);
 
         assertThat(output).isEqualTo("Map<String, Integer> 1 10\nStack<Any> 3\n");
@@ -93,8 +93,8 @@ class NativeIdentityExecutionTest {
                 }
 
                 die := nat::Die()
-                TextWriter(Stdio.stdout()).writeLine((die.roll(1)) .. (" ") .. (die.type()))
-                TextWriter(Stdio.stdout()).writeLine((die.toString().startsWith("java.util.Random")) .. (" ") .. (die.equals(die)) .. (" ") .. (die.hashCode() == die.hashCode()))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((die.roll(1)) .. (" ") .. (die.type()))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((die.toString().startsWith("java.util.Random")) .. (" ") .. (die.equals(die)) .. (" ") .. (die.hashCode() == die.hashCode()))
                 """, directory);
 
         assertThat(output).isEqualTo("0 Die\ntrue true true\n");
@@ -119,10 +119,10 @@ class NativeIdentityExecutionTest {
                 bag := nat::Bag()
                 bag.add(7)
                 bag.add(8)
-                TextWriter(Stdio.stdout()).writeLine((bag.type()) .. (" ") .. (bag.hashCode()) .. (" ") .. (bag.toString().startsWith("[")))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((bag.type()) .. (" ") .. (bag.hashCode()) .. (" ") .. (bag.toString().startsWith("[")))
 
                 lines := nat::Lines("ff\\nrest")
-                TextWriter(Stdio.stdout()).writeLine((lines.type()) .. (" ") .. (lines.toString()))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((lines.type()) .. (" ") .. (lines.toString()))
                 """, directory);
 
         // hashCode() is the declared binding (ArrayList.size()) rather than an identity hash,
@@ -141,7 +141,7 @@ class NativeIdentityExecutionTest {
 
                 mut die: nat::Die? = nat::Die()
                 die = Null
-                TextWriter(Stdio.stdout()).writeLine((die) .. (" ") .. (die == Null) .. (" ") .. (Null == Null) .. (" ") .. (String(die)))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((die) .. (" ") .. (die == Null) .. (" ") .. (Null == Null) .. (" ") .. (String(die)))
                 """, directory);
 
         assertThat(output).isEqualTo("null true true null\n");
@@ -164,8 +164,8 @@ class NativeIdentityExecutionTest {
                 left.add(1)
                 right.add(1)
                 other.add(2)
-                TextWriter(Stdio.stdout()).writeLine((left.equals(right)) .. (" ") .. (left.equals(other)) .. (" ") .. (left.equals(left)) .. (" ") .. (left.equals("x")))
-                TextWriter(Stdio.stdout()).writeLine((left == right) .. (" ") .. (left == left))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((left.equals(right)) .. (" ") .. (left.equals(other)) .. (" ") .. (left.equals(left)) .. (" ") .. (left.equals("x")))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((left == right) .. (" ") .. (left == left))
                 """, directory);
 
         // The bridge hands the Java member the delegate of another value of the same binding, so
@@ -190,8 +190,8 @@ class NativeIdentityExecutionTest {
                 other := nat::Amount("2000")
                 ledger := solvik::collections::Map<nat::Amount, Integer>()
                 ledger.put(owed, 7)
-                TextWriter(Stdio.stdout()).writeLine((owed.equals(paid)) .. (" ") .. (owed.hashCode() == paid.hashCode()))
-                TextWriter(Stdio.stdout()).writeLine((ledger.get(paid)) .. (" ") .. (ledger.get(other)) .. (" ") .. (ledger.size()))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((owed.equals(paid)) .. (" ") .. (owed.hashCode() == paid.hashCode()))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((ledger.get(paid)) .. (" ") .. (ledger.get(other)) .. (" ") .. (ledger.size()))
                 """, directory);
 
         assertThat(output).isEqualTo("true true\n7 null 1\n");
@@ -207,7 +207,7 @@ class NativeIdentityExecutionTest {
                 }
 
                 die := nat::Die()
-                TextWriter(Stdio.stdout()).writeLine((die.type()) .. (" ") .. (die.hashCode()) .. (" ") .. (die.equals(die)))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((die.type()) .. (" ") .. (die.hashCode()) .. (" ") .. (die.equals(die)))
                 """);
 
         String program = PackagedLibrary.programClass(files);

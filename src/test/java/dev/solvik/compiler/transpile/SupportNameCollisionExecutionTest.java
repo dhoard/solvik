@@ -72,15 +72,15 @@ class SupportNameCollisionExecutionTest {
                 func toLong(value: Integer) -> Integer { return value + 1 }
                 func checked(value: Any) -> Any { return value }
 
-                TextWriter(Stdio.stdout()).writeLine((render("x")) .. "")
-                TextWriter(Stdio.stdout()).writeLine((toLong(1)) .. (" ") .. (checked("c")))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((render("x")) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((toLong(1)) .. (" ") .. (checked("c")))
 
                 // The support members still do their own work: rendering a dynamic value and an
                 // array of dynamic values must not call the user functions above.
                 number: Number = 5
-                TextWriter(Stdio.stdout()).writeLine((number) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((number) .. "")
                 values := Any[2] {1, "two"}
-                TextWriter(Stdio.stdout()).writeLine((values) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((values) .. "")
                 """, directory);
 
         assertThat(output).isEqualTo("""
@@ -103,7 +103,7 @@ class SupportNameCollisionExecutionTest {
                     pub func Helper() { }
                     static pub func render(value: Integer) -> String { return "static:" .. value }
                 }
-                TextWriter(Stdio.stdout()).writeLine((tools::plainText(1)) .. (" ") .. (Helper.render(2)))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((tools::plainText(1)) .. (" ") .. (Helper.render(2)))
                 """, directory);
 
         assertThat(output).isEqualTo("module:1 static:2\n");

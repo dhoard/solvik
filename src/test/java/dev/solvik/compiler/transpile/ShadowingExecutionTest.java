@@ -69,9 +69,9 @@ class ShadowingExecutionTest {
                 x := 1
                 {
                     x := 2
-                    TextWriter(Stdio.stdout()).writeLine(("inner ") .. (x))
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("inner ") .. (x))
                 }
-                TextWriter(Stdio.stdout()).writeLine(("outer ") .. (x))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("outer ") .. (x))
                 """, directory);
 
         assertThat(output).isEqualTo("inner 2\nouter 1\n");
@@ -83,13 +83,13 @@ class ShadowingExecutionTest {
                 x := 1
                 {
                     x := outer x + 1
-                    TextWriter(Stdio.stdout()).writeLine((x) .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((x) .. "")
                     {
                         x := outer x * 10
-                        TextWriter(Stdio.stdout()).writeLine((x) .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((x) .. "")
                     }
                 }
-                TextWriter(Stdio.stdout()).writeLine((x) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((x) .. "")
                 """, directory);
 
         // The inner block's `outer x` is the middle binding (2), not the outermost (1).
@@ -103,9 +103,9 @@ class ShadowingExecutionTest {
                 {
                     mut count := 10
                     outer count = outer count + 1
-                    TextWriter(Stdio.stdout()).writeLine(("inner ") .. (count))
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("inner ") .. (count))
                 }
-                TextWriter(Stdio.stdout()).writeLine(("outer ") .. (count))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("outer ") .. (count))
                 """, directory);
 
         assertThat(output).isEqualTo("inner 10\nouter 1\n");
@@ -118,9 +118,9 @@ class ShadowingExecutionTest {
                 value := 1
                 {
                     value := "text"
-                    TextWriter(Stdio.stdout()).writeLine((value) .. (" ") .. (value.type()))
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((value) .. (" ") .. (value.type()))
                 }
-                TextWriter(Stdio.stdout()).writeLine((value) .. (" ") .. (value.type()))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((value) .. (" ") .. (value.type()))
                 """, directory);
 
         assertThat(output).isEqualTo("text String\n1 Integer\n");
@@ -135,12 +135,12 @@ class ShadowingExecutionTest {
                         return item .. " over " .. outer item
                     }
                 }
-                TextWriter(Stdio.stdout()).writeLine((show(3)) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((show(3)) .. "")
 
                 items := Integer[2] {1, 2}
                 for item in items {
                     item := item * 100
-                    TextWriter(Stdio.stdout()).writeLine((item) .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((item) .. "")
                 }
                 """, directory);
 
@@ -154,9 +154,9 @@ class ShadowingExecutionTest {
                 slot = 5
                 {
                     mut slot := 9
-                    TextWriter(Stdio.stdout()).writeLine((slot) .. (" ") .. (outer slot))
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((slot) .. (" ") .. (outer slot))
                 }
-                TextWriter(Stdio.stdout()).writeLine((slot) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((slot) .. "")
                 """, directory);
 
         assertThat(output).isEqualTo("9 5\n5\n");
@@ -189,7 +189,7 @@ class ShadowingExecutionTest {
 
                 counter := Counter()
                 counter.add(10)      // adds 11 then 10
-                TextWriter(Stdio.stdout()).writeLine((counter.report()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((counter.report()) .. "")
                 """, directory);
 
         assertThat(output).isEqualTo("total 21\n");
@@ -202,13 +202,13 @@ class ShadowingExecutionTest {
                 base := 0
                 {
                     base := 1
-                    TextWriter(Stdio.stdout()).writeLine((base) .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((base) .. "")
                 }
                 {
                     base := 2
-                    TextWriter(Stdio.stdout()).writeLine((base) .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((base) .. "")
                 }
-                TextWriter(Stdio.stdout()).writeLine((base) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((base) .. "")
                 """, directory);
 
         assertThat(output).isEqualTo("1\n2\n0\n");

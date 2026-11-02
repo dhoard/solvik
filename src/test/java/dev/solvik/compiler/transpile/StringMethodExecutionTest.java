@@ -61,11 +61,11 @@ class StringMethodExecutionTest {
     void size_and_the_three_strips_are_measured(@TempDir Path directory) throws Exception {
         String output = run("""
                 text := "  padded  "
-                TextWriter(Stdio.stdout()).writeLine((text.size()) .. "")
-                TextWriter(Stdio.stdout()).writeLine(("[" .. text.strip() .. "]") .. "")
-                TextWriter(Stdio.stdout()).writeLine(("[" .. text.stripLeading() .. "]") .. "")
-                TextWriter(Stdio.stdout()).writeLine(("[" .. text.stripTrailing() .. "]") .. "")
-                TextWriter(Stdio.stdout()).writeLine(("[" .. "   ".strip() .. "]") .. (" ") .. ("   ".strip().size()))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((text.size()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("[" .. text.strip() .. "]") .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("[" .. text.stripLeading() .. "]") .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("[" .. text.stripTrailing() .. "]") .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("[" .. "   ".strip() .. "]") .. (" ") .. ("   ".strip().size()))
                 """, directory);
 
         assertThat(output).isEqualTo("""
@@ -81,11 +81,11 @@ class StringMethodExecutionTest {
     void case_and_replace_work_on_the_whole_text(@TempDir Path directory) throws Exception {
         String output = run("""
                 text := "Hello, World"
-                TextWriter(Stdio.stdout()).writeLine((text.toUpperCase()) .. "")
-                TextWriter(Stdio.stdout()).writeLine((text.toLowerCase()) .. "")
-                TextWriter(Stdio.stdout()).writeLine((text.replace("World", "Solvik")) .. "")
-                TextWriter(Stdio.stdout()).writeLine((text.replace(",", "")) .. "")
-                TextWriter(Stdio.stdout()).writeLine(("no match: ") .. (text.replace("zzz", "y")))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((text.toUpperCase()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((text.toLowerCase()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((text.replace("World", "Solvik")) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((text.replace(",", "")) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("no match: ") .. (text.replace("zzz", "y")))
                 """, directory);
 
         assertThat(output).isEqualTo("""
@@ -101,10 +101,10 @@ class StringMethodExecutionTest {
     void substring_takes_a_start_and_an_optional_end(@TempDir Path directory) throws Exception {
         String output = run("""
                 text := "abcdef"
-                TextWriter(Stdio.stdout()).writeLine((text.substring(2)) .. "")
-                TextWriter(Stdio.stdout()).writeLine((text.substring(2, 4)) .. "")
-                TextWriter(Stdio.stdout()).writeLine(("[" .. text.substring(6) .. "]") .. "")
-                TextWriter(Stdio.stdout()).writeLine(("[" .. text.substring(0, 0) .. "]") .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((text.substring(2)) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((text.substring(2, 4)) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("[" .. text.substring(6) .. "]") .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("[" .. text.substring(0, 0) .. "]") .. "")
                 """, directory);
 
         assertThat(output).isEqualTo("cdef\ncd\n[]\n[]\n");
@@ -115,10 +115,10 @@ class StringMethodExecutionTest {
     void searching(@TempDir Path directory) throws Exception {
         String output = run("""
                 text := "banana"
-                TextWriter(Stdio.stdout()).writeLine((text.indexOf("an")) .. (" ") .. (text.indexOf("na")) .. (" ") .. (text.indexOf("zz")))
-                TextWriter(Stdio.stdout()).writeLine((text.contains("nan")) .. (" ") .. (text.contains("zz")))
-                TextWriter(Stdio.stdout()).writeLine((text.startsWith("ban")) .. (" ") .. (text.startsWith("nan")))
-                TextWriter(Stdio.stdout()).writeLine((text.endsWith("ana")) .. (" ") .. (text.endsWith("ban")))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((text.indexOf("an")) .. (" ") .. (text.indexOf("na")) .. (" ") .. (text.indexOf("zz")))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((text.contains("nan")) .. (" ") .. (text.contains("zz")))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((text.startsWith("ban")) .. (" ") .. (text.startsWith("nan")))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((text.endsWith("ana")) .. (" ") .. (text.endsWith("ban")))
                 """, directory);
 
         assertThat(output).isEqualTo("1 2 -1\ntrue false\ntrue false\ntrue false\n");
@@ -129,13 +129,13 @@ class StringMethodExecutionTest {
     void splitting(@TempDir Path directory) throws Exception {
         String output = run("""
                 parts := "a,b,,c".split(",")
-                TextWriter(Stdio.stdout()).writeLine((parts.size) .. (" ") .. (parts[0]) .. ("|") .. (parts[1]) .. ("|") .. (parts[2]) .. ("|") .. (parts[3]))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((parts.size) .. (" ") .. (parts[0]) .. ("|") .. (parts[1]) .. ("|") .. (parts[2]) .. ("|") .. (parts[3]))
                 trailing := "a,".split(",")
-                TextWriter(Stdio.stdout()).writeLine((trailing.size) .. (" [") .. (trailing[1]) .. ("]"))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((trailing.size) .. (" [") .. (trailing[1]) .. ("]"))
                 literal := "a.b".split(".")
-                TextWriter(Stdio.stdout()).writeLine((literal.size) .. (" ") .. (literal[0]) .. ("|") .. (literal[1]))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((literal.size) .. (" ") .. (literal[0]) .. ("|") .. (literal[1]))
                 none := "abc".split(",")
-                TextWriter(Stdio.stdout()).writeLine((none.size) .. (" ") .. (none[0]))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((none.size) .. (" ") .. (none[0]))
                 """, directory);
 
         assertThat(output).isEqualTo("""
@@ -152,12 +152,12 @@ class StringMethodExecutionTest {
         String output = run("""
                 words := "one two three".split(" ")
                 for word in words {
-                    TextWriter(Stdio.stdout()).write((word.toUpperCase()) .. ("-"))
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).write((word.toUpperCase()) .. ("-"))
                 }
-                TextWriter(Stdio.stdout()).writeLine("")
-                TextWriter(Stdio.stdout()).writeLine((words[1]) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((words[1]) .. "")
                 words[1] = words[1].replace("w", "W")
-                TextWriter(Stdio.stdout()).writeLine((words[1]) .. (" ") .. (words.size))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((words[1]) .. (" ") .. (words.size))
                 """, directory);
 
         assertThat(output).isEqualTo("ONE-TWO-THREE-\ntwo\ntWo 3\n");
@@ -166,15 +166,15 @@ class StringMethodExecutionTest {
     @Test
     void string_methods_chain_and_compose_with_switch(@TempDir Path directory) throws Exception {
         String output = run("""
-                TextWriter(Stdio.stdout()).writeLine((" a b ".strip().split(" ")[1].toUpperCase()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((" a b ".strip().split(" ")[1].toUpperCase()) .. "")
 
                 path := "/api/users/42"
                 switch path.substring(path.indexOf("/users/") + 7) {
                     case "42" {
-                        TextWriter(Stdio.stdout()).writeLine(("the answer") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("the answer") .. "")
                     }
                     default {
-                        TextWriter(Stdio.stdout()).writeLine(("something else") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("something else") .. "")
                     }
                 }
                 """, directory);
@@ -188,18 +188,18 @@ class StringMethodExecutionTest {
         assertThat(abortCode("""
                 text := "abc"
                 index := 9
-                TextWriter(Stdio.stdout()).writeLine((text.substring(index)) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((text.substring(index)) .. "")
                 """, directory)).isEqualTo("SOL-R009");
 
         assertThat(abortCode("""
                 text := "abc"
-                TextWriter(Stdio.stdout()).writeLine((text.substring(2, 1)) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((text.substring(2, 1)) .. "")
                 """, directory)).isEqualTo("SOL-R009");
 
         assertThat(abortCode("""
                 text := "abc"
                 separator := ""
-                TextWriter(Stdio.stdout()).writeLine((text.split(separator)) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((text.split(separator)) .. "")
                 """, directory)).isEqualTo("SOL-R010");
     }
 

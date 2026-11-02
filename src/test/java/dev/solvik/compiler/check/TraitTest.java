@@ -119,7 +119,7 @@ class TraitTest {
                     pub func name() -> String { return "job" }
                 }
                 job := Job()
-                TextWriter(Stdio.stdout()).writeLine((job.label()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((job.label()) .. "")
                 """);
     }
 
@@ -129,7 +129,7 @@ class TraitTest {
                 trait DefaultName { pub func name() -> String { return "default" } }
                 trait NeedsName { pub func name() -> String }
                 type Job implements DefaultName, NeedsName { pub func Job() { } }
-                TextWriter(Stdio.stdout()).writeLine((Job().name()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Job().name()) .. "")
                 """);
         assertThat(check("""
                 trait First { pub func name() -> String { return "first" } }
@@ -157,7 +157,7 @@ class TraitTest {
                 type Both implements Left, Right { pub func Both() { } }
                 """).format("<t>")).contains("incompatible returns");
         assertThat(check("""
-                trait Work { pub func run() { TextWriter(Stdio.stdout()).writeLine((self.missing) .. "") } }
+                trait Work { pub func run() { solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((self.missing) .. "") } }
                 """).all()).isNotEmpty();
         assertThat(check("""
                 trait Work { pub func run() { } }
@@ -200,7 +200,7 @@ class TraitTest {
         assertThat(check("""
                 trait Retry { pub func delay(attempt: Integer) -> Long { return Long(attempt) } }
                 type Backoff implements Retry { pub func Backoff() { } }
-                TextWriter(Stdio.stdout()).writeLine((Retry.delay(Backoff(), 1)) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Retry.delay(Backoff(), 1)) .. "")
                 """).format("<t>")).contains("valid only in an instance function");
         assertThat(check("""
                 trait Retry { pub func delay(attempt: Integer) -> Long { return Long(attempt) } }

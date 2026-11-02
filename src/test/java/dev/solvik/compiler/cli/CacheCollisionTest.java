@@ -73,8 +73,8 @@ class CacheCollisionTest {
     @Test
     @DisplayName("same file name in different directories with different content never collide")
     void same_name_different_content() throws IOException {
-        Path first = write("a/demo.sol", "TextWriter(Stdio.stdout()).writeLine((\"from a\") .. \"\")\n");
-        Path second = write("b/demo.sol", "TextWriter(Stdio.stdout()).writeLine((\"from b\") .. \"\")\n");
+        Path first = write("a/demo.sol", "solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((\"from a\") .. \"\")\n");
+        Path second = write("b/demo.sol", "solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((\"from b\") .. \"\")\n");
 
         assertThat(run(first)).isZero();
         assertThat(run(second)).isZero();
@@ -91,8 +91,8 @@ class CacheCollisionTest {
     @Test
     @DisplayName("identical text at different paths gets its own entry, because imports are relative")
     void same_content_different_path() throws IOException {
-        Path first = write("a/demo.sol", "TextWriter(Stdio.stdout()).writeLine((\"same\") .. \"\")\n");
-        Path second = write("b/demo.sol", "TextWriter(Stdio.stdout()).writeLine((\"same\") .. \"\")\n");
+        Path first = write("a/demo.sol", "solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((\"same\") .. \"\")\n");
+        Path second = write("b/demo.sol", "solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((\"same\") .. \"\")\n");
 
         assertThat(run(first)).isZero();
         assertThat(run(second)).isZero();
@@ -105,9 +105,9 @@ class CacheCollisionTest {
     @Test
     @DisplayName("a changed file under the same name gets its own entry")
     void same_name_changed_content() throws IOException {
-        Path source = write("demo.sol", "TextWriter(Stdio.stdout()).writeLine((1) .. \"\")\n");
+        Path source = write("demo.sol", "solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1) .. \"\")\n");
         assertThat(run(source)).isZero();
-        Files.writeString(source, "TextWriter(Stdio.stdout()).writeLine((2) .. \"\")\n", StandardCharsets.UTF_8);
+        Files.writeString(source, "solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((2) .. \"\")\n", StandardCharsets.UTF_8);
         assertThat(run(source)).isZero();
 
         assertThat(entries()).hasSize(2);
@@ -123,7 +123,7 @@ class CacheCollisionTest {
                     total = total + i
                     i = i + 1
                 }
-                TextWriter(Stdio.stdout()).writeLine(("total=") .. (total))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("total=") .. (total))
                 """);
         String expected = "total=499500\n";
 

@@ -150,21 +150,21 @@ class TypeCheckerTest {
                         return -1
                     }
                     func announce() {
-                        TextWriter(Stdio.stdout()).writeLine(("before") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("before") .. "")
                         return
                     }
-                    TextWriter(Stdio.stdout()).writeLine((early(20, Integer[2] {20, 30})) .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((early(20, Integer[2] {20, 30})) .. "")
                     announce()
                     """);
         }
 
         @Test
         void return_outside_a_function_and_unreachable_code_are_rejected() {
-            assertThat(codes("TextWriter(Stdio.stdout()).writeLine((1) .. \"\")\nreturn")).contains(TypeChecker.RETURN_OUTSIDE_FUNCTION);
+            assertThat(codes("solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1) .. \"\")\nreturn")).contains(TypeChecker.RETURN_OUTSIDE_FUNCTION);
             assertThat(codes("""
                     func f() {
                         return
-                        TextWriter(Stdio.stdout()).writeLine((1) .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1) .. "")
                     }
                     """)).contains(TypeChecker.UNREACHABLE);
         }
@@ -198,8 +198,8 @@ class TypeCheckerTest {
 
         @Test
         void output_calls_accept_any_values_and_null() {
-            assertClean("TextWriter(Stdio.stdout()).writeLine((1) .. \"\")\nTextWriter(Stdio.stdout()).writeLine((\"a\") .. (2) .. (true))\nTextWriter(Stdio.stdout()).write(\"\")\nTextWriter(Stdio.stdout()).writeLine((Null) .. \"\")");
-            assertClean("x: String? = Null\nTextWriter(Stdio.stdout()).writeLine((x) .. \"\")");
+            assertClean("solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1) .. \"\")\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((\"a\") .. (2) .. (true))\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).write(\"\")\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Null) .. \"\")");
+            assertClean("x: String? = Null\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((x) .. \"\")");
         }
     }
 
@@ -273,7 +273,7 @@ class TypeCheckerTest {
             assertClean("""
                     bytes := Byte[2] {1, 2}
                     for b in bytes {
-                        TextWriter(Stdio.stdout()).writeLine((b) .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((b) .. "")
                     }
                     """);
         }

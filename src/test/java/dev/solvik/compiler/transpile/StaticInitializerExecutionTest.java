@@ -93,11 +93,11 @@ class StaticInitializerExecutionTest {
                     }
                 }
 
-                TextWriter(Stdio.stdout()).writeLine("before=" .. Log.text)
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("before=" .. Log.text)
                 unused: LazyProbe? = Null
-                TextWriter(Stdio.stdout()).writeLine("afterMention=" .. Log.text)
-                TextWriter(Stdio.stdout()).writeLine("ordered=" .. Ordered.state())
-                TextWriter(Stdio.stdout()).writeLine("again=" .. Ordered.state())
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("afterMention=" .. Log.text)
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("ordered=" .. Ordered.state())
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("again=" .. Ordered.state())
                 """, directory);
 
         assertThat(output).isEqualTo("""
@@ -129,8 +129,8 @@ class StaticInitializerExecutionTest {
                 }
 
                 instance := Constructed()
-                TextWriter(Stdio.stdout()).writeLine("constructed=" .. instance.isReady())
-                TextWriter(Stdio.stdout()).writeLine("field=" .. FieldReady.value)
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("constructed=" .. instance.isReady())
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("field=" .. FieldReady.value)
                 """, directory);
 
         assertThat(output).isEqualTo("constructed=true\nfield=9\n");
@@ -152,7 +152,7 @@ class StaticInitializerExecutionTest {
                     }
                 }
 
-                TextWriter(Stdio.stdout()).writeLine("state=" .. Ordered.state())
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("state=" .. Ordered.state())
                 """, directory);
 
         assertThat(output).isEqualTo("state=a|a|ab\n");
@@ -179,7 +179,7 @@ class StaticInitializerExecutionTest {
                     }
                 }
 
-                TextWriter(Stdio.stdout()).writeLine("total=" .. Scoped.now())
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("total=" .. Scoped.now())
                 """, directory);
 
         assertThat(output).isEqualTo("total=3\n");
@@ -207,7 +207,7 @@ class StaticInitializerExecutionTest {
                     }
                 }
 
-                TextWriter(Stdio.stdout()).writeLine("singleton=" .. Config.current().name)
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("singleton=" .. Config.current().name)
                 """, directory);
 
         assertThat(output).isEqualTo("singleton=configured\n");
@@ -230,7 +230,7 @@ class StaticInitializerExecutionTest {
                     }
                 }
 
-                TextWriter(Stdio.stdout()).writeLine("code=" .. Codes.current())
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("code=" .. Codes.current())
                 """, directory);
 
         assertThat(output).isEqualTo("code=7\n");
@@ -251,7 +251,7 @@ class StaticInitializerExecutionTest {
                     }
                 }
 
-                TextWriter(Stdio.stdout()).writeLine("forward=" .. Forward.state())
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("forward=" .. Forward.state())
                 """, directory);
 
         assertThat(output).isEqualTo("forward=null\n");

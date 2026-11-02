@@ -86,13 +86,13 @@ class LanguageConsistencyExecutionTest {
                 message := "a"
                 \\ .. "b"
                 \\ .. "c"
-                TextWriter(Stdio.stdout()).writeLine((message) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((message) .. "")
 
                 mut total := 0
                 total = 1
                 \\ + 2
                 \\ + 3
-                TextWriter(Stdio.stdout()).writeLine((total) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((total) .. "")
 
                 greeting := "hello"
                 // a comment line, a blank line, a marker-only line, then the rest
@@ -100,7 +100,7 @@ class LanguageConsistencyExecutionTest {
                 \\
                 \\ .. " "
                 \\ .. "world"
-                TextWriter(Stdio.stdout()).writeLine((greeting) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((greeting) .. "")
                 """, "abc\n6\nhello world\n", directory);
     }
 
@@ -109,16 +109,16 @@ class LanguageConsistencyExecutionTest {
             throws Exception {
         output("""
                 func boxed(x: Any, y: Any) -> Boolean { return x.equals(y) }
-                TextWriter(Stdio.stdout()).writeLine((1.equals(1.0)) .. (" ") .. (Float("NaN").equals(Float("NaN"))) .. (" ") .. (Double("-0.0").equals(0.0)))
-                TextWriter(Stdio.stdout()).writeLine((boxed(1, 1.0)) .. (" ") .. (boxed(Float("NaN"), Float("NaN"))) .. (" ") .. (boxed(Double("-0.0"), 0.0)))
-                TextWriter(Stdio.stdout()).writeLine((1 == 1.0) .. (" ") .. (1 === 1.0))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1.equals(1.0)) .. (" ") .. (Float("NaN").equals(Float("NaN"))) .. (" ") .. (Double("-0.0").equals(0.0)))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((boxed(1, 1.0)) .. (" ") .. (boxed(Float("NaN"), Float("NaN"))) .. (" ") .. (boxed(Double("-0.0"), 0.0)))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1 == 1.0) .. (" ") .. (1 === 1.0))
                 left := Integer[1] {1}
                 right := Integer[1] {1}
-                TextWriter(Stdio.stdout()).writeLine((left.equals(left)) .. (" ") .. (left.equals(right)) .. (" ") .. (boxed(left, right)))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((left.equals(left)) .. (" ") .. (left.equals(right)) .. (" ") .. (boxed(left, right)))
                 mut empty: Integer? = 1
                 empty = Null
-                TextWriter(Stdio.stdout()).writeLine((empty == Null) .. (" ") .. (empty == 1) .. (" ") .. (Null == Null))
-                TextWriter(Stdio.stdout()).writeLine((BigDecimal("1.0").equals(BigDecimal("1.00"))) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((empty == Null) .. (" ") .. (empty == 1) .. (" ") .. (Null == Null))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((BigDecimal("1.0").equals(BigDecimal("1.00"))) .. "")
                 """, "false true false\nfalse true false\ntrue false\ntrue false false\ntrue false true\nfalse\n",
                 directory);
     }
@@ -127,20 +127,20 @@ class LanguageConsistencyExecutionTest {
     void equality_uses_the_promoted_float_carrier(@TempDir Path directory)
             throws Exception {
         output("""
-                TextWriter(Stdio.stdout()).writeLine((Float(16777216) == 16777217) .. (" ") .. (Float(16777216) >= 16777217) .. (" ") .. (Float(16777216) != 16777217))
-                TextWriter(Stdio.stdout()).writeLine((Float("9007199254740992") == Long("9007199254740993")) .. "")
-                TextWriter(Stdio.stdout()).writeLine((Double(16777216) == 16777217) .. "")
-                TextWriter(Stdio.stdout()).writeLine((Float("NaN") == Float("NaN")) .. (" ") .. (Float("-0.0") == Float("0.0")))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Float(16777216) == 16777217) .. (" ") .. (Float(16777216) >= 16777217) .. (" ") .. (Float(16777216) != 16777217))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Float("9007199254740992") == Long("9007199254740993")) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Double(16777216) == 16777217) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Float("NaN") == Float("NaN")) .. (" ") .. (Float("-0.0") == Float("0.0")))
                 mut missing: Float? = Float(1)
                 missing = Null
-                TextWriter(Stdio.stdout()).writeLine((missing == Null) .. (" ") .. (missing == Float(1)) .. (" ") .. (missing == missing))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((missing == Null) .. (" ") .. (missing == Float(1)) .. (" ") .. (missing == missing))
                 func next(state: Integer[], value: Integer) -> Float {
                     state[0] = state[0] + 1
-                    TextWriter(Stdio.stdout()).write((value) .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).write((value) .. "")
                     return Float(value)
                 }
                 state := Integer[1] {0}
-                TextWriter(Stdio.stdout()).writeLine((next(state, 1) == next(state, 2)) .. (" ") .. (state[0]))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((next(state, 1) == next(state, 2)) .. (" ") .. (state[0]))
                 """, "true true false\ntrue\nfalse\nfalse true\ntrue false true\n12false 2\n", directory);
     }
 
@@ -150,7 +150,7 @@ class LanguageConsistencyExecutionTest {
         output("""
                 type Item<T> {
                     pub func Item(seed: T) {}
-                    pub func equals(other: Any?) -> Boolean { TextWriter(Stdio.stdout()).write(("equals:") .. ""); return true }
+                    pub func equals(other: Any?) -> Boolean { solvik::io::TextWriter(solvik::io::Stdio.stdout()).write(("equals:") .. ""); return true }
                     pub func hashCode() -> Integer { return 17 }
                     pub func toString() -> String { return "item" }
                 }
@@ -158,12 +158,12 @@ class LanguageConsistencyExecutionTest {
                 func boxed(x: Any, y: Any) -> Boolean { return x.equals(y) }
                 a := Item(1)
                 b := Item(2)
-                TextWriter(Stdio.stdout()).writeLine((a == b) .. (" ") .. (a === b) .. (" ") .. (a == a) .. (" ") .. (same(a, b)))
-                TextWriter(Stdio.stdout()).writeLine((a.equals(b)) .. (" ") .. (boxed(a, b)) .. (" ") .. (a.equals(a)) .. (" ") .. (a.hashCode()) .. (" ") .. (a))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((a == b) .. (" ") .. (a === b) .. (" ") .. (a == a) .. (" ") .. (same(a, b)))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((a.equals(b)) .. (" ") .. (boxed(a, b)) .. (" ") .. (a.equals(a)) .. (" ") .. (a.hashCode()) .. (" ") .. (a))
                 func hashCode() -> Integer? { return Null }
                 func equals(value: Any?) -> Boolean? { return Null }
                 module names { pub func toString() -> String? { return Null } }
-                TextWriter(Stdio.stdout()).writeLine((hashCode()) .. (" ") .. (equals(1)) .. (" ") .. (names::toString()))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((hashCode()) .. (" ") .. (equals(1)) .. (" ") .. (names::toString()))
                 """, "false false true false\nequals:equals:equals:true true true 17 item\nnull null null\n", directory);
     }
 
@@ -187,7 +187,7 @@ class LanguageConsistencyExecutionTest {
                     }
 
                     pub func equals(other: Any?) -> Boolean {
-                        TextWriter(Stdio.stdout()).write(("body:") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).write(("body:") .. "")
                         return other.has(self.value) && self.has(other.value)
                     }
                 }
@@ -197,8 +197,8 @@ class LanguageConsistencyExecutionTest {
                 different := Box(2)
                 other := Other()
                 func stop() { exit(0) } // emits the serializable Exit support without invoking it
-                TextWriter(Stdio.stdout()).writeLine((one == other) .. (" ") .. (one.equals(other)))
-                TextWriter(Stdio.stdout()).writeLine((one.equals(same)) .. (" ") .. (one.equals(different)) .. (" ") .. (one.equals("not a box")) .. (" ") .. (one.equals(Null)))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((one == other) .. (" ") .. (one.equals(other)))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((one.equals(same)) .. (" ") .. (one.equals(different)) .. (" ") .. (one.equals("not a box")) .. (" ") .. (one.equals(Null)))
                 """, "false false\nbody:body:true false false false\n", directory);
     }
 
@@ -206,7 +206,7 @@ class LanguageConsistencyExecutionTest {
     void null_is_rejected_by_conversion_and_by_the_object_contract_signatures() {
         assertThatThrownBy(() -> transpile("""
                 func missing() -> Boolean? { return Null }
-                TextWriter(Stdio.stdout()).writeLine((Boolean(missing())) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Boolean(missing())) .. "")
                 """)).isInstanceOf(SolvikCompiler.CompilationFailure.class)
                 .hasMessageContaining(TypeChecker.TYPE_ERROR);
 
@@ -215,7 +215,7 @@ class LanguageConsistencyExecutionTest {
                     ? "pub func hashCode() -> Integer? { return Null }"
                     : "pub func equals(other: Any?) -> Boolean? { return Null }";
             assertThatThrownBy(() -> transpile("type Item { pub func Item() {}\n" + declaration
-                    + " }\nTextWriter(Stdio.stdout()).writeLine((Item()." + method
+                    + " }\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Item()." + method
                     + "(Item())) .. \"\")"))
                     .isInstanceOf(SolvikCompiler.CompilationFailure.class)
                     .hasMessageContaining(TypeChecker.TYPE_ERROR);
@@ -234,7 +234,7 @@ class LanguageConsistencyExecutionTest {
                 func same(x: Any, y: Any) -> Boolean { return x == y }
                 a := Text()
                 b := Text()
-                TextWriter(Stdio.stdout()).writeLine((a.equals("")) .. (" ") .. (a.hashCode()) .. (" ") .. (a == b) .. (" ") .. (a === b) .. (" ") .. (same(a, "")))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((a.equals("")) .. (" ") .. (a.hashCode()) .. (" ") .. (a == b) .. (" ") .. (a === b) .. (" ") .. (same(a, "")))
                 """, "true 0 false false false\n", directory);
     }
 
@@ -242,16 +242,16 @@ class LanguageConsistencyExecutionTest {
     void numeric_array_literals_use_context_for_sign_and_range(@TempDir Path directory)
             throws Exception {
         output("""
-                TextWriter(Stdio.stdout()).writeLine((Byte[3] {-128, -1, 127}) .. "")
-                TextWriter(Stdio.stdout()).writeLine((Short[3] {-32768, -1, 32767}) .. "")
-                TextWriter(Stdio.stdout()).writeLine((Integer[2] {-2147483648, 2147483647}) .. "")
-                TextWriter(Stdio.stdout()).writeLine((Long[3] {-9223372036854775808, -2147483648, 9223372036854775807}) .. "")
-                TextWriter(Stdio.stdout()).writeLine((BigInteger[2] {-999999999999999999999, 999999999999999999999}) .. "")
-                TextWriter(Stdio.stdout()).writeLine((BigDecimal[2] {-999999999999999999999, -1.50}) .. "")
-                TextWriter(Stdio.stdout()).writeLine((Float[2] {-1.5, -0.0}) .. "")
-                TextWriter(Stdio.stdout()).writeLine((Double[2] {-1.5, -0.0}) .. "")
-                TextWriter(Stdio.stdout()).writeLine((Byte?[2] {- -1}) .. "")
-                TextWriter(Stdio.stdout()).writeLine((Long[][1] {Long[1] {2147483648}}) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Byte[3] {-128, -1, 127}) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Short[3] {-32768, -1, 32767}) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Integer[2] {-2147483648, 2147483647}) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Long[3] {-9223372036854775808, -2147483648, 9223372036854775807}) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((BigInteger[2] {-999999999999999999999, 999999999999999999999}) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((BigDecimal[2] {-999999999999999999999, -1.50}) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Float[2] {-1.5, -0.0}) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Double[2] {-1.5, -0.0}) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Byte?[2] {- -1}) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Long[][1] {Long[1] {2147483648}}) .. "")
                 """, """
                 [-128, -1, 127]
                 [-32768, -1, 32767]
@@ -272,10 +272,10 @@ class LanguageConsistencyExecutionTest {
         output("""
                 func describe(value: Byte) {
                     switch value {
-                        case -128 { TextWriter(Stdio.stdout()).writeLine(("min") .. "") }
-                        case -1 { TextWriter(Stdio.stdout()).writeLine(("negative") .. "") }
-                        case 127 { TextWriter(Stdio.stdout()).writeLine(("max") .. "") }
-                        default { TextWriter(Stdio.stdout()).writeLine(("other") .. "") }
+                        case -128 { solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("min") .. "") }
+                        case -1 { solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("negative") .. "") }
+                        case 127 { solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("max") .. "") }
+                        default { solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("other") .. "") }
                     }
                 }
                 describe(Byte(-128))
@@ -289,15 +289,15 @@ class LanguageConsistencyExecutionTest {
     void boolean_literals_short_indexes_and_field_append_work(
             @TempDir Path directory) throws Exception {
         output("""
-                TextWriter(Stdio.stdout()).writeLine((Boolean(true)) .. (" ") .. (Boolean(false)))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Boolean(true)) .. (" ") .. (Boolean(false)))
                 values := Integer[2] {1, 2}
                 values[Short(0)] = 3
-                TextWriter(Stdio.stdout()).writeLine((values[Short(0)]) .. (" ") .. (values[Byte(1)]))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((values[Short(0)]) .. (" ") .. (values[Byte(1)]))
                 type Item { pub mut text := "a"
                     pub func Item() {} }
                 item := Item()
                 item.text ..= values[Short(0)]
-                TextWriter(Stdio.stdout()).writeLine((item.text) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((item.text) .. "")
                 """, "true false\n3 2\na3\n", directory);
     }
 }

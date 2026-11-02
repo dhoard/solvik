@@ -16,7 +16,7 @@ absent := Null         // Null: the singleton type and value, written with a cap
 escaped := "quote: \" tab:\t newline:\n done"
 escapedMore := "slash:\\ return:\r nul:\0"
 raw := r#"  raw "text" keeps \ escapes and whitespace  "#
-TextWriter(Stdio.stdout()).writeLine(("more escapes: ") .. (escapedMore == "slash:\\ return:\r nul:\0") .. (" ") .. (escapedMore.size()))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("more escapes: ") .. (escapedMore == "slash:\\ return:\r nul:\0") .. (" ") .. (escapedMore.size()))
 intMin := -2147483648  // the unsuffixed Integer minimum is a literal, not a negation of 2147483648
 
 // --------------------------------------------------- declarations (§3.1, §3.2)
@@ -27,26 +27,26 @@ mut counter := 0                              // inferred Integer, mutable
 counter = counter + 1                          // assignment to the existing binding
 mut declaredTotal: Integer = counter + 1       // explicitly typed Integer
 name: String = "Solvik"                        // an immutable explicitly typed binding
-TextWriter(Stdio.stdout()).writeLine(("declarations: ") .. (counter) .. (" ") .. (declaredTotal) .. (" ") .. (name))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("declarations: ") .. (counter) .. (" ") .. (declaredTotal) .. (" ") .. (name))
 // `name? := value` declares a binding whose type is the value's type plus `?`, so it may also
 // hold `Null`. The name itself has no `?`: the marker belongs to the declaration.
 mut countdownText? := "ready"   // type String?
 countdownText = Null            // legal: String? accepts Null
 countdownText = "go"            // legal: String is assignable to String?
-TextWriter(Stdio.stdout()).writeLine(("nullable inferred=") .. (countdownText) .. (" ") .. (countdownText == Null))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("nullable inferred=") .. (countdownText) .. (" ") .. (countdownText == Null))
 // `name? := Null` infers Any?, because Null alone names no narrower non-null type.
 mut anything? := Null           // type Any?
 anything = "text"               // legal: String is assignable to Any?
 anything = 42                   // legal: Integer is assignable to Any
-TextWriter(Stdio.stdout()).writeLine(("nullable Any=") .. (anything) .. (" ") .. (anything == Null))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("nullable Any=") .. (anything) .. (" ") .. (anything == Null))
 // A nullable inference may also start at a present value; the type is the value's type plus `?`.
 mut maybeNumber? := 1           // Integer?
 maybeNumber = Null
-TextWriter(Stdio.stdout()).writeLine(("nullable number=") .. (maybeNumber) .. (" ") .. (maybeNumber == Null))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("nullable number=") .. (maybeNumber) .. (" ") .. (maybeNumber == Null))
 // An explicitly typed declaration keeps a specific nullable type, and the type never changes.
 mut label: String? = Null
 label = "named"
-TextWriter(Stdio.stdout()).writeLine(("nullable explicit=") .. (label))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("nullable explicit=") .. (label))
 
 // ------------------------------------------------------------ conversions
 // Ten conversion constructors, one argument each: the numeric carriers, String, and Boolean.
@@ -68,11 +68,11 @@ longFromBig := Long(BigInteger("2147483648"))
 booleanFromBoolean := Boolean(true)
 falseFromText := Boolean("false")
 textFromNull := String(Null)  // every value converts, including Null
-TextWriter(Stdio.stdout()).writeLine(("conversions: ") .. (octet) .. (" ") .. (shortValue) .. (" ") .. (fromText) .. (" ") .. (longValue) .. (" ") .. (floatValue) .. (" ") .. (doubleValue) .. (" ") .. (bigInteger) .. (" ") .. (asDecimal) .. (" ") .. (asText) .. (" ") .. (asBoolean))
-TextWriter(Stdio.stdout()).writeLine(("more conversions: ") .. (fromNumeric) .. (" ") .. (decimalFromNumeric) .. (" ") .. (longFromBig) .. (" ") .. (booleanFromBoolean) .. (" ") .. (falseFromText) .. (" ") .. (textFromNull) .. (" ") .. (Float(1)))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("conversions: ") .. (octet) .. (" ") .. (shortValue) .. (" ") .. (fromText) .. (" ") .. (longValue) .. (" ") .. (floatValue) .. (" ") .. (doubleValue) .. (" ") .. (bigInteger) .. (" ") .. (asDecimal) .. (" ") .. (asText) .. (" ") .. (asBoolean))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("more conversions: ") .. (fromNumeric) .. (" ") .. (decimalFromNumeric) .. (" ") .. (longFromBig) .. (" ") .. (booleanFromBoolean) .. (" ") .. (falseFromText) .. (" ") .. (textFromNull) .. (" ") .. (Float(1)))
 
 // Float and Double also read the IEEE 754 special spellings; other text never becomes one.
-TextWriter(Stdio.stdout()).writeLine(("float text: ") .. (Float("NaN")) .. (" ") .. (Double("Infinity")) .. (" ") .. (Double("-Infinity")) .. (" ") .. (Float("+Infinity")))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("float text: ") .. (Float("NaN")) .. (" ") .. (Double("Infinity")) .. (" ") .. (Double("-Infinity")) .. (" ") .. (Float("+Infinity")))
 // A fractional literal that overflows to Infinity or underflows to zero is SOL-T008; use a text
 // conversion when those IEEE 754 values are intended.
 // Rejected while compiling, because the text can never convert (SOL-T008):
@@ -90,19 +90,19 @@ integerSpelledFloat := 1F     // an integer-spelled literal may name any suffix
 suffixedDouble := 1.5D
 suffixedBigInteger := 123456789012345678901234567890BI
 suffixedBigDecimal := 1.50BD
-TextWriter(Stdio.stdout()).writeLine(("suffix types: ") .. (suffixedByte.type()) .. (" ") .. (suffixedShort.type()) .. (" ") .. (suffixedInteger.type()) .. (" ") .. (suffixedLong.type()) .. (" ") .. (suffixedFloat.type()) .. (" ") .. (suffixedDouble.type()) .. (" ") .. (suffixedBigInteger.type()) .. (" ") .. (suffixedBigDecimal.type()) .. (" ") .. (integerSpelledFloat.type()))
-TextWriter(Stdio.stdout()).writeLine(("suffix values: ") .. (suffixedByte) .. (" ") .. (suffixedShort) .. (" ") .. (suffixedInteger) .. (" ") .. (suffixedLong) .. (" ") .. (suffixedFloat) .. (" ") .. (suffixedDouble) .. (" ") .. (suffixedBigInteger) .. (" ") .. (suffixedBigDecimal))
-TextWriter(Stdio.stdout()).writeLine(("suffix = constructor: ") .. (1L == Long(1)) .. (" ") .. (1.50BD == BigDecimal("1.50")) .. (" ") .. (1B == Byte(1)))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("suffix types: ") .. (suffixedByte.type()) .. (" ") .. (suffixedShort.type()) .. (" ") .. (suffixedInteger.type()) .. (" ") .. (suffixedLong.type()) .. (" ") .. (suffixedFloat.type()) .. (" ") .. (suffixedDouble.type()) .. (" ") .. (suffixedBigInteger.type()) .. (" ") .. (suffixedBigDecimal.type()) .. (" ") .. (integerSpelledFloat.type()))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("suffix values: ") .. (suffixedByte) .. (" ") .. (suffixedShort) .. (" ") .. (suffixedInteger) .. (" ") .. (suffixedLong) .. (" ") .. (suffixedFloat) .. (" ") .. (suffixedDouble) .. (" ") .. (suffixedBigInteger) .. (" ") .. (suffixedBigDecimal))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("suffix = constructor: ") .. (1L == Long(1)) .. (" ") .. (1.50BD == BigDecimal("1.50")) .. (" ") .. (1B == Byte(1)))
 
 // A sign belongs to a suffixed literal, so each carrier's minimum is writable.
-TextWriter(Stdio.stdout()).writeLine(("suffix minima: ") .. (-128B) .. (" ") .. (-32768S) .. (" ") .. (-2147483648I) .. (" ") .. (-9223372036854775808L))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("suffix minima: ") .. (-128B) .. (" ") .. (-32768S) .. (" ") .. (-2147483648I) .. (" ") .. (-9223372036854775808L))
 // Suffixes take part in the ordinary promotion rules; Big carriers never mix with primitives.
-TextWriter(Stdio.stdout()).writeLine(("suffix arithmetic: ") .. (1B + 1B) .. (" ") .. (1L + 1) .. (" ") .. (1F + 1) .. (" ") .. (10L / 3L) .. (" ") .. (1BD + 1BD) .. (" ") .. (2BI.pow(3)))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("suffix arithmetic: ") .. (1B + 1B) .. (" ") .. (1L + 1) .. (" ") .. (1F + 1) .. (" ") .. (10L / 3L) .. (" ") .. (1BD + 1BD) .. (" ") .. (2BI.pow(3)))
 // An unsuffixed element adopts the array type; a suffixed one keeps its own (§4, §6).
 suffixedBytes := Byte[2] {-128B, 127B}
 adoptedLongs := Long[2] {1L, 2}
 sizedWithSuffix := Integer[3I] {1, 2, 3}    // an array size may carry the I suffix
-TextWriter(Stdio.stdout()).writeLine(("suffix arrays: ") .. (suffixedBytes[0]) .. (" ") .. (suffixedBytes[1]) .. (" ") .. (adoptedLongs[1]) .. (" ") .. (sizedWithSuffix.size))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("suffix arrays: ") .. (suffixedBytes[0]) .. (" ") .. (suffixedBytes[1]) .. (" ") .. (adoptedLongs[1]) .. (" ") .. (sizedWithSuffix.size))
 // Rejected while compiling:
 //   Integer[1] {1L}          -> the suffix type wins, so this is SOL-T001
 //   n := 1.5B             -> a fractional literal cannot be a Byte (SOL-T001)
@@ -112,49 +112,49 @@ TextWriter(Stdio.stdout()).writeLine(("suffix arrays: ") .. (suffixedBytes[0]) .
 //   case 1L in an Integer switch -> a Long label cannot match the Integer subject
 
 // -------------------------------------------------------------- operators
-TextWriter(Stdio.stdout()).writeLine(("precedence: ") .. (1 + 2 * 3))          // 7
-TextWriter(Stdio.stdout()).writeLine(("integer min: ") .. (intMin))
-TextWriter(Stdio.stdout()).writeLine(("overflow wraps: ") .. (2147483647 + 1) .. (" ") .. (9223372036854775807L + 1L))
-TextWriter(Stdio.stdout()).writeLine(("widening: ") .. (1 + 1.5))              // Decimal 2.5
-TextWriter(Stdio.stdout()).writeLine(("byte promote: ") .. (Byte(100) + Byte(100))) // Integer 200, no wrap at 127
-TextWriter(Stdio.stdout()).writeLine(("division: ") .. (10 / 3) .. (" remainder: ") .. (10 % 3)) // truncates toward zero
-TextWriter(Stdio.stdout()).writeLine(("negative: ") .. (-7 / 2) .. (" ") .. (-7 % 2))
-TextWriter(Stdio.stdout()).writeLine(("decimal divide: ") .. (1.5 / 2))        // 0.75
-TextWriter(Stdio.stdout()).writeLine(("ieee division: ") .. (1.0 / 0.0) .. (" ") .. (-1.0 / 0.0) .. (" ") .. (0.0 / 0.0) .. (" ") .. (1.0 % 0.0))
-TextWriter(Stdio.stdout()).writeLine(("compare: ") .. (1 < 2) .. (" ") .. (1 <= 1) .. (" ") .. (2 > 1) .. (" ") .. (2 >= 2) .. (" ") .. (1 < 1.5))
-TextWriter(Stdio.stdout()).writeLine(("equality: ") .. (1 == 1) .. (" ") .. (1 != 2) .. (" ") .. (1 == 1.0)) // numeric, after widening
-TextWriter(Stdio.stdout()).writeLine(("decimal scale equality: ") .. (1.0BD == 1.00BD) .. (" ") .. (1.50BD == BigDecimal("1.50")))
-TextWriter(Stdio.stdout()).writeLine(("float rounding: ") .. (Float(16777216) == 16777217) .. (" ") .. (Float("-0.0") == Float("0.0")))
-TextWriter(Stdio.stdout()).writeLine(("explicit equals: ") .. (1.equals(1.0)) .. (" ") .. (Float("NaN").equals(Float("NaN"))) .. (" ") .. (Double("-0.0").equals(0.0)) .. (" ") .. (BigDecimal("1.0").equals(BigDecimal("1.00"))))
-TextWriter(Stdio.stdout()).writeLine(("null equality: ") .. (Null == Null) .. (" ") .. (Null != 1) .. (" ") .. (Null == 1))
-TextWriter(Stdio.stdout()).writeLine(("logical: ") .. (true && false) .. (" ") .. (true || false) .. (" ") .. (!false))
-TextWriter(Stdio.stdout()).writeLine(("concat: ") .. ("a" .. 1 .. "b" .. true))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("precedence: ") .. (1 + 2 * 3))          // 7
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("integer min: ") .. (intMin))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("overflow wraps: ") .. (2147483647 + 1) .. (" ") .. (9223372036854775807L + 1L))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("widening: ") .. (1 + 1.5))              // Decimal 2.5
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("byte promote: ") .. (Byte(100) + Byte(100))) // Integer 200, no wrap at 127
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("division: ") .. (10 / 3) .. (" remainder: ") .. (10 % 3)) // truncates toward zero
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("negative: ") .. (-7 / 2) .. (" ") .. (-7 % 2))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("decimal divide: ") .. (1.5 / 2))        // 0.75
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("ieee division: ") .. (1.0 / 0.0) .. (" ") .. (-1.0 / 0.0) .. (" ") .. (0.0 / 0.0) .. (" ") .. (1.0 % 0.0))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("compare: ") .. (1 < 2) .. (" ") .. (1 <= 1) .. (" ") .. (2 > 1) .. (" ") .. (2 >= 2) .. (" ") .. (1 < 1.5))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("equality: ") .. (1 == 1) .. (" ") .. (1 != 2) .. (" ") .. (1 == 1.0)) // numeric, after widening
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("decimal scale equality: ") .. (1.0BD == 1.00BD) .. (" ") .. (1.50BD == BigDecimal("1.50")))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("float rounding: ") .. (Float(16777216) == 16777217) .. (" ") .. (Float("-0.0") == Float("0.0")))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("explicit equals: ") .. (1.equals(1.0)) .. (" ") .. (Float("NaN").equals(Float("NaN"))) .. (" ") .. (Double("-0.0").equals(0.0)) .. (" ") .. (BigDecimal("1.0").equals(BigDecimal("1.00"))))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("null equality: ") .. (Null == Null) .. (" ") .. (Null != 1) .. (" ") .. (Null == 1))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("logical: ") .. (true && false) .. (" ") .. (true || false) .. (" ") .. (!false))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("concat: ") .. ("a" .. 1 .. "b" .. true))
 
 // A value typed Any or Number compares with boxed equality, without dynamic promotion.
 func boxedEqual(left: Any, right: Any) -> Boolean { return left == right }
 func numberEqual(left: Number, right: Number) -> Boolean { return left == right }
-TextWriter(Stdio.stdout()).writeLine(("boxed equality: ") .. (boxedEqual(1, 1.0)) .. (" ") .. (boxedEqual(1, 1)) .. (" ") .. (numberEqual(1, 1.0)) .. (" ") .. (numberEqual(1, 1)))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("boxed equality: ") .. (boxedEqual(1, 1.0)) .. (" ") .. (boxedEqual(1, 1)) .. (" ") .. (numberEqual(1, 1.0)) .. (" ") .. (numberEqual(1, 1)))
 
 // `..=` appends to a String binding in place and requires `mut`; on an immutable binding it is
 // SOL-T010. A declaration writes `mut` before the name, never after it.
 mut log := "start"
 log ..= "-middle"
 log ..= "-end"
-TextWriter(Stdio.stdout()).writeLine(("append: ") .. (log))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("append: ") .. (log))
 
 // Identity is reference identity; value equality is `==`.
 first := 1
 alias := first
 sameValue := 1
-TextWriter(Stdio.stdout()).writeLine(("identity: ") .. (first === alias) .. (" ") .. (first === sameValue))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("identity: ") .. (first === alias) .. (" ") .. (first === sameValue))
 
 // ------------------------------------------------ statement separators
-one := 1; two := 2; TextWriter(Stdio.stdout()).writeLine(("semicolons: ") .. (one + two))
+one := 1; two := 2; solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("semicolons: ") .. (one + two))
 banner := "continuation"
 
 // a comment-only line still counts as blank, so this continuation is legal
 \ .. " joined across lines"
-TextWriter(Stdio.stdout()).writeLine((banner) .. "")
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((banner) .. "")
 
 // --------------------------------------------------------------- arrays
 bytes := Byte[4] {0, 1, 100, 127}          // literal elements take Byte
@@ -164,32 +164,32 @@ flags := Boolean[2] {true, false}
 words := String[2] {"Hello", "World"}
 mixed := Any[3] {1, "one", true}           // children of Any
 numbers := Number[2] {Byte(1), 2.5}        // children of Number
-TextWriter(Stdio.stdout()).writeLine(("sizes: ") .. (bytes.size) .. (" ") .. (integers.size) .. (" ") .. (decimals.size))
-TextWriter(Stdio.stdout()).writeLine(("indexing: ") .. (bytes[0]) .. (" ") .. (bytes[3]) .. (" ") .. (words[1]) .. (" ") .. (integers[2]))
-TextWriter(Stdio.stdout()).writeLine(("array type: ") .. (integers.type()))     // every array reports Array
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("sizes: ") .. (bytes.size) .. (" ") .. (integers.size) .. (" ") .. (decimals.size))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("indexing: ") .. (bytes[0]) .. (" ") .. (bytes[3]) .. (" ") .. (words[1]) .. (" ") .. (integers[2]))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("array type: ") .. (integers.type()))     // every array reports Array
 // An array's length is its only member: an immutable Integer that reads the length the array was
 // constructed with (§5). It is a member, not a function, and it never changes.
 fixedBytes := Byte[10] {0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
-TextWriter(Stdio.stdout()).writeLine(("array member: ") .. (fixedBytes.size))                    // 10
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("array member: ") .. (fixedBytes.size))                    // 10
 slots := Byte?[10] {}
-TextWriter(Stdio.stdout()).writeLine(("member of empty slots: ") .. (slots.size))                // 10
-TextWriter(Stdio.stdout()).writeLine(("member in expressions: ") .. (integers.size .. " items") .. (" ") .. (integers.size == 3) .. (" ") .. (integers.size + 1))                                      // 3 items true 4
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("member of empty slots: ") .. (slots.size))                // 10
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("member in expressions: ") .. (integers.size .. " items") .. (" ") .. (integers.size == 3) .. (" ") .. (integers.size + 1))                                      // 3 items true 4
 // Rejected while compiling:
 //   integers.size()        -> the member is not a function (SOL-T001)
 //   integers.size = 4      -> the member is immutable (SOL-T010)
 // The index carrier may be Integer, Byte, or Short; all three are range checked at run time.
 shortIndex := Short(1)
 byteIndex := Byte(2)
-TextWriter(Stdio.stdout()).writeLine(("carrier indices: ") .. (integers[shortIndex]) .. (" ") .. (integers[byteIndex]))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("carrier indices: ") .. (integers[shortIndex]) .. (" ") .. (integers[byteIndex]))
 mut total := 0
 for value in integers {
     total = total + value
 }
-TextWriter(Stdio.stdout()).writeLine(("for total: ") .. (total))                 // 60
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("for total: ") .. (total))                 // 60
 for item in mixed {
-    TextWriter(Stdio.stdout()).write((item.type()) .. ("=") .. (item) .. (" "))        // Any-typed elements keep their dynamic type
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).write((item.type()) .. ("=") .. (item) .. (" "))        // Any-typed elements keep their dynamic type
 }
-TextWriter(Stdio.stdout()).writeLine("")
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("")
 
 // An element is assigned through the same `[index]` form. The size never changes:
 // there is no resize, append, or removal in the language.
@@ -197,19 +197,19 @@ counts := Integer[3] {0, 0, 0}
 counts[0] = 7
 slotIndex := 1
 counts[slotIndex] = counts[0] + 1
-TextWriter(Stdio.stdout()).writeLine(("element write: ") .. (counts[0]) .. (" ") .. (counts[1]) .. (" ") .. (counts[2]))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("element write: ") .. (counts[0]) .. (" ") .. (counts[1]) .. (" ") .. (counts[2]))
 squares := Integer[4] {0, 0, 0, 0}
 mut squareIndex := 0
 while squareIndex < squares.size {
     squares[squareIndex] = (squareIndex + 1) * (squareIndex + 1)
     squareIndex = squareIndex + 1
 }
-TextWriter(Stdio.stdout()).writeLine(("filled in place: ") .. (squares[0]) .. (" ") .. (squares[1]) .. (" ") .. (squares[3]))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("filled in place: ") .. (squares[0]) .. (" ") .. (squares[1]) .. (" ") .. (squares[3]))
 words[0] ..= "!"                              // append to an element, not to the array
-TextWriter(Stdio.stdout()).writeLine(("element append: ") .. (words[0]))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("element append: ") .. (words[0]))
 grid := Integer[2][2] {Integer[2] {1, 2}, Integer[2] {3, 4}}
 grid[1][0] = 9                                // nested elements are reached the same way
-TextWriter(Stdio.stdout()).writeLine(("nested write: ") .. (grid[0][0]) .. (" ") .. (grid[1][0]))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("nested write: ") .. (grid[0][0]) .. (" ") .. (grid[1][0]))
 
 // `Integer[][]` is how a nested array is written in a signature.
 func flatten(rows: Integer[][]) -> Integer {
@@ -221,17 +221,17 @@ func flatten(rows: Integer[][]) -> Integer {
     }
     return sum
 }
-TextWriter(Stdio.stdout()).writeLine(("nested signature: ") .. (flatten(grid)))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("nested signature: ") .. (flatten(grid)))
 
 // The written length is part of the array type, so `String[4]` and `String[3]` differ. A
 // non-nullable element type must list exactly N elements; a nullable one may list fewer, because
 // the construction rule makes the omitted elements Null (§5.1).
 roster := String?[4] {"ann", "bob"}
-TextWriter(Stdio.stdout()).writeLine(("partial literal: ") .. (roster.size) .. (" ") .. (roster))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("partial literal: ") .. (roster.size) .. (" ") .. (roster))
 roster[3] = "dee"
 pending := Integer?[3] { }
 pending[0] = 5
-TextWriter(Stdio.stdout()).writeLine(("filled later: ") .. (roster[3]) .. (" ") .. (pending.size) .. (" ") .. (pending))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("filled later: ") .. (roster[3]) .. (" ") .. (pending.size) .. (" ") .. (pending))
 
 // An array type names its length: `Integer[3]` and `Integer[2]` are different fixed-length types,
 // and a signature may require one of them. `Integer[]` is the size-erased array type: it accepts
@@ -239,10 +239,10 @@ TextWriter(Stdio.stdout()).writeLine(("filled later: ") .. (roster[3]) .. (" ") 
 func third(values: Integer[3]) -> Integer {
     return values[2]
 }
-TextWriter(Stdio.stdout()).writeLine(("fixed length: ") .. (third(Integer[3] {7, 8, 9})))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("fixed length: ") .. (third(Integer[3] {7, 8, 9})))
 mut nullableFixed: Integer[3]? = Integer[3] {1, 2, 3}   // the array may be Null, elements may not
 nullableFixed = Null
-TextWriter(Stdio.stdout()).writeLine(("nullable fixed array: ") .. (nullableFixed) .. (" ") .. (nullableFixed == Null))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("nullable fixed array: ") .. (nullableFixed) .. (" ") .. (nullableFixed == Null))
 // Rejected while compiling:
 //   third(Integer[2] {1, 2})       an Integer[2] is not an Integer[3] (SOL-T001)
 //   Integer[2] {1}                 one non-null element is missing (SOL-T001)
@@ -262,7 +262,7 @@ func describeAll(numbers: Number[]) -> String {
     }
     return text
 }
-TextWriter(Stdio.stdout()).writeLine(("Number parameter: ") .. (describeAll(Number[3] {Byte(2), 40, 0.5})))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("Number parameter: ") .. (describeAll(Number[3] {Byte(2), 40, 0.5})))
 
 // Invalid lengths and element counts are compile errors, not truncation:
 //   Integer[0] { }   Integer[2147483648] { }   Integer[1] {1, 2}   Integer[2] {1}
@@ -273,10 +273,10 @@ TextWriter(Stdio.stdout()).writeLine(("Number parameter: ") .. (describeAll(Numb
 // A condition must be Boolean; there is no truthiness, so `if 1` is SOL-T001.
 mut countdown := 3
 while countdown > 0 {
-    TextWriter(Stdio.stdout()).write((countdown) .. (".. "))
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).write((countdown) .. (".. "))
     countdown = countdown - 1
 }
-TextWriter(Stdio.stdout()).writeLine(("liftoff") .. "")
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("liftoff") .. "")
 
 // `continue` skips an iteration and `break` leaves the loop; both target the
 // innermost loop, and a `switch` between them changes nothing.
@@ -289,7 +289,7 @@ while true {
     if ticks > 4 {
         break                         // the body decides when to stop
     }
-    TextWriter(Stdio.stdout()).writeLine(("tick ") .. (ticks))
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("tick ") .. (ticks))
 }
 stops := Integer[5] {1, 2, 3, 4, 5}
 mut kept := 0
@@ -305,34 +305,34 @@ for stop in stops {
             kept = kept + stop
         }
         default {
-            TextWriter(Stdio.stdout()).writeLine(("unreachable") .. "")
+            solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("unreachable") .. "")
         }
     }
 }
-TextWriter(Stdio.stdout()).writeLine(("kept ") .. (kept))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("kept ") .. (kept))
 
 // ----------------------------------------------- scope and shadowing
 // A block is a scope, and a nested declaration shadows the enclosing one.
 mut shadowed := 1
 {
     mut shadowed := outer shadowed + 1        // 2
-    TextWriter(Stdio.stdout()).writeLine(("shadow: inner ") .. (shadowed))
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("shadow: inner ") .. (shadowed))
     {
         mut shadowed := outer shadowed * 10   // 20: the middle binding
-        TextWriter(Stdio.stdout()).writeLine(("shadow: nested ") .. (shadowed))
+        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("shadow: nested ") .. (shadowed))
     }
     outer shadowed = 5                       // writes through to the middle binding
-    TextWriter(Stdio.stdout()).writeLine(("shadow: after write-through ") .. (shadowed))
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("shadow: after write-through ") .. (shadowed))
 }
-TextWriter(Stdio.stdout()).writeLine(("shadow: inner ") .. (shadowed))          // the outermost binding is untouched
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("shadow: inner ") .. (shadowed))          // the outermost binding is untouched
 
 // A shadow may take a different type: a binding keeps its declared type forever (§3).
 typed := 1
 {
     typed := "now a String"
-    TextWriter(Stdio.stdout()).writeLine(("shadow: ") .. (typed) .. (" ") .. (typed.type()))
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("shadow: ") .. (typed) .. (" ") .. (typed.type()))
 }
-TextWriter(Stdio.stdout()).writeLine(("shadow: ") .. (typed) .. (" ") .. (typed.type()))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("shadow: ") .. (typed) .. (" ") .. (typed.type()))
 
 // `outer` reaches a parameter, a for binding, and an enclosing declaration.
 
@@ -342,25 +342,25 @@ func shadowing(item: Integer) -> String {
         return item .. " over " .. outer item
     }
 }
-TextWriter(Stdio.stdout()).writeLine(("outer param: ") .. (shadowing(3)))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("outer param: ") .. (shadowing(3)))
 
 // `outer` assigns and appends exactly like the plain name.
 mut trail := "a"
 {
     mut trail := "b"
     outer trail ..= "c"
-    TextWriter(Stdio.stdout()).writeLine(("outer append: ") .. (trail))
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("outer append: ") .. (trail))
 }
-TextWriter(Stdio.stdout()).writeLine(("outer append: ") .. (trail))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("outer append: ") .. (trail))
 for flag2 in flags {
     flag2 := !flag2
-    TextWriter(Stdio.stdout()).writeLine(("outer loop binding: ") .. (flag2) .. (" was ") .. (outer flag2))
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("outer loop binding: ") .. (flag2) .. (" was ") .. (outer flag2))
 }
 mut shadowSlot: Integer? = Null
 shadowSlot = 7
 {
     mut shadowSlot := 99
-    TextWriter(Stdio.stdout()).writeLine(("outer shadowing: ") .. (shadowSlot) .. (" ") .. (outer shadowSlot))
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("outer shadowing: ") .. (shadowSlot) .. (" ") .. (outer shadowSlot))
 }
 
 // --------------------------------------------------------------- switch
@@ -370,33 +370,33 @@ shadowSlot = 7
 method := "POST"
 switch method {
     case "GET" {
-        TextWriter(Stdio.stdout()).writeLine(("switch String: read") .. "")
+        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("switch String: read") .. "")
     }
     case "POST" {
-        TextWriter(Stdio.stdout()).writeLine(("switch String: write") .. "")
+        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("switch String: write") .. "")
     }
     case "DELETE" {
-        TextWriter(Stdio.stdout()).writeLine(("switch String: remove") .. "")   // skipped: only one arm ever runs
+        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("switch String: remove") .. "")   // skipped: only one arm ever runs
     }
     default {
-        TextWriter(Stdio.stdout()).writeLine(("switch String: other") .. "")
+        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("switch String: other") .. "")
     }
 }
 
 // Parentheses around the subject are optional and change nothing.
 switch (method) {
     case "PUT" {
-        TextWriter(Stdio.stdout()).writeLine(("switch parens: put") .. "")
+        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("switch parens: put") .. "")
     }
     default {
-        TextWriter(Stdio.stdout()).writeLine(("switch parens: not a PUT") .. "")
+        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("switch parens: not a PUT") .. "")
     }
 }
 
 // A switch with no default and no matching arm does nothing at all.
 switch method {
     case "PATCH" {
-        TextWriter(Stdio.stdout()).writeLine(("switch no-default: patch") .. "")
+        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("switch no-default: patch") .. "")
     }
 }
 
@@ -419,7 +419,7 @@ func route(path: String) -> String {
         }
     }
 }
-TextWriter(Stdio.stdout()).writeLine(("switch regex: ") .. (route("/health")) .. (" ") .. (route("/api/users/7")) .. (" ") .. (route("/api/status")) .. (" ") .. (route("/about")))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("switch regex: ") .. (route("/health")) .. (" ") .. (route("/api/users/7")) .. (" ") .. (route("/api/status")) .. (" ") .. (route("/about")))
 
 // Integer, Byte, and Boolean subjects all dispatch too.
 
@@ -439,27 +439,27 @@ func name(code: Integer) -> String {
         }
     }
 }
-TextWriter(Stdio.stdout()).writeLine(("switch Integer: ") .. (name(-1)) .. (" ") .. (name(0)) .. (" ") .. (name(200)) .. (" ") .. (name(7)))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("switch Integer: ") .. (name(-1)) .. (" ") .. (name(0)) .. (" ") .. (name(200)) .. (" ") .. (name(7)))
 for byteValue in bytes {
     switch byteValue {
         case 0B {
-            TextWriter(Stdio.stdout()).writeLine(("switch Byte: zero") .. "")
+            solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("switch Byte: zero") .. "")
         }
         case 127B {
-            TextWriter(Stdio.stdout()).writeLine(("switch Byte: max") .. "")
+            solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("switch Byte: max") .. "")
         }
         default {
-            TextWriter(Stdio.stdout()).writeLine(("switch Byte: ") .. (byteValue))
+            solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("switch Byte: ") .. (byteValue))
         }
     }
 }
 for flag in flags {
     switch flag {
         case true {
-            TextWriter(Stdio.stdout()).writeLine(("switch Boolean: true") .. "")
+            solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("switch Boolean: true") .. "")
         }
         case false {
-            TextWriter(Stdio.stdout()).writeLine(("switch Boolean: false") .. "")
+            solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("switch Boolean: false") .. "")
         }
     }
 }
@@ -471,35 +471,35 @@ for kind in kinds {
         case "get" {
             switch method {
                 case "POST" {
-                    TextWriter(Stdio.stdout()).writeLine(("nested: get is sent as POST") .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("nested: get is sent as POST") .. "")
                 }
             }
         }
         default {
-            TextWriter(Stdio.stdout()).writeLine(("nested: ") .. (kind))
+            solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("nested: ") .. (kind))
         }
     }
 }
 
 // ------------------------------------------------------- string methods (§7)
 padded := "  Hello, World  "
-TextWriter(Stdio.stdout()).writeLine(("string size: ") .. (padded.size()))
-TextWriter(Stdio.stdout()).writeLine(("string strip: [") .. (padded.strip()) .. ("] [") .. (padded.stripLeading()) .. ("] [") .. (padded.stripTrailing()) .. ("]"))
-TextWriter(Stdio.stdout()).writeLine(("string case: ") .. (padded.strip().toUpperCase()) .. (" ") .. (padded.strip().toLowerCase()))
-TextWriter(Stdio.stdout()).writeLine(("string substring: ") .. (padded.strip().substring(0, 5)) .. (" ") .. (padded.strip().substring(7)))
-TextWriter(Stdio.stdout()).writeLine(("string search: ") .. (padded.indexOf("World")) .. (" ") .. (padded.indexOf("absent")) .. (" ") .. (padded.contains("World")) .. (" ") .. (padded.strip().startsWith("Hello")) .. (" ") .. (padded.strip().endsWith("d")))
-TextWriter(Stdio.stdout()).writeLine(("string replace: ") .. (padded.strip().replace("World", "Solvik")))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("string size: ") .. (padded.size()))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("string strip: [") .. (padded.strip()) .. ("] [") .. (padded.stripLeading()) .. ("] [") .. (padded.stripTrailing()) .. ("]"))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("string case: ") .. (padded.strip().toUpperCase()) .. (" ") .. (padded.strip().toLowerCase()))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("string substring: ") .. (padded.strip().substring(0, 5)) .. (" ") .. (padded.strip().substring(7)))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("string search: ") .. (padded.indexOf("World")) .. (" ") .. (padded.indexOf("absent")) .. (" ") .. (padded.contains("World")) .. (" ") .. (padded.strip().startsWith("Hello")) .. (" ") .. (padded.strip().endsWith("d")))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("string replace: ") .. (padded.strip().replace("World", "Solvik")))
 
 // split is literal, keeps empty parts, and returns an ordinary array.
 csv := "alpha,beta,,delta,"
 fields := csv.split(",")
-TextWriter(Stdio.stdout()).writeLine(("split: ") .. (fields.size) .. (" ") .. (fields[0]) .. ("|") .. (fields[1]) .. ("|") .. (fields[2]) .. ("|") .. (fields[3]) .. ("|") .. (fields[4] .. "end"))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("split: ") .. (fields.size) .. (" ") .. (fields[0]) .. ("|") .. (fields[1]) .. ("|") .. (fields[2]) .. ("|") .. (fields[3]) .. ("|") .. (fields[4] .. "end"))
 for field in fields {
-    TextWriter(Stdio.stdout()).write(("[" .. field .. "]") .. "")
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).write(("[" .. field .. "]") .. "")
 }
-TextWriter(Stdio.stdout()).writeLine("")
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("")
 fields[2] = "gamma"
-TextWriter(Stdio.stdout()).writeLine(("split array write: ") .. (fields[2]))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("split array write: ") .. (fields[2]))
 
 // String methods compose with everything else: arrays, switch, functions.
 
@@ -513,7 +513,7 @@ func pathKind(path: String) -> String {
         }
     }
 }
-TextWriter(Stdio.stdout()).writeLine(("string + switch: ") .. (pathKind("/api/users")) .. (" ") .. (pathKind("/index.html")))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("string + switch: ") .. (pathKind("/api/users")) .. (" ") .. (pathKind("/index.html")))
 
 // These fail at run time only when the index or separator is not a literal the compiler can
 // reject (SOL-R009 / SOL-R010); a literal empty separator is the compile-time SOL-T008 case:
@@ -524,24 +524,24 @@ TextWriter(Stdio.stdout()).writeLine(("string + switch: ") .. (pathKind("/api/us
 
 // ------------------------------------ identity, hashing, and conversion text
 // `===` is value identity for scalars: no cache size can change the answer.
-TextWriter(Stdio.stdout()).writeLine(("identity scalars: ") .. (Byte(7) === Byte(7)) .. (" ") .. (Byte(100) === Byte(100)) .. (" ") .. (1 === 1.0) .. (" ") .. ("a" === "a") .. (" ") .. (true === true))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("identity scalars: ") .. (Byte(7) === Byte(7)) .. (" ") .. (Byte(100) === Byte(100)) .. (" ") .. (1 === 1.0) .. (" ") .. ("a" === "a") .. (" ") .. (true === true))
 
 // ...and reference identity for arrays and user types, as `==` also is for them.
 leftArray := Integer[1] {1}
 rightArray := Integer[1] {1}
-TextWriter(Stdio.stdout()).writeLine(("identity references: ") .. (leftArray === leftArray) .. (" ") .. (leftArray === rightArray) .. (" ") .. (leftArray != rightArray))
-TextWriter(Stdio.stdout()).writeLine(("array equals method: ") .. (leftArray.equals(leftArray)) .. (" ") .. (leftArray.equals(rightArray)))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("identity references: ") .. (leftArray === leftArray) .. (" ") .. (leftArray === rightArray) .. (" ") .. (leftArray != rightArray))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("array equals method: ") .. (leftArray.equals(leftArray)) .. (" ") .. (leftArray.equals(rightArray)))
 
 // Equal values hash alike whatever their carrier or scale.
-TextWriter(Stdio.stdout()).writeLine(("hash agrees: ") .. (1 == 1.0) .. (" ") .. (1.hashCode() == 1.0.hashCode()) .. (" ") .. (Byte(1).hashCode() == 1.hashCode()) .. (" ") .. (1.50.hashCode() == 1.5.hashCode()))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("hash agrees: ") .. (1 == 1.0) .. (" ") .. (1.hashCode() == 1.0.hashCode()) .. (" ") .. (Byte(1).hashCode() == 1.hashCode()) .. (" ") .. (1.50.hashCode() == 1.5.hashCode()))
 
 // Conversions read text exactly as written: no trimming, ASCII digits, one dot.
-TextWriter(Stdio.stdout()).writeLine(("conversion text: ") .. (Integer("+42")) .. (" ") .. (Integer("0042")) .. (" ") .. (BigDecimal("1e3")) .. (" ") .. (BigDecimal(".5")) .. (" ") .. (Boolean("true")))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("conversion text: ") .. (Integer("+42")) .. (" ") .. (Integer("0042")) .. (" ") .. (BigDecimal("1e3")) .. (" ") .. (BigDecimal(".5")) .. (" ") .. (Boolean("true")))
 
 // Rejected while compiling, because the literal can never convert (SOL-T008):
 //   Integer(" 42")   Integer("1_000")   BigDecimal("5.")   Boolean("TRUE")
 // A Decimal renders in plain form, keeping the scale it was written with.
-TextWriter(Stdio.stdout()).writeLine(("decimal render: ") .. (BigDecimal("1e3")) .. (" ") .. (BigDecimal("1e-3")) .. (" ") .. (1.50) .. (" ") .. (0.1 + 0.2))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("decimal render: ") .. (BigDecimal("1e3")) .. (" ") .. (BigDecimal("1e-3")) .. (" ") .. (1.50) .. (" ") .. (0.1 + 0.2))
 
 // ------------------------------------------ big-number Java methods (§4)
 // BigInteger and BigDecimal are stored as the Java classes, so their public instance methods
@@ -549,13 +549,13 @@ TextWriter(Stdio.stdout()).writeLine(("decimal render: ") .. (BigDecimal("1e3"))
 // adapter and no reflection: the compiler resolves the overload at compile time.
 twelve := BigInteger("12")
 eighteen := BigInteger("18")
-TextWriter(Stdio.stdout()).writeLine(("big integer methods: ") .. (twelve.gcd(eighteen)) .. (" ") .. (twelve.pow(2)) .. (" ") .. (twelve.bitLength()) .. (" ") .. (twelve.toString(2)) .. (" ") .. (twelve.add(eighteen)))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("big integer methods: ") .. (twelve.gcd(eighteen)) .. (" ") .. (twelve.pow(2)) .. (" ") .. (twelve.bitLength()) .. (" ") .. (twelve.toString(2)) .. (" ") .. (twelve.add(eighteen)))
 
 scaled := BigDecimal("1234.5000")
-TextWriter(Stdio.stdout()).writeLine(("big decimal methods: ") .. (scaled.scale()) .. (" ") .. (scaled.stripTrailingZeros()) .. (" ") .. (scaled.unscaledValue()) .. (" ") .. (scaled.movePointLeft(2)) .. (" ") .. (scaled.add(BigDecimal("0.5"))))
-TextWriter(Stdio.stdout()).writeLine(("big suffix methods: ") .. (12BI.gcd(18BI)) .. (" ") .. (1.50BD.scale()) .. (" ") .. (2BD.add(1BD)))
-TextWriter(Stdio.stdout()).writeLine(("big integer arithmetic: ") .. (12BI - 2BI) .. (" ") .. (12BI * 2BI) .. (" ") .. (12BI / 5BI) .. (" ") .. (12BI % 5BI))
-TextWriter(Stdio.stdout()).writeLine(("big decimal arithmetic: ") .. (1.5BD + 2.25BD) .. (" ") .. (1.5BD - 0.5BD) .. (" ") .. (1.5BD * 2BD) .. (" ") .. (10BD / 4BD))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("big decimal methods: ") .. (scaled.scale()) .. (" ") .. (scaled.stripTrailingZeros()) .. (" ") .. (scaled.unscaledValue()) .. (" ") .. (scaled.movePointLeft(2)) .. (" ") .. (scaled.add(BigDecimal("0.5"))))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("big suffix methods: ") .. (12BI.gcd(18BI)) .. (" ") .. (1.50BD.scale()) .. (" ") .. (2BD.add(1BD)))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("big integer arithmetic: ") .. (12BI - 2BI) .. (" ") .. (12BI * 2BI) .. (" ") .. (12BI / 5BI) .. (" ") .. (12BI % 5BI))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("big decimal arithmetic: ") .. (1.5BD + 2.25BD) .. (" ") .. (1.5BD - 0.5BD) .. (" ") .. (1.5BD * 2BD) .. (" ") .. (10BD / 4BD))
 
 // No Solvik type can represent a byte[] result, and an unknown name is SOL-T001:
 //   twelve.toByteArray()      twelve.noSuchMethod()
@@ -573,30 +573,30 @@ TextWriter(Stdio.stdout()).writeLine(("big decimal arithmetic: ") .. (1.5BD + 2.
 // binding keeps its static type, so it still prints and compares once it holds Null.
 mut nilCount: Integer? = 1
 nilCount = Null
-TextWriter(Stdio.stdout()).writeLine(("null Integer: ") .. (nilCount) .. (" ") .. (nilCount == Null) .. (" ") .. (nilCount != 1))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("null Integer: ") .. (nilCount) .. (" ") .. (nilCount == Null) .. (" ") .. (nilCount != 1))
 nilCount = 2
-TextWriter(Stdio.stdout()).writeLine(("restored Integer: ") .. (nilCount))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("restored Integer: ") .. (nilCount))
 mut nilByte: Byte? = Byte(9)
 nilByte = Null
-TextWriter(Stdio.stdout()).writeLine(("null Byte: ") .. (nilByte))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("null Byte: ") .. (nilByte))
 mut nilFlag: Boolean? = true
 nilFlag = Null
-TextWriter(Stdio.stdout()).writeLine(("null Boolean: ") .. (nilFlag))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("null Boolean: ") .. (nilFlag))
 mut nilDecimal: Double? = 1.5
 nilDecimal = Null
-TextWriter(Stdio.stdout()).writeLine(("null Double: ") .. (nilDecimal))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("null Double: ") .. (nilDecimal))
 mut nilText: String? = "text"
 nilText = Null
-TextWriter(Stdio.stdout()).writeLine(("null String: ") .. (nilText) .. (" ") .. (nilText == Null))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("null String: ") .. (nilText) .. (" ") .. (nilText == Null))
 nilText = "text again"
-TextWriter(Stdio.stdout()).writeLine(("restored String: ") .. (nilText))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("restored String: ") .. (nilText))
 mut nilArray: Integer[2]? = Integer[2] {1, 2}   // a nullable array with non-null elements
 nilArray = Null
-TextWriter(Stdio.stdout()).writeLine(("null array: ") .. (nilArray) .. (" ") .. (nilArray == Null))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("null array: ") .. (nilArray) .. (" ") .. (nilArray == Null))
 
 // The singleton value's own type is Null, and equality and String(value) accept it.
 nothing := Null
-TextWriter(Stdio.stdout()).writeLine(("null value: ") .. (nothing) .. (" ") .. (nothing == Null) .. (" ") .. (Null === Null) .. (" ") .. ("String(Null)=" .. String(Null)))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("null value: ") .. (nothing) .. (" ") .. (nothing == Null) .. (" ") .. (Null === Null) .. (" ") .. ("String(Null)=" .. String(Null)))
 // `Null` is a value, so `Null()` is SOL-T001: it is not a constructor and has no members.
 // Null stops at the operations defined for it: it is accepted by ==, !=, ===, and String(value),
 // and a nullable value must be proven present before anything else (§7.1).
@@ -608,21 +608,21 @@ func describeOptional(text: String?) -> String {
     }
     return text.size() .. ":" .. text       // narrowed: text is a String here
 }
-TextWriter(Stdio.stdout()).writeLine(("null narrowing: ") .. (describeOptional(Null)) .. (" ") .. (describeOptional("four")))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("null narrowing: ") .. (describeOptional(Null)) .. (" ") .. (describeOptional("four")))
 
 // `Null` is also a written type: a function that can only return the singleton value declares
 // `-> Null`, which is not the same as a function with no return value.
 func absentValue() -> Null {
     return Null
 }
-TextWriter(Stdio.stdout()).writeLine(("null return: ") .. (absentValue()) .. (" ") .. (absentValue() == Null))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("null return: ") .. (absentValue()) .. (" ") .. (absentValue() == Null))
 
 // The array and its elements carry separate nullability (§5): `Integer?[2]` is a non-null array
 // whose elements may be Null, and `Integer[2]?` is a nullable array of non-null elements.
 mut elementHoles: Integer?[3] = Integer?[3] {1, Null, 3}
-TextWriter(Stdio.stdout()).writeLine(("element null: ") .. (elementHoles[1]) .. (" ") .. (elementHoles[1] == Null) .. (" ") .. (elementHoles[2]))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("element null: ") .. (elementHoles[1]) .. (" ") .. (elementHoles[1] == Null) .. (" ") .. (elementHoles[2]))
 elementHoles[1] = 2
-TextWriter(Stdio.stdout()).writeLine(("element filled: ") .. (elementHoles[1]))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("element filled: ") .. (elementHoles[1]))
 
 // ------------------------------------------------------------ functions
 
@@ -638,11 +638,11 @@ func describe(value: Any) -> String {
 }
 
 func banner2() {                  // no return type: callable only as a statement
-    TextWriter(Stdio.stdout()).writeLine(("void function ran") .. "")
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("void function ran") .. "")
 }
-TextWriter(Stdio.stdout()).writeLine(("recursion: ") .. (factorial(6)))            // 720
-TextWriter(Stdio.stdout()).writeLine(("describe: ") .. (describe(42)) .. (" ") .. (describe("text")) .. (" ") .. (describe(true)))
-TextWriter(Stdio.stdout()).writeLine(("forward reference: ") .. (later(3)))        // declared below the call site
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("recursion: ") .. (factorial(6)))            // 720
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("describe: ") .. (describe(42)) .. (" ") .. (describe("text")) .. (" ") .. (describe(true)))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("forward reference: ") .. (later(3)))        // declared below the call site
 banner2()
 
 func later(n: Integer) -> String {
@@ -657,7 +657,7 @@ func multiline(
 ) -> String {
     return label .. ":" .. (first + second)
 }
-TextWriter(Stdio.stdout()).writeLine(("multiline: ") .. (multiline(
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("multiline: ") .. (multiline(
     1,
     2,
     "sum"
@@ -678,7 +678,7 @@ spannedLists.add("spanned")
 spannedSized := Integer[
 3
 ] {1, 2, 3}
-TextWriter(Stdio.stdout()).writeLine(("delimited lines: ") .. (grouped) .. (" ") .. (picked) .. (" ") .. (spannedLists.get(0)) .. (" ") .. (spannedSized.size))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("delimited lines: ") .. (grouped) .. (" ") .. (picked) .. (" ") .. (spannedLists.get(0)) .. (" ") .. (spannedSized.size))
 
 // Output arguments are evaluated once, left to right, before anything renders.
 func nextCount(state: Integer[]) -> Integer {
@@ -686,213 +686,217 @@ func nextCount(state: Integer[]) -> Integer {
     return state[0]
 }
 orderState := Integer[1] {10}
-TextWriter(Stdio.stdout()).writeLine(("evaluation order: ") .. (nextCount(orderState)) .. (" ") .. (nextCount(orderState)) .. (" ") .. (nextCount(orderState)) .. (" state=") .. (orderState[0]))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("evaluation order: ") .. (nextCount(orderState)) .. (" ") .. (nextCount(orderState)) .. (" ") .. (nextCount(orderState)) .. (" state=") .. (orderState[0]))
 
 // ------------------------------------------------- the Any contract methods
 sample := 255
-TextWriter(Stdio.stdout()).writeLine(("toString: ") .. (sample.toString()))
-TextWriter(Stdio.stdout()).writeLine(("type: ") .. (sample.type()))
-TextWriter(Stdio.stdout()).writeLine(("equals: ") .. (sample.equals(255)) .. (" ") .. (sample.equals(1)))
-TextWriter(Stdio.stdout()).writeLine(("hash: ") .. (sample.hashCode()))
-TextWriter(Stdio.stdout()).writeLine(("size of array: ") .. (bytes.size))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("toString: ") .. (sample.toString()))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("type: ") .. (sample.type()))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("equals: ") .. (sample.equals(255)) .. (" ") .. (sample.equals(1)))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("hash: ") .. (sample.hashCode()))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("size of array: ") .. (bytes.size))
 
 // --------------------------------------------------------------- branching
 if total > 100 {
-    TextWriter(Stdio.stdout()).writeLine(("branch: large") .. "")
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("branch: large") .. "")
 } else if total > 50 {
-    TextWriter(Stdio.stdout()).writeLine(("branch: medium") .. "")
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("branch: medium") .. "")
 } else {
-    TextWriter(Stdio.stdout()).writeLine(("branch: small") .. "")
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("branch: small") .. "")
 }
 for value in integers {
     if value == 20 {
-        TextWriter(Stdio.stdout()).writeLine(("branch: found 20") .. "")
+        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("branch: found 20") .. "")
     }
 }
 
 // ---------------------------------------------------------------- closing
-TextWriter(Stdio.stdout()).writeLine(("done: ") .. (count) .. (" ") .. (price) .. (" ") .. (title) .. (" ") .. (enabled))
-TextWriter(Stdio.stdout()).writeLine(("null renders as: ") .. (Null))   // Null renders as null (§4)
-TextWriter(Stdio.stdout()).write("")                              // writes no bytes
-TextWriter(Stdio.stdout()).writeLine("")                            // writes exactly one terminator
-TextWriter(Stdio.stdout()).writeLine(("empty output calls: done") .. "")
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("done: ") .. (count) .. (" ") .. (price) .. (" ") .. (title) .. (" ") .. (enabled))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("null renders as: ") .. (Null))   // Null renders as null (§4)
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).write("")                              // writes no bytes
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("")                            // writes exactly one terminator
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("empty output calls: done") .. "")
 // A text write has no result and exit has no result; each is callable only as a statement.
 
 // ---------------------------------------------------------- standard I/O (§11.3)
 // The bundled I/O types are ordinary Solvik types declared in packaged `.sol` sources:
-// Channel, Stdio, TextReader, TextWriter, and the IoError code namespace. No import is needed.
-out := TextWriter(Stdio.stdout())
+// solvik::io::Channel, solvik::io::Stdio, solvik::io::TextReader, solvik::io::TextWriter,
+// solvik::io::ByteReader, solvik::io::ByteWriter, solvik::io::File, and solvik::io::IoError.
+// A program names them through the `solvik::io` module and does not import them.
+out := solvik::io::TextWriter(solvik::io::Stdio.stdout())
 out.write("a write adds no terminator")
 out.writeLine("")
 out.flush()
-TextWriter(Stdio.stdout()).writeLine(("line ending is [") .. (TextWriter.LINE_ENDING) .. ("]"))
-// LINE_ENDING is a static immutable String: read it through the type, never through a writer.
-// `out.LINE_ENDING` is SOL-T001 and `TextWriter.LINE_ENDING = "x"` is SOL-T010.
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("line ending is [") .. (solvik::io::TextWriter.EOL) .. ("]"))
+// solvik::io::TextWriter.EOL is a static immutable String: read it through the type,
+// never through a writer. `out.EOL` is SOL-T001 and assigning `TextWriter.EOL` is SOL-T010.
 
-// A Channel is an opaque byte endpoint. Channel.bytes() is a duplex in-memory channel: writes
-// append, reads consume from the front, and end of input is Null rather than an empty array.
-memory := Channel.bytes()
-TextWriter(Stdio.stdout()).writeLine(("memory: open=") .. (memory.isOpen()) .. (" read=")
+// A solvik::io::Channel is an opaque byte endpoint. solvik::io::Channel.bytes() is a duplex
+// in-memory channel: writes append, reads consume from the front, and end of input is Null
+// rather than an empty array.
+memory := solvik::io::Channel.bytes()
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("memory: open=") .. (memory.isOpen()) .. (" read=")
     \ .. (memory.canRead()) .. (" write=") .. (memory.canWrite()))
-seed := TextWriter(memory)
+seed := solvik::io::TextWriter(memory)
 seed.write("first\r\nsecond\nthird\rfourth")
 seed.close()
 
 readChunk := memory.read(5)                 // "first": at most five bytes
 if readChunk != Null {
-    TextWriter(Stdio.stdout()).writeLine(("read ") .. (readChunk.size) .. (" bytes: ")
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("read ") .. (readChunk.size) .. (" bytes: ")
         \ .. (readChunk))
 }
-reader := TextReader(memory)
+reader := solvik::io::TextReader(memory)
 mut lineNumber := 0
 mut line: String? = reader.readLine()
 while line != Null {
     lineNumber = lineNumber + 1
-    TextWriter(Stdio.stdout()).writeLine(("line ") .. (lineNumber) .. (": [") .. (line) .. ("]"))
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("line ") .. (lineNumber) .. (": [") .. (line) .. ("]"))
     line = reader.readLine()
 }
-TextWriter(Stdio.stdout()).writeLine(("lines: ") .. (lineNumber))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("lines: ") .. (lineNumber))
 reader.close()                              // closes the reader, never the channel
 
 // `write` reports the bytes it accepted; `writeAll` repeats it until every byte is sent.
-sink := Channel.bytes()
+sink := solvik::io::Channel.bytes()
 payload := Byte[4] {0, 127, -128, -1}        // 0x00, 0x7F, 0x80, 0xFF survive the round trip
-TextWriter(Stdio.stdout()).writeLine(("write accepted ") .. (sink.write(payload)) .. (" bytes"))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("write accepted ") .. (sink.write(payload)) .. (" bytes"))
 sink.writeAll(Byte[2] {65, 66})
 sink.flush()
 roundTrip := sink.read(6)
 if roundTrip != Null {
-    TextWriter(Stdio.stdout()).writeLine(("round trip: ") .. (roundTrip.size) .. (" bytes, first=")
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("round trip: ") .. (roundTrip.size) .. (" bytes, first=")
         \ .. (roundTrip[0]) .. (", last=") .. (roundTrip[5]))
 }
 
-textSink := Channel.bytes()
-echoWriter := TextWriter(textSink)
+textSink := solvik::io::Channel.bytes()
+echoWriter := solvik::io::TextWriter(textSink)
 echoWriter.writeLine("echoed")
 echoWriter.close()
-echo := TextReader(textSink)
-TextWriter(Stdio.stdout()).writeLine(("echo: ") .. (echo.readLine()) .. (" eof=")
+echo := solvik::io::TextReader(textSink)
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("echo: ") .. (echo.readLine()) .. (" eof=")
     \ .. (echo.readLine() == Null))
 echo.close()
 
-// Stdio setters replace one current channel binding. A writer keeps the channel it was built
-// with, and a saved standard reference still targets the original endpoint.
-savedOut := Stdio.stdout()
-captured := Channel.bytes()
-Stdio.setStdout(captured)
-TextWriter(Stdio.stdout()).writeLine("captured to memory")
-Stdio.setStdout(savedOut)
-captureReader := TextReader(captured)
-TextWriter(Stdio.stdout()).writeLine(("captured: ") .. (captureReader.readLine()))
+// solvik::io::Stdio setters replace one current channel binding. A writer keeps the channel it
+// was built with, and a saved standard reference still targets the original endpoint.
+savedOut := solvik::io::Stdio.stdout()
+captured := solvik::io::Channel.bytes()
+solvik::io::Stdio.setStdout(captured)
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("captured to memory")
+solvik::io::Stdio.setStdout(savedOut)
+captureReader := solvik::io::TextReader(captured)
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("captured: ") .. (captureReader.readLine()))
 captureReader.close()
 
 // Standard input and standard error are the same kind of binding. Replacing stdin with a
 // readable channel exercises the reader path without depending on the process's own input.
-savedIn := Stdio.stdin()
-TextWriter(Stdio.stdout()).writeLine(("stdin readable=") .. (savedIn.canRead())
+savedIn := solvik::io::Stdio.stdin()
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("stdin readable=") .. (savedIn.canRead())
     \ .. (" writable=") .. (savedIn.canWrite()))
-memoryIn := Channel.bytes()
-seedIn := TextWriter(memoryIn)
+memoryIn := solvik::io::Channel.bytes()
+seedIn := solvik::io::TextWriter(memoryIn)
 seedIn.write("line from memory stdin\n")
 seedIn.close()
-Stdio.setStdin(memoryIn)
-fromStdin := TextReader(Stdio.stdin())
-TextWriter(Stdio.stdout()).writeLine(("stdin: ") .. (fromStdin.readLine()))
+solvik::io::Stdio.setStdin(memoryIn)
+fromStdin := solvik::io::TextReader(solvik::io::Stdio.stdin())
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("stdin: ") .. (fromStdin.readLine()))
 fromStdin.close()
-Stdio.setStdin(savedIn)
+solvik::io::Stdio.setStdin(savedIn)
 
-savedErr := Stdio.stderr()
-capturedErr := Channel.bytes()
-Stdio.setStderr(capturedErr)
-TextWriter(Stdio.stderr()).writeLine("captured stderr")
-Stdio.setStderr(savedErr)
-errReader := TextReader(capturedErr)
-TextWriter(Stdio.stdout()).writeLine(("stderr: ") .. (errReader.readLine()))
+savedErr := solvik::io::Stdio.stderr()
+capturedErr := solvik::io::Channel.bytes()
+solvik::io::Stdio.setStderr(capturedErr)
+solvik::io::TextWriter(solvik::io::Stdio.stderr()).writeLine("captured stderr")
+solvik::io::Stdio.setStderr(savedErr)
+errReader := solvik::io::TextReader(capturedErr)
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("stderr: ") .. (errReader.readLine()))
 errReader.close()
 
-// --------------------------------------------------- File and byte I/O (§11.3)
-// File owns one single-direction byte channel; ByteReader and ByteWriter borrow it. The path is
-// unique to this run and is deleted at the end, so the corpus leaves no file behind.
+// ---------------------------------------------------------- File and byte I/O (§11.3)
+// solvik::io::File owns one single-direction byte channel; solvik::io::ByteReader and
+// solvik::io::ByteWriter borrow it. The path is unique to this run and is deleted at the end,
+// so the corpus leaves no file behind.
 filePath := "solvik-example-" .. solvik::util::UUID.now().toString() .. ".bin"
-file := File.openWrite(filePath)
-TextWriter(Stdio.stdout()).writeLine(("file: path=") .. (file.path() == filePath)
+file := solvik::io::File.openWrite(filePath)
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("file: path=") .. (file.path() == filePath)
     \ .. (" open=") .. (file.isOpen()) .. (" canWrite=") .. (file.channel().canWrite()))
-bytesOut := ByteWriter(file.channel())
+bytesOut := solvik::io::ByteWriter(file.channel())
 bytesOut.write(Byte[4] {0, 127, -128, -1})
 bytesOut.flush()
 bytesOut.close()
 file.close()
 
-appended := File.openAppend(filePath)
-ByteWriter(appended.channel()).write(Byte[2] {65, 66})
+appended := solvik::io::File.openAppend(filePath)
+solvik::io::ByteWriter(appended.channel()).write(Byte[2] {65, 66})
 appended.close()
 
-readFile := File.openRead(filePath)
-TextWriter(Stdio.stdout()).writeLine(("file: canRead=") .. (readFile.channel().canRead())
+readFile := solvik::io::File.openRead(filePath)
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("file: canRead=") .. (readFile.channel().canRead())
     \ .. (" canWrite=") .. (readFile.channel().canWrite()))
-bytesIn := ByteReader(readFile.channel())
+bytesIn := solvik::io::ByteReader(readFile.channel())
 head := bytesIn.read(4)
 tail := bytesIn.read(2)
 if head != Null && tail != Null {
-    TextWriter(Stdio.stdout()).writeLine(("file bytes: ") .. (head) .. (" then ") .. (tail)
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("file bytes: ") .. (head) .. (" then ") .. (tail)
         \ .. (" eof=") .. (bytesIn.read(1) == Null))
 }
 bytesIn.close()
-TextWriter(Stdio.stdout()).writeLine(("file: reader closed, channel open=")
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("file: reader closed, channel open=")
     \ .. (readFile.channel().isOpen()))
 readFile.close()
 
-// A closed File and a closed wrapper raise the published codes.
+// A closed solvik::io::File and a closed wrapper raise the published codes.
 try {
-    closedFile := File.openRead(filePath)
+    closedFile := solvik::io::File.openRead(filePath)
     closedFile.close()
     ignored := closedFile.channel()
 } catch (error: Exception) {
-    TextWriter(Stdio.stdout()).writeLine(("file closed: ")
-        \ .. (error.getCode() == IoError.Closed))
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("file closed: ")
+        \ .. (error.getCode() == solvik::io::IoError.Closed))
 }
 try {
-    bytesGone := ByteReader(Channel.bytes())
+    bytesGone := solvik::io::ByteReader(solvik::io::Channel.bytes())
     bytesGone.close()
     ignored := bytesGone.read(1)
 } catch (error: Exception) {
-    TextWriter(Stdio.stdout()).writeLine(("byte reader closed: ")
-        \ .. (error.getCode() == IoError.Closed))
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("byte reader closed: ")
+        \ .. (error.getCode() == solvik::io::IoError.Closed))
 }
 try {
-    missingFile := File.openRead(filePath .. ".absent")
+    missingFile := solvik::io::File.openRead(filePath .. ".absent")
 } catch (error: Exception) {
-    TextWriter(Stdio.stdout()).writeLine(("file missing: ")
-        \ .. (error.getCode() == IoError.Io))
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("file missing: ")
+        \ .. (error.getCode() == solvik::io::IoError.Io))
 }
 
-TextWriter(Stdio.stdout()).writeLine(("file exists: ") .. (File.exists(filePath)))
-TextWriter(Stdio.stdout()).writeLine(("file deleted: ") .. (File.delete(filePath))
-    .. (" gone=") .. (File.exists(filePath) == false))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("file exists: ") .. (solvik::io::File.exists(filePath)))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("file deleted: ") .. (solvik::io::File.delete(filePath))
+    .. (" gone=") .. (solvik::io::File.exists(filePath) == false))
 
-// I/O failures are ordinary Solvik exceptions carrying a published IoError code.
+// I/O failures are ordinary Solvik exceptions carrying a published solvik::io::IoError code.
 try {
     memory.close()
     memory.close()                          // repeated close is harmless
-    ignored := memory.read(1)               // a closed channel raises IoError.Closed
+    ignored := memory.read(1)               // a closed channel raises solvik::io::IoError.Closed
 } catch (error: Exception) {
-    TextWriter(Stdio.stdout()).writeLine(("closed: ") .. (error.getCode() == IoError.Closed)
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("closed: ") .. (error.getCode() == solvik::io::IoError.Closed)
         \ .. (" ") .. (error.getMessage()))
 }
 try {
-    Stdio.stdout().close()                  // the original standards are protected
+    solvik::io::Stdio.stdout().close()                  // the original standards are protected
 } catch (error: Exception) {
-    TextWriter(Stdio.stdout()).writeLine(("protected: ")
-        \ .. (error.getCode() == IoError.Unsupported))
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("protected: ")
+        \ .. (error.getCode() == solvik::io::IoError.Unsupported))
 }
-malformed := Channel.bytes()
+malformed := solvik::io::Channel.bytes()
 rejected := malformed.write(Byte[1] {-1B})  // 0xFF is not valid UTF-8
-badReader := TextReader(malformed)
+badReader := solvik::io::TextReader(malformed)
 try {
     invalid := badReader.readLine()
 } catch (error: Exception) {
-    TextWriter(Stdio.stdout()).writeLine(("encoding error: ")
-        \ .. (error.getCode() == IoError.Encoding) .. (" after ") .. (rejected) .. (" byte"))
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("encoding error: ")
+        \ .. (error.getCode() == solvik::io::IoError.Encoding) .. (" after ") .. (rejected) .. (" byte"))
 }
 badReader.close()
 
@@ -921,11 +925,11 @@ type StaticOrdered {
     }
 }
 
-TextWriter(Stdio.stdout()).writeLine(("static before=") .. (StaticLog.text))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("static before=") .. (StaticLog.text))
 staticUnused: StaticLazy? = Null
-TextWriter(Stdio.stdout()).writeLine(("static mention=") .. (StaticLog.text))
-TextWriter(Stdio.stdout()).writeLine(("static ordered=") .. (StaticOrdered.state()))
-TextWriter(Stdio.stdout()).writeLine(("static ordered again=") .. (StaticOrdered.state()))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("static mention=") .. (StaticLog.text))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("static ordered=") .. (StaticOrdered.state()))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("static ordered again=") .. (StaticOrdered.state()))
 
 // The block may construct the enclosing type through its private constructor.
 type StaticConfig {
@@ -945,7 +949,7 @@ type StaticConfig {
         return value
     }
 }
-TextWriter(Stdio.stdout()).writeLine(("static singleton=") .. (StaticConfig.current().name))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("static singleton=") .. (StaticConfig.current().name))
 
 // ------------------------------------------------------- user-defined types
 // Members are private and immutable unless they say otherwise:
@@ -983,14 +987,14 @@ origin := Point(0, 0)
 corner := Point(3, 4)
 mut missing: Point? = Point(0, 0)
 missing = Null
-TextWriter(Stdio.stdout()).writeLine(("null user type: ") .. (missing) .. (" ") .. (missing == Null))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("null user type: ") .. (missing) .. (" ") .. (missing == Null))
 missing = Point(1, 1)
-TextWriter(Stdio.stdout()).writeLine(("restored user type: ") .. (missing))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("restored user type: ") .. (missing))
 corner.shift(1, -1)
-TextWriter(Stdio.stdout()).writeLine(("types: ") .. (origin) .. (" ") .. (corner) .. (" ") .. (corner.type()))
-TextWriter(Stdio.stdout()).writeLine(("pub read: ") .. (corner.x) .. (" ") .. (corner.y) .. (" ") .. (corner.labelCount()))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("types: ") .. (origin) .. (" ") .. (corner) .. (" ") .. (corner.type()))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("pub read: ") .. (corner.x) .. (" ") .. (corner.y) .. (" ") .. (corner.labelCount()))
 corner.x = 10                      // `pub mut`: writable from outside
-TextWriter(Stdio.stdout()).writeLine(("pub write: ") .. (corner.x))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("pub write: ") .. (corner.x))
 
 // `size` is the array's member, not a reserved name: a type may still declare its own function of
 // that name, and calling it stays a call. The array field is read with the member.
@@ -1003,7 +1007,7 @@ type Ledger {
         return self.items.size
     }
 }
-TextWriter(Stdio.stdout()).writeLine(("user size(): ") .. (Ledger().size()) .. (" ") .. (Ledger().items.size))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("user size(): ") .. (Ledger().size()) .. (" ") .. (Ledger().items.size))
 
 // These are compile errors, by design:
 //   corner.labels            -> private member
@@ -1013,7 +1017,7 @@ TextWriter(Stdio.stdout()).writeLine(("user size(): ") .. (Ledger().size()) .. (
 
 // An array may hold user values, and its elements keep their declared type.
 points := Point[2] {Point(1, 1), Point(2, 2)}
-TextWriter(Stdio.stdout()).writeLine(("user array: ") .. (points[0]) .. (" ") .. (points[1]) .. (" ") .. (points[1].type()))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("user array: ") .. (points[0]) .. (" ") .. (points[1]) .. (" ") .. (points[1].type()))
 
 // Overloaded constructors and methods share a name when their parameter types differ. A user
 // `equals(other: Any)` sees a checked peer of its own type, so private fields and methods of the
@@ -1054,14 +1058,14 @@ type Version {
 v1 := Version(1, 2)
 v2 := Version(1, 2)
 v3 := Version(2)
-TextWriter(Stdio.stdout()).writeLine(("user equals: ") .. (v1 == v2) .. (" ") .. (v1.equals(v2)) .. (" ") .. (v1.equals(v3)) .. (" ") .. (v1.equals(Null)) .. (" ") .. (v1.equals("not a version")))
-TextWriter(Stdio.stdout()).writeLine(("user hash: ") .. (v1.hashCode()) .. (" ") .. (v2.hashCode()) .. (" ") .. (v1.equals(v2) && v1.hashCode() == v2.hashCode()))
-TextWriter(Stdio.stdout()).writeLine(("user overloads: ") .. (v3) .. (" ") .. (v1.label(7)) .. (" ") .. (v1.label("seven")))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("user equals: ") .. (v1 == v2) .. (" ") .. (v1.equals(v2)) .. (" ") .. (v1.equals(v3)) .. (" ") .. (v1.equals(Null)) .. (" ") .. (v1.equals("not a version")))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("user hash: ") .. (v1.hashCode()) .. (" ") .. (v2.hashCode()) .. (" ") .. (v1.equals(v2) && v1.hashCode() == v2.hashCode()))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("user overloads: ") .. (v3) .. (" ") .. (v1.label(7)) .. (" ") .. (v1.label("seven")))
 // Contract overrides must be public and exact: equals(other: Any) -> Boolean,
 // hashCode() -> Integer, and toString() -> String. `type()` is final and cannot be overridden.
 versionOwners := solvik::collections::Map<Version, String>()
 versionOwners.put(v1, "ann")
-TextWriter(Stdio.stdout()).writeLine(("user key: ") .. (versionOwners.get(v2)) .. (" ") .. (versionOwners.size()))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("user key: ") .. (versionOwners.get(v2)) .. (" ") .. (versionOwners.size()))
 // These are compile errors, by design:
 //   v1.sameAs(v2)            -> a private method
 //   v1.major                 -> a private field
@@ -1085,7 +1089,7 @@ type Token {
         return value
     }
 }
-TextWriter(Stdio.stdout()).writeLine(("private constructor: ") .. (Token.of("made").text()))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("private constructor: ") .. (Token.of("made").text()))
 
 type Solvik {
 
@@ -1106,7 +1110,7 @@ type Solvik {
         }
     }
 }
-TextWriter(Stdio.stdout()).writeLine((Solvik().describe()) .. "")
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Solvik().describe()) .. "")
 
 // ------------------------------------------------------ static type members
 // `static` declares a field or function that belongs to the type, not to an instance. It is
@@ -1150,12 +1154,12 @@ firstVisitor := Visitors()
 secondVisitor := Visitors()
 firstVisit := firstVisitor.visit()
 secondVisit := secondVisitor.visit()
-TextWriter(Stdio.stdout()).writeLine(("static: ") .. (firstVisit) .. (" ") .. (secondVisit) .. (" ") .. (Visitors.report()))
-TextWriter(Stdio.stdout()).writeLine(("static init: ") .. (Visitors.labelPlus) .. (" ") .. (Visitors.doubledLimit))
-TextWriter(Stdio.stdout()).writeLine(("static factory: ") .. (Visitors.make().type()))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("static: ") .. (firstVisit) .. (" ") .. (secondVisit) .. (" ") .. (Visitors.report()))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("static init: ") .. (Visitors.labelPlus) .. (" ") .. (Visitors.doubledLimit))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("static factory: ") .. (Visitors.make().type()))
 Visitors.reset()
 Visitors.limit = 5
-TextWriter(Stdio.stdout()).writeLine(("static reset: ") .. (Visitors.report()) .. (" ") .. (Visitors.kind) .. (Visitors.limit))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("static reset: ") .. (Visitors.report()) .. (" ") .. (Visitors.kind) .. (Visitors.limit))
 
 // A static field is immutable unless `mut`; `Visitors.kind = "other"` is SOL-T010. A static field
 // needs an initializer, and static members of a generic type may not use its type parameters.
@@ -1175,7 +1179,7 @@ type StaticNames {
     static pub func hashCode() -> Integer { return 7 }
     static pub func equals(value: Any) -> Boolean { return value == 1 }
 }
-TextWriter(Stdio.stdout()).writeLine(("static contract names: ") .. (StaticNames.toString()) .. (" ") .. (StaticNames.hashCode()) .. (" ") .. (StaticNames.equals(1)) .. (" ") .. (StaticNames.equals(2)))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("static contract names: ") .. (StaticNames.toString()) .. (" ") .. (StaticNames.hashCode()) .. (" ") .. (StaticNames.equals(1)) .. (" ") .. (StaticNames.equals(2)))
 
 // ------------------------------------------------------- imports and modules (§1, §10)
 // `import "path"` names a file, relative to this file, and contributes declarations only: its
@@ -1198,10 +1202,10 @@ import "include-extra.sol" // imports include.sol itself: this is a diamond, not
 
 ticket := showcase::issue(7)
 board := showcase::Board("sprint")
-TextWriter(Stdio.stdout()).writeLine(("pub field read: ") .. (ticket.id))
-TextWriter(Stdio.stdout()).writeLine(("import: ") .. (ticket) .. (" ") .. (showcase::label(ticket)) .. (" ") .. (board.first()))
-TextWriter(Stdio.stdout()).writeLine(("import: ") .. (showcase::nextAfter(41)) .. (" ") .. (ticket.type()) .. (" ") .. (board.type()))
-TextWriter(Stdio.stdout()).writeLine(("import diamond: ") .. (showcase::extraTag()))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("pub field read: ") .. (ticket.id))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("import: ") .. (ticket) .. (" ") .. (showcase::label(ticket)) .. (" ") .. (board.first()))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("import: ") .. (showcase::nextAfter(41)) .. (" ") .. (ticket.type()) .. (" ") .. (board.type()))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("import diamond: ") .. (showcase::extraTag()))
 
 // This file reopens `module showcase` too. The private `Counter` declared in include.sol is
 // visible here because a declaration is private to its module, not to its file; the module-level
@@ -1220,7 +1224,7 @@ module showcase {
 
     pub func hidden() -> String { return prefix() }
 }
-TextWriter(Stdio.stdout()).writeLine(("module merge: ") .. (showcase::counter()) .. (" ") .. (showcase::label(1)) .. (" ") .. (showcase::label("x")) .. (" ") .. (showcase::hidden()))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("module merge: ") .. (showcase::counter()) .. (" ") .. (showcase::label(1)) .. (" ") .. (showcase::label("x")) .. (" ") .. (showcase::hidden()))
 
 // A trait declared in an imported file still supports the qualified default form. The explicit
 // call skips virtual dispatch and invokes that trait's default body.
@@ -1230,7 +1234,7 @@ type Echoer implements showcase::Echo {
         return "override:" .. showcase::Echo.echo(self, value)
     }
 }
-TextWriter(Stdio.stdout()).writeLine(("qualified trait default: ") .. (Echoer().echo("x")) .. (" ") .. (Echoer().echo("y")))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("qualified trait default: ") .. (Echoer().echo("x")) .. (" ") .. (Echoer().echo("y")))
 // Trait.default(self, ...) is valid only inside an instance function of a concrete type that
 // directly implements the trait. `self` is the first argument and is not a declared parameter, and
 // the selected trait overload must have a body (SOL-T001).
@@ -1245,11 +1249,11 @@ TextWriter(Stdio.stdout()).writeLine(("qualified trait default: ") .. (Echoer().
 mapRaw := solvik::collections::Map<Any, Any>()
 mapRaw.put("alpha", 1)
 mapRaw.put("beta", 2)
-TextWriter(Stdio.stdout()).writeLine(("map: ") .. (mapRaw.size()) .. (" ") .. (mapRaw.get("alpha")) .. (" ") .. (mapRaw.containsKey("beta")) .. (" ") .. (mapRaw.containsValue(9)))
-TextWriter(Stdio.stdout()).writeLine(("map remove: ") .. (mapRaw.removeValue("beta")) .. (" ") .. (mapRaw.size()))
-TextWriter(Stdio.stdout()).writeLine(("map text: ") .. (mapRaw.toString().size() > 0))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("map: ") .. (mapRaw.size()) .. (" ") .. (mapRaw.get("alpha")) .. (" ") .. (mapRaw.containsKey("beta")) .. (" ") .. (mapRaw.containsValue(9)))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("map remove: ") .. (mapRaw.removeValue("beta")) .. (" ") .. (mapRaw.size()))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("map text: ") .. (mapRaw.toString().size() > 0))
 mapRaw.clear()
-TextWriter(Stdio.stdout()).writeLine(("map clear: ") .. (mapRaw.size()) .. (" ") .. (mapRaw.isEmpty()))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("map clear: ") .. (mapRaw.size()) .. (" ") .. (mapRaw.isEmpty()))
 
 // 2. Map with generics: a typed key and value, checked by the compiler. `get` returns `V?`,
 // because java.util.HashMap.get can return null (§11).
@@ -1258,18 +1262,18 @@ mapTyped.put("ann", 10)
 mapTyped.put("bob", 20)
 annScore := mapTyped.get("ann")               // Integer?
 if annScore == Null {
-    TextWriter(Stdio.stdout()).writeLine(("map typed: absent") .. "")
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("map typed: absent") .. "")
 } else {
-    TextWriter(Stdio.stdout()).writeLine(("map typed: ") .. (annScore + mapTyped.size()) .. (" ") .. (mapTyped.size()) .. (" ") .. (mapTyped.isEmpty()))
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("map typed: ") .. (annScore + mapTyped.size()) .. (" ") .. (mapTyped.size()) .. (" ") .. (mapTyped.isEmpty()))
 }
 
 // 3. Stack over Any: peek() and pop() return `T?` because a Java Stack may be empty.
 stackRaw := solvik::collections::Stack<Any>()
 stackRaw.push("first")
 stackRaw.push("second")
-TextWriter(Stdio.stdout()).writeLine(("stack: ") .. (stackRaw.size()) .. (" ") .. (stackRaw.peek()) .. (" ") .. (stackRaw.search("first")))
-TextWriter(Stdio.stdout()).writeLine(("stack text: ") .. (stackRaw))
-TextWriter(Stdio.stdout()).writeLine(("stack pop: ") .. (stackRaw.pop()) .. (" ") .. (stackRaw.size()) .. (" ") .. (stackRaw.empty()))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("stack: ") .. (stackRaw.size()) .. (" ") .. (stackRaw.peek()) .. (" ") .. (stackRaw.search("first")))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("stack text: ") .. (stackRaw))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("stack pop: ") .. (stackRaw.pop()) .. (" ") .. (stackRaw.size()) .. (" ") .. (stackRaw.empty()))
 
 // 4. Stack with generics.
 stackTyped := solvik::collections::Stack<Integer>()
@@ -1280,7 +1284,7 @@ firstPop := stackTyped.pop()
 secondPop := stackTyped.pop()
 thirdPop := stackTyped.pop()
 if firstPop != Null && secondPop != Null && thirdPop != Null {
-    TextWriter(Stdio.stdout()).writeLine(("stack typed: ") .. (firstPop + secondPop + thirdPop))
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("stack typed: ") .. (firstPop + secondPop + thirdPop))
 }
 
 // 5. ArrayList through the `List` binding, over Any.
@@ -1288,13 +1292,13 @@ listRaw := solvik::collections::List<Any>()
 listRaw.add("alpha")
 listRaw.add("beta")
 listRaw.add("gamma")
-TextWriter(Stdio.stdout()).writeLine(("list: ") .. (listRaw.size()) .. (" ") .. (listRaw.get(0)) .. (" ") .. (listRaw.indexOf("gamma")))
-TextWriter(Stdio.stdout()).writeLine(("list text: ") .. (listRaw))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("list: ") .. (listRaw.size()) .. (" ") .. (listRaw.get(0)) .. (" ") .. (listRaw.indexOf("gamma")))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("list text: ") .. (listRaw))
 listRaw.set(1, "BETA")
-TextWriter(Stdio.stdout()).writeLine(("list: ") .. (listRaw.get(1)) .. (" ") .. (listRaw.contains("beta")) .. (" ") .. (listRaw.contains("BETA")))
-TextWriter(Stdio.stdout()).writeLine(("list remove: ") .. (listRaw.remove(0)) .. (" ") .. (listRaw.size()) .. (" ") .. (listRaw.removeValue("BETA")))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("list: ") .. (listRaw.get(1)) .. (" ") .. (listRaw.contains("beta")) .. (" ") .. (listRaw.contains("BETA")))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("list remove: ") .. (listRaw.remove(0)) .. (" ") .. (listRaw.size()) .. (" ") .. (listRaw.removeValue("BETA")))
 listRaw.clear()
-TextWriter(Stdio.stdout()).writeLine(("list clear: ") .. (listRaw.size()) .. (" ") .. (listRaw.isEmpty()) .. (" ") .. (listRaw))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("list clear: ") .. (listRaw.size()) .. (" ") .. (listRaw.isEmpty()) .. (" ") .. (listRaw))
 
 // 6. ArrayList with generics: `List<T>` is a java.util.ArrayList<T>, and get() returns T?.
 listTyped := solvik::collections::List<Integer>()
@@ -1305,7 +1309,7 @@ firstItem := listTyped.get(0)
 secondItem := listTyped.get(1)
 thirdItem := listTyped.get(2)
 if firstItem != Null && secondItem != Null && thirdItem != Null {
-    TextWriter(Stdio.stdout()).writeLine(("list sum: ") .. (firstItem + secondItem + thirdItem) .. (" ") .. (listTyped.size()))
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("list sum: ") .. (firstItem + secondItem + thirdItem) .. (" ") .. (listTyped.size()))
 }
 
 // ------------------------------------- solvik::util::UUID (value type in Solvik)
@@ -1317,15 +1321,15 @@ if firstItem != Null && secondItem != Null && thirdItem != Null {
 // module-private and never appear in a program.
 
 uuid := solvik::util::UUID.now()
-TextWriter(Stdio.stdout()).writeLine(("uuid: ") .. (uuid) .. (" stamp: ") .. (uuid.timestamp()) .. (" type: ") .. (uuid.type()))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("uuid: ") .. (uuid) .. (" stamp: ") .. (uuid.timestamp()) .. (" type: ") .. (uuid.type()))
 uuidText := uuid.toString()
-TextWriter(Stdio.stdout()).writeLine(("uuid shape: ") .. (uuidText.size()) .. (" ") .. (uuidText.substring(14, 15)) .. (" ") .. ("89ab".indexOf(uuidText.substring(19, 20)) >= 0))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("uuid shape: ") .. (uuidText.size()) .. (" ") .. (uuidText.substring(14, 15)) .. (" ") .. ("89ab".indexOf(uuidText.substring(19, 20)) >= 0))
 
 // Equality is by value: parse() rebuilds an equal value, while `==` stays reference identity.
 // parse() returns `UUID?`, because it reports rejection by returning Null.
 uuidCopy := solvik::util::UUID.parse(uuidText)
 if uuidCopy != Null {
-    TextWriter(Stdio.stdout()).writeLine(("uuid equal: ") .. (uuidCopy.equals(uuid)) .. (" ") .. (uuidCopy.hashCode() == uuid.hashCode()) .. (" ") .. (uuidCopy == uuid) .. (" ") .. (uuid.timestamp() == uuidCopy.timestamp()))
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("uuid equal: ") .. (uuidCopy.equals(uuid)) .. (" ") .. (uuidCopy.hashCode() == uuid.hashCode()) .. (" ") .. (uuidCopy == uuid) .. (" ") .. (uuid.timestamp() == uuidCopy.timestamp()))
 }
 
 // compareTo() orders by timestamp, then by the random fields, so ids sort by creation time.
@@ -1333,12 +1337,12 @@ if uuidCopy != Null {
 earlyId := solvik::util::UUID.parse("0190f2a4-7b3c-7a1d-8e2f-3c4d5e6f7a8b")
 laterId := solvik::util::UUID.parse("0190f2a4-7b3d-7a1d-8e2f-3c4d5e6f7a8b")
 if earlyId != Null && laterId != Null {
-    TextWriter(Stdio.stdout()).writeLine(("uuid order: ") .. (earlyId.compareTo(laterId) < 0) .. (" ") .. (laterId.compareTo(earlyId) > 0) .. (" ") .. (earlyId.compareTo(earlyId) == 0))
-    TextWriter(Stdio.stdout()).writeLine(("uuid stamps: ") .. (earlyId.timestamp()) .. (" ") .. (laterId.timestamp() - earlyId.timestamp()))
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("uuid order: ") .. (earlyId.compareTo(laterId) < 0) .. (" ") .. (laterId.compareTo(earlyId) > 0) .. (" ") .. (earlyId.compareTo(earlyId) == 0))
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("uuid stamps: ") .. (earlyId.timestamp()) .. (" ") .. (laterId.timestamp() - earlyId.timestamp()))
 }
 
 // parse() accepts either case and rejects anything that is not canonical version 7 text.
-TextWriter(Stdio.stdout()).writeLine(("uuid parse: ") .. (solvik::util::UUID.parse("0190F2A4-7B3C-7A1D-8E2F-3C4D5E6F7A8B")) .. (" ") .. (solvik::util::UUID.parse("0190f2a4-7b3c-4a1d-8e2f-3c4d5e6f7a8b") == Null) .. (" ") .. (solvik::util::UUID.parse("junk") == Null))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("uuid parse: ") .. (solvik::util::UUID.parse("0190F2A4-7B3C-7A1D-8E2F-3C4D5E6F7A8B")) .. (" ") .. (solvik::util::UUID.parse("0190f2a4-7b3c-4a1d-8e2f-3c4d5e6f7a8b") == Null) .. (" ") .. (solvik::util::UUID.parse("junk") == Null))
 
 // Value equality and hashing reach Java's HashMap through the generated overrides, so a UUID
 // works as a key and a reparsed value finds the same entry.
@@ -1346,7 +1350,7 @@ uuidOwners := solvik::collections::Map<solvik::util::UUID, String>()
 uuidOwners.put(uuid, "ann")
 reparsed := solvik::util::UUID.parse(uuid.toString())
 if reparsed != Null {
-    TextWriter(Stdio.stdout()).writeLine(("uuid key: ") .. (uuidOwners.get(reparsed)) .. (" ") .. (uuidOwners.size()))
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("uuid key: ") .. (uuidOwners.get(reparsed)) .. (" ") .. (uuidOwners.size()))
 }
 
 // ----------------------------------------------------------- modules
@@ -1489,41 +1493,41 @@ module java {
 }
 
 shapeCorner := shapes::Point(2, 3)
-TextWriter(Stdio.stdout()).writeLine(("modules: ") .. (shapeCorner) .. (" ") .. (shapeCorner.type()))
-TextWriter(Stdio.stdout()).writeLine(("modules: ") .. (shapes::area(2, 3)) .. (" ") .. (shapes::square(4)))
-TextWriter(Stdio.stdout()).writeLine(("modules: ") .. (shapes::describe(shapeCorner.shifted(1))))
-TextWriter(Stdio.stdout()).writeLine(("modules: ") .. (Point(9, 9)) .. (" and ") .. (shapes::Point(9, 9)))
-TextWriter(Stdio.stdout()).writeLine(("distinct types: ") .. (origin === shapeCorner) .. (" ") .. (origin == shapeCorner))
-TextWriter(Stdio.stdout()).writeLine(("modules: ") .. (shapes::audit(21)) .. (" ") .. (shapes::Report().summary(4)))
-TextWriter(Stdio.stdout()).writeLine(("module static: ") .. (shapes::Report.kind()) .. (" ") .. (shapes::Report.category))
-TextWriter(Stdio.stdout()).writeLine(("nested modules: ") .. (shapes::solids::volume(3)) .. (" ") .. (shapes::solids::Cube(4).volume()) .. (" ") .. (shapes::solids::Cube(2).type()))
-TextWriter(Stdio.stdout()).writeLine(("nested merge: ") .. (shapes::solids::surface(2)) .. (" ") .. (widgets::solids::kind()))
-TextWriter(Stdio.stdout()).writeLine(("java root module: ") .. (java::sample::tag()) .. (" ") .. (java::sample::Widget()) .. (" ") .. (java::sample::Widget().type()))
-TextWriter(Stdio.stdout()).writeLine(("static native: ") .. (showcase::Math.abs(-7)) .. (" ") .. (showcase::Math.max(3, 9)) .. (" ") .. (showcase::Math.sqrt(81.0)) .. (" ") .. (showcase::Math.floor(2.9)))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("modules: ") .. (shapeCorner) .. (" ") .. (shapeCorner.type()))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("modules: ") .. (shapes::area(2, 3)) .. (" ") .. (shapes::square(4)))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("modules: ") .. (shapes::describe(shapeCorner.shifted(1))))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("modules: ") .. (Point(9, 9)) .. (" and ") .. (shapes::Point(9, 9)))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("distinct types: ") .. (origin === shapeCorner) .. (" ") .. (origin == shapeCorner))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("modules: ") .. (shapes::audit(21)) .. (" ") .. (shapes::Report().summary(4)))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("module static: ") .. (shapes::Report.kind()) .. (" ") .. (shapes::Report.category))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("nested modules: ") .. (shapes::solids::volume(3)) .. (" ") .. (shapes::solids::Cube(4).volume()) .. (" ") .. (shapes::solids::Cube(2).type()))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("nested merge: ") .. (shapes::solids::surface(2)) .. (" ") .. (widgets::solids::kind()))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("java root module: ") .. (java::sample::tag()) .. (" ") .. (java::sample::Widget()) .. (" ") .. (java::sample::Widget().type()))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("static native: ") .. (showcase::Math.abs(-7)) .. (" ") .. (showcase::Math.max(3, 9)) .. (" ") .. (showcase::Math.sqrt(81.0)) .. (" ") .. (showcase::Math.floor(2.9)))
 
 // An instance binding wraps one Java object, and `native "name"` picks the Java member each
 // Solvik declaration selects; a declaration with no return type would discard the Java result.
 die := showcase::Die()
-TextWriter(Stdio.stdout()).writeLine(("instance native: ") .. (die.roll(6) >= 0) .. (" ") .. (die.roll(6) < 6) .. (" ") .. (die.type()))
-TextWriter(Stdio.stdout()).writeLine(("renamed native: ") .. (showcase::NumberText.text(42)) .. (" ") .. (showcase::NumberText.parse("7")) .. (" ") .. (showcase::NumberText.parse(showcase::NumberText.text(-3))))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("instance native: ") .. (die.roll(6) >= 0) .. (" ") .. (die.roll(6) < 6) .. (" ") .. (die.type()))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("renamed native: ") .. (showcase::NumberText.text(42)) .. (" ") .. (showcase::NumberText.parse("7")) .. (" ") .. (showcase::NumberText.parse(showcase::NumberText.text(-3))))
 
 // `hashCode` is routed to the Java list's `size()` by the declaration; `toString` is not declared,
 // so it renders the delegate, and `type()` always reports the Solvik name.
 bag := showcase::Bag()
 bag.put("one")
 bag.put("two")
-TextWriter(Stdio.stdout()).writeLine(("binding contract: ") .. (bag.hashCode()) .. (" ") .. (bag.count()) .. (" ") .. (bag) .. (" ") .. (bag.type()))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("binding contract: ") .. (bag.hashCode()) .. (" ") .. (bag.count()) .. (" ") .. (bag) .. (" ") .. (bag.type()))
 
 // A native type is a reference type too, so it can hold Null; the type stays the binding type.
 func missingBag(value: showcase::Bag?) -> Boolean { return value == Null }
-TextWriter(Stdio.stdout()).writeLine(("native null: ") .. (missingBag(Null)) .. (" ") .. (missingBag(bag)))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("native null: ") .. (missingBag(Null)) .. (" ") .. (missingBag(bag)))
 
 // A declared `toString()` routes the render contract to the Java method and puts the override on
 // the adapter. `append` has no return type, so its Java result is discarded as a statement.
 builder := showcase::Text()
 builder.append("hello")
 builder.append(" world")
-TextWriter(Stdio.stdout()).writeLine(("declared toString: ") .. (builder) .. (" ") .. (builder.toString()) .. (" ") .. (builder.type()))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("declared toString: ") .. (builder) .. (" ") .. (builder.toString()) .. (" ") .. (builder.type()))
 
 // A checked Java exception from a native call surfaces as SOL-R011; unchecked ones propagate.
 // Invalid classes, unsupported shapes, and ambiguous overloads are SOL-T013 at the declaration.
@@ -1538,7 +1542,7 @@ owed := showcase::Amount("1000")
 paid := showcase::Amount("1000")
 ledger := solvik::collections::Map<showcase::Amount, Integer>()
 ledger.put(owed, 7)
-TextWriter(Stdio.stdout()).writeLine(("binding equality: ") .. (owed.equals(paid)) .. (" ") .. (owed == paid) .. (" ") .. (owed === paid) .. (" ") .. (owed.text()) .. (" ") .. (ledger.get(paid)) .. (" ") .. (ledger.get(showcase::Amount("2000"))))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("binding equality: ") .. (owed.equals(paid)) .. (" ") .. (owed == paid) .. (" ") .. (owed === paid) .. (" ") .. (owed.text()) .. (" ") .. (ledger.get(paid)) .. (" ") .. (ledger.get(showcase::Amount("2000"))))
 
 // ----------------------------------------------------------- generics
 
@@ -1608,8 +1612,8 @@ letterBucket.put("b")
 letterBucket.put("c")
 numberBucket := Bucket(7)
 numberBucket.put(8)
-TextWriter(Stdio.stdout()).writeLine(("generic array: ") .. (letterBucket.count()) .. (" ") .. (letterBucket.items))
-TextWriter(Stdio.stdout()).writeLine(("generic array numbers: ") .. (numberBucket.get(1)) .. (" ") .. (numberBucket.count()))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("generic array: ") .. (letterBucket.count()) .. (" ") .. (letterBucket.items))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("generic array numbers: ") .. (numberBucket.get(1)) .. (" ") .. (numberBucket.count()))
 
 numberBox := Box(41)                 // Box<Integer>, inferred
 textBox := Box("hello")              // Box<String>, inferred
@@ -1617,20 +1621,20 @@ pair := Pair(1, "one")               // Pair<Integer, String>
 nested := Box(Box(1))                // Box<Box<Integer>>
 boxedValue := numberBox.get()        // Integer?
 if boxedValue != Null {
-    TextWriter(Stdio.stdout()).writeLine(("generics: ") .. (boxedValue + 1) .. (" ") .. (numberBox.type()))
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("generics: ") .. (boxedValue + 1) .. (" ") .. (numberBox.type()))
 }
-TextWriter(Stdio.stdout()).writeLine(("generic equality: ") .. (numberBox.sameAs(41)) .. (" ") .. (textBox.sameAs("hello")) .. (" ") .. (textBox.sameAs("other")))
-TextWriter(Stdio.stdout()).writeLine(("generics: ") .. (textBox.get()) .. (" ") .. (textBox.type()))
-TextWriter(Stdio.stdout()).writeLine(("generics: ") .. (pair.describe()) .. (" ") .. (pair.type()))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("generic equality: ") .. (numberBox.sameAs(41)) .. (" ") .. (textBox.sameAs("hello")) .. (" ") .. (textBox.sameAs("other")))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("generics: ") .. (textBox.get()) .. (" ") .. (textBox.type()))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("generics: ") .. (pair.describe()) .. (" ") .. (pair.type()))
 innerBox := nested.get()             // Box<Integer>?
 if innerBox != Null {
-    TextWriter(Stdio.stdout()).writeLine(("generics: ") .. (innerBox.get()) .. (" ") .. (nested.type()))
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("generics: ") .. (innerBox.get()) .. (" ") .. (nested.type()))
 }
 mut nullableBox? := Box(1)      // inferred nullable: Box<Integer>?
 nullableBox = Null
-TextWriter(Stdio.stdout()).writeLine(("generic null: ") .. (nullableBox) .. (" ") .. (nullableBox == Null))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("generic null: ") .. (nullableBox) .. (" ") .. (nullableBox == Null))
 nullableBox = Box(2)
-TextWriter(Stdio.stdout()).writeLine(("generic restored: ") .. (nullableBox.get()) .. (" ") .. (nullableBox.type()))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("generic restored: ") .. (nullableBox.get()) .. (" ") .. (nullableBox.type()))
 
 // A static member of a generic type may not use the type's parameters, because Java's static
 // context has no instance type arguments: `static func make(value: T)` is SOL-T001.
@@ -1644,8 +1648,8 @@ func overloadLabel(value: String) -> String { return "string:" .. value }
 func rank(value: Any) -> String { return "any" }
 func rank(value: Number) -> String { return "number" }
 func rank(value: Integer) -> String { return "integer" }
-TextWriter(Stdio.stdout()).writeLine(("overloads: ") .. (overloadLabel(7)) .. (" ") .. (overloadLabel("seven")))
-TextWriter(Stdio.stdout()).writeLine(("specific overloads: ") .. (rank(1)) .. (" ") .. (rank(1.5)) .. (" ") .. (rank("text")))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("overloads: ") .. (overloadLabel(7)) .. (" ") .. (overloadLabel("seven")))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("specific overloads: ") .. (rank(1)) .. (" ") .. (rank(1.5)) .. (" ") .. (rank("text")))
 // Exact duplicate signatures and signatures with the same Java erasure are SOL-T001; an
 // inapplicable call is SOL-T001, and equally good candidates are SOL-T014.
 
@@ -1746,22 +1750,22 @@ func missingTask(task: NamedTask?) -> Boolean { return task == Null }
 
 sumTask := SumTask(20, 22)
 sumTask.ready()
-TextWriter(Stdio.stdout()).writeLine(("trait defaults: ") .. (sumTask.summary()) .. (" ") .. (describeTask(sumTask)) .. (" ") .. (sumTask.format(7)) .. (" ") .. (sumTask.format("seven")) .. (" ") .. (describeTask(LoudTask())))
-TextWriter(Stdio.stdout()).writeLine(("trait null: ") .. (missingTask(Null)) .. (" ") .. (missingTask(sumTask)))
-TextWriter(Stdio.stdout()).writeLine(("composed defaults: ") .. (Combined().name()))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("trait defaults: ") .. (sumTask.summary()) .. (" ") .. (describeTask(sumTask)) .. (" ") .. (sumTask.format(7)) .. (" ") .. (sumTask.format("seven")) .. (" ") .. (describeTask(LoudTask())))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("trait null: ") .. (missingTask(Null)) .. (" ") .. (missingTask(sumTask)))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("composed defaults: ") .. (Combined().name()))
 exampleCloseable := ExampleCloseable()
 exampleCloseable.close()
-TextWriter(Stdio.stdout()).writeLine(("native trait default: ") .. (exampleCloseable.closeLabel()))
-TextWriter(Stdio.stdout()).writeLine(("reused trait default: ") .. (Backoff().delayMs(2)))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("native trait default: ") .. (exampleCloseable.closeLabel()))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("reused trait default: ") .. (Backoff().delayMs(2)))
 sumThread := solvik::concurrency::Thread.start(sumTask)
 sumThread.await()
 sumThread.await(1L) // the completed-thread timed form is deterministic
 sumThread.await(0L) // zero waits indefinitely, like the bare form; the thread is already done
-TextWriter(Stdio.stdout()).writeLine(("virtual thread result: ") .. (sumTask.result()) .. (" alive=") .. (sumThread.isAlive()))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("virtual thread result: ") .. (sumTask.result()) .. (" alive=") .. (sumThread.isAlive()))
 // A completed thread can still take an interrupt request; its interrupt status is observable while
 // it stays terminated. This exercises both remaining Thread methods deterministically.
 sumThread.interrupt()
-TextWriter(Stdio.stdout()).writeLine(("thread interrupt: ") .. (sumThread.isInterrupted()) .. (" alive=") .. (sumThread.isAlive()))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("thread interrupt: ") .. (sumThread.isInterrupted()) .. (" alive=") .. (sumThread.isAlive()))
 // Thread.start always uses Java 25 virtual threads; there is no platform-thread constructor and no
 // isVirtual() query. A positive await may time out, so isAlive() is checked before relying on state.
 // `0L` waits indefinitely and a negative duration follows Java's IllegalArgumentException.
@@ -1780,21 +1784,21 @@ func requirePositive(value: Integer) {
     if value <= 0 {
         raise Exception(FailureCodes.Denied, "value must be positive, found " .. value)
     }
-    TextWriter(Stdio.stdout()).writeLine(("accepted ") .. (value))
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("accepted ") .. (value))
 }
 
 // One exception type carries an Integer code, so the code is what a handler dispatches on.
 try {
     requirePositive(0)
 } catch (problem: Exception) {
-    TextWriter(Stdio.stdout()).writeLine(("caught: ") .. (problem))
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("caught: ") .. (problem))
     if problem.getCode() == FailureCodes.Denied {
-        TextWriter(Stdio.stdout()).writeLine(("dispatch: denied ") .. (problem.getMessage()))
+        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("dispatch: denied ") .. (problem.getMessage()))
     }
     switch problem.getCode() {
-        case 4001 { TextWriter(Stdio.stdout()).writeLine(("switch: denied") .. "") }
-        case 4002 { TextWriter(Stdio.stdout()).writeLine(("switch: missing") .. "") }
-        default { TextWriter(Stdio.stdout()).writeLine(("switch: other") .. "") }
+        case 4001 { solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("switch: denied") .. "") }
+        case 4002 { solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("switch: missing") .. "") }
+        default { solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("switch: other") .. "") }
     }
 }
 requirePositive(5)
@@ -1807,10 +1811,10 @@ func cleanupReturn(flag: Boolean) -> Integer {
         }
         return 2
     } finally {
-        TextWriter(Stdio.stdout()).writeLine(("cleanup after return") .. "")
+        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("cleanup after return") .. "")
     }
 }
-TextWriter(Stdio.stdout()).writeLine(("returned ") .. (cleanupReturn(true)) .. (" ") .. (cleanupReturn(false)))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("returned ") .. (cleanupReturn(true)) .. (" ") .. (cleanupReturn(false)))
 
 mut trace := ""
 for step in Integer[3] {1, 2, 3} {
@@ -1826,17 +1830,17 @@ for step in Integer[3] {1, 2, 3} {
         trace ..= "!"
     }
 }
-TextWriter(Stdio.stdout()).writeLine(("finally trace: ") .. (trace))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("finally trace: ") .. (trace))
 
 // try/finally without a catch: the cleanup runs and the raise keeps traveling outwards.
 try {
     try {
         raise Exception(FailureCodes.Missing, "inner failure")
     } finally {
-        TextWriter(Stdio.stdout()).writeLine(("inner cleanup") .. "")
+        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("inner cleanup") .. "")
     }
 } catch (outermost: Exception) {
-    TextWriter(Stdio.stdout()).writeLine(("outer caught: ") .. (outermost.getCode()) .. (" ") .. (outermost.getMessage()))
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("outer caught: ") .. (outermost.getCode()) .. (" ") .. (outermost.getMessage()))
 }
 
 // A handler may raise again, and a nullable Exception narrows like any other nullable value.
@@ -1850,10 +1854,10 @@ try {
         raise wrapped
     }
 } catch (recaught: Exception) {
-    TextWriter(Stdio.stdout()).writeLine(("reraised: ") .. (recaught))
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("reraised: ") .. (recaught))
 }
 if heldOver != Null {
-    TextWriter(Stdio.stdout()).writeLine(("heldOver: ") .. (heldOver.type()) .. (" ") .. (heldOver.getCode()) .. (" ") .. (String(heldOver)))
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("heldOver: ") .. (heldOver.type()) .. (" ") .. (heldOver.getCode()) .. (" ") .. (String(heldOver)))
 }
 
 // An exception is an ordinary value: it can be built, held, and raised where it is needed.
@@ -1861,16 +1865,16 @@ planned := Exception(FailureCodes.Denied, "planned failure")
 try {
     raise planned
 } catch (held: Exception) {
-    TextWriter(Stdio.stdout()).writeLine(("planned: ") .. (held.getCode()) .. (" ") .. (held.getMessage()))
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("planned: ") .. (held.getCode()) .. (" ") .. (held.getMessage()))
 }
 
 // ------------------------------------------------------------ exit status
 boxedCount := numberBox.get()
 if boxedCount != Null && boxedCount > 100 {
-    TextWriter(Stdio.stdout()).writeLine(("unexpected") .. "")
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("unexpected") .. "")
     exit(1)
 }
-TextWriter(Stdio.stdout()).writeLine(("final status code: 0") .. "")
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("final status code: 0") .. "")
 exit()                                    // bare exit(); `exit(1)` above is the code form
 
 // ------------------------------------------------- what this file cannot show

@@ -80,10 +80,10 @@ class UuidLibraryExecutionTest {
         long before = System.currentTimeMillis();
         String output = run("""
                 id := solvik::util::UUID.now()
-                TextWriter(Stdio.stdout()).writeLine((id.toString()) .. "")
-                TextWriter(Stdio.stdout()).writeLine((id.timestamp()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((id.toString()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((id.timestamp()) .. "")
                 text := id.toString()
-                TextWriter(Stdio.stdout()).writeLine((text.size()) .. (" ") .. (text.substring(14, 15)) .. (" ") .. ("89ab".indexOf(text.substring(19, 20)) >= 0))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((text.size()) .. (" ") .. (text.substring(14, 15)) .. (" ") .. ("89ab".indexOf(text.substring(19, 20)) >= 0))
                 """, directory);
         long after = System.currentTimeMillis();
 
@@ -102,9 +102,9 @@ class UuidLibraryExecutionTest {
                 mut copy: solvik::util::UUID? = solvik::util::UUID.parse(id.toString())
                 mut alsoCopy: solvik::util::UUID? = solvik::util::UUID.parse(id.toString())
                 if copy != Null && alsoCopy != Null {
-                    TextWriter(Stdio.stdout()).writeLine((copy.toString() == id.toString()) .. (" ") .. (copy.equals(id)) .. (" ") .. (copy.hashCode() == id.hashCode()))
-                    TextWriter(Stdio.stdout()).writeLine((copy.equals(alsoCopy)) .. (" ") .. (copy == alsoCopy))
-                    TextWriter(Stdio.stdout()).writeLine((id.equals("not a uuid")) .. (" ") .. (id.equals(Null)) .. (" ") .. (copy.timestamp() == id.timestamp()))
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((copy.toString() == id.toString()) .. (" ") .. (copy.equals(id)) .. (" ") .. (copy.hashCode() == id.hashCode()))
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((copy.equals(alsoCopy)) .. (" ") .. (copy == alsoCopy))
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((id.equals("not a uuid")) .. (" ") .. (id.equals(Null)) .. (" ") .. (copy.timestamp() == id.timestamp()))
                 }
                 """, directory);
 
@@ -129,11 +129,11 @@ class UuidLibraryExecutionTest {
                 }
                 for candidate in candidates {
                     if candidate == Null {
-                        TextWriter(Stdio.stdout()).writeLine((true) .. (" ") .. (false))
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((true) .. (" ") .. (false))
                     } else {
                         parsed := solvik::util::UUID.parse(candidate)
                         matches := parsed != Null && parsed.toString() == "0190f2a4-7b3c-7a1d-8e2f-3c4d5e6f7a8b"
-                        TextWriter(Stdio.stdout()).writeLine((parsed == Null) .. (" ") .. (matches))
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((parsed == Null) .. (" ") .. (matches))
                     }
                 }
                 """, directory);
@@ -163,11 +163,11 @@ class UuidLibraryExecutionTest {
                 if base != Null && later != Null && low != Null && high != Null {
                     same := solvik::util::UUID.parse(base.toString())
                     if same != Null {
-                        TextWriter(Stdio.stdout()).writeLine((base.compareTo(later) < 0) .. (" ") .. (later.compareTo(base) > 0))
-                        TextWriter(Stdio.stdout()).writeLine((base.compareTo(base) == 0) .. (" ") .. (base.compareTo(same) == 0))
-                        TextWriter(Stdio.stdout()).writeLine((low.compareTo(high) < 0) .. (" ") .. (high.compareTo(low) > 0))
-                        TextWriter(Stdio.stdout()).writeLine((low.compareTo(base) < 0) .. (" ") .. (base.compareTo(high) < 0))
-                        TextWriter(Stdio.stdout()).writeLine((later.timestamp() - base.timestamp()) .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((base.compareTo(later) < 0) .. (" ") .. (later.compareTo(base) > 0))
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((base.compareTo(base) == 0) .. (" ") .. (base.compareTo(same) == 0))
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((low.compareTo(high) < 0) .. (" ") .. (high.compareTo(low) > 0))
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((low.compareTo(base) < 0) .. (" ") .. (base.compareTo(high) < 0))
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((later.timestamp() - base.timestamp()) .. "")
                     }
                 }
                 """, directory);
@@ -190,7 +190,7 @@ class UuidLibraryExecutionTest {
                     ids.put(id.toString(), index)
                     index = index + 1
                 }
-                TextWriter(Stdio.stdout()).writeLine((ids.size()) .. (" ") .. (malformed))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((ids.size()) .. (" ") .. (malformed))
                 """, directory);
 
         assertThat(output).isEqualTo("2000 0\n");
@@ -204,10 +204,10 @@ class UuidLibraryExecutionTest {
                 mut copy: solvik::util::UUID? = solvik::util::UUID.parse(text)
                 early := solvik::util::UUID.parse("00000000-0000-7000-8000-000000000000")
                 late := solvik::util::UUID.parse("0190f2a4-7b3d-7a1d-8e2f-3c4d5e6f7a8b")
-                TextWriter(Stdio.stdout()).writeLine((text.size()) .. (" ") .. (text.substring(14, 15)))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((text.size()) .. (" ") .. (text.substring(14, 15)))
                 if copy != Null && early != Null && late != Null {
-                    TextWriter(Stdio.stdout()).writeLine((copy.equals(id)) .. (" ") .. (copy.hashCode() == id.hashCode()) .. (" ") .. (copy == id))
-                    TextWriter(Stdio.stdout()).writeLine((early.compareTo(late) < 0) .. (" ") .. (late.compareTo(early) > 0) .. (" ") .. (early.compareTo(early) == 0) .. (" ") .. (solvik::util::UUID.parse("nope") == Null))
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((copy.equals(id)) .. (" ") .. (copy.hashCode() == id.hashCode()) .. (" ") .. (copy == id))
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((early.compareTo(late) < 0) .. (" ") .. (late.compareTo(early) > 0) .. (" ") .. (early.compareTo(early) == 0) .. (" ") .. (solvik::util::UUID.parse("nope") == Null))
                 }
                 """, directory);
 
@@ -223,7 +223,7 @@ class UuidLibraryExecutionTest {
                 .contains("SOL-T001")
                 .contains("the constructor of 'solvik::util::UUID' is private");
         assertThat(compilationError("""
-                TextWriter(Stdio.stdout()).writeLine((solvik::util::Hex.toHexString(Long(255))) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((solvik::util::Hex.toHexString(Long(255))) .. "")
                 """, directory))
                 .contains("SOL-T011")
                 .contains("type 'solvik::util::Hex' is private to module 'solvik::util'");
@@ -249,7 +249,7 @@ class UuidLibraryExecutionTest {
     void values_can_only_be_created_by_the_type(@TempDir Path directory) throws Exception {
         Map<String, String> files = transpile("""
                 id := solvik::util::UUID.now()
-                TextWriter(Stdio.stdout()).writeLine((id) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((id) .. "")
                 """, directory);
 
         assertThat(files).containsKeys("Solvik$Program.java", "solvik/util/UUID.java",

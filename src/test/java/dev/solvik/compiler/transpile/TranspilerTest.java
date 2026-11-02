@@ -47,7 +47,7 @@ class TranspilerTest {
 
         @Test
         void output_is_deterministic() {
-            String source = "a := 1\nTextWriter(Stdio.stdout()).writeLine((a) .. \"\")";
+            String source = "a := 1\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((a) .. \"\")";
             assertThat(transpile(source)).isEqualTo(transpile(source));
         }
 
@@ -63,7 +63,7 @@ class TranspilerTest {
                     type Pair<A, B> {
                         pub func Pair() { }
                     }
-                    TextWriter(Stdio.stdout()).writeLine((Box(1).type()) .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Box(1).type()) .. "")
                     """).get("Solvik$Program.java");
 
             assertThat(java)
@@ -97,7 +97,7 @@ class TranspilerTest {
                     flag := i < d
                     bytes := Byte[2] {1, 2}
                     mut n := bytes.size
-                    TextWriter(Stdio.stdout()).writeLine((s) .. (flag) .. (n))
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((s) .. (flag) .. (n))
                     """).get("Solvik$Program.java");
 
             assertThat(java)
@@ -118,12 +118,12 @@ class TranspilerTest {
         void uses_kr_braces() {
             String java = transpile("""
                     if 1 < 2 {
-                        TextWriter(Stdio.stdout()).writeLine(("a") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("a") .. "")
                     } else {
-                        TextWriter(Stdio.stdout()).writeLine(("b") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("b") .. "")
                     }
                     while 1 < 2 {
-                        TextWriter(Stdio.stdout()).writeLine(("c") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("c") .. "")
                     }
                     """).get("Solvik$Program.java");
 
@@ -135,7 +135,7 @@ class TranspilerTest {
 
         @Test
         void escapes_string_literals_for_java() {
-            String java = transpile("TextWriter(Stdio.stdout()).writeLine((\"quote \\\" tab \\t\") .. \"\")").get("Solvik$Program.java");
+            String java = transpile("solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((\"quote \\\" tab \\t\") .. \"\")").get("Solvik$Program.java");
             assertThat(java).contains("\"quote \\\" tab \\t\"");
         }
     }
@@ -201,12 +201,12 @@ class TranspilerTest {
         @DisplayName("arithmetic, widening, division, and concatenation")
         void runs_arithmetic(@TempDir Path directory) throws Exception {
             String output = run("""
-                    TextWriter(Stdio.stdout()).writeLine((1 + 2 * 3) .. "")
-                    TextWriter(Stdio.stdout()).writeLine((1 + 1.5) .. "")
-                    TextWriter(Stdio.stdout()).writeLine((10 / 3) .. "")
-                    TextWriter(Stdio.stdout()).writeLine((10 % 3) .. "")
-                    TextWriter(Stdio.stdout()).writeLine((-7 / 2) .. "")
-                    TextWriter(Stdio.stdout()).writeLine(("n=" .. 4) .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1 + 2 * 3) .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1 + 1.5) .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((10 / 3) .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((10 % 3) .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((-7 / 2) .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("n=" .. 4) .. "")
                     """, directory);
 
             assertThat(output).isEqualTo("7\n2.5\n3\n1\n-3\nn=4\n");
@@ -223,19 +223,19 @@ class TranspilerTest {
                         total = total + bytes[i]
                         i = i + 1
                     }
-                    TextWriter(Stdio.stdout()).writeLine((total) .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((total) .. "")
 
                     for b in bytes {
-                        TextWriter(Stdio.stdout()).write((b) .. (","))
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).write((b) .. (","))
                     }
-                    TextWriter(Stdio.stdout()).writeLine("")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("")
 
                     if total > 50 {
-                        TextWriter(Stdio.stdout()).writeLine(("big") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("big") .. "")
                     } else if total > 10 {
-                        TextWriter(Stdio.stdout()).writeLine(("medium") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("medium") .. "")
                     } else {
-                        TextWriter(Stdio.stdout()).writeLine(("small") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("small") .. "")
                     }
                     """, directory);
 
@@ -250,10 +250,10 @@ class TranspilerTest {
                         return value.type() .. "=" .. value
                     }
 
-                    TextWriter(Stdio.stdout()).writeLine((describe(42)) .. "")
-                    TextWriter(Stdio.stdout()).writeLine((describe("text")) .. "")
-                    TextWriter(Stdio.stdout()).writeLine((describe(true)) .. "")
-                    TextWriter(Stdio.stdout()).writeLine((Null) .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((describe(42)) .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((describe("text")) .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((describe(true)) .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Null) .. "")
                     """, directory);
 
             assertThat(output).isEqualTo("Integer=42\nString=text\nBoolean=true\nnull\n");
@@ -267,7 +267,7 @@ class TranspilerTest {
             Files.createDirectories(directory.resolve("classes"));
             Map<String, String> files = transpile("""
                     zero := 0
-                    TextWriter(Stdio.stdout()).writeLine((10 / zero) .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((10 / zero) .. "")
                     """);
             for (Map.Entry<String, String> entry : files.entrySet()) {
                 Path $path = sourceDirectory.resolve(entry.getKey());

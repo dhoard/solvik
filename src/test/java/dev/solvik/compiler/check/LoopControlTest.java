@@ -128,7 +128,7 @@ class LoopControlTest {
                     }
                 }
                 for item in items {
-                    TextWriter(Stdio.stdout()).writeLine((item) .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((item) .. "")
                 }
                 """, TypeChecker.LOOP_CONTROL_OUTSIDE_LOOP);
     }
@@ -157,7 +157,7 @@ class LoopControlTest {
                 items := Integer[1] {1}
                 for item in items {
                     continue
-                    TextWriter(Stdio.stdout()).writeLine((item) .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((item) .. "")
                 }
                 """, TypeChecker.UNREACHABLE);
     }
@@ -175,7 +175,7 @@ class LoopControlTest {
                     }
                     return n .. ""
                 }
-                TextWriter(Stdio.stdout()).writeLine((firstEven(0)) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((firstEven(0)) .. "")
                 """);
     }
 

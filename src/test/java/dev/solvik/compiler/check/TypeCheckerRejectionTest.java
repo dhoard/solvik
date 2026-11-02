@@ -71,14 +71,14 @@ class TypeCheckerRejectionTest {
             "mut a := 1 === 1",
             "mut a := Byte(1) < Byte(2)",
             "bytes := Byte[2] {1, 2}\nx := bytes[Byte(1)]",
-            "mut a := 1\nTextWriter(Stdio.stdout()).writeLine((a.hashCode()) .. \"\")",
-            "mut a := 1\nTextWriter(Stdio.stdout()).writeLine((a.toString()) .. \"\")",
-            "mut a := 1\nTextWriter(Stdio.stdout()).writeLine((a.type()) .. \"\")",
-            "mut a := 1\nTextWriter(Stdio.stdout()).writeLine((a.equals(2)) .. \"\")",
-            "bytes := Byte[2] {1, 2}\nTextWriter(Stdio.stdout()).writeLine((bytes.size) .. \"\")",
+            "mut a := 1\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((a.hashCode()) .. \"\")",
+            "mut a := 1\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((a.toString()) .. \"\")",
+            "mut a := 1\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((a.type()) .. \"\")",
+            "mut a := 1\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((a.equals(2)) .. \"\")",
+            "bytes := Byte[2] {1, 2}\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((bytes.size) .. \"\")",
             "func f(a: Any) -> String {\n    return a.type()\n}\ns := f(1)",
             "mut a: Integer? = Null\nif true {\n    a = 1\n}",
-            "nested := 1\nif true {\n    inner := 2\n    TextWriter(Stdio.stdout()).writeLine((inner) .. \"\")\n}",
+            "nested := 1\nif true {\n    inner := 2\n    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((inner) .. \"\")\n}",
             "mut a := 1\nmut b := a\nb = 2",
     })
     @DisplayName("accepts programs that follow the rules")
@@ -89,17 +89,17 @@ class TypeCheckerRejectionTest {
     @Test
     void rejects_unary_on_void_and_method_arity_errors() {
         assertRejected("func note() {\n}\nx := -note()");
-        assertRejected("mut a := 1\nTextWriter(Stdio.stdout()).writeLine((a.size(1)) .. \"\")");
-        assertRejected("bytes := Byte[1] {1}\nTextWriter(Stdio.stdout()).writeLine((bytes.size(1)) .. \"\")");
-        assertRejected("mut a := 1\nTextWriter(Stdio.stdout()).writeLine((a.equals()) .. \"\")");
-        assertRejected("mut a := 1\nTextWriter(Stdio.stdout()).writeLine((a.equals(1, 2)) .. \"\")");
+        assertRejected("mut a := 1\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((a.size(1)) .. \"\")");
+        assertRejected("bytes := Byte[1] {1}\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((bytes.size(1)) .. \"\")");
+        assertRejected("mut a := 1\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((a.equals()) .. \"\")");
+        assertRejected("mut a := 1\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((a.equals(1, 2)) .. \"\")");
     }
 
     @Test
     void rejects_unknown_and_unsupported_constructs() {
-        assertThat(codes("TextWriter(Stdio.stdout()).writeLine((nope()) .. \"\")")).contains(TypeChecker.TYPE_ERROR);
-        assertThat(codes("mut a := 1\nTextWriter(Stdio.stdout()).writeLine((a.field) .. \"\")")).contains(TypeChecker.TYPE_ERROR);
-        assertThat(codes("mut a := 1\nTextWriter(Stdio.stdout()).writeLine((a.nope()) .. \"\")")).contains(TypeChecker.TYPE_ERROR);
+        assertThat(codes("solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((nope()) .. \"\")")).contains(TypeChecker.TYPE_ERROR);
+        assertThat(codes("mut a := 1\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((a.field) .. \"\")")).contains(TypeChecker.TYPE_ERROR);
+        assertThat(codes("mut a := 1\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((a.nope()) .. \"\")")).contains(TypeChecker.TYPE_ERROR);
         assertThat(codes("type Point { }")).isEmpty(); // declaring a type is now supported
         assertThat(codes("mut a := name[1]")).contains(TypeChecker.TYPE_ERROR);
     }
@@ -107,19 +107,19 @@ class TypeCheckerRejectionTest {
     @Test
     @DisplayName("an array's size is a read-only member, never a function")
     void rejects_the_array_size_call_form_and_writes_to_the_member() {
-        assertThat(codes("values := Integer[2] {1, 2}\nTextWriter(Stdio.stdout()).writeLine((values.size()) .. \"\")"))
+        assertThat(codes("values := Integer[2] {1, 2}\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((values.size()) .. \"\")"))
                 .containsExactly(TypeChecker.TYPE_ERROR);
-        assertThat(codes("values := Integer[2] {1, 2}\nTextWriter(Stdio.stdout()).writeLine((values.size(1)) .. \"\")"))
+        assertThat(codes("values := Integer[2] {1, 2}\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((values.size(1)) .. \"\")"))
                 .contains(TypeChecker.TYPE_ERROR);
         assertThat(codes("values := Integer[2] {1, 2}\nvalues.size = 3"))
                 .containsExactly(TypeChecker.IMMUTABLE_MEMBER);
         assertThat(codes("values := Integer[2] {1, 2}\nvalues.size ..= \"x\""))
                 .containsExactly(TypeChecker.IMMUTABLE_MEMBER);
-        assertThat(codes("values := Integer[2] {1, 2}\nTextWriter(Stdio.stdout()).writeLine((values.length) .. \"\")"))
+        assertThat(codes("values := Integer[2] {1, 2}\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((values.length) .. \"\")"))
                 .containsExactly(TypeChecker.TYPE_ERROR);
-        assertThat(codes("text := \"abc\"\nTextWriter(Stdio.stdout()).writeLine((text.size) .. \"\")"))
+        assertThat(codes("text := \"abc\"\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((text.size) .. \"\")"))
                 .containsExactly(TypeChecker.TYPE_ERROR);
-        assertAccepted("values := Integer[2] {1, 2}\nTextWriter(Stdio.stdout()).writeLine((values.size) .. \"\")");
+        assertAccepted("values := Integer[2] {1, 2}\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((values.size) .. \"\")");
     }
 
     @Test
@@ -153,7 +153,7 @@ class TypeCheckerRejectionTest {
 
     @Test
     void rejects_for_in_over_a_value_that_is_not_an_array() {
-        assertRejected("for x in 1 {\n    TextWriter(Stdio.stdout()).writeLine((x) .. \"\")\n}");
+        assertRejected("for x in 1 {\n    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((x) .. \"\")\n}");
     }
 
     @Test

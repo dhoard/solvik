@@ -38,9 +38,9 @@ class ShadowingTest {
                 mut x := 1
                 {
                     mut x := 2
-                    TextWriter(Stdio.stdout()).writeLine((x) .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((x) .. "")
                 }
-                TextWriter(Stdio.stdout()).writeLine((x) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((x) .. "")
                 """);
     }
 
@@ -50,7 +50,7 @@ class ShadowingTest {
                 mut x := 1
                 {
                     mut x := outer x + 1
-                    TextWriter(Stdio.stdout()).writeLine((x) .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((x) .. "")
                 }
                 """);
     }
@@ -62,7 +62,7 @@ class ShadowingTest {
                 {
                     mut count := 10
                     outer count = outer count + 1
-                    TextWriter(Stdio.stdout()).writeLine((count) .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((count) .. "")
                 }
                 """);
     }
@@ -75,7 +75,7 @@ class ShadowingTest {
                     mut x := 2
                     {
                         mut x := outer x + 10
-                        TextWriter(Stdio.stdout()).writeLine((x) .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((x) .. "")
                     }
                 }
                 """);
@@ -87,9 +87,9 @@ class ShadowingTest {
                 value := 1
                 {
                     value := "text"
-                    TextWriter(Stdio.stdout()).writeLine((value) .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((value) .. "")
                 }
-                TextWriter(Stdio.stdout()).writeLine((value) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((value) .. "")
                 """);
     }
 
@@ -102,19 +102,19 @@ class ShadowingTest {
                         return item .. " over " .. outer item
                     }
                 }
-                TextWriter(Stdio.stdout()).writeLine((describe(3)) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((describe(3)) .. "")
                 """);
         assertAccepted("""
                 items := Integer[2] {1, 2}
                 for item in items {
                     item := item * 100
-                    TextWriter(Stdio.stdout()).writeLine((item) .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((item) .. "")
                 }
                 """);
         assertAccepted("""
                 items := Integer[1] {7}
                 for item in items {
-                    TextWriter(Stdio.stdout()).writeLine((item) .. (" ") .. (outer item))
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((item) .. (" ") .. (outer item))
                 }
                 """);
     }
@@ -126,7 +126,7 @@ class ShadowingTest {
                 slot = 5
                 {
                     mut slot := 9
-                    TextWriter(Stdio.stdout()).writeLine((slot) .. (" ") .. (outer slot))
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((slot) .. (" ") .. (outer slot))
                 }
                 """);
     }
@@ -136,14 +136,14 @@ class ShadowingTest {
         assertRejected("""
                 mut x := 1
                 mut x := 2
-                TextWriter(Stdio.stdout()).writeLine((x) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((x) .. "")
                 """);
         assertRejected("""
                 mut x := 1
                 {
                     y := 2
                     y := 3
-                    TextWriter(Stdio.stdout()).writeLine((x) .. (y))
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((x) .. (y))
                 }
                 """);
     }
@@ -155,14 +155,14 @@ class ShadowingTest {
                 items := Integer[1] {1}
                 for item in items {
                     item := 2
-                    TextWriter(Stdio.stdout()).writeLine((item) .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((item) .. "")
                 }
                 """);
         assertAccepted("""
                 items := Integer[1] {1}
                 for item in items {
                     items := item
-                    TextWriter(Stdio.stdout()).writeLine((items) .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((items) .. "")
                 }
                 """);
     }
@@ -171,12 +171,12 @@ class ShadowingTest {
     void outer_without_an_enclosing_binding_is_rejected() {
         assertRejected("""
                 mut x := 1
-                TextWriter(Stdio.stdout()).writeLine((outer x) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((outer x) .. "")
                 """);
         assertRejected("""
                 mut x := 1
                 {
-                    TextWriter(Stdio.stdout()).writeLine((outer y) .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((outer y) .. "")
                 }
                 """);
     }
@@ -186,7 +186,7 @@ class ShadowingTest {
         assertRejected("""
                 {
                     mut slot := 9
-                    TextWriter(Stdio.stdout()).writeLine((outer slot) .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((outer slot) .. "")
                 }
                 """);
     }
@@ -217,7 +217,7 @@ class ShadowingTest {
     void outer_is_a_reserved_word() {
         assertRejected("""
                 outer := 1
-                TextWriter(Stdio.stdout()).writeLine((outer) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((outer) .. "")
                 """);
     }
 }

@@ -85,7 +85,7 @@ class RuntimeAbortTest {
     void division_by_zero_reports_its_code(@TempDir Path directory) throws Exception {
         Abort abort = runAborting("""
                 divisor := 0
-                TextWriter(Stdio.stdout()).writeLine((10 / divisor) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((10 / divisor) .. "")
                 """, directory);
 
         assertThat(abort.code()).isEqualTo("SOL-R001");
@@ -97,7 +97,7 @@ class RuntimeAbortTest {
     void remainder_by_zero_reports_its_code(@TempDir Path directory) throws Exception {
         Abort abort = runAborting("""
                 divisor := 0
-                TextWriter(Stdio.stdout()).writeLine((10 % divisor) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((10 % divisor) .. "")
                 """, directory);
 
         assertThat(abort.code()).isEqualTo("SOL-R002");
@@ -108,7 +108,7 @@ class RuntimeAbortTest {
     void non_terminating_division_reports_its_code(@TempDir Path directory) throws Exception {
         Abort abort = runAborting("""
                 divisor := BigDecimal(3)
-                TextWriter(Stdio.stdout()).writeLine((BigDecimal(1.0) / divisor) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((BigDecimal(1.0) / divisor) .. "")
                 """, directory);
 
         assertThat(abort.code()).isEqualTo("SOL-R003");
@@ -119,7 +119,7 @@ class RuntimeAbortTest {
     void index_conversion_and_conversions_report_their_codes(@TempDir Path directory) throws Exception {
         Abort conversion = runAborting("""
                 text := "abc"
-                TextWriter(Stdio.stdout()).writeLine((Integer(text)) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Integer(text)) .. "")
                 """, directory);
         assertThat(conversion.code()).isEqualTo("SOL-R006");
         assertThat(conversion.message()).isEqualTo("cannot convert 'abc' to Integer");
@@ -142,7 +142,7 @@ class RuntimeAbortTest {
         Abort read = runAborting("""
                 items := Integer[2] {1, 2}
                 index := 5
-                TextWriter(Stdio.stdout()).writeLine((items[index]) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((items[index]) .. "")
                 """, directory);
         assertThat(read.cause()).isInstanceOf(IndexOutOfBoundsException.class);
 
@@ -169,7 +169,7 @@ class RuntimeAbortTest {
                 }
 
                 map := raw::Map()
-                TextWriter(Stdio.stdout()).writeLine((map.get("absent")) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((map.get("absent")) .. "")
                 """, directory);
 
         assertThat(abort.code()).isEqualTo("SOL-R008");
@@ -184,7 +184,7 @@ class RuntimeAbortTest {
     void a_computed_zero_still_aborts_at_run_time(@TempDir Path directory) throws Exception {
         Abort abort = runAborting("""
                 zero := 0
-                TextWriter(Stdio.stdout()).writeLine((1 / zero) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1 / zero) .. "")
                 """, directory);
 
         assertThat(abort.code()).isEqualTo("SOL-R001");

@@ -190,7 +190,7 @@ module jdk {
         static pub func sqrt(value: Double) -> Double
     }
 }
-TextWriter(Stdio.stdout()).writeLine((jdk::Math.abs(-3)) .. " " .. (jdk::Math.sqrt(81.0)))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((jdk::Math.abs(-3)) .. " " .. (jdk::Math.sqrt(81.0)))
 ```
 
 A native type that exports only static functions is generated without a delegate
@@ -222,27 +222,27 @@ public Object $payload() { return this.$payload; }
 ```
 
 A native constructor computes the payload; a native instance method passes `this.$payload` as the
-adapter's first argument; a native static method passes none. A `Channel` parameter passes
-`channel.$payload()`, and a binding that returns a `Channel` wraps the adapter's result with
-`Channel.$of(...)`. Every other value crosses in its language carrier (`List<Byte>` for `Byte[]`,
+adapter's first argument; a native static method passes none. A `solvik::io::Channel` parameter passes
+`channel.$payload()`, and a binding that returns a `solvik::io::Channel` wraps the adapter's result with
+`solvik::io::Channel.$of(...)`. Every other value crosses in its language carrier (`List<Byte>` for `Byte[]`,
 `String`, `Boolean`, `Integer`). Names contain `$`, so no Solvik declaration can collide with them.
 
 The adapter itself is emitted as `solvik/Solvik$Io.java` only when a binding is lowered. It is
 compiler-emitted Java using the JDK and the program's generated `$solvikException`; it is not a
 runtime JAR, and its `$` name is not a Solvik identifier. It implements the standard handles,
-synchronized `Stdio` bindings, the duplex in-memory channel, strict UTF-8 read/write, CR/LF/CRLF
+synchronized `solvik::io::Stdio` bindings, the duplex in-memory channel, strict UTF-8 read/write, CR/LF/CRLF
 line recognition, flush-on-write, reader/writer close that never closes the borrowed channel, and
-the `IoError`-coded `Exception` failures documented in `LANGUAGE.md` §11.6.
+the `solvik::io::IoError`-coded `Exception` failures documented in `LANGUAGE.md` §11.6.
 
-The filesystem additions are five more entries in the same registry: `File::openReadChannel`,
+The filesystem additions are five more entries in the same registry: `solvik::io::File.openReadChannel`,
 `openWriteChannel`, and `openAppendChannel` return an owned single-direction channel through
-`PAYLOAD_RESULT`; `File::exists` and `File::delete` return `Boolean`. They call
+`PAYLOAD_RESULT`; `solvik::io::File.exists` and `solvik::io::File.delete` return `Boolean`. They call
 `Solvik$Io.openFileRead/openFileWrite/openFileAppend/fileExists/fileDelete`, which use
 `FileInputStream`, `FileOutputStream`, and `java.nio.file.Files`. An invalid path becomes
-`IoError.InvalidArgument`; an I/O failure becomes `IoError.Io`. `ByteReader` and `ByteWriter` have
-no registry entry: their `read`, `write`, `flush`, and `close` are Solvik bodies over `Channel`.
-The generated `File` class therefore has no `$payload`; only its type-private open helpers call
-the adapter, and every public `File` signature names Solvik types only.
+`solvik::io::IoError.InvalidArgument`; an I/O failure becomes `solvik::io::IoError.Io`. `solvik::io::ByteReader` and `solvik::io::ByteWriter` have
+no registry entry: their `read`, `write`, `flush`, and `close` are Solvik bodies over `solvik::io::Channel`.
+The generated `solvik::io::File` class therefore has no `$payload`; only its type-private open helpers call
+the adapter, and every public `solvik::io::File` signature names Solvik types only.
 
 A declared non-null result is checked at the boundary: the call is wrapped in
 `Solvik$Program.checked(value)`, which aborts with `SOL-R008` when the Java member
@@ -398,12 +398,13 @@ type, so a generated program that declares generic types stays warning-free unde
 
 The unified lowering path applies these type-directed rules:
 
-- **Output:** there are no output builtins. `TextWriter.write`, `TextWriter.writeLine`,
-  `TextWriter.flush`, and `TextWriter.close` are calls on a generated Solvik class, and the class's
+- **Output:** there are no output builtins. `solvik::io::TextWriter.write`, `solvik::io::TextWriter.writeLine`,
+  `solvik::io::TextWriter.flush`, and `solvik::io::TextWriter.close` are calls on a generated Solvik class, and the class's
   native members call the generated adapter. `writeLine(text)` is compiled from its `.sol` body,
-  `write(text .. TextWriter.LINE_ENDING)`, so the terminator is the published static value and not
-  a literal in the backend. A temporary `TextWriter(Stdio.stdout())` in statement position emits
-  `new TextWriter(Stdio.stdout()).writeLine(...)` and needs no flush: the adapter flushes after
+  `write(text .. TextWriter.EOL)`, so the terminator is the published static value and not
+  a literal in the backend. A temporary `solvik::io::TextWriter(solvik::io::Stdio.stdout())` in statement position emits
+  `new TextWriter(Stdio.stdout()).writeLine(...)` (the renderer imports `solvik.io.TextWriter` and
+  `solvik.io.Stdio`) and needs no flush: the adapter flushes after
   each successful write. No generated statement calls `System.out.print`; a program that wants
   direct JVM output must bind a Java API explicitly.
 - **Concatenation:** `..` lowers to one Java string concatenation when both operands render
@@ -477,12 +478,12 @@ The unified lowering path applies these type-directed rules:
   rejects a negative code with `SOL-R012`, so a code computed at run time is checked
   once, where the value is built.
 
-For example, `TextWriter(Stdio.stdout()).write("hello")` becomes
+For example, `solvik::io::TextWriter(solvik::io::Stdio.stdout()).write("hello")` becomes
 `new TextWriter(Stdio.stdout()).write("hello");`, and
-`TextWriter(Stdio.stdout()).writeLine("hello")` becomes
-`new TextWriter(Stdio.stdout()).writeLine("hello");`. The appended terminator lives in the
-generated `TextWriter` class as `static String LINE_ENDING = TextWriter.lineSeparator();`. No
-external Solvik runtime is required.
+`solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("hello")` becomes
+`new TextWriter(Stdio.stdout()).writeLine("hello");` with the renderer's imports for `solvik.io.TextWriter`
+and `solvik.io.Stdio`. The appended terminator lives in the generated `solvik.io.TextWriter` class as
+`static String EOL = TextWriter.lineSeparator();`. No external Solvik runtime is required.
 
 The backend emits primitive Java return types for instance
 `equals(other: Any?) -> Boolean` and `hashCode() -> Integer` overrides, as required by
@@ -627,16 +628,16 @@ suppression. `example.sol` runs end to end
 `Map` (Java `HashMap`), `Stack`, `List` (Java `ArrayList`) from the packaged library,
 a static-only `java.lang.Math` binding plus a renamed static and an instance
 binding in `include.sol`, exception handling through `raise`, `catch`, and `finally`, and the
-standard I/O surface: `Channel`, `Channel.bytes()`, `Stdio`, `TextReader`, `TextWriter`,
-`TextWriter.LINE_ENDING`, in-memory redirection, and a caught `IoError`.
+standard I/O surface: `solvik::io::Channel`, `solvik::io::Channel.bytes()`, `solvik::io::Stdio`, `solvik::io::TextReader`, `solvik::io::TextWriter`,
+`solvik::io::TextWriter.EOL`, in-memory redirection, and a caught `solvik::io::IoError`.
 
 The bundled-binding regressions are `NativeBindingTest` (parser/checker acceptance and rejection,
-trusted provenance, registry mismatch), `BundledIoExecutionTest` (channel, reader, writer, `Stdio`,
+trusted provenance, registry mismatch), `BundledIoExecutionTest` (channel, reader, writer, `solvik::io::Stdio`,
 line terminators, error codes, and reader/writer close semantics), and
 `ExampleCorpusTest.generated_java_is_warning_free`, which compiles the emitted adapter under
 `-Xlint:all -Werror` with an empty dependency classpath. `GeneratedOutputOptimizationTest` pins
 that a program without I/O emits neither `Solvik$Io.java` nor the I/O type files.
-`BundledFileExecutionTest` covers `File`, `ByteReader`, and `ByteWriter`: open modes, capabilities,
+`BundledFileExecutionTest` covers `solvik::io::File`, `solvik::io::ByteReader`, and `solvik::io::ByteWriter`: open modes, capabilities,
 byte round trips, close/borrow rules, path failures, and the generated public shape.
 `StaticInitializerTest` covers the static-context rules and rejection cases;
 `StaticInitializerExecutionTest` pins once-only first use, source ordering, private-constructor

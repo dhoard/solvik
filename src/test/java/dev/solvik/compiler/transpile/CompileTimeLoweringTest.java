@@ -73,11 +73,11 @@ class CompileTimeLoweringTest {
     @Test
     void emits_direct_text_writer_calls_without_output_builtins() {
         String java = transpile("""
-                TextWriter(Stdio.stdout()).write(("hello") .. "")
-                TextWriter(Stdio.stdout()).writeLine(("world") .. "")
-                TextWriter(Stdio.stdout()).writeLine("")
-                TextWriter(Stdio.stdout()).write("")
-                TextWriter(Stdio.stdout()).writeLine(("value=") .. (1))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).write(("hello") .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("world") .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).write("")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("value=") .. (1))
                 """).get("Solvik$Program.java");
 
         assertThat(java).contains(
@@ -97,12 +97,12 @@ class CompileTimeLoweringTest {
                 mut i := 2
                 d := 1.5
                 b := Byte(3)
-                TextWriter(Stdio.stdout()).writeLine((-i) .. (-d) .. (b + i) .. (i + d) .. (i < d))
-                TextWriter(Stdio.stdout()).writeLine((String(d)) .. (i.toString()) .. (Integer(i)) .. (Integer(b)) .. (BigDecimal(i)) .. (BigDecimal(d)))
-                TextWriter(Stdio.stdout()).writeLine(("n=" .. i .. d) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((-i) .. (-d) .. (b + i) .. (i + d) .. (i < d))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((String(d)) .. (i.toString()) .. (Integer(i)) .. (Integer(b)) .. (BigDecimal(i)) .. (BigDecimal(d)))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("n=" .. i .. d) .. "")
                 array := Integer[1] {1}
-                TextWriter(Stdio.stdout()).writeLine((array == array) .. (array != array) .. (array === array) .. (array.equals(array)))
-                TextWriter(Stdio.stdout()).writeLine((i === i) .. ("a" == "a") .. (true == false) .. ("a".equals("a")))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((array == array) .. (array != array) .. (array === array) .. (array.equals(array)))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((i === i) .. ("a" == "a") .. (true == false) .. ("a".equals("a")))
                 """).get("Solvik$Program.java");
         int support = java.indexOf("\n    public static String render(");
         String body = java.substring(0, support < 0 ? java.length() : support);
@@ -117,23 +117,23 @@ class CompileTimeLoweringTest {
     void preserves_output_formatting_and_nulls(@TempDir Path directory)
             throws Exception {
         Outcome outcome = run("""
-                TextWriter(Stdio.stdout()).write("")
-                TextWriter(Stdio.stdout()).writeLine("")
-                TextWriter(Stdio.stdout()).write(("a") .. "")
-                TextWriter(Stdio.stdout()).write(("b") .. ("c"))
-                TextWriter(Stdio.stdout()).writeLine((Null) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).write("")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).write(("a") .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).write(("b") .. ("c"))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Null) .. "")
                 mut decimal: BigDecimal? = BigDecimal("1e3")
-                TextWriter(Stdio.stdout()).writeLine((decimal) .. (" ") .. (BigDecimal("1.50")) .. (" ") .. (BigDecimal("1e-3")))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((decimal) .. (" ") .. (BigDecimal("1.50")) .. (" ") .. (BigDecimal("1e-3")))
                 decimal = Null
-                TextWriter(Stdio.stdout()).writeLine((decimal) .. (" ") .. (String(decimal)))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((decimal) .. (" ") .. (String(decimal)))
                 items := BigDecimal?[2] {BigDecimal("1e3"), Null}
-                TextWriter(Stdio.stdout()).writeLine((items) .. "")
-                func show(value: Any) { TextWriter(Stdio.stdout()).writeLine((value) .. "") }
-                func number(value: Number) { TextWriter(Stdio.stdout()).writeLine((value) .. "") }
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((items) .. "")
+                func show(value: Any) { solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((value) .. "") }
+                func number(value: Number) { solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((value) .. "") }
                 show(items)
                 number(BigDecimal("1e3"))
-                TextWriter(Stdio.stdout()).writeLine((BigDecimal?[][1] {items}) .. "")
-                TextWriter(Stdio.stdout()).writeLine((Byte(7)) .. (" ") .. (true) .. (" ") .. (4))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((BigDecimal?[][1] {items}) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Byte(7)) .. (" ") .. (true) .. (" ") .. (4))
                 """, directory);
 
         assertThat(outcome.failure()).isNull();
@@ -159,25 +159,25 @@ class CompileTimeLoweringTest {
                     pub mut label := "old"
                     pub func Item() { }
                     pub func toString() -> String {
-                        TextWriter(Stdio.stdout()).write(("<render>") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).write(("<render>") .. "")
                         return self.label
                     }
                 }
                 func update(item: Item) -> String {
-                    TextWriter(Stdio.stdout()).write(("<arg>") .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).write(("<arg>") .. "")
                     item.label = "new"
                     return "!"
                 }
                 item := Item()
-                TextWriter(Stdio.stdout()).writeLine((item) .. (update(item)))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((item) .. (update(item)))
                 item.label = "old"
-                TextWriter(Stdio.stdout()).writeLine((item .. update(item)) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((item .. update(item)) .. "")
                 func change(items: Integer[]) -> String {
                     items[0] = 2
                     return "!"
                 }
                 items := Integer[1] {1}
-                TextWriter(Stdio.stdout()).writeLine((items) .. (change(items)))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((items) .. (change(items)))
                 """, directory);
 
         assertThat(outcome.failure()).isNull();
@@ -189,12 +189,12 @@ class CompileTimeLoweringTest {
     void renders_computed_decimals_once(@TempDir Path directory) throws Exception {
         Outcome outcome = run("""
                 func next() -> BigDecimal {
-                    TextWriter(Stdio.stdout()).write(("called:") .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).write(("called:") .. "")
                     return BigDecimal("1e3")
                 }
-                TextWriter(Stdio.stdout()).writeLine((next()) .. "")
-                TextWriter(Stdio.stdout()).writeLine((String(next())) .. "")
-                TextWriter(Stdio.stdout()).writeLine((next().toString()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((next()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((String(next())) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((next().toString()) .. "")
                 """, directory);
 
         assertThat(outcome.failure()).isNull();
@@ -208,14 +208,14 @@ class CompileTimeLoweringTest {
         Outcome outcome = run("""
                 module output {
                     pub func write(value: Any) {
-                        TextWriter(Stdio.stdout()).write(("module=") .. (value))
-                        TextWriter(Stdio.stdout()).writeLine("")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).write(("module=") .. (value))
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("")
                     }
                 }
                 type Box<T> {
                     mut value: T? = Null
                     pub func Box(seed: T) { self.value = seed }
-                    pub func write() { TextWriter(Stdio.stdout()).writeLine(("box=") .. (self.value)) }
+                    pub func write() { solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("box=") .. (self.value)) }
                 }
                 for item in Integer[2] {1, 2} {
                     output::write(item)
@@ -235,15 +235,15 @@ class CompileTimeLoweringTest {
                 b := Byte(127)
                 mut i: Integer? = 2
                 d := BigDecimal("1.50")
-                TextWriter(Stdio.stdout()).writeLine((Integer(b)) .. (" ") .. (BigDecimal(b)) .. (" ") .. (BigDecimal(d)))
-                TextWriter(Stdio.stdout()).writeLine((Integer(2)) .. (" ") .. (BigDecimal(2)))
-                TextWriter(Stdio.stdout()).writeLine((b + b) .. (" ") .. (BigDecimal(b) + d) .. (" ") .. (-b) .. (" ") .. (BigDecimal(i) * d))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Integer(b)) .. (" ") .. (BigDecimal(b)) .. (" ") .. (BigDecimal(d)))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Integer(2)) .. (" ") .. (BigDecimal(2)))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((b + b) .. (" ") .. (BigDecimal(b) + d) .. (" ") .. (-b) .. (" ") .. (BigDecimal(i) * d))
                 mut s: String? = "text"
                 mut flag: Boolean? = true
                 i = Null
                 s = Null
                 flag = Null
-                TextWriter(Stdio.stdout()).writeLine((i == i) .. (" ") .. (i === i) .. (" ") .. (s == s) .. (" ") .. (flag == flag))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((i == i) .. (" ") .. (i === i) .. (" ") .. (s == s) .. (" ") .. (flag == flag))
                 """, directory);
 
         assertThat(outcome.failure()).isNull();
@@ -267,7 +267,7 @@ class CompileTimeLoweringTest {
                         return String(1 / divisor)
                     }
                 }
-                TextWriter(Stdio.stdout()).writeLine(("not written") .. (Broken()))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("not written") .. (Broken()))
                 """, directory);
 
         assertThat(outcome.failure()).isNotNull();
@@ -280,12 +280,12 @@ class CompileTimeLoweringTest {
     void a_nullable_numeric_operand_is_rejected_before_it_can_be_evaluated() {
         assertThatThrownBy(() -> transpile("""
                 func rhs() -> Integer {
-                    TextWriter(Stdio.stdout()).write(("not evaluated") .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).write(("not evaluated") .. "")
                     return 1
                 }
                 mut value: Integer? = 1
                 value = Null
-                TextWriter(Stdio.stdout()).writeLine((value + rhs()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((value + rhs()) .. "")
                 """)).isInstanceOf(SolvikCompiler.CompilationFailure.class)
                 .hasMessageContaining(TypeChecker.NULL_UNSAFE);
     }
@@ -297,12 +297,12 @@ class CompileTimeLoweringTest {
                 type Loud {
                     pub func Loud() { }
                     pub func toString() -> String {
-                        TextWriter(Stdio.stdout()).write(("not rendered") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).write(("not rendered") .. "")
                         return "not written"
                     }
                 }
                 divisor := 0
-                TextWriter(Stdio.stdout()).writeLine((Loud()) .. (1 / divisor))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Loud()) .. (1 / divisor))
                 """, directory);
 
         assertThat(outcome.failure()).isNotNull();

@@ -86,7 +86,7 @@ class MainTest {
     @Test
     @DisplayName("a source file without the required command word is a usage error")
     void rejects_a_verb_less_invocation() throws Exception {
-        Path source = write("verb-less.sol", "TextWriter(Stdio.stdout()).writeLine((\"x\") .. \"\")\n");
+        Path source = write("verb-less.sol", "solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((\"x\") .. \"\")\n");
 
         assertThat(solvik(source.toString())).isEqualTo(2);
         assertThat(stderr())
@@ -107,7 +107,7 @@ class MainTest {
     @Test
     @DisplayName("transpiles, compiles, and executes in one step")
     void runs_a_program() throws Exception {
-        Path source = write("hello.sol", "TextWriter(Stdio.stdout()).writeLine((\"hello \" .. 1 + 2) .. \"\")\n");
+        Path source = write("hello.sol", "solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((\"hello \" .. 1 + 2) .. \"\")\n");
 
         assertThat(run(source.toString())).isZero();
         assertThat(stdout()).isEqualTo("hello 3\n");
@@ -119,7 +119,7 @@ class MainTest {
     void reports_a_runtime_abort_with_its_code() throws Exception {
         Path source = write("abort.sol", """
                 divisor := 0
-                TextWriter(Stdio.stdout()).writeLine((10 / divisor) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((10 / divisor) .. "")
                 """);
 
         assertThat(run(source.toString())).isEqualTo(1);
@@ -133,7 +133,7 @@ class MainTest {
                 try {
                     raise Exception(4001, "denied")
                 } finally {
-                    TextWriter(Stdio.stdout()).writeLine(("cleanup") .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("cleanup") .. "")
                 }
                 """);
 
@@ -159,9 +159,9 @@ class MainTest {
 
     @ParameterizedTest
     @CsvSource({
-            "'1, 2', 7, TextWriter(Stdio.stdout()).writeLine((items[index]) .. \"\")",
+            "'1, 2', 7, solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((items[index]) .. \"\")",
             "'1, 2', -1, items[index] = 9",
-            "1, -1, TextWriter(Stdio.stdout()).writeLine((items[index]) .. \"\")",
+            "1, -1, solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((items[index]) .. \"\")",
             "1, 7, items[index] = 9"
     })
     @DisplayName("array bounds reported by the JVM are mapped to their own code")
@@ -184,7 +184,7 @@ class MainTest {
                 items := Integer[2] {1, 2}
                 mut index: Integer? = 0
                 index = Null
-                TextWriter(Stdio.stdout()).writeLine((items[index]) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((items[index]) .. "")
                 """);
 
         assertThat(run(source.toString())).isEqualTo(1);
@@ -259,7 +259,7 @@ class MainTest {
                 try {
                     value := Boom()
                 } catch (error: Exception) {
-                    TextWriter(Stdio.stdout()).writeLine("caught")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("caught")
                 }
                 """);
 
@@ -271,7 +271,7 @@ class MainTest {
     @Test
     @DisplayName("a provably failing operation never runs: it is a compile error")
     void reports_a_static_failure_instead_of_running() throws Exception {
-        Path source = write("static.sol", "TextWriter(Stdio.stdout()).writeLine((1 / 0) .. \"\")\n");
+        Path source = write("static.sol", "solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1 / 0) .. \"\")\n");
 
         assertThat(run(source.toString())).isEqualTo(1);
         assertThat(stderr()).contains("SOL-T008").contains("by zero always fails");
@@ -296,7 +296,7 @@ class MainTest {
     @Test
     @DisplayName("a runtime abort exits non-zero and keeps its diagnostic")
     void reports_runtime_aborts() throws Exception {
-        Path source = write("boom.sol", "zero := 0\nTextWriter(Stdio.stdout()).writeLine((10 / zero) .. \"\")\n");
+        Path source = write("boom.sol", "zero := 0\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((10 / zero) .. \"\")\n");
 
         assertThat(run(source.toString())).isEqualTo(1);
         assertThat(stderr()).contains("division by zero");
@@ -305,7 +305,7 @@ class MainTest {
     @Test
     @DisplayName("exit(status) becomes the process status, with output flushed first")
     void exit_sets_the_status() throws Exception {
-        Path source = write("quit.sol", "TextWriter(Stdio.stdout()).writeLine((\"bye\") .. \"\")\nexit(7)\n");
+        Path source = write("quit.sol", "solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((\"bye\") .. \"\")\nexit(7)\n");
 
         assertThat(run(source.toString())).isEqualTo(7);
         assertThat(stdout()).isEqualTo("bye\n");
@@ -314,7 +314,7 @@ class MainTest {
 
     @Test
     void exit_without_a_status_is_success() throws Exception {
-        Path source = write("quit-zero.sol", "TextWriter(Stdio.stdout()).writeLine((\"ok\") .. \"\")\nexit()\nTextWriter(Stdio.stdout()).writeLine((\"never\") .. \"\")\n");
+        Path source = write("quit-zero.sol", "solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((\"ok\") .. \"\")\nexit()\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((\"never\") .. \"\")\n");
 
         assertThat(run(source.toString())).isZero();
         assertThat(stdout()).isEqualTo("ok\n");
@@ -325,12 +325,12 @@ class MainTest {
     void exit_runs_finally_and_sets_the_status() throws Exception {
         Path source = write("quit-finally.sol", """
                 try {
-                    TextWriter(Stdio.stdout()).writeLine(("before") .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("before") .. "")
                     exit(4)
                 } catch (e: Exception) {
-                    TextWriter(Stdio.stdout()).writeLine(("must not catch") .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("must not catch") .. "")
                 } finally {
-                    TextWriter(Stdio.stdout()).writeLine(("cleanup") .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("cleanup") .. "")
                 }
                 """);
 
@@ -342,7 +342,7 @@ class MainTest {
     @Test
     @DisplayName("an unchanged file is executed from cached classes without recompiling")
     void reuses_the_cache() throws Exception {
-        Path source = write("cached.sol", "TextWriter(Stdio.stdout()).writeLine((\"cached\") .. \"\")\n");
+        Path source = write("cached.sol", "solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((\"cached\") .. \"\")\n");
 
         assertThat(run(source.toString())).isZero();
         Path classes = singleCacheClasses();
@@ -358,11 +358,11 @@ class MainTest {
 
     @Test
     void a_changed_source_produces_a_new_cache_entry() throws Exception {
-        Path source = write("changed.sol", "TextWriter(Stdio.stdout()).writeLine((1) .. \"\")\n");
+        Path source = write("changed.sol", "solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1) .. \"\")\n");
         assertThat(run(source.toString())).isZero();
         assertThat(cacheEntries()).hasSize(1);
 
-        Files.writeString(source, "TextWriter(Stdio.stdout()).writeLine((2) .. \"\")\n", StandardCharsets.UTF_8);
+        Files.writeString(source, "solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((2) .. \"\")\n", StandardCharsets.UTF_8);
         out.reset();
         assertThat(run(source.toString())).isZero();
 
@@ -373,7 +373,7 @@ class MainTest {
     @Test
     @DisplayName("generated Java sources are deleted once the classes are compiled")
     void discards_generated_sources() throws Exception {
-        Path source = write("kept.sol", "TextWriter(Stdio.stdout()).writeLine((\"hi\") .. \"\")\n");
+        Path source = write("kept.sol", "solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((\"hi\") .. \"\")\n");
 
         assertThat(run(source.toString())).isZero();
 
@@ -390,7 +390,7 @@ class MainTest {
     @Test
     @DisplayName("--keep-sources retains the generated Java that a plain run deletes")
     void keep_sources_flag() throws Exception {
-        Path source = write("kept.sol", "TextWriter(Stdio.stdout()).writeLine((1) .. \"\")\n");
+        Path source = write("kept.sol", "solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1) .. \"\")\n");
 
         assertThat(run("--keep-sources", source.toString())).isZero();
         assertThat(stdout()).isEqualTo("1\n");
@@ -406,7 +406,7 @@ class MainTest {
     @Test
     @DisplayName("the flag is part of the cache key, so the two modes never share an entry")
     void keep_sources_is_part_of_the_key() throws Exception {
-        Path source = write("both.sol", "TextWriter(Stdio.stdout()).writeLine((2) .. \"\")\n");
+        Path source = write("both.sol", "solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((2) .. \"\")\n");
 
         assertThat(run(source.toString())).isZero();
         assertThat(run("--keep-sources", source.toString())).isZero();
@@ -416,7 +416,7 @@ class MainTest {
 
     @Test
     void rejects_an_unknown_option() throws Exception {
-        Path source = write("opt.sol", "TextWriter(Stdio.stdout()).writeLine((3) .. \"\")\n");
+        Path source = write("opt.sol", "solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((3) .. \"\")\n");
 
         assertThat(run("--nope", source.toString())).isEqualTo(2);
         assertThat(stderr()).contains("unknown option: --nope").contains("usage: solvik");
@@ -426,7 +426,7 @@ class MainTest {
     @DisplayName("the run command word compiles and runs its file")
     void runs_a_program_through_the_run_command() throws Exception {
         Path source = write("command.sol",
-                "TextWriter(Stdio.stdout()).writeLine((\"ran\") .. \"\")\n");
+                "solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((\"ran\") .. \"\")\n");
 
         assertThat(run(source.toString())).isZero();
         assertThat(stdout()).isEqualTo("ran\n");
@@ -446,7 +446,7 @@ class MainTest {
     @Test
     @DisplayName("global options are accepted on either side of the command word")
     void the_run_command_accepts_options_on_either_side() throws Exception {
-        Path source = write("either.sol", "TextWriter(Stdio.stdout()).writeLine((4) .. \"\")\n");
+        Path source = write("either.sol", "solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((4) .. \"\")\n");
 
         assertThat(solvik("--keep-sources", "run", source.toString())).isZero();
         assertThat(stdout()).isEqualTo("4\n");
@@ -461,7 +461,7 @@ class MainTest {
     @Test
     @DisplayName("where the command word sits on the line is not part of the cache key")
     void the_command_word_position_is_not_part_of_the_key() throws Exception {
-        Path source = write("shared.sol", "TextWriter(Stdio.stdout()).writeLine((5) .. \"\")\n");
+        Path source = write("shared.sol", "solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((5) .. \"\")\n");
 
         assertThat(solvik("--keep-sources", "run", source.toString())).isZero();
         Path classes = singleCacheClasses();
@@ -488,7 +488,7 @@ class MainTest {
     @Test
     @DisplayName("an unknown command word is a usage error, not a missing file")
     void rejects_an_unknown_command() throws Exception {
-        Path source = write("command.sol", "TextWriter(Stdio.stdout()).writeLine((6) .. \"\")\n");
+        Path source = write("command.sol", "solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((6) .. \"\")\n");
 
         assertThat(solvik("build", source.toString())).isEqualTo(2);
         assertThat(stderr()).contains("unknown command: build").contains("usage: solvik");
@@ -498,7 +498,7 @@ class MainTest {
     @Test
     @DisplayName("a second operand after the command word is a usage error")
     void rejects_a_second_operand_after_the_command() throws Exception {
-        Path source = write("command.sol", "TextWriter(Stdio.stdout()).writeLine((7) .. \"\")\n");
+        Path source = write("command.sol", "solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((7) .. \"\")\n");
 
         assertThat(run(source.toString(), "extra.sol")).isEqualTo(2);
         assertThat(stderr()).contains("usage: solvik");
@@ -509,7 +509,7 @@ class MainTest {
     @DisplayName("check compiles a program and reports success silently")
     void check_accepts_a_compiling_program() throws Exception {
         Path source = write("checked.sol",
-                "TextWriter(Stdio.stdout()).writeLine((\"compiles\") .. \"\")\n");
+                "solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((\"compiles\") .. \"\")\n");
 
         assertThat(check(source.toString())).isZero();
         assertThat(stdout()).isEmpty();
@@ -520,7 +520,7 @@ class MainTest {
     @DisplayName("check never runs the program it compiles")
     void check_does_not_execute_the_program() throws Exception {
         Path source = write("not-run.sol", """
-                TextWriter(Stdio.stdout()).writeLine(("must not run") .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("must not run") .. "")
                 exit(7)
                 """);
 
@@ -534,7 +534,7 @@ class MainTest {
     void check_ignores_run_time_failures() throws Exception {
         Path source = write("would-abort.sol", """
                 divisor := 0
-                TextWriter(Stdio.stdout()).writeLine((10 / divisor) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((10 / divisor) .. "")
                 """);
 
         assertThat(check(source.toString())).isZero();
@@ -577,7 +577,7 @@ class MainTest {
     @DisplayName("check leaves no cache entry and does not warm the cache for run")
     void check_leaves_the_cache_untouched() throws Exception {
         Path source = write("scratch-check.sol",
-                "TextWriter(Stdio.stdout()).writeLine((\"ran\") .. \"\")\n");
+                "solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((\"ran\") .. \"\")\n");
 
         assertThat(check(source.toString())).isZero();
         assertNoLeftoverEntry();

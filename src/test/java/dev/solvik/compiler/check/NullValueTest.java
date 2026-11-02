@@ -41,7 +41,7 @@ class NullValueTest {
     @DisplayName("only a nullable declaration accepts Null; an ordinary type does not")
     void null_needs_a_nullable_type() {
         for (String type : new String[]{"Integer", "Double", "String", "Boolean", "Byte"}) {
-            assertAccepted("mut value: " + type + "? = Null\nvalue = Null\nTextWriter(Stdio.stdout()).writeLine((value) .. \"\")\n");
+            assertAccepted("mut value: " + type + "? = Null\nvalue = Null\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((value) .. \"\")\n");
             assertRejected("mut value: " + type + " = " + initial(type) + "\nvalue = Null\n");
         }
         assertAccepted("""
@@ -74,20 +74,20 @@ class NullValueTest {
         assertAccepted("""
                 mut x: Integer? = 1
                 x = Null
-                TextWriter(Stdio.stdout()).writeLine((x == Null) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((x == Null) .. "")
                 x = 2
-                TextWriter(Stdio.stdout()).writeLine((x + 1) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((x + 1) .. "")
                 """);
         assertAccepted("""
                 mut flag: Boolean? = true
                 flag = Null
                 flag = false
-                TextWriter(Stdio.stdout()).writeLine((flag) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((flag) .. "")
                 """);
         assertAccepted("""
                 mut text: String? = "value"
                 text = Null
-                TextWriter(Stdio.stdout()).writeLine((text) .. (" ") .. (text == Null))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((text) .. (" ") .. (text == Null))
                 """);
     }
 
@@ -102,7 +102,7 @@ class NullValueTest {
                 untyped = "hello"
                 untyped = 42
                 nothing := Null
-                TextWriter(Stdio.stdout()).writeLine((inferred) .. (" ") .. (untyped) .. (" ") .. (nothing))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((inferred) .. (" ") .. (untyped) .. (" ") .. (nothing))
                 """);
         assertThat(check("mut untyped? := Null\nuntyped = 1\n").all())
                 .extracting(d -> d.code()).isEmpty();
@@ -116,13 +116,13 @@ class NullValueTest {
     void null_may_fill_a_nullable_element_a_parameter_and_a_field() {
         assertAccepted("""
                 mut items: Integer?[2] = Integer?[2] {1, Null}
-                TextWriter(Stdio.stdout()).writeLine((items[1] == Null) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((items[1] == Null) .. "")
                 """);
         assertAccepted("""
                 func show(value: Integer?) -> String {
                     return value .. ""
                 }
-                TextWriter(Stdio.stdout()).writeLine((show(Null)) .. (" ") .. (show(1)))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((show(Null)) .. (" ") .. (show(1)))
                 """);
         assertAccepted("""
                 type Box {
@@ -136,7 +136,7 @@ class NullValueTest {
                         return self.value .. ""
                     }
                 }
-                TextWriter(Stdio.stdout()).writeLine((Box().report()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Box().report()) .. "")
                 """);
     }
 
@@ -163,15 +163,15 @@ class NullValueTest {
     void nullable_values_need_a_null_check() {
         assertRejected("""
                 x: String? = Null
-                TextWriter(Stdio.stdout()).writeLine((x.size()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((x.size()) .. "")
                 """);
         assertRejected("""
                 mut n: Integer? = Null
-                TextWriter(Stdio.stdout()).writeLine((n + 1) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((n + 1) .. "")
                 """);
         assertRejected("""
                 mut values: Integer[2]? = Null
-                TextWriter(Stdio.stdout()).writeLine((values.size) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((values.size) .. "")
                 """);
         assertRejected("""
                 mut flag: Boolean? = Null
@@ -180,21 +180,21 @@ class NullValueTest {
         assertAccepted("""
                 mut x: String? = Null
                 if x != Null {
-                    TextWriter(Stdio.stdout()).writeLine((x.size()) .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((x.size()) .. "")
                 }
                 """);
         assertAccepted("""
                 mut x: String? = Null
                 if x == Null {
-                    TextWriter(Stdio.stdout()).writeLine(("absent") .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("absent") .. "")
                 } else {
-                    TextWriter(Stdio.stdout()).writeLine((x.size()) .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((x.size()) .. "")
                 }
                 """);
         assertAccepted("""
                 mut n: Integer? = 1
                 n = 2
-                TextWriter(Stdio.stdout()).writeLine((n + 1) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((n + 1) .. "")
                 """);
     }
 }

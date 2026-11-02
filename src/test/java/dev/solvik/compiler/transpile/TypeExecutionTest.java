@@ -61,14 +61,14 @@ class TypeExecutionTest {
     @DisplayName("numeric equality follows boxed value equality across carriers")
     void numeric_equality_widens(@TempDir Path directory) throws Exception {
         String output = run("""
-                TextWriter(Stdio.stdout()).writeLine((1 == 1.0) .. "")
-                TextWriter(Stdio.stdout()).writeLine((1.0 == 1.00) .. "")
-                TextWriter(Stdio.stdout()).writeLine((Byte(100) == 100) .. "")
-                TextWriter(Stdio.stdout()).writeLine((Integer(1) == 1) .. "")
-                TextWriter(Stdio.stdout()).writeLine((1 != 1.0) .. "")
-                TextWriter(Stdio.stdout()).writeLine((1 == 1.5) .. "")
-                TextWriter(Stdio.stdout()).writeLine(("1" == "1") .. "")
-                TextWriter(Stdio.stdout()).writeLine((1 === 1.0) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1 == 1.0) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1.0 == 1.00) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Byte(100) == 100) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Integer(1) == 1) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1 != 1.0) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1 == 1.5) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("1" == "1") .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1 === 1.0) .. "")
                 """, directory);
 
         assertThat(output).isEqualTo("true\ntrue\ntrue\ntrue\nfalse\nfalse\ntrue\nfalse\n");
@@ -104,8 +104,8 @@ class TypeExecutionTest {
 
                 a := Solvik("alpha")
                 b := SolvikProgram("beta")
-                TextWriter(Stdio.stdout()).writeLine((a.describe()) .. "")
-                TextWriter(Stdio.stdout()).writeLine((b.describe()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((a.describe()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((b.describe()) .. "")
                 """, directory);
 
         assertThat(output).isEqualTo("Solvik(alpha)\nProgram(beta)\n");
@@ -135,9 +135,9 @@ class TypeExecutionTest {
                 c := Counter("hits")
                 c.bump(2)
                 c.bump(3)
-                TextWriter(Stdio.stdout()).writeLine((c.describe()) .. "")
-                TextWriter(Stdio.stdout()).writeLine((c.type()) .. "")
-                TextWriter(Stdio.stdout()).writeLine((c.toString() == c.toString()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((c.describe()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((c.type()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((c.toString() == c.toString()) .. "")
                 """, directory);
 
         assertThat(output).isEqualTo("hits=5\nCounter\ntrue\n");
@@ -163,9 +163,9 @@ class TypeExecutionTest {
                 words := Box("text")
                 count := numbers.get()
                 if count != Null {
-                    TextWriter(Stdio.stdout()).writeLine((count + 1) .. (" ") .. (numbers.type()))
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((count + 1) .. (" ") .. (numbers.type()))
                 }
-                TextWriter(Stdio.stdout()).writeLine((words.get()) .. (" ") .. (words.type()))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((words.get()) .. (" ") .. (words.type()))
                 """, directory);
 
         assertThat(output).isEqualTo("2 Box<Integer>\ntext Box<String>\n");
@@ -202,20 +202,20 @@ class TypeExecutionTest {
                 }
 
                 pair := Pair(1, "one")
-                TextWriter(Stdio.stdout()).writeLine((pair.describe()) .. (" ") .. (pair.type()))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((pair.describe()) .. (" ") .. (pair.type()))
 
                 nested := Box(Box(7))
                 inner := nested.get()
                 if inner != Null {
                     seven := inner.get()
                     if seven != Null {
-                        TextWriter(Stdio.stdout()).writeLine((seven + 1) .. (" ") .. (nested.type()))
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((seven + 1) .. (" ") .. (nested.type()))
                     }
                 }
 
                 values := Any[2] {Box(1), Box("x")}
                 for value in values {
-                    TextWriter(Stdio.stdout()).writeLine((value.type()) .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((value.type()) .. "")
                 }
                 """, directory);
 
@@ -245,7 +245,7 @@ class TypeExecutionTest {
 
                 items := Any[3] {Item("a"), Item("b"), Item("c")}
                 for item in items {
-                    TextWriter(Stdio.stdout()).writeLine((item.type()) .. (" ") .. (item.toString()))
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((item.type()) .. (" ") .. (item.toString()))
                 }
                 """, directory);
 

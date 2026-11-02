@@ -54,7 +54,7 @@ class DeclarationTest {
                 maybeNumber? := 1
                 maybeEmpty? := Null
                 nothing := Null
-                TextWriter(Stdio.stdout()).writeLine((x) .. (y) .. (name) .. (title) .. (maybeNumber) .. (maybeEmpty) .. (nothing))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((x) .. (y) .. (name) .. (title) .. (maybeNumber) .. (maybeEmpty) .. (nothing))
                 """);
     }
 
@@ -144,7 +144,7 @@ class DeclarationTest {
     @ParameterizedTest
     @ValueSource(strings = {
             "x := 1\nx := 2",
-            "x := 1\n{\n    x := 2\n    TextWriter(Stdio.stdout()).writeLine((x) .. \"\")\n}\nTextWriter(Stdio.stdout()).writeLine((x) .. \"\")",
+            "x := 1\n{\n    x := 2\n    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((x) .. \"\")\n}\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((x) .. \"\")",
     })
     @DisplayName("a nested scope may shadow, a single scope may not redeclare")
     void redeclaration_is_rejected_and_shadowing_is_allowed(String source) {
@@ -178,7 +178,7 @@ class DeclarationTest {
     @DisplayName("Null is a value, never a constructor")
     void null_is_not_a_constructor() {
         assertRejected("Null()", TypeChecker.TYPE_ERROR);
-        assertRejected("TextWriter(Stdio.stdout()).writeLine((Null()) .. \"\")", TypeChecker.TYPE_ERROR);
+        assertRejected("solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Null()) .. \"\")", TypeChecker.TYPE_ERROR);
     }
 
     @Test
@@ -205,7 +205,7 @@ class DeclarationTest {
                     }
                 }
                 c := Counter()
-                TextWriter(Stdio.stdout()).writeLine((c.bump()) .. (" ") .. (Counter.instances))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((c.bump()) .. (" ") .. (Counter.instances))
                 """);
         assertRejected("""
                 type Broken {
@@ -230,7 +230,7 @@ class DeclarationTest {
 
                     pub func Ordered() { }
                 }
-                TextWriter(Stdio.stdout()).writeLine((Ordered.limit) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Ordered.limit) .. "")
                 """);
         assertRejected("""
                 type Misordered {
@@ -255,7 +255,7 @@ class DeclarationTest {
                 func area(width: Integer, height: Integer) -> Integer {
                     return width * height
                 }
-                TextWriter(Stdio.stdout()).writeLine((area(2, 3)) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((area(2, 3)) .. "")
                 """);
         assertRejected("""
                 func area(width: Integer = 1) -> Integer {
