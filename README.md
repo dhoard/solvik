@@ -1,88 +1,107 @@
 # Solvik
 
-Solvik is a small, statically typed language that compiles to standalone Java 25 source.
-A generated program depends only on the JDK and on the Java libraries it binds explicitly;
-there is no Solvik runtime jar and no interpreter loop.
+[![build](https://github.com/dhoard/solvik/actions/workflows/build.yml/badge.svg)](https://github.com/dhoard/solvik/actions/workflows/build.yml)
+[![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Java 25](https://img.shields.io/badge/Java-25-orange.svg)](https://openjdk.org/projects/jdk/25/)
 
-The language declares bindings with `name := value`, `name: Type = value`, and
-`name? := value`, and keeps them immutable unless declared `mut`; `Null` is a singleton
-type and value, ordinary types are non-null, and `T?` is nullable. It supports
-signature-based function, method, and constructor overloading plus nominal traits with
-required functions and stateless defaults. Its packaged concurrency API
-accepts explicit task objects and always starts Java 25 virtual threads, with indefinite and
-timed `await` operations.
+**A small, statically typed language that compiles to standalone Java 25 source.**
 
-I/O is ordinary standard-library API use: the bundled `Channel`, `Stdio`, `TextReader`,
-`TextWriter`, `ByteReader`, `ByteWriter`, and `File` types are declared in packaged `.sol` sources
-with checked native bindings. There are no output built-ins; `TextWriter.writeLine` appends the
-published platform terminator `TextWriter.LINE_ENDING`, and `write` translates nothing. `File`
-owns a single-direction channel, and the two byte wrappers borrow one.
+Solvik transpiles to Java, compiles that with `javac`, and runs the result directly on the JDK.
+There is no Solvik runtime jar, no interpreter loop, and no reflective dispatch in generated code:
+a program depends only on the JDK and on the Java libraries it binds explicitly.
 
-Concrete overrides can reuse a directly implemented trait's body with
-`Trait.function(self, arguments...)`; ordinary calls remain dynamically dispatched.
+```solvik
+module app {
 
-The compiler is itself a Java 25 application, built with the Maven wrapper in this repository.
+    pub type Account {
+        pub owner: String = ""
+        mut balance := 0
 
-## Status
+        pub func Account(owner: String, opening: Integer) {
+            self.owner = owner
+            balance = opening
+        }
 
-The implementation matches [LANGUAGE.md](LANGUAGE.md), which is the authoritative language
-guide; where documentation and code disagree, the code wins. The code-generation contract is
-described in [JAVA_BACKEND.md](JAVA_BACKEND.md). `./mvnw verify` is the definition of a
-healthy build.
+        pub func deposit(amount: Integer) {
+            balance = balance + amount
+        }
+
+        pub func summary() -> String {
+            return owner .. ": " .. balance .. " credits"
+        }
+    }
+}
+
+account := app::Account("Ada", 10)
+account.deposit(25)
+TextWriter(Stdio.stdout()).writeLine(account.summary())
+```
+
+Running it prints:
+
+```text
+Ada: 35 credits
+```
+
+## Highlights
+
+- **Checked before anything runs.** Bindings are immutable unless declared `mut`, ordinary types are
+  non-null, `T?` is nullable and `Null` is a singleton type and value, and every expression is
+  type-checked before a single class file is written.
+- **Java without the ceremony.** Signature-based function, method, and constructor overloading;
+  nominal traits with required functions and stateless defaults; modules that map to Java packages;
+  generics; `switch` with regex cases; exceptions with stable codes.
+- **Ordinary Java bindings.** Bundled `native` declarations resolve against real Java classes at
+  compile time, so standard I/O, files, collections, and concurrency are library types rather than
+  built-in syntax. Only packaged library sources may declare `native` members.
+- **No hidden runtime.** Generated Java imports only the JDK and the Java libraries the program
+  binds explicitly, uses no reflection, and is emitted as deterministic, warning-free Java 25 source
+  that compiles with `javac --release 25`.
+- **Designed for iteration.** `run` caches compiled programs by content, so an unchanged program is
+  executed straight from cached classes; `check` compiles the whole program without executing it and
+  leaves no cache state behind.
 
 ## Requirements
 
 | Requirement | Version | Notes |
 | --- | --- | --- |
-| JDK | 25 | The launcher, the compiler, and every generated program target Java 25. |
-| Maven | none | `./mvnw` downloads Maven and the build dependencies on first use. |
-| Network | first build only | Only needed to fetch the Maven distribution and dependencies. |
-
-Run `java -version` before building: the build compiles with `--release 25` and refuses to
-produce working classes on an older JDK.
+| JDK | 25 | The compiler and every generated program target Java 25 (`--release 25`). |
+| Maven | none | `./mvnw` downloads Maven 3.9.11 on first use. |
+| Network | first build only | Needed once to fetch the Maven distribution and test dependencies. |
 
 ## Quick start
 
 ```bash
-# Compile the compiler, run every test, check coverage thresholds, then package the uber jar.
+git clone https://github.com/dhoard/solvik.git
+cd solvik
+
+# Build the compiler, run every test, enforce coverage thresholds, package target/solvik.jar.
 ./mvnw verify
 
-# Transpile, compile with javac, and run a program; the result is cached.
+# Transpile, compile, and run a program; the result is cached.
 ./solvik run example.sol
 
-# Transpile and compile without running; exit status 0 means the file compiles.
+# Compile the whole program without running it: exit status 0 means it compiles.
 ./solvik check example.sol
-
-# Keep the generated Java sources next to the cached classes for inspection.
-./solvik run --keep-sources example.sol
-
-# Resolve bindings, compile, and run against explicit dependency JARs.
-./solvik run --cp "lib/a.jar:lib/b.jar" app.sol
 ```
 
-The launcher builds `target/solvik.jar` when it is missing or older than the compiler sources,
-so a fresh checkout can run `./solvik run app.sol` directly. The packaged jar is also runnable on
-its own: `java -jar target/solvik.jar run app.sol`.
+The launcher builds `target/solvik.jar` when it is missing or older than the compiler sources, so a
+fresh checkout can run `./solvik run app.sol` without a separate build step. The packaged jar is
+runnable on its own:
 
-## How it works
+```bash
+java -jar target/solvik.jar run app.sol
+```
 
-1. `ProgramLoader` loads the packaged standard library — every `.sol` resource under the
-   compiler's own resources — and then the entry file and the files it imports. An import names
-   a file; only a packaged resource may declare the reserved `solvik` root namespace.
-2. `Lexer` and `Parser` produce the AST in `Ast`.
-3. `TypeChecker` resolves names, validates modules and signatures, resolves bundled `native`
-   declarations against the compiler's binding registry, and records a type for every expression
-   and binding.
-4. `JavaLowerer` turns the checked AST into a typed Java IR (`dev.solvik.compiler.jir`), which
-   `JavaSourceRenderer` renders as deterministic Java 25 source. `Transpiler` emits one Java
-   file per reached class; `GeneratedIntrinsics` declares the reachable JDK-only support members
-   as IR, and `IoSupport` supplies the generated binding adapter when a native binding is used.
-5. The CLI compiles the generated sources with the JDK compiler and publishes them atomically in a
-   content-addressed cache. `run` then executes the result in an isolated class loader over the
-   cached classes and the supplied dependency JARs; `check` stops after the compile.
+## Example program
 
-Diagnostics carry stable codes (`SOL-L###`, `SOL-P###`, `SOL-T###`, `SOL-I###`, `SOL-R###`) and
-are rendered by `DiagnosticReporter` with a source line and a caret.
+`example.sol` is the language corpus: an example program that exercises every implemented construct,
+with `include.sol` and `include-extra.sol` supplying imported declarations, including a diamond
+import. Running it prints a transcript of the language surface:
+
+```bash
+./solvik run example.sol
+```
 
 ## Command line
 
@@ -95,78 +114,140 @@ check             transpile and compile with javac, without running the file
 --cp <jar-list>   ordered, explicit dependency JARs (';' on Windows)
 ```
 
-The command word is required and must be the first positional argument: `./solvik example.sol` is a
-usage error. Global options may appear on either side of it. `run` and `check` are the command
-words; further ones are added in `Main.Command`, where the recognized words and their dispatch live
-together. A source file whose path is exactly a command word must be spelled as a path (`./run`,
-`./check`).
+The command word is required and must be the first positional argument; global options may appear on
+either side of it. A source file whose path is exactly a command word must be spelled as a path
+(`./run`, `./check`).
 
-`check` stops after `javac`. It checks the whole program — the entry file, every file it imports
+`check` is a one-off compile. It checks the whole program — the entry file, every file it imports
 transitively, and the packaged standard library — so a diagnostic in an imported file fails the
 check and is reported against that file. Nothing is executed: a program that writes output, calls
-`exit`, or would abort at run time still checks successfully. It is a one-off compile as well: the
-generated Java and classes go into a temporary, randomly keyed entry under the same cache root, that
-entry is deleted when the check ends, and no published entry is read or written. A check therefore
-leaves `~/.cache/solvik/` as it found it, a later `run` compiles for itself, and repeated checks
-recompile; `--keep-sources` applies to `run` only.
+`exit`, or would abort at run time still checks successfully. Generated Java and classes go into a
+temporary, randomly keyed entry under the cache root, which is deleted when the check ends, so a
+check reads no published entry, writes none, and leaves `~/.cache/solvik/` as it found it.
 
 Exit codes: `0` success, `1` compile error or runtime abort, `2` bad usage (unknown option, unknown
 command, missing command, or the wrong number of operands).
 
 The cache root is resolved from `-Dsolvik.cache.dir`, then `$SOLVIK_CACHE_DIR`, then
-`$XDG_CACHE_HOME/solvik`, then `~/.cache/solvik`. Published entries belong to `run`: they are keyed
+`$XDG_CACHE_HOME/solvik`, then `~/.cache/solvik`. Published entries belong to `run`; they are keyed
 by the loaded source text of the whole program, the supplied classpath, the `--keep-sources` mode,
-and the compiler build, so a rebuild invalidates them automatically. `check` writes only a scratch
-entry, which it deletes.
+and the compiler build, so a compiler rebuild invalidates them automatically.
 
-## Repository layout
+`--cp` takes explicit, ordered JARs — no directories, wildcards, or manifest-based resolution. The
+same JARs are used to resolve bindings, to compile the generated Java, and to run the program.
+
+## How it works
+
+1. `ProgramLoader` loads the packaged standard library — every `.sol` resource in the compiler's own
+   resources — and then the entry file and the files it imports, transitively. An import names a
+   file; only a packaged resource may declare the reserved `solvik` root namespace.
+2. `Lexer` and `Parser` produce the AST in `Ast`.
+3. `TypeChecker` resolves names, validates modules and signatures, resolves bundled `native`
+   declarations against the compiler's binding registry, and records a type for every expression and
+   binding.
+4. `JavaLowerer` turns the checked AST into a typed Java IR (`dev.solvik.compiler.jir`), which
+   `JavaSourceRenderer` renders as deterministic Java 25 source. `Transpiler` emits one Java file
+   per reached class; `GeneratedIntrinsics` declares the reachable JDK-only support members as IR,
+   and `IoSupport` supplies the generated binding adapter when a native binding is used.
+5. The CLI publishes the generated sources and classes atomically in a content-addressed cache;
+   `run` then executes the program in an isolated class loader, and `check` stops after `javac`.
+
+Diagnostics carry stable codes (`SOL-L###`, `SOL-P###`, `SOL-T###`, `SOL-I###`, `SOL-R###`) and are
+rendered with the offending source line and a caret.
+
+## Standard library
+
+The standard library is packaged as `.sol` sources inside the compiler jar, so every program sees
+it without an import, and only the types a program actually reaches are emitted into the generated
+Java.
+
+| Namespace | Types |
+| --- | --- |
+| `solvik::collections` | `List`, `Map`, `Stack` |
+| `solvik::concurrency` | `Task`, `Thread` — `Thread.start` starts a virtual thread; `await()` and `await(milliseconds)` join it |
+| `solvik::util` | `UUID` — version 7 (RFC 9562), written in Solvik rather than bound to Java |
+| top level | `Channel`, `Stdio`, `TextReader`, `TextWriter`, `ByteReader`, `ByteWriter`, `File`, `IoError` |
+
+There are no output built-ins. `TextWriter.writeLine` appends `TextWriter.LINE_ENDING`; `write`
+translates nothing. `File` owns a single-direction channel, and the byte wrappers borrow one.
+
+## Project layout
 
 ```text
-src/main/java/dev/solvik/compiler/   compiler: CLI, lexer, parser, checker, bindings, backend
-src/main/java/dev/solvik/compiler/jir/ typed Java IR, its validator, and the source renderer
-src/main/resources/solvik/        packaged standard library: every .sol here belongs to every
-                                  program and needs no import; solvik/io declares the bundled
-                                  Channel, Stdio, TextReader, TextWriter, ByteReader, ByteWriter,
-                                  File, and IoError types
-src/test/java/                        unit, language-consistency, and execution tests
-example.sol                           complete language corpus: exercises every implemented
-                                      construct; include.sol and include-extra.sol provide
-                                      imported declarations
-include.sol                           imported declarations used by example.sol
-include-extra.sol                     further imported declarations; imports include.sol
-plans/                                design and implementation records for past features
-LANGUAGE.md                           language guide (authoritative)
-JAVA_BACKEND.md                       Java representation and lowering contract
-AGENTS.md, DESIGN.md, IMPLEMENT.md    engineering workflow for changes in this repository
+src/main/java/dev/solvik/compiler/       compiler: CLI, lexer, parser, checker, bindings, backend
+src/main/java/dev/solvik/compiler/jir/   typed Java IR, its validator, and the source renderer
+src/main/resources/solvik/               packaged standard library (.sol sources, loaded into every
+                                         program)
+src/test/java/                           unit, language-consistency, and execution tests
+example.sol                              example program: exercises every implemented construct
+include.sol, include-extra.sol           imported declarations used by example.sol
+solvik                                   launcher script (builds and runs target/solvik.jar)
+pom.xml                                  Maven build; ./mvnw is the wrapper
+LANGUAGE.md                              language guide (authoritative)
+JAVA_BACKEND.md                          Java representation and lowering contract
+LICENSE                                  MIT license
+plans/                                   design and implementation records (local, not versioned)
 ```
 
-## Verification
+## Building and testing
 
-`./mvnw verify` runs every gate that a change must satisfy:
+`./mvnw verify` is the definition of a healthy build and the same command CI runs:
 
-- `javac` with `-Xlint:all -Werror` for main and test sources, including every generated adapter;
-  a warning fails the build.
+- `javac` with `-Xlint:all -Werror` for main and test sources, including every generated adapter.
 - 900+ unit tests (`maven-surefire-plugin`) and packaged-JAR integration tests
   (`maven-failsafe-plugin`), including running programs from `target/solvik.jar` with an empty
   dependency classpath.
-- JaCoCo coverage thresholds of 85% instruction and 80% branch coverage.
+- JaCoCo coverage thresholds of 85% instruction and 80% branch coverage over the whole bundle.
 
 `LanguageConsistencyTest`, `BundledIoExecutionTest`, `BundledFileExecutionTest`,
-`StaticInitializerExecutionTest`, and the other `*ExecutionTest` suites compile and run the generated
-Java they produce. `JavaIrTest`, `JavaSourceRendererTest`, and the renderer's javac fixture test cover
-the Java IR, precedence, imports, and formatting independently of Solvik; `JavaLoweringTest`
+`StaticInitializerExecutionTest`, and the other `*ExecutionTest` suites compile and run the Java
+they generate. `JavaIrTest`, `JavaSourceRendererTest`, and the renderer's `javac` fixture test
+cover the Java IR, precedence, imports, and formatting independently of Solvik; `JavaLoweringTest`
 covers lowering edge cases.
 
-## Conventions
+Continuous integration runs on GitHub Actions with JDK 25 (Temurin) for pushes to `main` and for
+pull requests, and uploads the test and coverage reports.
 
-- Java sources use four-space indentation, LF line endings, and a single ASCII-sorted
-  import block after any `import static` lines.
-- Public compiler types carry Javadoc that names the rule being implemented and the section of
-  `LANGUAGE.md` it comes from.
-- Behavior changes update the authoritative documentation and add the focused regression test
-  that proves them.
+## Documentation
+
+| Document | Contents |
+| --- | --- |
+| [LANGUAGE.md](LANGUAGE.md) | The language guide: bindings, nullability, control flow, generics, traits, modules, Java interoperability, diagnostics |
+| [JAVA_BACKEND.md](JAVA_BACKEND.md) | The Java representation, lowering rules, and code-generation contract |
+| [PROJECT.md](PROJECT.md) | Project priorities, contracts, and the rules a change must preserve |
+| [AGENTS.md](AGENTS.md), [DESIGN.md](DESIGN.md), [IMPLEMENT.md](IMPLEMENT.md) | Engineering workflow: design plans, implementation plans, and verification |
+
+`LANGUAGE.md` is authoritative for language behavior. Where documentation and code disagree, the
+code wins and the documentation is the bug.
+
+## Versioning and compatibility
+
+Solvik is pre-1.0 (`0.1.0-SNAPSHOT`). The language, the CLI, and the shape of the generated Java may
+change between releases, and each such change updates `LANGUAGE.md` or `JAVA_BACKEND.md` together
+with the regression that proves it. Diagnostic codes (`SOL-…`) are stable identifiers; the CLI exit
+codes are fixed at `0` success, `1` compile error or runtime abort, and `2` bad usage.
+
+## Contributing
+
+Issues and pull requests are welcome.
+
+1. Open an issue before starting anything larger than a bug fix.
+2. Branch from `main` and make the smallest coherent change.
+3. Run `./mvnw verify`; it must pass before a pull request is reviewed.
+4. Update the authoritative documentation for any behavior change, add the focused regression that
+   proves it, and update `example.sol` when the language surface changes.
+5. Describe the behavior change and the verification you ran in the pull request.
+
+Java sources use four-space indentation, LF line endings, and a single ASCII-sorted import block
+after any `import static` lines. Code, comments, and documentation use USA English spellings.
+
+## Reporting issues
+
+Open an issue at <https://github.com/dhoard/solvik/issues>. Please include your `java -version`,
+the Solvik source that reproduces the problem, the exact command you ran, and the diagnostic or exit
+code you saw.
 
 ## License
 
-No license has been declared for this repository yet. Add a `LICENSE` file before distributing
-the compiler or generated programs.
+Solvik is released under the MIT License. The full text, including the copyright notice, is in
+[LICENSE](LICENSE).
