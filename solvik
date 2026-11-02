@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# Solvik launcher.
+#
+#   ./solvik run <source file>
+#   ./solvik check <source file>
+#
+# `run` transpiles the file to Java, compiles it with the JDK compiler, caches the result, and runs
+# it. `check` stops after the compile and reports the result only through its exit status, so the
+# program never runs. Both commands check the whole program: the entry file, every file it imports
+# transitively, and the packaged standard library. `run` caches under ~/.cache/solvik/ (or
+# $SOLVIK_CACHE_DIR), keyed by the program's source text, the dependency classpath, the
+# --keep-sources mode, and the compiler build, so an unchanged program is executed straight from the
+# cached classes. `check` is a one-off compile: it reads no published entry, publishes none, and
+# deletes the scratch entry it used.
+#
+# Every argument is forwarded verbatim: command words, options, and operands are parsed in Java by
+# dev.solvik.compiler.cli.Main, where `run` or `check` is the required command word, so
+# `./solvik example.sol` without one is a usage error (exit 2).
+#
+# The launcher runs the packaged uber jar (target/solvik.jar), building it when missing or stale.
+# You can also invoke it directly: java -jar target/solvik.jar <run|check> <source file>
+#
+# Exit codes: 0 success, 1 compile error or runtime abort, 2 bad usage.
+set -euo pipefail
+
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+jar="$root/target/solvik.jar"
+
+needs_build=0
+if [ ! -f "$jar" ]; then
+  needs_build=1
+elif [ -n "$(find "$root/src/main" "$root/pom.xml" -newer "$jar" -print -quit 2>/dev/null)" ]; then
+  needs_build=1
+fi
+
+if [ "$needs_build" -eq 1 ]; then
+  ( cd "$root" && ./mvnw -q -DskipTests package )
+fi
+
+exec java -jar "$jar" "$@"

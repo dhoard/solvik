@@ -1,0 +1,14 @@
+target/
+
+# IDE and editor state
+.idea/
+*.iml
+.vscode/
+*.swp
+
+# OS metadata
+.DS_Store
+
+# Plans
+plans/
+

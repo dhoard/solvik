@@ -1,0 +1,12 @@
+# Normalize line endings in the working tree; never rewrite binaries.
+* text=auto eol=lf
+
+*.jar binary
+*.class binary
+
+mvnw text eol=lf
+
+*.sol text eol=lf
+*.java text eol=lf
+*.md text eol=lf
+*.xml text eol=lf
