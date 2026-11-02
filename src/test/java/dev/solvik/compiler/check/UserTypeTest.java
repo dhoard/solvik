@@ -43,7 +43,7 @@ class UserTypeTest {
                     pub func Ledger() { }
                     pub func size() -> Integer { return self.items.size }
                 }
-                TextWriter(Stdio.stdout()).writeLine((Ledger().size()) .. (" ") .. (Ledger().items.size))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Ledger().size()) .. (" ") .. (Ledger().items.size))
                 """);
     }
 
@@ -65,7 +65,7 @@ class UserTypeTest {
                 }
 
                 p := Point(1, 2)
-                TextWriter(Stdio.stdout()).writeLine((p.toString()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((p.toString()) .. "")
                 """);
     }
 
@@ -92,7 +92,7 @@ class UserTypeTest {
             // a method named after another type
             "type Point { x := 0 }\ntype Line { y := 0\n func Point() {\n  self.y = 1\n }\n}",
             // field access outside a type body
-            "type Point { x := 0 }\nvar p : Point()\nTextWriter(Stdio.stdout()).writeLine((p.x) .. \"\")",
+            "type Point { x := 0 }\nvar p : Point()\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((p.x) .. \"\")",
             // method call with the wrong arity and unknown type
             "type Point {\n x := 0\n func shift(n: Integer) {\n  self.x = n\n }\n}\nvar p : Point()\np.shift()",
             "p := Missing()",
@@ -113,7 +113,7 @@ class UserTypeTest {
                 }
                 origin := Point()
                 other := Point(2)
-                TextWriter(Stdio.stdout()).writeLine((origin) .. (other))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((origin) .. (other))
                 """);
     }
 
@@ -147,7 +147,7 @@ class UserTypeTest {
 
                 a := Solvik("alpha")
                 b := SolvikProgram("beta")
-                TextWriter(Stdio.stdout()).writeLine((a.describe()) .. (" ") .. (b.describe()))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((a.describe()) .. (" ") .. (b.describe()))
                 """);
     }
 
@@ -163,7 +163,7 @@ class UserTypeTest {
                 }
 
                 p := Point(1)
-                TextWriter(Stdio.stdout()).writeLine((p.type()) .. (" ") .. (p.toString()) .. (" ") .. (p.equals(p)) .. (" ") .. (p.hashCode()))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((p.type()) .. (" ") .. (p.toString()) .. (" ") .. (p.equals(p)) .. (" ") .. (p.hashCode()))
                 """);
     }
 
@@ -180,7 +180,7 @@ class UserTypeTest {
 
                 points := Any[2] {Point(1), Point(2)}
                 for p in points {
-                    TextWriter(Stdio.stdout()).writeLine((p.type()) .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((p.type()) .. "")
                 }
                 """);
     }

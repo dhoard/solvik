@@ -76,8 +76,8 @@ class MemberAccessExecutionTest {
                 }
 
                 corner := Point(3, 4)
-                TextWriter(Stdio.stdout()).writeLine((corner.x) .. (" ") .. (corner.y))
-                TextWriter(Stdio.stdout()).writeLine((corner.x + corner.y) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((corner.x) .. (" ") .. (corner.y))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((corner.x + corner.y) .. "")
                 """, directory);
 
         assertThat(output).isEqualTo("3 4\n7\n");
@@ -101,7 +101,7 @@ class MemberAccessExecutionTest {
 
                 balance := Balance()
                 balance.amount = 21
-                TextWriter(Stdio.stdout()).writeLine((balance.amount) .. (" ") .. (balance.doubled()))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((balance.amount) .. (" ") .. (balance.doubled()))
                 """, directory);
 
         assertThat(output).isEqualTo("21 42\n");
@@ -132,7 +132,7 @@ class MemberAccessExecutionTest {
                 counter := Counter()
                 counter.add(2)
                 counter.add(3)
-                TextWriter(Stdio.stdout()).writeLine((counter.report()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((counter.report()) .. "")
                 """, directory);
 
         assertThat(output).isEqualTo("5 in 2\n");
@@ -151,9 +151,9 @@ class MemberAccessExecutionTest {
                 }
 
                 box := Box(1)
-                TextWriter(Stdio.stdout()).writeLine((box.value) .. (" ") .. (box.value == Null))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((box.value) .. (" ") .. (box.value == Null))
                 box.value = 2
-                TextWriter(Stdio.stdout()).writeLine((box.value) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((box.value) .. "")
                 """, directory);
 
         assertThat(output).isEqualTo("1 false\n2\n");
@@ -193,7 +193,7 @@ class MemberAccessExecutionTest {
 
                 counter := Counter("hits")
                 counter.add(2)
-                TextWriter(Stdio.stdout()).writeLine((counter.report()) .. (" ") .. (counter.doubled()))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((counter.report()) .. (" ") .. (counter.doubled()))
                 """, directory);
 
         // add(2) stores 2, bump() makes 3, and doubled() sees 100 + 3 through `self.total`.
@@ -226,7 +226,7 @@ class MemberAccessExecutionTest {
                 }
 
                 container := Outer()
-                TextWriter(Stdio.stdout()).writeLine((container.name) .. (" ") .. (container.inner.label) .. (" ") .. (container.describe()))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((container.name) .. (" ") .. (container.inner.label) .. (" ") .. (container.describe()))
                 """, directory);
 
         assertThat(output).isEqualTo("out in out/in\n");

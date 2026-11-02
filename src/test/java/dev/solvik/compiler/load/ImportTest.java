@@ -77,7 +77,7 @@ class ImportTest {
                     }
                 }
 
-                TextWriter(Stdio.stdout()).writeLine((shapes::origin().x) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((shapes::origin().x) .. "")
                 """);
 
         Diagnostics diagnostics = new Diagnostics();
@@ -109,7 +109,7 @@ class ImportTest {
         write("app.sol", """
                 import "middle.sol"
 
-                TextWriter(Stdio.stdout()).writeLine((middle::doubled()) .. (" ") .. (inner::seven()))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((middle::doubled()) .. (" ") .. (inner::seven()))
                 """);
 
         Diagnostics diagnostics = new Diagnostics();
@@ -141,7 +141,7 @@ class ImportTest {
                     }
                 }
                 """);
-        write("app.sol", "import \"a.sol\"\n\nTextWriter(Stdio.stdout()).writeLine((a::fromB()) .. \"\")\n");
+        write("app.sol", "import \"a.sol\"\n\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((a::fromB()) .. \"\")\n");
 
         Diagnostics diagnostics = new Diagnostics();
         load("app.sol", diagnostics);
@@ -174,7 +174,7 @@ class ImportTest {
 
     @Test
     void a_file_that_imports_itself_is_a_cycle() throws IOException {
-        write("self.sol", "import \"self.sol\"\n\nTextWriter(Stdio.stdout()).writeLine((1) .. \"\")\n");
+        write("self.sol", "import \"self.sol\"\n\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1) .. \"\")\n");
 
         Diagnostics diagnostics = new Diagnostics();
         load("self.sol", diagnostics);
@@ -201,7 +201,7 @@ class ImportTest {
                 """);
         write("left.sol", "import \"shared.sol\"\n\nmodule left {\n    pub func make() -> shared::Value {\n        return shared::Value(1)\n    }\n}\n");
         write("right.sol", "import \"shared.sol\"\n\nmodule right {\n    pub func make() -> shared::Value {\n        return shared::Value(2)\n    }\n}\n");
-        write("app.sol", "import \"left.sol\"\nimport \"right.sol\"\n\nTextWriter(Stdio.stdout()).writeLine((left::make().n) .. (\" \") .. (right::make().n))\n");
+        write("app.sol", "import \"left.sol\"\nimport \"right.sol\"\n\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((left::make().n) .. (\" \") .. (right::make().n))\n");
 
         Diagnostics diagnostics = new Diagnostics();
         ProgramLoader.Loaded loaded = load("app.sol", diagnostics);
@@ -221,12 +221,12 @@ class ImportTest {
                     }
                 }
 
-                TextWriter(Stdio.stdout()).writeLine(("must not run") .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("must not run") .. "")
                 """);
         write("app.sol", """
                 import "lib.sol"
 
-                TextWriter(Stdio.stdout()).writeLine(("entry ") .. (lib::value()))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("entry ") .. (lib::value()))
                 """);
 
         Diagnostics diagnostics = new Diagnostics();
@@ -240,7 +240,7 @@ class ImportTest {
 
     @Test
     void a_missing_import_is_reported_against_the_importing_file() throws IOException {
-        write("app.sol", "import \"nope.sol\"\n\nTextWriter(Stdio.stdout()).writeLine((1) .. \"\")\n");
+        write("app.sol", "import \"nope.sol\"\n\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1) .. \"\")\n");
 
         Diagnostics diagnostics = new Diagnostics();
         load("app.sol", diagnostics);
@@ -267,7 +267,7 @@ class ImportTest {
                     import "unreadable.sol"
                     import "c.sol"
 
-                    TextWriter(Stdio.stdout()).writeLine(("a") .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("a") .. "")
                     """);
             write("c.sol", """
                     import "a.sol"
@@ -294,7 +294,7 @@ class ImportTest {
 
     @Test
     void an_absolute_import_path_is_rejected() throws IOException {
-        write("app.sol", "import \"/etc/passwd\"\n\nTextWriter(Stdio.stdout()).writeLine((1) .. \"\")\n");
+        write("app.sol", "import \"/etc/passwd\"\n\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1) .. \"\")\n");
 
         Diagnostics diagnostics = new Diagnostics();
         load("app.sol", diagnostics);
@@ -339,7 +339,7 @@ class ImportTest {
     @Test
     void a_diagnostic_names_the_file_it_came_from() throws IOException {
         write("lib.sol", "module lib {\n    pub func broken() -> Integer {\n        return \"text\"\n    }\n}\n");
-        write("app.sol", "import \"lib.sol\"\n\nTextWriter(Stdio.stdout()).writeLine((lib::broken()) .. \"\")\n");
+        write("app.sol", "import \"lib.sol\"\n\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((lib::broken()) .. \"\")\n");
 
         var out = new ByteArrayOutputStream();
         var err = new ByteArrayOutputStream();
@@ -359,7 +359,7 @@ class ImportTest {
 
     @Test
     void a_single_source_compilation_refuses_imports() {
-        assertThat(runFailure("import \"lib.sol\"\n\nTextWriter(Stdio.stdout()).writeLine((1) .. \"\")\n"))
+        assertThat(runFailure("import \"lib.sol\"\n\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1) .. \"\")\n"))
                 .contains(ProgramLoader.MISSING_FILE)
                 .contains("run the compiler on a file path");
     }

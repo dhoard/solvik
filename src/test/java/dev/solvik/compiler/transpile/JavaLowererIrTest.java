@@ -221,7 +221,7 @@ class JavaLowererIrTest {
                     pub func Box() { }
                 }
                 count := 1
-                TextWriter(Stdio.stdout()).write((count) .. (Box()))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).write((count) .. (Box()))
                 """);
         JDecl.Method main = method(lowered.unit(), "main");
         JStmt.ExpressionStatement printed = (JStmt.ExpressionStatement) main.body().getLast();

@@ -48,16 +48,16 @@ class NullabilityTest {
     @DisplayName("§15: printing, equality, and String(value) accept Null")
     void null_safe_operations_accept_null() {
         assertAccepted("""
-                TextWriter(Stdio.stdout()).writeLine((Null) .. "")
-                TextWriter(Stdio.stdout()).writeLine((Null == Null) .. "")
-                TextWriter(Stdio.stdout()).writeLine((Null != Null) .. "")
-                TextWriter(Stdio.stdout()).writeLine((Null === Null) .. "")
-                TextWriter(Stdio.stdout()).writeLine((String(Null)) .. "")
-                TextWriter(Stdio.stdout()).writeLine(("value=" .. Null) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Null) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Null == Null) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Null != Null) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Null === Null) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((String(Null)) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("value=" .. Null) .. "")
                 """);
         assertAccepted("""
                 text: String? = Null
-                TextWriter(Stdio.stdout()).writeLine((text) .. (" ") .. (text == Null) .. (" ") .. (text != "x") .. (" ") .. (String(text)))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((text) .. (" ") .. (text == Null) .. (" ") .. (text != "x") .. (" ") .. (String(text)))
                 """);
     }
 
@@ -69,7 +69,7 @@ class NullabilityTest {
                 b: Any? = Null
                 c: String[2]? = Null
                 d := Null
-                TextWriter(Stdio.stdout()).writeLine((a) .. (b) .. (c) .. (d))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((a) .. (b) .. (c) .. (d))
                 """);
         assertThat(diagnostics("a: Integer = Null").all()).extracting(d -> d.code())
                 .contains(TypeChecker.TYPE_ERROR);
@@ -87,13 +87,13 @@ class NullabilityTest {
                     return Null
                 }
                 held: Null = Null
-                TextWriter(Stdio.stdout()).writeLine((onlyNull()) .. (" ") .. (held) .. (" ") .. (onlyNull() == Null))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((onlyNull()) .. (" ") .. (held) .. (" ") .. (onlyNull() == Null))
                 """);
         assertThat(diagnostics("""
                 func nothing() -> Null {
                     return
                 }
-                TextWriter(Stdio.stdout()).writeLine((nothing()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((nothing()) .. "")
                 """).all()).extracting(d -> d.code()).contains(TypeChecker.TYPE_ERROR);
         assertThat(diagnostics("""
                 func noValue() {
@@ -114,16 +114,16 @@ class NullabilityTest {
     @Test
     @DisplayName("a nullable value must be proven present before it is dereferenced")
     void nullable_values_are_not_usable_as_values() {
-        assertUnsafe("v: String? = Null\nTextWriter(Stdio.stdout()).writeLine((v.size) .. \"\")");
-        assertUnsafe("v: Integer? = Null\nTextWriter(Stdio.stdout()).writeLine((v + 1) .. \"\")");
-        assertUnsafe("v: Integer? = Null\nTextWriter(Stdio.stdout()).writeLine((-v) .. \"\")");
+        assertUnsafe("v: String? = Null\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((v.size) .. \"\")");
+        assertUnsafe("v: Integer? = Null\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((v + 1) .. \"\")");
+        assertUnsafe("v: Integer? = Null\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((-v) .. \"\")");
         assertUnsafe("v: Boolean? = Null\nif v { }");
-        assertUnsafe("v: Boolean? = Null\nTextWriter(Stdio.stdout()).writeLine((v && true) .. \"\")");
-        assertUnsafe("v: Integer[2]? = Null\nTextWriter(Stdio.stdout()).writeLine((v[0]) .. \"\")");
-        assertUnsafe("v: Integer[2]? = Null\nTextWriter(Stdio.stdout()).writeLine((v.size) .. \"\")");
-        assertUnsafe("v: Integer[2]? = Null\nfor n in v { TextWriter(Stdio.stdout()).writeLine((n) .. \"\") }");
+        assertUnsafe("v: Boolean? = Null\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((v && true) .. \"\")");
+        assertUnsafe("v: Integer[2]? = Null\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((v[0]) .. \"\")");
+        assertUnsafe("v: Integer[2]? = Null\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((v.size) .. \"\")");
+        assertUnsafe("v: Integer[2]? = Null\nfor n in v { solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((n) .. \"\") }");
         assertUnsafe("v: Integer? = Null\nswitch v { case 1 { } }");
-        assertUnsafe("v: String? = Null\nTextWriter(Stdio.stdout()).writeLine((v.equals(\"x\")) .. \"\")");
+        assertUnsafe("v: String? = Null\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((v.equals(\"x\")) .. \"\")");
         assertUnsafe("mut v: String? = Null\nv ..= \"x\"");
     }
 
@@ -133,15 +133,15 @@ class NullabilityTest {
         assertAccepted("""
                 text: String? = Null
                 if text != Null {
-                    TextWriter(Stdio.stdout()).writeLine((text.size()) .. (" ") .. (text.substring(0, 1)))
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((text.size()) .. (" ") .. (text.substring(0, 1)))
                 }
                 """);
         assertAccepted("""
                 text: String? = Null
                 if text == Null {
-                    TextWriter(Stdio.stdout()).writeLine(("absent") .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("absent") .. "")
                 } else {
-                    TextWriter(Stdio.stdout()).writeLine((text.size()) .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((text.size()) .. "")
                 }
                 """);
         assertAccepted("""
@@ -151,13 +151,13 @@ class NullabilityTest {
                     }
                     return text.size()
                 }
-                TextWriter(Stdio.stdout()).writeLine((size(Null)) .. (" ") .. (size("four")))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((size(Null)) .. (" ") .. (size("four")))
                 """);
         assertAccepted("""
                 a: String? = Null
                 b: String? = "x"
                 if a != Null && b != Null {
-                    TextWriter(Stdio.stdout()).writeLine((a.size() + b.size()) .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((a.size() + b.size()) .. "")
                 }
                 """);
         assertAccepted("""
@@ -168,12 +168,12 @@ class NullabilityTest {
                         n = Null
                     }
                 }
-                TextWriter(Stdio.stdout()).writeLine((n) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((n) .. "")
                 """);
         assertAccepted("""
                 text: String? = Null
                 if !(text == Null) {
-                    TextWriter(Stdio.stdout()).writeLine((text.size()) .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((text.size()) .. "")
                 }
                 """);
     }
@@ -185,14 +185,14 @@ class NullabilityTest {
                 mut text: String? = Null
                 if text != Null {
                     text = Null
-                    TextWriter(Stdio.stdout()).writeLine((text.size()) .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((text.size()) .. "")
                 }
                 """);
         assertAccepted("""
                 mut text: String? = Null
                 if text != Null {
                     text = "again"
-                    TextWriter(Stdio.stdout()).writeLine((text.size()) .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((text.size()) .. "")
                 }
                 """);
     }
@@ -202,18 +202,18 @@ class NullabilityTest {
     void a_non_null_value_proves_presence() {
         assertAccepted("""
                 mut text: String? = "ready"
-                TextWriter(Stdio.stdout()).writeLine((text.size()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((text.size()) .. "")
                 text = "again"
-                TextWriter(Stdio.stdout()).writeLine((text.size()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((text.size()) .. "")
                 """);
         assertAccepted("""
                 mut count: Integer? = 1
-                TextWriter(Stdio.stdout()).writeLine((count + 1) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((count + 1) .. "")
                 """);
         assertUnsafe("""
                 mut text: String? = "ready"
                 text = Null
-                TextWriter(Stdio.stdout()).writeLine((text.size()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((text.size()) .. "")
                 """);
     }
 
@@ -228,13 +228,13 @@ class NullabilityTest {
                 }
                 box := Box()
                 if box.value != Null {
-                    TextWriter(Stdio.stdout()).writeLine((box.value.size()) .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((box.value.size()) .. "")
                 }
                 """);
         assertUnsafe("""
                 values: String?[2] = String?[2] {Null, Null}
                 if values[0] != Null {
-                    TextWriter(Stdio.stdout()).writeLine((values[0].size()) .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((values[0].size()) .. "")
                 }
                 """);
     }
@@ -249,18 +249,18 @@ class NullabilityTest {
                     }
                     return value
                 }
-                TextWriter(Stdio.stdout()).writeLine((describe(Null)) .. (" ") .. (describe("x")))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((describe(Null)) .. (" ") .. (describe("x")))
                 """);
         assertThat(diagnostics("""
                 func describe(value: String) -> String { return value }
-                TextWriter(Stdio.stdout()).writeLine((describe(Null)) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((describe(Null)) .. "")
                 """).all()).extracting(d -> d.code()).contains(TypeChecker.TYPE_ERROR);
         assertThat(diagnostics("""
                 func describe(value: String?) -> String {
                     if value == Null { return "absent" }
                     return value
                 }
-                TextWriter(Stdio.stdout()).writeLine((describe(Null)) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((describe(Null)) .. "")
                 """).all()).isEmpty();
     }
 
@@ -272,16 +272,16 @@ class NullabilityTest {
                 value = 1
                 value = "text"
                 value = 1.5
-                TextWriter(Stdio.stdout()).writeLine((value) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((value) .. "")
                 """);
         assertThat(diagnostics("""
                 value: Any = Null
-                TextWriter(Stdio.stdout()).writeLine((value) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((value) .. "")
                 """).all()).extracting(d -> d.code()).contains(TypeChecker.TYPE_ERROR);
         assertThat(diagnostics("""
                 mut number: Number? = Null
                 number = 1
-                TextWriter(Stdio.stdout()).writeLine((number) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((number) .. "")
                 """).all()).isEmpty();
     }
 
@@ -292,7 +292,7 @@ class NullabilityTest {
         assertThat(diagnostics("""
                 type Left { pub func Left() { } }
                 func choose(value: Left) -> Integer { return 1 }
-                TextWriter(Stdio.stdout()).writeLine((choose(Null)) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((choose(Null)) .. "")
                 """).all()).extracting(d -> d.code()).contains(TypeChecker.TYPE_ERROR);
         // Two unrelated nullable overloads are equally good, so the call is ambiguous.
         assertThat(diagnostics("""
@@ -300,13 +300,13 @@ class NullabilityTest {
                 type Right { pub func Right() { } }
                 func choose(value: Left?) -> Integer { return 1 }
                 func choose(value: Right?) -> Integer { return 2 }
-                TextWriter(Stdio.stdout()).writeLine((choose(Null)) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((choose(Null)) .. "")
                 """).all()).extracting(d -> d.code()).contains(JavaMathMethods.AMBIGUOUS);
         // A non-nullable and a nullable overload erase to one Java signature.
         assertThat(diagnostics("""
                 func choose(value: Integer) -> Integer { return value }
                 func choose(value: Integer?) -> Integer { return 0 }
-                TextWriter(Stdio.stdout()).writeLine((choose(1)) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((choose(1)) .. "")
                 """).all()).extracting(d -> d.code()).contains(TypeChecker.TYPE_ERROR);
     }
 
@@ -318,25 +318,25 @@ class NullabilityTest {
                 nullableElements := Integer?[2] {1, Null}
                 nullableArray: Integer[2]? = Integer[2] {1, 2}
                 both: Integer?[2]? = Integer?[2] {Null, 2}
-                TextWriter(Stdio.stdout()).writeLine((plain) .. (nullableElements) .. (nullableArray) .. (both))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((plain) .. (nullableElements) .. (nullableArray) .. (both))
                 """);
         assertAccepted("""
                 elements: String?[2] = String?[2] {Null, Null}
-                TextWriter(Stdio.stdout()).writeLine((elements[0] == Null) .. (" ") .. (elements[1] == Null))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((elements[0] == Null) .. (" ") .. (elements[1] == Null))
                 """);
         assertAccepted("""
                 array: String[2]? = String[2] {"a", "b"}
                 if array != Null {
-                    TextWriter(Stdio.stdout()).writeLine((array[0].size()) .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((array[0].size()) .. "")
                 }
                 """);
         assertThat(diagnostics("""
                 array: String[2] = Null
-                TextWriter(Stdio.stdout()).writeLine((array) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((array) .. "")
                 """).all()).extracting(d -> d.code()).contains(TypeChecker.TYPE_ERROR);
         assertUnsafe("""
                 array: String[2]? = Null
-                TextWriter(Stdio.stdout()).writeLine((array[0]) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((array[0]) .. "")
                 """);
     }
 
@@ -345,13 +345,13 @@ class NullabilityTest {
     void nullable_elements_yield_nullable_values() {
         assertUnsafe("""
                 values: Integer?[2] = Integer?[2] {1, 2}
-                TextWriter(Stdio.stdout()).writeLine((values[0] + 1) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((values[0] + 1) .. "")
                 """);
         assertAccepted("""
                 values: Integer?[2] = Integer?[2] {1, 2}
                 first := values[0]
                 if first != Null {
-                    TextWriter(Stdio.stdout()).writeLine((first + 1) .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((first + 1) .. "")
                 }
                 """);
     }
@@ -376,13 +376,13 @@ class NullabilityTest {
     @DisplayName("equality is null-safe for every operand shape")
     void equality_is_null_safe() {
         assertAccepted("""
-                TextWriter(Stdio.stdout()).writeLine((Null == Null) .. (" ") .. (Null == 1) .. (" ") .. (Null == "text") .. (" ") .. (Null == true))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Null == Null) .. (" ") .. (Null == 1) .. (" ") .. (Null == "text") .. (" ") .. (Null == true))
                 a: Integer? = Null
                 b: Integer? = 1
-                TextWriter(Stdio.stdout()).writeLine((a == b) .. (" ") .. (a == Null) .. (" ") .. (b == 1))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((a == b) .. (" ") .. (a == Null) .. (" ") .. (b == 1))
                 c: String[2]? = Null
                 d := String[2] {"a", "b"}
-                TextWriter(Stdio.stdout()).writeLine((c == d) .. (" ") .. (d == Null) .. (" ") .. (d === d))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((c == d) .. (" ") .. (d == Null) .. (" ") .. (d === d))
                 """);
     }
 
@@ -401,17 +401,17 @@ class NullabilityTest {
                 mut v: Any? = Null
                 v = 1
                 v = "text"
-                TextWriter(Stdio.stdout()).writeLine((v) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((v) .. "")
                 """);
     }
 
     @Test
     @DisplayName("a Null-typed binding is immutable in practice: it can hold only Null")
     void a_null_typed_binding_holds_only_null() {
-        assertAccepted("nothing := Null\nTextWriter(Stdio.stdout()).writeLine((nothing) .. (\" \") .. (nothing == Null))");
+        assertAccepted("nothing := Null\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((nothing) .. (\" \") .. (nothing == Null))");
         assertThat(diagnostics("mut nothing := Null\nnothing = 1").all())
                 .extracting(d -> d.code()).contains(TypeChecker.TYPE_ERROR);
-        assertThat(diagnostics("nothing := Null\nTextWriter(Stdio.stdout()).writeLine((nothing + 1) .. \"\")").all())
+        assertThat(diagnostics("nothing := Null\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((nothing + 1) .. \"\")").all())
                 .extracting(d -> d.code()).contains(TypeChecker.TYPE_ERROR);
     }
 
@@ -422,19 +422,19 @@ class NullabilityTest {
                 func missing() -> String? {
                     return Null
                 }
-                TextWriter(Stdio.stdout()).writeLine((missing()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((missing()) .. "")
                 """);
         assertThat(diagnostics("""
                 func missing() -> String {
                     return Null
                 }
-                TextWriter(Stdio.stdout()).writeLine((missing()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((missing()) .. "")
                 """).all()).extracting(d -> d.code()).contains(TypeChecker.TYPE_ERROR);
         assertThat(diagnostics("""
                 func maybe(value: Integer?) -> Integer {
                     return value
                 }
-                TextWriter(Stdio.stdout()).writeLine((maybe(1)) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((maybe(1)) .. "")
                 """).all()).extracting(d -> d.code()).contains(TypeChecker.TYPE_ERROR);
     }
 
@@ -443,11 +443,11 @@ class NullabilityTest {
     void conversions_do_not_assert_non_null() {
         assertThat(diagnostics("""
                 v: Integer? = Null
-                TextWriter(Stdio.stdout()).writeLine((Integer(v)) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Integer(v)) .. "")
                 """).all()).extracting(d -> d.code()).contains(TypeChecker.TYPE_ERROR);
         assertAccepted("""
                 v: Integer? = Null
-                TextWriter(Stdio.stdout()).writeLine((String(v)) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((String(v)) .. "")
                 """);
     }
 
@@ -457,13 +457,13 @@ class NullabilityTest {
         assertUnsafe("""
                 type Point { pub func Point() { } }
                 p: Point? = Null
-                TextWriter(Stdio.stdout()).writeLine((p.equals(Null)) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((p.equals(Null)) .. "")
                 """);
         assertAccepted("""
                 type Point { pub func Point() { } }
                 p: Point? = Null
                 if p != Null {
-                    TextWriter(Stdio.stdout()).writeLine((p.equals(Null)) .. (" ") .. (p.equals(p)))
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((p.equals(Null)) .. (" ") .. (p.equals(p)))
                 }
                 """);
     }
@@ -494,7 +494,7 @@ class NullabilityTest {
                 mut plain: String[2] = String[2] {"x", "y"}
                 mut nullable: String?[2] = plain
                 nullable[0] = Null
-                TextWriter(Stdio.stdout()).writeLine((plain[0]) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((plain[0]) .. "")
                 """).all()).extracting(d -> d.code()).contains(TypeChecker.TYPE_ERROR);
         assertThat(diagnostics("""
                 inner := String[2] {"a", "b"}
@@ -505,7 +505,7 @@ class NullabilityTest {
                 values := String[2] {"a", "b"}
                 maybe: String[2]? = values
                 if maybe != Null {
-                    TextWriter(Stdio.stdout()).writeLine((maybe[0].size()) .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((maybe[0].size()) .. "")
                 }
                 """);
         // An element may still be a non-null value where the element type is nullable: the
@@ -513,7 +513,7 @@ class NullabilityTest {
         assertAccepted("""
                 values: String?[2] = String?[2] {"a", "b"}
                 values[0] = "c"
-                TextWriter(Stdio.stdout()).writeLine((values[0]) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((values[0]) .. "")
                 """);
     }
 
@@ -527,7 +527,7 @@ class NullabilityTest {
                     pub func Box() { }
                 }
                 box := Box()
-                TextWriter(Stdio.stdout()).writeLine((box.value.size()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((box.value.size()) .. "")
                 """);
         assertAccepted("""
                 type Box {
@@ -543,7 +543,7 @@ class NullabilityTest {
                         return mine.size()
                     }
                 }
-                TextWriter(Stdio.stdout()).writeLine((Box().textSize()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Box().textSize()) .. "")
                 """);
     }
 }

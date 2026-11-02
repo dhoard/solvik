@@ -35,9 +35,9 @@ class ArraySizeExecutionTest {
     void declared_length_fills_the_remaining_elements_with_null() throws IOException {
         String output = run("""
                 names := String?[4] {"ann", "bob"}
-                TextWriter(Stdio.stdout()).writeLine((names.size) .. (" ") .. (names[1]) .. (" ") .. (names[2] == Null) .. (" ") .. (names))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((names.size) .. (" ") .. (names[1]) .. (" ") .. (names[2] == Null) .. (" ") .. (names))
                 names[3] = "dee"
-                TextWriter(Stdio.stdout()).writeLine((names[3]) .. (" ") .. (names.size))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((names[3]) .. (" ") .. (names.size))
                 """);
         assertThat(output).isEqualTo("4 bob true [ann, bob, null, null]\ndee 4\n");
     }
@@ -55,7 +55,7 @@ class ArraySizeExecutionTest {
                 }
 
                 numbers := Integer?[5] {1, 2, 3}
-                TextWriter(Stdio.stdout()).writeLine((numbers.size) .. (" ") .. (counts(numbers)) .. (" ") .. (numbers.size))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((numbers.size) .. (" ") .. (counts(numbers)) .. (" ") .. (numbers.size))
                 """);
         assertThat(output).isEqualTo("5 5 5\n");
     }
@@ -65,10 +65,10 @@ class ArraySizeExecutionTest {
     void an_unset_slot_is_assignable_later() throws IOException {
         String output = run("""
                 cells := Integer?[3] { }
-                TextWriter(Stdio.stdout()).writeLine((cells.size) .. (" ") .. (cells[0] == Null) .. (" ") .. (cells))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((cells.size) .. (" ") .. (cells[0] == Null) .. (" ") .. (cells))
                 cells[0] = 7
                 cells[2] = 9
-                TextWriter(Stdio.stdout()).writeLine((cells[0]) .. (" ") .. (cells[1] == Null) .. (" ") .. (cells[2]))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((cells[0]) .. (" ") .. (cells[1] == Null) .. (" ") .. (cells[2]))
                 """);
         assertThat(output).isEqualTo("3 true [null, null, null]\n7 true 9\n");
     }
@@ -78,9 +78,9 @@ class ArraySizeExecutionTest {
     void nested_levels_keep_their_declared_sizes() throws IOException {
         String output = run("""
                 grid := Integer?[][3] {Integer?[2] {1}, Integer?[2] {2}, Integer?[2] {3}}
-                TextWriter(Stdio.stdout()).writeLine((grid.size) .. (" ") .. (grid[0].size) .. (" ") .. (grid[1][1] == Null))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((grid.size) .. (" ") .. (grid[0].size) .. (" ") .. (grid[1][1] == Null))
                 grid[1] = Integer?[2] {8, 9}
-                TextWriter(Stdio.stdout()).writeLine((grid[1][1]) .. (" ") .. (grid))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((grid[1][1]) .. (" ") .. (grid))
                 """);
         assertThat(output).isEqualTo("3 2 true\n9 [[1, null], [8, 9], [3, null]]\n");
     }
@@ -90,17 +90,17 @@ class ArraySizeExecutionTest {
     void the_size_member_is_the_constructed_length() throws IOException {
         String output = run("""
                 fixed := Byte[10] {0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
-                TextWriter(Stdio.stdout()).writeLine((fixed.size) .. (" ") .. (fixed[9]))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((fixed.size) .. (" ") .. (fixed[9]))
                 slots := Byte?[10] {}
-                TextWriter(Stdio.stdout()).writeLine((slots.size) .. (" ") .. (slots[0] == Null))
-                TextWriter(Stdio.stdout()).writeLine((fixed.size .. " items") .. (" ") .. (fixed.size == 10) .. (" ") .. (fixed.size + 1))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((slots.size) .. (" ") .. (slots[0] == Null))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((fixed.size .. " items") .. (" ") .. (fixed.size == 10) .. (" ") .. (fixed.size + 1))
                 mut limit := 0
                 mut index := 0
                 while index < fixed.size {
                     index = index + 1
                     limit = index
                 }
-                TextWriter(Stdio.stdout()).writeLine(("loop: ") .. (limit) .. (" ") .. (fixed[fixed.size - 1]))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("loop: ") .. (limit) .. (" ") .. (fixed[fixed.size - 1]))
                 """);
         assertThat(output).isEqualTo("10 9\n10 true\n10 items true 11\nloop: 10 9\n");
     }
@@ -117,7 +117,7 @@ class ArraySizeExecutionTest {
                     pub func Row() { }
                 }
                 fields := "a,b,c".split(",")
-                TextWriter(Stdio.stdout()).writeLine((fields.size) .. (" ") .. (width(Integer[2] {1, 2})) .. (" ") .. (Row().cells.size))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((fields.size) .. (" ") .. (width(Integer[2] {1, 2})) .. (" ") .. (Row().cells.size))
                 """);
         assertThat(output).isEqualTo("3 2 3\n");
     }

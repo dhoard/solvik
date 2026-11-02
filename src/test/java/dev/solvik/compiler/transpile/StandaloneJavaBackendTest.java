@@ -18,7 +18,7 @@ class StandaloneJavaBackendTest {
                     pub func Item() { }
                 }
                 items := Integer[2] {1, 2}
-                TextWriter(Stdio.stdout()).writeLine((Item().name) .. (" ") .. (items.size))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Item().name) .. (" ") .. (items.size))
                 """);
 
         assertThat(PackagedLibrary.programFiles(files)).containsExactly("Item.java", "Solvik$Program.java");
@@ -37,7 +37,7 @@ class StandaloneJavaBackendTest {
                     return values[0]
                 }
                 items := Number[2] {Byte(3), 4.5}
-                TextWriter(Stdio.stdout()).writeLine((items) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((items) .. "")
                 """);
         assertThat(files.get("Solvik$Program.java"))
                 .contains("List<Number>")

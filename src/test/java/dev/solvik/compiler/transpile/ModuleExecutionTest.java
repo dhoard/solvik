@@ -99,8 +99,8 @@ class ModuleExecutionTest {
 
                 start := geometry::Point(1, 2)
                 bill := billing::Point()
-                TextWriter(Stdio.stdout()).writeLine((start.shifted(3)) .. (" ") .. (bill))
-                TextWriter(Stdio.stdout()).writeLine((start.type()) .. (" ") .. (bill.type()))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((start.shifted(3)) .. (" ") .. (bill))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((start.type()) .. (" ") .. (bill.type()))
                 """, directory);
 
         assertThat(output).isEqualTo("geo(4, 2) bill:invoice\nPoint Point\n");
@@ -134,7 +134,7 @@ class ModuleExecutionTest {
                     }
                 }
 
-                TextWriter(Stdio.stdout()).writeLine((geometry::Circle(7).center().x) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((geometry::Circle(7).center().x) .. "")
                 """, directory);
 
         assertThat(output).isEqualTo("7\n");
@@ -174,7 +174,7 @@ class ModuleExecutionTest {
                 box := geometry::Box(geometry::Point(10))
                 mut boxed: geometry::Point? = box.value
                 if boxed != Null {
-                    TextWriter(Stdio.stdout()).writeLine((total(grid)) .. (" ") .. (boxed.x) .. (" ") .. (box.type()))
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((total(grid)) .. (" ") .. (boxed.x) .. (" ") .. (box.type()))
                 }
                 """, directory);
 
@@ -209,7 +209,7 @@ class ModuleExecutionTest {
                     }
                 }
 
-                TextWriter(Stdio.stdout()).writeLine((describe()) .. (" ") .. (geometry::describe()) .. (" ") .. (geometry::report(4)))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((describe()) .. (" ") .. (geometry::describe()) .. (" ") .. (geometry::report(4)))
                 """, directory);
 
         assertThat(output).isEqualTo("global scoped scoped:16\n");
@@ -241,7 +241,7 @@ class ModuleExecutionTest {
                     }
                 }
 
-                TextWriter(Stdio.stdout()).writeLine((geometry::Point(3).scaled(4)) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((geometry::Point(3).scaled(4)) .. "")
                 """, directory);
 
         assertThat(output).isEqualTo("24\n");
@@ -279,7 +279,7 @@ class ModuleExecutionTest {
                     }
                 }
 
-                TextWriter(Stdio.stdout()).writeLine((shapes::Report().summary()) .. (" ") .. (shapes::helper()))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((shapes::Report().summary()) .. (" ") .. (shapes::helper()))
                 """, directory);
 
         assertThat(output).isEqualTo("total=21 doubled=42 8\n");
@@ -318,7 +318,7 @@ class ModuleExecutionTest {
                     }
                 }
 
-                TextWriter(Stdio.stdout()).writeLine((Point(1)) .. (" ") .. (geometry::Point(9)) .. (" ") .. (geometry::Point(0).fresh()))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Point(1)) .. (" ") .. (geometry::Point(9)) .. (" ") .. (geometry::Point(0).fresh()))
                 """, directory);
 
         assertThat(output).isEqualTo("global(1) scoped(9) scoped(2)\n");

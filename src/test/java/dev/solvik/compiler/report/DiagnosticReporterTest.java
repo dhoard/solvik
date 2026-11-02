@@ -17,7 +17,7 @@ class DiagnosticReporterTest {
     @Test
     @DisplayName("reports file, position, code, message, and the offending line with a caret")
     void renders_all_four_facts() {
-        String source = "a := 1\nb := 1 + \"text\"\nTextWriter(Stdio.stdout()).writeLine((b) .. \"\")\n";
+        String source = "a := 1\nb := 1 + \"text\"\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((b) .. \"\")\n";
         Diagnostic diagnostic = Diagnostic.error("SOL-T001",
                 new SourcePos(20, 2, 15), "operator '+' needs numeric operands");
 

@@ -36,9 +36,9 @@ class NullValueExecutionTest {
     @DisplayName("a negative literal compares with Null without a Java-invalid cast")
     void negative_literals_compare_with_null(@TempDir Path directory) throws Exception {
         String output = run("""
-                TextWriter(Stdio.stdout()).writeLine((-1 == Null) .. (" ") .. (Null == -1) .. (" ") .. (-1 != Null))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((-1 == Null) .. (" ") .. (Null == -1) .. (" ") .. (-1 != Null))
                 mut absent: Any? = Null
-                TextWriter(Stdio.stdout()).writeLine((absent == -1) .. (" ") .. (absent == Null))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((absent == -1) .. (" ") .. (absent == Null))
                 """, directory);
 
         assertThat(output).isEqualTo("false false true\nfalse true\n");
@@ -85,15 +85,15 @@ class NullValueExecutionTest {
         String output = run("""
                 mut octet: Byte? = Null
                 octet = Byte(7)
-                TextWriter(Stdio.stdout()).writeLine((octet) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((octet) .. "")
                 octet = Null
-                TextWriter(Stdio.stdout()).writeLine((octet) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((octet) .. "")
 
                 mut flag: Boolean? = Null
                 flag = true
-                TextWriter(Stdio.stdout()).writeLine((flag) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((flag) .. "")
                 flag = Null
-                TextWriter(Stdio.stdout()).writeLine((flag) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((flag) .. "")
                 """, directory);
 
         assertThat(output).isEqualTo("7\nnull\ntrue\nnull\n");
@@ -105,15 +105,15 @@ class NullValueExecutionTest {
         String output = run("""
                 mut x: Integer? = 1
                 x = Null
-                TextWriter(Stdio.stdout()).writeLine((x) .. (" ") .. (x == Null))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((x) .. (" ") .. (x == Null))
                 x = 2
-                TextWriter(Stdio.stdout()).writeLine((x) .. (" ") .. (x + 1))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((x) .. (" ") .. (x + 1))
 
                 mut words: String[2]? = String[2] {"a", "b"}
                 words = Null
-                TextWriter(Stdio.stdout()).writeLine((words) .. (" ") .. (words == Null))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((words) .. (" ") .. (words == Null))
                 nothing := Null
-                TextWriter(Stdio.stdout()).writeLine((nothing) .. (" ") .. (nothing == Null) .. (" ") .. (Null === Null) .. (" ") .. (String(Null)))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((nothing) .. (" ") .. (nothing == Null) .. (" ") .. (Null === Null) .. (" ") .. (String(Null)))
                 """, directory);
 
         assertThat(output).isEqualTo("null true\n2 3\nnull true\nnull true true null\n");
@@ -144,7 +144,7 @@ class NullValueExecutionTest {
                 decimal = Null
                 text = Null
                 point = Null
-                TextWriter(Stdio.stdout()).writeLine((octet) .. (" ") .. (flag) .. (" ") .. (decimal) .. (" ") .. (text) .. (" ") .. (point))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((octet) .. (" ") .. (flag) .. (" ") .. (decimal) .. (" ") .. (text) .. (" ") .. (point))
 
                 octet = Byte(1)
                 flag = true
@@ -153,7 +153,7 @@ class NullValueExecutionTest {
                 point = Point()
                 mut restored: Point? = point
                 if restored != Null {
-                    TextWriter(Stdio.stdout()).writeLine((octet) .. (" ") .. (flag) .. (" ") .. (decimal) .. (" ") .. (text) .. (" ") .. (restored.describe()))
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((octet) .. (" ") .. (flag) .. (" ") .. (decimal) .. (" ") .. (text) .. (" ") .. (restored.describe()))
                 }
                 """, directory);
 
@@ -168,9 +168,9 @@ class NullValueExecutionTest {
     void an_element_may_be_null(@TempDir Path directory) throws Exception {
         String output = run("""
                 items := Integer?[3] {1, Null, 3}
-                TextWriter(Stdio.stdout()).writeLine((items[1]) .. (" ") .. (items[1] == Null) .. (" ") .. (items[2]))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((items[1]) .. (" ") .. (items[1] == Null) .. (" ") .. (items[2]))
                 items[1] = 2
-                TextWriter(Stdio.stdout()).writeLine((items[1]) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((items[1]) .. "")
                 """, directory);
 
         assertThat(output).isEqualTo("null true 3\n2\n");
@@ -182,21 +182,21 @@ class NullValueExecutionTest {
         assertThatThrownBy(() -> run("""
                 mut x: Integer? = 1
                 x = Null
-                TextWriter(Stdio.stdout()).writeLine((x + 1) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((x + 1) .. "")
                 """, directory)).isInstanceOf(SolvikCompiler.CompilationFailure.class)
                 .hasMessageContaining(TypeChecker.NULL_UNSAFE);
 
         assertThatThrownBy(() -> run("""
                 mut flag: Boolean? = Null
                 if flag {
-                    TextWriter(Stdio.stdout()).writeLine(("yes") .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("yes") .. "")
                 }
                 """, directory)).isInstanceOf(SolvikCompiler.CompilationFailure.class)
                 .hasMessageContaining(TypeChecker.NULL_UNSAFE);
 
         assertThatThrownBy(() -> run("""
                 mut text: String? = Null
-                TextWriter(Stdio.stdout()).writeLine((text.size()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((text.size()) .. "")
                 """, directory)).isInstanceOf(SolvikCompiler.CompilationFailure.class)
                 .hasMessageContaining(TypeChecker.NULL_UNSAFE);
     }

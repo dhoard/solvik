@@ -45,7 +45,7 @@ class ModuleTest {
     void a_qualified_type_is_constructed_through_its_module() {
         assertAccepted(POINT + """
                 point := geometry::Point(3, 4)
-                TextWriter(Stdio.stdout()).writeLine((point.shifted(1)) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((point.shifted(1)) .. "")
                 """);
     }
 
@@ -62,7 +62,7 @@ class ModuleTest {
 
                 a := geometry::Point(1, 2)
                 b := billing::Point()
-                TextWriter(Stdio.stdout()).writeLine((a.type()) .. (" ") .. (b.type()) .. (" ") .. (b.note))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((a.type()) .. (" ") .. (b.type()) .. (" ") .. (b.note))
                 """);
     }
 
@@ -84,7 +84,7 @@ class ModuleTest {
                 }
 
                 circle := geometry::Circle(2)
-                TextWriter(Stdio.stdout()).writeLine((circle.share(geometry::Point(1, 1))) .. (" ") .. (circle.radius))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((circle.share(geometry::Point(1, 1))) .. (" ") .. (circle.radius))
                 """);
     }
 
@@ -143,7 +143,7 @@ class ModuleTest {
 
                 global := Point(1)
                 scoped := geometry::Point(2)
-                TextWriter(Stdio.stdout()).writeLine((global.x) .. (" ") .. (scoped.scoped().x))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((global.x) .. (" ") .. (scoped.scoped().x))
                 """);
     }
 
@@ -170,7 +170,7 @@ class ModuleTest {
 
                 grid := geometry::Point[2] { geometry::Point(1, 0), geometry::Point(2, 0) }
                 box := geometry::Box(41)
-                TextWriter(Stdio.stdout()).writeLine((total(grid)) .. (" ") .. (box.value))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((total(grid)) .. (" ") .. (box.value))
                 """);
     }
 
@@ -191,7 +191,7 @@ class ModuleTest {
                     }
                 }
 
-                TextWriter(Stdio.stdout()).writeLine((geometry::area(2, 3)) .. (" ") .. (geometry::exposed()))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((geometry::area(2, 3)) .. (" ") .. (geometry::exposed()))
                 """);
     }
 
@@ -218,7 +218,7 @@ class ModuleTest {
                     }
                 }
 
-                TextWriter(Stdio.stdout()).writeLine((describe()) .. (" ") .. (geometry::describe()) .. (" ") .. (geometry::viaSibling()) .. (" ") .. (geometry::other()))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((describe()) .. (" ") .. (geometry::describe()) .. (" ") .. (geometry::viaSibling()) .. (" ") .. (geometry::other()))
                 """);
     }
 
@@ -246,7 +246,7 @@ class ModuleTest {
                     }
                 }
 
-                TextWriter(Stdio.stdout()).writeLine((area()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((area()) .. "")
                 """, TypeChecker.TYPE_ERROR);
     }
 
@@ -275,7 +275,7 @@ class ModuleTest {
                     }
                 }
 
-                TextWriter(Stdio.stdout()).writeLine((geometry::Point(3).doubled()) .. (" ") .. (geometry::area(4)))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((geometry::Point(3).doubled()) .. (" ") .. (geometry::area(4)))
                 """);
     }
 
@@ -288,7 +288,7 @@ class ModuleTest {
                     }
                 }
 
-                TextWriter(Stdio.stdout()).writeLine((geometry::perimeter()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((geometry::perimeter()) .. "")
                 """, TypeChecker.TYPE_ERROR, "declares no type or function 'perimeter'");
     }
 
@@ -330,7 +330,7 @@ class ModuleTest {
                     }
                 }
 
-                TextWriter(Stdio.stdout()).writeLine((shapes::Shown().peek()) .. (" ") .. (shapes::fresh()))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((shapes::Shown().peek()) .. (" ") .. (shapes::fresh()))
                 """);
     }
 
@@ -347,7 +347,7 @@ class ModuleTest {
                     }
                 }
 
-                TextWriter(Stdio.stdout()).writeLine((shapes::api()) .. (" ") .. (shapes::helper()))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((shapes::api()) .. (" ") .. (shapes::helper()))
                 """, TypeChecker.PRIVATE_DECLARATION, "shapes::helper");
     }
 
@@ -417,7 +417,7 @@ class ModuleTest {
                     }
                 }
 
-                TextWriter(Stdio.stdout()).writeLine((shapes::origin().x) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((shapes::origin().x) .. "")
                 """);
     }
 
@@ -430,7 +430,7 @@ class ModuleTest {
                 """, Parser.INVALID_DECLARATION);
         assertRejected("""
                 module geometry {
-                    TextWriter(Stdio.stdout()).writeLine(("nope") .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("nope") .. "")
                 }
                 """, Parser.INVALID_DECLARATION);
     }

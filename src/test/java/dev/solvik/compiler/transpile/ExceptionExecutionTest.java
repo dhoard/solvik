@@ -113,8 +113,8 @@ class ExceptionExecutionTest {
                     }
                     log ..= " " .. e.getMessage() .. " [" .. e.getCode() .. "]"
                 }
-                TextWriter(Stdio.stdout()).writeLine((log) .. "")
-                TextWriter(Stdio.stdout()).writeLine((check(0) == 99) .. (" ") .. (check(3)))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((log) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((check(0) == 99) .. (" ") .. (check(3)))
                 """, """
                 caught denied:switch-1 denied [4001]
                 true 99
@@ -132,12 +132,12 @@ class ExceptionExecutionTest {
                         }
                         return 20
                     } finally {
-                        TextWriter(Stdio.stdout()).writeLine(("finally") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("finally") .. "")
                     }
                 }
 
-                TextWriter(Stdio.stdout()).writeLine((pick(true)) .. "")
-                TextWriter(Stdio.stdout()).writeLine((pick(false)) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((pick(true)) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((pick(false)) .. "")
 
                 mut log := ""
                 for item in Integer[3] {1, 2, 3} {
@@ -153,7 +153,7 @@ class ExceptionExecutionTest {
                         log ..= "!"
                     }
                 }
-                TextWriter(Stdio.stdout()).writeLine((log) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((log) .. "")
                 """, """
                 finally
                 10
@@ -171,14 +171,14 @@ class ExceptionExecutionTest {
                     try {
                         raise Exception(9, "boom")
                     } finally {
-                        TextWriter(Stdio.stdout()).writeLine(("cleanup") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("cleanup") .. "")
                     }
                 }
 
                 try {
                     attempt()
                 } finally {
-                    TextWriter(Stdio.stdout()).writeLine(("outer cleanup") .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("outer cleanup") .. "")
                 }
                 """, directory);
 
@@ -192,7 +192,7 @@ class ExceptionExecutionTest {
     @Test
     @DisplayName("an uncaught exception carries its code and renders as [code] message")
     void an_uncaught_exception_carries_its_code(@TempDir Path directory) throws Exception {
-        Outcome result = run("TextWriter(Stdio.stdout()).writeLine((Exception(7, \"seven\")) .. \"\")\n", directory);
+        Outcome result = run("solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Exception(7, \"seven\")) .. \"\")\n", directory);
 
         assertThat(result.failure()).isNull();
         assertThat(result.stdout()).isEqualTo("[7] seven\n");
@@ -204,11 +204,11 @@ class ExceptionExecutionTest {
         Outcome result = run("""
                 try {
                     values := Integer[2] {1, 2}
-                    TextWriter(Stdio.stdout()).writeLine((values[7]) .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((values[7]) .. "")
                 } catch (e: Exception) {
-                    TextWriter(Stdio.stdout()).writeLine(("must not catch") .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("must not catch") .. "")
                 } finally {
-                    TextWriter(Stdio.stdout()).writeLine(("cleanup") .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("cleanup") .. "")
                 }
                 """, directory);
 
@@ -223,11 +223,11 @@ class ExceptionExecutionTest {
                 try {
                     exit(3)
                 } catch (e: Exception) {
-                    TextWriter(Stdio.stdout()).writeLine(("must not catch") .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("must not catch") .. "")
                 } finally {
-                    TextWriter(Stdio.stdout()).writeLine(("cleanup") .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("cleanup") .. "")
                 }
-                TextWriter(Stdio.stdout()).writeLine(("unreachable") .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("unreachable") .. "")
                 """, directory);
 
         assertThat(result.stdout()).isEqualTo("cleanup\n");
@@ -244,7 +244,7 @@ class ExceptionExecutionTest {
                 try {
                     raise Exception(code, "negative")
                 } catch (e: Exception) {
-                    TextWriter(Stdio.stdout()).writeLine(("must not catch") .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("must not catch") .. "")
                 }
                 """, directory);
 
@@ -266,13 +266,13 @@ class ExceptionExecutionTest {
                     try {
                         attempt()
                     } catch (e: Exception) {
-                        TextWriter(Stdio.stdout()).writeLine(("inner ") .. (e.getCode()))
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("inner ") .. (e.getCode()))
                         raise Exception(e.getCode() + 1, e.getMessage())
                     }
                 } catch (recaught: Exception) {
-                    TextWriter(Stdio.stdout()).writeLine(("outer ") .. (recaught))
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("outer ") .. (recaught))
                 }
-                TextWriter(Stdio.stdout()).writeLine(("done") .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("done") .. "")
                 """, """
                 inner 5000
                 outer [5001] inner
@@ -287,9 +287,9 @@ class ExceptionExecutionTest {
                 mut maybe: Exception? = Null
                 maybe = Exception(7, "seven")
                 if maybe != Null {
-                    TextWriter(Stdio.stdout()).writeLine((maybe.type()) .. (" ") .. (maybe.getCode()) .. (" ") .. (maybe.getMessage()))
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((maybe.type()) .. (" ") .. (maybe.getCode()) .. (" ") .. (maybe.getMessage()))
                 }
-                TextWriter(Stdio.stdout()).writeLine((String(Exception(8, "eight"))) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((String(Exception(8, "eight"))) .. "")
                 """, """
                 Exception 7 seven
                 [8] eight
@@ -321,8 +321,8 @@ class ExceptionExecutionTest {
                     }
                 }
 
-                TextWriter(Stdio.stdout()).writeLine((guard::Checker().run(true)) .. "")
-                TextWriter(Stdio.stdout()).writeLine((guard::Checker().run(false)) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((guard::Checker().run(true)) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((guard::Checker().run(false)) .. "")
                 """, """
                 ok
                 caught 6001: guard failed
@@ -337,7 +337,7 @@ class ExceptionExecutionTest {
         assertThat(plain).doesNotContainKey(GeneratedNames.IO_SOURCE_PATH);
 
         Map<String, String> io = new SolvikCompiler("io.sol").transpile("""
-                TextWriter(Stdio.stdout()).writeLine(("plain") .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("plain") .. "")
                 """);
         // The generated adapter raises the program's Solvik Exception, so I/O pulls it in.
         assertThat(io).containsKey(GeneratedNames.IO_SOURCE_PATH);
@@ -348,7 +348,7 @@ class ExceptionExecutionTest {
                 try {
                     raise Exception(1, "x")
                 } catch (e: Exception) {
-                    TextWriter(Stdio.stdout()).writeLine((e.getCode()) .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((e.getCode()) .. "")
                 }
                 """);
         String program = used.get("Solvik$Program.java");
@@ -369,11 +369,11 @@ class ExceptionExecutionTest {
                     pub func Point() { }
                 }
 
-                TextWriter(Stdio.stdout()).writeLine((Point().type()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Point().type()) .. "")
                 try {
                     raise Exception(1, "x")
                 } catch (e: Exception) {
-                    TextWriter(Stdio.stdout()).writeLine((e.type()) .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((e.type()) .. "")
                 }
                 """, """
                 Point

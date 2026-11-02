@@ -62,11 +62,11 @@ class IndexAssignmentExecutionTest {
         String output = run("""
                 x := Integer[2] {1, 0}
                 x[0] = 2
-                TextWriter(Stdio.stdout()).writeLine((x[0]) .. (" ") .. (x[1]))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((x[0]) .. (" ") .. (x[1]))
 
                 words := String[2] {"a", "b"}
                 words[1] ..= "!"
-                TextWriter(Stdio.stdout()).writeLine((words[0]) .. (words[1]))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((words[0]) .. (words[1]))
                 """, directory);
 
         assertThat(output).isEqualTo("2 0\nab!\n");
@@ -81,7 +81,7 @@ class IndexAssignmentExecutionTest {
                     squares[index] = (index + 1) * (index + 1)
                     index = index + 1
                 }
-                TextWriter(Stdio.stdout()).writeLine((squares[0]) .. (" ") .. (squares[1]) .. (" ") .. (squares[2]) .. (" ") .. (squares[4]))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((squares[0]) .. (" ") .. (squares[1]) .. (" ") .. (squares[2]) .. (" ") .. (squares[4]))
                 """, directory);
 
         assertThat(output).isEqualTo("1 4 9 25\n");
@@ -95,7 +95,7 @@ class IndexAssignmentExecutionTest {
                 row := 0
                 column := 1
                 grid[row][column] = 8
-                TextWriter(Stdio.stdout()).writeLine((grid[0][0]) .. (" ") .. (grid[0][1]) .. (" ") .. (grid[1][0]) .. (" ") .. (grid[1][1]))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((grid[0][0]) .. (" ") .. (grid[0][1]) .. (" ") .. (grid[1][0]) .. (" ") .. (grid[1][1]))
                 """, directory);
 
         assertThat(output).isEqualTo("1 8 9 4\n");
@@ -129,7 +129,7 @@ class IndexAssignmentExecutionTest {
 
                 box := Box()
                 box.array()[0] = 7
-                TextWriter(Stdio.stdout()).writeLine((box.count()) .. (" ") .. (box.itemCount()))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((box.count()) .. (" ") .. (box.itemCount()))
                 """, directory);
 
         assertThat(output).isEqualTo("1 3\n");
@@ -146,7 +146,7 @@ class IndexAssignmentExecutionTest {
 
                 words := String[2] {"", ""}
                 fill(words)
-                TextWriter(Stdio.stdout()).writeLine((words[0]) .. (" ") .. (words[1]))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((words[0]) .. (" ") .. (words[1]))
                 """, directory);
 
         assertThat(output).isEqualTo("first second\n");
@@ -160,9 +160,9 @@ class IndexAssignmentExecutionTest {
                     numbers := Integer[2] {5, 6}
                     numbers[0] = 9
                     outer numbers[1] = 8
-                    TextWriter(Stdio.stdout()).writeLine((numbers[0]) .. (" ") .. (numbers[1]))
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((numbers[0]) .. (" ") .. (numbers[1]))
                 }
-                TextWriter(Stdio.stdout()).writeLine((numbers[0]) .. (" ") .. (numbers[1]))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((numbers[0]) .. (" ") .. (numbers[1]))
                 """, directory);
 
         assertThat(output).isEqualTo("9 6\n1 8\n");
@@ -174,7 +174,7 @@ class IndexAssignmentExecutionTest {
                 bytes := Byte[3] {0, 0, 0}
                 bytes[0] = Byte(1)
                 bytes[2] = Byte(127)
-                TextWriter(Stdio.stdout()).writeLine((bytes[0]) .. (" ") .. (bytes[1]) .. (" ") .. (bytes[2]))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((bytes[0]) .. (" ") .. (bytes[1]) .. (" ") .. (bytes[2]))
                 """, directory);
 
         assertThat(output).isEqualTo("1 0 127\n");

@@ -43,7 +43,7 @@ class ConcurrencyExecutionTest {
             thread := solvik::concurrency::Thread.start(task)
             thread.await()
             thread.await(1L)
-            TextWriter(Stdio.stdout()).writeLine((task.result()) .. (" ") .. (thread.isAlive()) .. (" ") .. (thread.isInterrupted()))
+            solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((task.result()) .. (" ") .. (thread.isAlive()) .. (" ") .. (thread.isInterrupted()))
             """;
 
     private static Map<String, String> transpile(String source) {
@@ -114,7 +114,7 @@ class ConcurrencyExecutionTest {
                 two := Box("abc")
                 one.put("hello")
                 two.put(9)
-                TextWriter(Stdio.stdout()).writeLine((describe(1)) .. (" ") .. (describe("x")) .. (" ") .. (nullable(Null)) .. (" ") .. (one.get()) .. (" ") .. (two.get()))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((describe(1)) .. (" ") .. (describe("x")) .. (" ") .. (nullable(Null)) .. (" ") .. (one.get()) .. (" ") .. (two.get()))
                 """;
         Map<String, String> files = transpile(source);
         assertThat(files.get("Solvik$Program.java")).contains("(String) null");

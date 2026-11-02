@@ -227,7 +227,7 @@ class ParserTest {
         void distinguishes_assignment_append_and_calls() {
             assertThat(firstStatement("x = 1")).isInstanceOf(Ast.AssignStmt.class);
             assertThat(((Ast.AssignStmt) firstStatement("x ..= \"a\"")).operator()).isEqualTo("..=");
-            assertThat(firstStatement("TextWriter(Stdio.stdout()).writeLine((1) .. \"\")")).isInstanceOf(Ast.ExprStmt.class);
+            assertThat(firstStatement("solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1) .. \"\")")).isInstanceOf(Ast.ExprStmt.class);
         }
 
         @Test
@@ -419,7 +419,7 @@ class ParserTest {
         @DisplayName("indexing a nested array twice is not mistaken for a nested literal")
         void an_index_chain_stays_an_index_chain() {
             assertThat(codes("cell := grid[0][1]\n")).isEmpty();
-            assertThat(codes("if grid[0][1] {\n    TextWriter(Stdio.stdout()).writeLine((1) .. \"\")\n}\n")).isEmpty();
+            assertThat(codes("if grid[0][1] {\n    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1) .. \"\")\n}\n")).isEmpty();
         }
     }
 }

@@ -38,7 +38,7 @@ class JavaLoweringTest {
 
     @Test
     void declares_a_binding_as_its_inferred_type() {
-        assertThat(program("mut total := 0\ntotal = 1\nTextWriter(Stdio.stdout()).writeLine((total) .. \"\")"))
+        assertThat(program("mut total := 0\ntotal = 1\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((total) .. \"\")"))
                 .contains("Integer total = 0;")
                 .contains("total = 1;");
     }
@@ -46,7 +46,7 @@ class JavaLoweringTest {
     @Test
     @DisplayName("Null is a value of the Null type, carried by a Java reference")
     void lowers_the_null_singleton() {
-        assertThat(program("nothing := Null\nTextWriter(Stdio.stdout()).writeLine((nothing) .. \"\")"))
+        assertThat(program("nothing := Null\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((nothing) .. \"\")"))
                 .contains("Object nothing = null;");
     }
 
@@ -83,11 +83,11 @@ class JavaLoweringTest {
     @Test
     @DisplayName("an array's length comes from its declared size, not from its element list (§6)")
     void emits_the_declared_array_size() {
-        assertThat(program("exact := String[2] {\"a\", \"b\"}\nTextWriter(Stdio.stdout()).writeLine((exact) .. \"\")"))
+        assertThat(program("exact := String[2] {\"a\", \"b\"}\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((exact) .. \"\")"))
                 .contains("Arrays.<String>asList(\"a\", \"b\")");
-        assertThat(program("short := String?[4] {\"a\"}\nTextWriter(Stdio.stdout()).writeLine((short) .. \"\")"))
+        assertThat(program("short := String?[4] {\"a\"}\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((short) .. \"\")"))
                 .contains("Solvik$Program.<String>array(4, new Object[] { \"a\" })");
-        assertThat(program("empty := Integer?[3] { }\nTextWriter(Stdio.stdout()).writeLine((empty) .. \"\")"))
+        assertThat(program("empty := Integer?[3] { }\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((empty) .. \"\")"))
                 .contains("Solvik$Program.<Integer>array(3, new Object[] {})");
     }
 
@@ -96,7 +96,7 @@ class JavaLoweringTest {
         String java = program("""
                 func note() {
                     {
-                        TextWriter(Stdio.stdout()).writeLine((1) .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1) .. "")
                     }
                     return
                 }
@@ -110,9 +110,9 @@ class JavaLoweringTest {
         String java = program("""
                 a := 1
                 b := 1
-                TextWriter(Stdio.stdout()).writeLine((a === b) .. "")
-                TextWriter(Stdio.stdout()).writeLine((a != b) .. "")
-                TextWriter(Stdio.stdout()).writeLine((!(a == b) || a == b) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((a === b) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((a != b) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((!(a == b) || a == b) .. "")
                 """);
         assertThat(java)
                 .contains("Objects.equals(a, b)")
@@ -123,8 +123,8 @@ class JavaLoweringTest {
     @Test
     void emits_unary_minus_for_both_numeric_kinds() {
         String java = program("""
-                TextWriter(Stdio.stdout()).writeLine((-1) .. "")
-                TextWriter(Stdio.stdout()).writeLine((-1.5) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((-1) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((-1.5) .. "")
                 """);
         // A numeric literal is never null, so its sign is emitted with it.
         assertThat(java)
@@ -140,9 +140,9 @@ class JavaLoweringTest {
                 d := BigDecimal(1)
                 s := String(10)
                 f := Boolean("true")
-                TextWriter(Stdio.stdout()).writeLine((b) .. (i) .. (d) .. (s) .. (f))
-                TextWriter(Stdio.stdout()).writeLine((s.type()) .. (s.toString()) .. (s.hashCode()) .. (s.equals("x")))
-                TextWriter(Stdio.stdout()).writeLine((Integer[2] {1, 2}.size) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((b) .. (i) .. (d) .. (s) .. (f))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((s.type()) .. (s.toString()) .. (s.hashCode()) .. (s.equals("x")))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Integer[2] {1, 2}.size) .. "")
                 """);
         assertThat(java)
                 .contains("Solvik$Program.toByte(1)")
@@ -221,7 +221,7 @@ class JavaLoweringTest {
     @Test
     @DisplayName("the retired legacy backend switch no longer selects another renderer")
     void the_legacy_switch_has_no_effect() {
-        String source = "a := 1\nTextWriter(Stdio.stdout()).writeLine((a) .. \"\")";
+        String source = "a := 1\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((a) .. \"\")";
         Map<String, String> unified = new SolvikCompiler("demo.sol").transpile(source);
         System.setProperty("solvik.legacyEmitter", "true");
         try {
@@ -233,7 +233,7 @@ class JavaLoweringTest {
 
     @Test
     void compiler_facade_returns_files_for_a_valid_program() {
-        assertThat(new SolvikCompiler("demo.sol").transpile("TextWriter(Stdio.stdout()).writeLine((1) .. \"\")"))
+        assertThat(new SolvikCompiler("demo.sol").transpile("solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1) .. \"\")"))
                 .containsKeys("Solvik$Program.java");
     }
 }

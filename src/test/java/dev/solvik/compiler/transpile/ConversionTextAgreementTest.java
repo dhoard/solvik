@@ -76,7 +76,7 @@ class ConversionTextAgreementTest {
     private boolean converts(String target, String sample, Path directory) throws Exception {
         String quoted = "\"" + sample.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
         String source = "text := " + quoted + "\n"
-                + "TextWriter(Stdio.stdout()).writeLine((" + target + "(text)) .. \"\")\n";
+                + "solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((" + target + "(text)) .. \"\")\n";
         return runsWithoutAborting(source, directory.resolve("case-" + Math.abs(sample.hashCode())));
     }
 

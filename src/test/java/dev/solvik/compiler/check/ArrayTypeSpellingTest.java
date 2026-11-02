@@ -107,12 +107,12 @@ class ArrayTypeSpellingTest {
                 }
                 numbers := Integer[2] {1, 2}
                 grid := Integer[][2] { Integer[2] {1, 2}, Integer[2] {3, 4} }
-                TextWriter(Stdio.stdout()).writeLine((Job().count(numbers)) .. (" ") .. (Box("x").first(String[1] {"x"})) .. (" ") .. (flatten(grid)))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Job().count(numbers)) .. (" ") .. (Box("x").first(String[1] {"x"})) .. (" ") .. (flatten(grid)))
                 lists := solvik::collections::List<Integer[]>()
                 lists.add(grid[0])
                 mut stored: Integer[]? = lists.get(0)
                 if stored != Null {
-                    TextWriter(Stdio.stdout()).writeLine((stored.size) .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((stored.size) .. "")
                 }
                 """, directory);
 
@@ -128,7 +128,7 @@ class ArrayTypeSpellingTest {
                 grid := Integer[][2] { Integer[2] {1, 2}, Integer[2] {3, 4} }
                 cube := Integer?[2][2][1] { Integer?[2][2] {
                     Integer?[2] {5, 6}, Integer?[2] {7, Null} } }
-                TextWriter(Stdio.stdout()).writeLine((grid[0][1]) .. (grid[1].size) .. (" ") .. (cube[0][1][0]) .. (" ") .. (cube.size))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((grid[0][1]) .. (grid[1].size) .. (" ") .. (cube[0][1][0]) .. (" ") .. (cube.size))
                 """, directory);
 
         assertThat(outcome.failure()).isNull();
@@ -160,7 +160,7 @@ class ArrayTypeSpellingTest {
     void diagnostics_render_bracket_spelling() {
         var diagnostics = checkDiagnostics("""
                 func first(values: Integer[]) -> Integer { return values[0] }
-                TextWriter(Stdio.stdout()).writeLine((first(1)) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((first(1)) .. "")
                 """);
 
         assertThat(diagnostics.stream().map(d -> d.message()).toList())
@@ -177,7 +177,7 @@ class ArrayTypeSpellingTest {
                     pub func value() -> Integer { return count }
                 }
                 a := Array()
-                TextWriter(Stdio.stdout()).writeLine((a.type()) .. (" ") .. (a.value()))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((a.type()) .. (" ") .. (a.value()))
                 """, directory);
 
         assertThat(outcome.failure()).isNull();

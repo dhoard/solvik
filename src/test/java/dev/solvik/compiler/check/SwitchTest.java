@@ -40,13 +40,13 @@ class SwitchTest {
                 method := "GET"
                 switch method {
                     case "GET" {
-                        TextWriter(Stdio.stdout()).writeLine(("read") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("read") .. "")
                     }
                     case "POST" {
-                        TextWriter(Stdio.stdout()).writeLine(("write") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("write") .. "")
                     }
                     default {
-                        TextWriter(Stdio.stdout()).writeLine(("other") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("other") .. "")
                     }
                 }
                 """);
@@ -59,7 +59,7 @@ class SwitchTest {
                 method := "GET"
                 switch (method) {
                     case "GET" {
-                        TextWriter(Stdio.stdout()).writeLine(("read") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("read") .. "")
                     }
                 }
                 """);
@@ -71,16 +71,16 @@ class SwitchTest {
                 path := "/api/users/42"
                 switch path {
                     case "root" {
-                        TextWriter(Stdio.stdout()).writeLine(("root") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("root") .. "")
                     }
                     case regex "^/api/users/[0-9]+$" {
-                        TextWriter(Stdio.stdout()).writeLine(("user") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("user") .. "")
                     }
                     case regex "^/api/.*" {
-                        TextWriter(Stdio.stdout()).writeLine(("api") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("api") .. "")
                     }
                     default {
-                        TextWriter(Stdio.stdout()).writeLine(("static") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("static") .. "")
                     }
                 }
                 """);
@@ -92,13 +92,13 @@ class SwitchTest {
                 code := 2
                 switch code {
                     case 1 {
-                        TextWriter(Stdio.stdout()).writeLine(("one") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("one") .. "")
                     }
                     case -1 {
-                        TextWriter(Stdio.stdout()).writeLine(("minus one") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("minus one") .. "")
                     }
                     default {
-                        TextWriter(Stdio.stdout()).writeLine(("other") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("other") .. "")
                     }
                 }
                 """);
@@ -108,10 +108,10 @@ class SwitchTest {
                 for small in bytes {
                     switch small {
                         case 0 {
-                            TextWriter(Stdio.stdout()).writeLine(("zero") .. "")
+                            solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("zero") .. "")
                         }
                         case 127 {
-                            TextWriter(Stdio.stdout()).writeLine(("max") .. "")
+                            solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("max") .. "")
                         }
                     }
                 }
@@ -120,10 +120,10 @@ class SwitchTest {
                 flag := true
                 switch flag {
                     case true {
-                        TextWriter(Stdio.stdout()).writeLine(("yes") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("yes") .. "")
                     }
                     case false {
-                        TextWriter(Stdio.stdout()).writeLine(("no") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("no") .. "")
                     }
                 }
                 """);
@@ -138,12 +138,12 @@ class SwitchTest {
                         case "a" {
                             switch word {
                                 case "a" {
-                                    TextWriter(Stdio.stdout()).writeLine(("inner") .. "")
+                                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("inner") .. "")
                                 }
                             }
                         }
                         default {
-                            TextWriter(Stdio.stdout()).writeLine(("outer default") .. "")
+                            solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("outer default") .. "")
                         }
                     }
                 }
@@ -167,7 +167,7 @@ class SwitchTest {
                         }
                     }
                 }
-                TextWriter(Stdio.stdout()).writeLine((Router("/api/x").kind()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Router("/api/x").kind()) .. "")
                 """);
     }
 
@@ -177,7 +177,7 @@ class SwitchTest {
                 method := "GET"
                 switch method {
                     case "GET" {
-                        TextWriter(Stdio.stdout()).writeLine(("read") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("read") .. "")
                     }
                 }
                 """);
@@ -196,7 +196,7 @@ class SwitchTest {
                         }
                     }
                 }
-                TextWriter(Stdio.stdout()).writeLine((classify(200)) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((classify(200)) .. "")
                 """);
     }
 
@@ -208,7 +208,7 @@ class SwitchTest {
                 price := 1.5
                 switch price {
                     case 1 {
-                        TextWriter(Stdio.stdout()).writeLine(("one") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("one") .. "")
                     }
                 }
                 """);
@@ -219,7 +219,7 @@ class SwitchTest {
                 point := Point()
                 switch point {
                     case point {
-                        TextWriter(Stdio.stdout()).writeLine(("point") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("point") .. "")
                     }
                 }
                 """);
@@ -227,7 +227,7 @@ class SwitchTest {
                 var empty
                 switch empty {
                     case 1 {
-                        TextWriter(Stdio.stdout()).writeLine(("one") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("one") .. "")
                     }
                 }
                 """);
@@ -240,7 +240,7 @@ class SwitchTest {
                 code := 2
                 switch code {
                     case limit {
-                        TextWriter(Stdio.stdout()).writeLine(("limit") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("limit") .. "")
                     }
                 }
                 """);
@@ -248,7 +248,7 @@ class SwitchTest {
                 method := "GET"
                 switch method {
                     case method {
-                        TextWriter(Stdio.stdout()).writeLine(("same") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("same") .. "")
                     }
                 }
                 """);
@@ -260,7 +260,7 @@ class SwitchTest {
                 method := "GET"
                 switch method {
                     case 1 {
-                        TextWriter(Stdio.stdout()).writeLine(("number") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("number") .. "")
                     }
                 }
                 """);
@@ -268,7 +268,7 @@ class SwitchTest {
                 code := 1
                 switch code {
                     case "one" {
-                        TextWriter(Stdio.stdout()).writeLine(("text") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("text") .. "")
                     }
                 }
                 """);
@@ -276,7 +276,7 @@ class SwitchTest {
                 flag := true
                 switch flag {
                     case 1 {
-                        TextWriter(Stdio.stdout()).writeLine(("number") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("number") .. "")
                     }
                 }
                 """);
@@ -288,10 +288,10 @@ class SwitchTest {
                 method := "GET"
                 switch method {
                     case "GET" {
-                        TextWriter(Stdio.stdout()).writeLine(("first") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("first") .. "")
                     }
                     case "GET" {
-                        TextWriter(Stdio.stdout()).writeLine(("second") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("second") .. "")
                     }
                 }
                 """;
@@ -299,10 +299,10 @@ class SwitchTest {
                 code := 1
                 switch code {
                     case 1 {
-                        TextWriter(Stdio.stdout()).writeLine(("first") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("first") .. "")
                     }
                     case 1 {
-                        TextWriter(Stdio.stdout()).writeLine(("second") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("second") .. "")
                     }
                 }
                 """;
@@ -310,10 +310,10 @@ class SwitchTest {
                 code := 1
                 switch code {
                     case 1 {
-                        TextWriter(Stdio.stdout()).writeLine(("first") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("first") .. "")
                     }
                     case 01 {
-                        TextWriter(Stdio.stdout()).writeLine(("second") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("second") .. "")
                     }
                 }
                 """;
@@ -330,7 +330,7 @@ class SwitchTest {
                 for small in bytes {
                     switch small {
                         case 128 {
-                            TextWriter(Stdio.stdout()).writeLine(("impossible") .. "")
+                            solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("impossible") .. "")
                         }
                     }
                 }
@@ -340,7 +340,7 @@ class SwitchTest {
                 for small in bytes {
                     switch small {
                         case -129 {
-                            TextWriter(Stdio.stdout()).writeLine(("impossible") .. "")
+                            solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("impossible") .. "")
                         }
                     }
                 }
@@ -353,7 +353,7 @@ class SwitchTest {
                 code := 1
                 switch code {
                     case regex "[0-9]" {
-                        TextWriter(Stdio.stdout()).writeLine(("digit") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("digit") .. "")
                     }
                 }
                 """);
@@ -361,7 +361,7 @@ class SwitchTest {
                 path := "/api"
                 switch path {
                     case regex "^/api(" {
-                        TextWriter(Stdio.stdout()).writeLine(("broken") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("broken") .. "")
                     }
                 }
                 """);
@@ -374,10 +374,10 @@ class SwitchTest {
                 path := "/api"
                 switch path {
                     case regex "^/api.*" {
-                        TextWriter(Stdio.stdout()).writeLine(("api") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("api") .. "")
                     }
                     case "/api" {
-                        TextWriter(Stdio.stdout()).writeLine(("exact") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("exact") .. "")
                     }
                 }
                 """);
@@ -389,7 +389,7 @@ class SwitchTest {
                 path := "/api"
                 switch path {
                     case regex 5 {
-                        TextWriter(Stdio.stdout()).writeLine(("number") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("number") .. "")
                     }
                 }
                 """);
@@ -402,7 +402,7 @@ class SwitchTest {
                 path := "/api"
                 switch path {
                     case regex "[a-" {
-                        TextWriter(Stdio.stdout()).writeLine(("broken") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("broken") .. "")
                     }
                 }
                 """);
@@ -417,10 +417,10 @@ class SwitchTest {
                 method := "GET"
                 switch method {
                     default {
-                        TextWriter(Stdio.stdout()).writeLine(("first") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("first") .. "")
                     }
                     default {
-                        TextWriter(Stdio.stdout()).writeLine(("second") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("second") .. "")
                     }
                 }
                 """);
@@ -428,10 +428,10 @@ class SwitchTest {
                 method := "GET"
                 switch method {
                     default {
-                        TextWriter(Stdio.stdout()).writeLine(("first") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("first") .. "")
                     }
                     case "GET" {
-                        TextWriter(Stdio.stdout()).writeLine(("late") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("late") .. "")
                     }
                 }
                 """);

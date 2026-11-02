@@ -42,9 +42,9 @@ class NestedArrayExecutionTest {
                 }
 
                 grid := Integer[][2] {Integer[2] {1, 2}, Integer[2] {3, 4}}
-                TextWriter(Stdio.stdout()).writeLine((grid.size) .. (" ") .. (grid[0].size) .. (" ") .. (grid[1][0]))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((grid.size) .. (" ") .. (grid[0].size) .. (" ") .. (grid[1][0]))
                 grid[1][0] = 9
-                TextWriter(Stdio.stdout()).writeLine((grid[1][0]) .. (" ") .. (flatten(grid)))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((grid[1][0]) .. (" ") .. (flatten(grid)))
                 """);
         assertThat(output).isEqualTo("2 2 3\n9 16\n");
     }
@@ -57,7 +57,7 @@ class NestedArrayExecutionTest {
                 row := grid[0]
                 row[1] = 7
                 alias := grid
-                TextWriter(Stdio.stdout()).writeLine((grid[0][1]) .. (" ") .. (row === grid[0]) .. (" ") .. (alias === grid) .. (" ") .. (row === grid[1]))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((grid[0][1]) .. (" ") .. (row === grid[0]) .. (" ") .. (alias === grid) .. (" ") .. (row === grid[1]))
                 """);
         assertThat(output).isEqualTo("7 true true false\n");
     }
@@ -69,7 +69,7 @@ class NestedArrayExecutionTest {
                 cube := Integer[][][1] {
                     Integer[][1] {Integer[2] {5, 6}}
                 }
-                TextWriter(Stdio.stdout()).writeLine((cube[0][0][1]) .. (" ") .. (cube[0].size) .. (" ") .. (cube.size))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((cube[0][0][1]) .. (" ") .. (cube[0].size) .. (" ") .. (cube.size))
                 """);
         assertThat(output).isEqualTo("6 1 1\n");
     }

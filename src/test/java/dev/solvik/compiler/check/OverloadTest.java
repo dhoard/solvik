@@ -44,7 +44,7 @@ class OverloadTest {
                 second := Box("two")
                 first.put(3)
                 second.put("four")
-                TextWriter(Stdio.stdout()).writeLine((describe(1)) .. (describe("x")))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((describe(1)) .. (describe("x")))
                 """);
     }
 
@@ -69,7 +69,7 @@ class OverloadTest {
                 type Right { pub func Right() { } }
                 func choose(value: Left?) -> Integer { return 1 }
                 func choose(value: Right?) -> Integer { return 2 }
-                TextWriter(Stdio.stdout()).writeLine((choose(Null)) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((choose(Null)) .. "")
                 """).all()).extracting(diagnostic -> diagnostic.code())
                 .contains(JavaMathMethods.AMBIGUOUS);
     }
@@ -80,20 +80,20 @@ class OverloadTest {
         assertThat(check("""
                 func choose(value: Integer) -> Integer { return value }
                 func choose(value: Integer?) -> Integer { return 0 }
-                TextWriter(Stdio.stdout()).writeLine((choose(Null)) .. (" ") .. (choose(1)))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((choose(Null)) .. (" ") .. (choose(1)))
                 """).all()).extracting(diagnostic -> diagnostic.code())
                 .contains(TypeChecker.TYPE_ERROR);   // the two erase to one Java signature
         assertThat(check("""
                 type Left { pub func Left() { } }
                 func choose(value: Left) -> Integer { return 1 }
                 func choose(value: Integer?) -> Integer { return 2 }
-                TextWriter(Stdio.stdout()).writeLine((choose(Null)) .. (" ") .. (choose(Left())))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((choose(Null)) .. (" ") .. (choose(Left())))
                 """).all()).extracting(diagnostic -> diagnostic.code())
                 .doesNotContain(JavaMathMethods.AMBIGUOUS);
         assertThat(check("""
                 type Left { pub func Left() { } }
                 func choose(value: Left) -> Integer { return 1 }
-                TextWriter(Stdio.stdout()).writeLine((choose(Null)) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((choose(Null)) .. "")
                 """).all()).extracting(diagnostic -> diagnostic.code())
                 .contains(TypeChecker.TYPE_ERROR);
     }

@@ -75,7 +75,7 @@ class DeclarationExecutionTest {
                 name: String = "Solvik"
                 mut label: String? = Null
                 label = "ready"
-                TextWriter(Stdio.stdout()).writeLine((count) .. (" ") .. (total) .. (" ") .. (name) .. (" ") .. (label))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((count) .. (" ") .. (total) .. (" ") .. (name) .. (" ") .. (label))
                 """, directory);
 
         assertThat(output).isEqualTo("10 12 Solvik ready\n");
@@ -87,12 +87,12 @@ class DeclarationExecutionTest {
         String output = run("""
                 nothing := Null
                 mut maybe: Integer? = 1
-                TextWriter(Stdio.stdout()).writeLine((nothing) .. (" ") .. (nothing == Null) .. (" ") .. (Null === Null) .. (" ") .. (String(Null)))
-                TextWriter(Stdio.stdout()).writeLine((maybe) .. (" ") .. (maybe == Null))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((nothing) .. (" ") .. (nothing == Null) .. (" ") .. (Null === Null) .. (" ") .. (String(Null)))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((maybe) .. (" ") .. (maybe == Null))
                 maybe = Null
-                TextWriter(Stdio.stdout()).writeLine((maybe) .. (" ") .. (maybe == Null) .. (" ") .. (maybe != 1))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((maybe) .. (" ") .. (maybe == Null) .. (" ") .. (maybe != 1))
                 maybe = 3
-                TextWriter(Stdio.stdout()).writeLine((maybe) .. (" ") .. (maybe + 1))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((maybe) .. (" ") .. (maybe + 1))
                 """, directory);
 
         assertThat(output).isEqualTo("""
@@ -108,16 +108,16 @@ class DeclarationExecutionTest {
     void nullable_inference_runs(@TempDir Path directory) throws Exception {
         String output = run("""
                 mut inferred? := "hello"
-                TextWriter(Stdio.stdout()).writeLine((inferred) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((inferred) .. "")
                 inferred = Null
-                TextWriter(Stdio.stdout()).writeLine((inferred) .. (" ") .. (inferred == Null))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((inferred) .. (" ") .. (inferred == Null))
                 inferred = "world"
-                TextWriter(Stdio.stdout()).writeLine((inferred) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((inferred) .. "")
                 mut anything? := Null
                 anything = "text"
-                TextWriter(Stdio.stdout()).writeLine((anything) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((anything) .. "")
                 anything = 42
-                TextWriter(Stdio.stdout()).writeLine((anything) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((anything) .. "")
                 """, directory);
 
         assertThat(output).isEqualTo("hello\nnull true\nworld\ntext\n42\n");
@@ -136,19 +136,19 @@ class DeclarationExecutionTest {
 
                 mut label: String? = Null
                 if label != Null {
-                    TextWriter(Stdio.stdout()).writeLine(("unreachable") .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("unreachable") .. "")
                 } else {
-                    TextWriter(Stdio.stdout()).writeLine(("empty") .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("empty") .. "")
                 }
                 label = "ready"
                 if label != Null && label.size() > 0 {
-                    TextWriter(Stdio.stdout()).writeLine((label.toUpperCase()) .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((label.toUpperCase()) .. "")
                 }
-                TextWriter(Stdio.stdout()).writeLine((describe(Null)) .. (" ") .. (describe("four")))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((describe(Null)) .. (" ") .. (describe("four")))
 
                 mut count: Integer? = Null
                 count = 7
-                TextWriter(Stdio.stdout()).writeLine((count + 1) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((count + 1) .. "")
                 """, directory);
 
         assertThat(output).isEqualTo("""
@@ -165,17 +165,17 @@ class DeclarationExecutionTest {
         String output = run("""
                 plain := Integer[2] {1, 2}
                 holes := Integer?[2] {1, Null}
-                TextWriter(Stdio.stdout()).writeLine((plain[0] + plain[1]) .. (" ") .. (holes[0]) .. (" ") .. (holes[1] == Null))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((plain[0] + plain[1]) .. (" ") .. (holes[0]) .. (" ") .. (holes[1] == Null))
                 holes[1] = 9
-                TextWriter(Stdio.stdout()).writeLine((holes[1]) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((holes[1]) .. "")
 
                 mut optional: Integer[2]? = Integer[2] {3, 4}
-                TextWriter(Stdio.stdout()).writeLine((optional == Null) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((optional == Null) .. "")
                 optional = Null
-                TextWriter(Stdio.stdout()).writeLine((optional == Null) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((optional == Null) .. "")
 
                 partial := String?[3] {"a"}
-                TextWriter(Stdio.stdout()).writeLine((partial.size) .. (" ") .. (partial))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((partial.size) .. (" ") .. (partial))
                 """, directory);
 
         assertThat(output).isEqualTo("""
@@ -193,12 +193,12 @@ class DeclarationExecutionTest {
         assertThatThrownBy(() -> transpile("""
                 mut value: Integer? = 1
                 value = Null
-                TextWriter(Stdio.stdout()).writeLine((value + 1) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((value + 1) .. "")
                 """)).isInstanceOf(SolvikCompiler.CompilationFailure.class)
                 .hasMessageContaining(TypeChecker.NULL_UNSAFE);
         assertThatThrownBy(() -> transpile("""
                 text: String? = Null
-                TextWriter(Stdio.stdout()).writeLine((text.size()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((text.size()) .. "")
                 """)).isInstanceOf(SolvikCompiler.CompilationFailure.class)
                 .hasMessageContaining(TypeChecker.NULL_UNSAFE);
     }
@@ -221,9 +221,9 @@ class DeclarationExecutionTest {
                     }
                 }
                 box := Box()
-                TextWriter(Stdio.stdout()).writeLine((box.textSize()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((box.textSize()) .. "")
                 box.value = "text"
-                TextWriter(Stdio.stdout()).writeLine((box.textSize()) .. (" ") .. (box.value))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((box.textSize()) .. (" ") .. (box.value))
                 """, directory);
 
         assertThat(output).isEqualTo("0\n4 text\n");

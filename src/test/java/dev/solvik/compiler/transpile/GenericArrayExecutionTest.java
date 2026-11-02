@@ -59,7 +59,7 @@ class GenericArrayExecutionTest {
                 words.add("c")
                 numbers := Slots(10)
                 numbers.add(20)
-                TextWriter(Stdio.stdout()).writeLine((words.last()) .. (numbers.last()) .. (" ") .. (words.items))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((words.last()) .. (numbers.last()) .. (" ") .. (words.items))
                 """);
         assertThat(output).isEqualTo("c20 [a, b, c]\n");
     }
@@ -99,7 +99,7 @@ class GenericArrayExecutionTest {
                 list.add(1)
                 list.add(2)
                 list.add(3)
-                TextWriter(Stdio.stdout()).writeLine((list.count()) .. (" ") .. (list.get(0)) .. (list.get(3)))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((list.count()) .. (" ") .. (list.get(0)) .. (list.get(3)))
                 """);
         assertThat(output).isEqualTo("4 03\n");
     }

@@ -96,34 +96,34 @@ class BundledFileExecutionTest {
         String path = path(directory.resolve("lifecycle.bin"));
         String output = run("""
                 path := "%s"
-                file := File.openWrite(path)
-                TextWriter(Stdio.stdout()).writeLine("path=" .. (file.path() == path)
+                file := solvik::io::File.openWrite(path)
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("path=" .. (file.path() == path)
                     \\ .. " open=" .. file.isOpen())
-                writer := ByteWriter(file.channel())
+                writer := solvik::io::ByteWriter(file.channel())
                 writer.write(Byte[3] {65, 66, 67})
                 writer.close()
                 file.close()
-                TextWriter(Stdio.stdout()).writeLine("closed=" .. (file.isOpen() == false))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("closed=" .. (file.isOpen() == false))
 
-                appended := File.openAppend(path)
-                ByteWriter(appended.channel()).write(Byte[1] {68})
+                appended := solvik::io::File.openAppend(path)
+                solvik::io::ByteWriter(appended.channel()).write(Byte[1] {68})
                 appended.close()
 
-                readFile := File.openRead(path)
-                TextWriter(Stdio.stdout()).writeLine("readable=" .. readFile.channel().canRead()
+                readFile := solvik::io::File.openRead(path)
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("readable=" .. readFile.channel().canRead()
                     \\ .. " writable=" .. readFile.channel().canWrite())
-                reader := ByteReader(readFile.channel())
+                reader := solvik::io::ByteReader(readFile.channel())
                 all := reader.read(10)
                 if all != Null {
-                    TextWriter(Stdio.stdout()).writeLine("bytes=" .. all)
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("bytes=" .. all)
                 }
-                TextWriter(Stdio.stdout()).writeLine("eof=" .. (reader.read(1) == Null))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("eof=" .. (reader.read(1) == Null))
                 reader.close()
-                TextWriter(Stdio.stdout()).writeLine("channelOpen="
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("channelOpen="
                     \\ .. readFile.channel().isOpen())
                 readFile.close()
-                TextWriter(Stdio.stdout()).writeLine("exists=" .. File.exists(path)
-                    \\ .. " deleted=" .. File.delete(path) .. " after=" .. File.exists(path))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("exists=" .. solvik::io::File.exists(path)
+                    \\ .. " deleted=" .. solvik::io::File.delete(path) .. " after=" .. solvik::io::File.exists(path))
                 """.formatted(path), directory);
 
         assertThat(output).isEqualTo("""
@@ -144,29 +144,29 @@ class BundledFileExecutionTest {
         String path = path(directory.resolve("modes.bin"));
         String output = run("""
                 path := "%s"
-                first := File.openWrite(path)
-                ByteWriter(first.channel()).write(Byte[3] {97, 98, 99})
+                first := solvik::io::File.openWrite(path)
+                solvik::io::ByteWriter(first.channel()).write(Byte[3] {97, 98, 99})
                 first.close()
 
-                truncated := File.openWrite(path)
-                ByteWriter(truncated.channel()).write(Byte[1] {122})
+                truncated := solvik::io::File.openWrite(path)
+                solvik::io::ByteWriter(truncated.channel()).write(Byte[1] {122})
                 truncated.close()
 
-                created := File.openAppend(path)
-                ByteWriter(created.channel()).write(Byte[2] {121, 120})
+                created := solvik::io::File.openAppend(path)
+                solvik::io::ByteWriter(created.channel()).write(Byte[2] {121, 120})
                 created.close()
 
-                readFile := File.openRead(path)
-                reader := ByteReader(readFile.channel())
+                readFile := solvik::io::File.openRead(path)
+                reader := solvik::io::ByteReader(readFile.channel())
                 head := reader.read(2)
                 tail := reader.read(2)
                 if head != Null && tail != Null {
-                    TextWriter(Stdio.stdout()).writeLine("head=" .. head .. " tail=" .. tail
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("head=" .. head .. " tail=" .. tail
                         \\ .. " eof=" .. (reader.read(1) == Null))
                 }
                 reader.close()
                 readFile.close()
-                TextWriter(Stdio.stdout()).writeLine("deleted=" .. File.delete(path))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("deleted=" .. solvik::io::File.delete(path))
                 """.formatted(path), directory);
 
         assertThat(output).isEqualTo("head=[122, 121] tail=[120] eof=true\ndeleted=true\n");
@@ -178,19 +178,19 @@ class BundledFileExecutionTest {
         String path = path(directory.resolve("bytes.bin"));
         String output = run("""
                 path := "%s"
-                file := File.openWrite(path)
-                ByteWriter(file.channel()).write(Byte[4] {0, 127, -128, -1})
+                file := solvik::io::File.openWrite(path)
+                solvik::io::ByteWriter(file.channel()).write(Byte[4] {0, 127, -128, -1})
                 file.close()
 
-                readFile := File.openRead(path)
-                reader := ByteReader(readFile.channel())
+                readFile := solvik::io::File.openRead(path)
+                reader := solvik::io::ByteReader(readFile.channel())
                 back := reader.read(4)
                 if back != Null {
-                    TextWriter(Stdio.stdout()).writeLine("bytes=" .. back)
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("bytes=" .. back)
                 }
                 reader.close()
                 readFile.close()
-                cleaned := File.delete(path)
+                cleaned := solvik::io::File.delete(path)
                 """.formatted(path), directory);
 
         assertThat(output).isEqualTo("bytes=[0, 127, -128, -1]\n");
@@ -202,29 +202,29 @@ class BundledFileExecutionTest {
         String path = path(directory.resolve("directions.bin"));
         String output = run("""
                 path := "%s"
-                writeFile := File.openWrite(path)
-                TextWriter(Stdio.stdout()).writeLine("write=" .. writeFile.channel().canWrite()
+                writeFile := solvik::io::File.openWrite(path)
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("write=" .. writeFile.channel().canWrite()
                     \\ .. " read=" .. writeFile.channel().canRead())
                 writeFile.close()
 
-                readFile := File.openRead(path)
+                readFile := solvik::io::File.openRead(path)
                 try {
                     ignored := readFile.channel().write(Byte[1] {65})
                 } catch (error: Exception) {
-                    TextWriter(Stdio.stdout()).writeLine("readOnly="
-                        \\ .. (error.getCode() == IoError.Unsupported))
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("readOnly="
+                        \\ .. (error.getCode() == solvik::io::IoError.Unsupported))
                 }
                 readFile.close()
 
-                writeAgain := File.openAppend(path)
+                writeAgain := solvik::io::File.openAppend(path)
                 try {
                     ignored := writeAgain.channel().read(1)
                 } catch (error: Exception) {
-                    TextWriter(Stdio.stdout()).writeLine("writeOnly="
-                        \\ .. (error.getCode() == IoError.Unsupported))
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("writeOnly="
+                        \\ .. (error.getCode() == solvik::io::IoError.Unsupported))
                 }
                 writeAgain.close()
-                cleaned := File.delete(path)
+                cleaned := solvik::io::File.delete(path)
                 """.formatted(path), directory);
 
         assertThat(output).isEqualTo("""
@@ -240,56 +240,56 @@ class BundledFileExecutionTest {
         String path = path(directory.resolve("close.bin"));
         String output = run("""
                 path := "%s"
-                file := File.openWrite(path)
-                writer := ByteWriter(file.channel())
+                file := solvik::io::File.openWrite(path)
+                writer := solvik::io::ByteWriter(file.channel())
                 writer.write(Byte[1] {65})
                 writer.close()
                 writer.close()
-                TextWriter(Stdio.stdout()).writeLine("channelOpen=" .. file.channel().isOpen())
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("channelOpen=" .. file.channel().isOpen())
                 try {
                     writer.write(Byte[1] {66})
                 } catch (error: Exception) {
-                    TextWriter(Stdio.stdout()).writeLine("writerClosed="
-                        \\ .. (error.getCode() == IoError.Closed))
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("writerClosed="
+                        \\ .. (error.getCode() == solvik::io::IoError.Closed))
                 }
                 try {
                     writer.flush()
                 } catch (error: Exception) {
-                    TextWriter(Stdio.stdout()).writeLine("flushClosed="
-                        \\ .. (error.getCode() == IoError.Closed))
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("flushClosed="
+                        \\ .. (error.getCode() == solvik::io::IoError.Closed))
                 }
                 savedChannel := file.channel()
                 file.close()
                 file.close()
-                TextWriter(Stdio.stdout()).writeLine("fileOpen=" .. file.isOpen()
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("fileOpen=" .. file.isOpen()
                     \\ .. " ownedClosed=" .. (savedChannel.isOpen() == false))
                 try {
                     ignored := file.channel()
                 } catch (error: Exception) {
-                    TextWriter(Stdio.stdout()).writeLine("fileClosed="
-                        \\ .. (error.getCode() == IoError.Closed))
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("fileClosed="
+                        \\ .. (error.getCode() == solvik::io::IoError.Closed))
                 }
                 try {
                     ignored := savedChannel.read(1)
                 } catch (error: Exception) {
-                    TextWriter(Stdio.stdout()).writeLine("ownedChannel="
-                        \\ .. (error.getCode() == IoError.Closed))
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("ownedChannel="
+                        \\ .. (error.getCode() == solvik::io::IoError.Closed))
                 }
 
-                readFile := File.openRead(path)
-                reader := ByteReader(readFile.channel())
+                readFile := solvik::io::File.openRead(path)
+                reader := solvik::io::ByteReader(readFile.channel())
                 reader.close()
                 reader.close()
-                TextWriter(Stdio.stdout()).writeLine("readChannelOpen="
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("readChannelOpen="
                     \\ .. readFile.channel().isOpen())
                 try {
                     ignored := reader.read(1)
                 } catch (error: Exception) {
-                    TextWriter(Stdio.stdout()).writeLine("readerClosed="
-                        \\ .. (error.getCode() == IoError.Closed))
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("readerClosed="
+                        \\ .. (error.getCode() == solvik::io::IoError.Closed))
                 }
                 readFile.close()
-                cleaned := File.delete(path)
+                cleaned := solvik::io::File.delete(path)
                 """.formatted(path), directory);
 
         assertThat(output).isEqualTo("""
@@ -310,20 +310,20 @@ class BundledFileExecutionTest {
         String missing = path(directory.resolve("missing.bin"));
         String output = run("""
                 try {
-                    missing := File.openRead("%s")
+                    missing := solvik::io::File.openRead("%s")
                 } catch (error: Exception) {
-                    TextWriter(Stdio.stdout()).writeLine("missing="
-                        \\ .. (error.getCode() == IoError.Io))
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("missing="
+                        \\ .. (error.getCode() == solvik::io::IoError.Io))
                 }
                 try {
-                    ignored := File.exists("")
+                    ignored := solvik::io::File.exists("")
                 } catch (error: Exception) {
-                    TextWriter(Stdio.stdout()).writeLine("invalid="
-                        \\ .. (error.getCode() == IoError.InvalidArgument))
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("invalid="
+                        \\ .. (error.getCode() == solvik::io::IoError.InvalidArgument))
                 }
-                TextWriter(Stdio.stdout()).writeLine("deletedAbsent="
-                    \\ .. File.delete("%s"))
-                TextWriter(Stdio.stdout()).writeLine("exists=" .. File.exists("%s"))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("deletedAbsent="
+                    \\ .. solvik::io::File.delete("%s"))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("exists=" .. solvik::io::File.exists("%s"))
                 """.formatted(missing, missing, missing), directory);
 
         assertThat(output).isEqualTo("""
@@ -340,12 +340,12 @@ class BundledFileExecutionTest {
         Path folder = Files.createDirectories(directory.resolve("folder"));
         String output = run("""
                 path := "%s"
-                TextWriter(Stdio.stdout()).writeLine("exists=" .. File.exists(path))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("exists=" .. solvik::io::File.exists(path))
                 try {
-                    removed := File.delete(path)
+                    removed := solvik::io::File.delete(path)
                 } catch (error: Exception) {
-                    TextWriter(Stdio.stdout()).writeLine("directory="
-                        \\ .. (error.getCode() == IoError.Io))
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("directory="
+                        \\ .. (error.getCode() == solvik::io::IoError.Io))
                 }
                 """.formatted(path(folder)), directory);
 
@@ -359,19 +359,19 @@ class BundledFileExecutionTest {
         String path = path(directory.resolve("stdio.bin"));
         String output = run("""
                 path := "%s"
-                saved := Stdio.stdout()
-                file := File.openWrite(path)
-                Stdio.setStdout(file.channel())
-                TextWriter(Stdio.stdout()).writeLine("installed")
-                Stdio.setStdout(saved)
-                TextWriter(Stdio.stdout()).writeLine("fileOpen=" .. file.isOpen())
+                saved := solvik::io::Stdio.stdout()
+                file := solvik::io::File.openWrite(path)
+                solvik::io::Stdio.setStdout(file.channel())
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("installed")
+                solvik::io::Stdio.setStdout(saved)
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("fileOpen=" .. file.isOpen())
 
-                readFile := File.openRead(path)
-                line := TextReader(readFile.channel()).readLine()
-                TextWriter(Stdio.stdout()).writeLine("line=" .. line)
+                readFile := solvik::io::File.openRead(path)
+                line := solvik::io::TextReader(readFile.channel()).readLine()
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("line=" .. line)
                 readFile.close()
                 file.close()
-                cleaned := File.delete(path)
+                cleaned := solvik::io::File.delete(path)
                 """.formatted(path), directory);
 
         assertThat(output).isEqualTo("fileOpen=true\nline=installed\n");
@@ -380,12 +380,12 @@ class BundledFileExecutionTest {
     @Test
     @DisplayName("the File constructor and the open helpers are not public API")
     void construction_and_bindings_are_not_exported(@TempDir Path directory) throws Exception {
-        assertThat(compilationError("forged := File(Channel.bytes(), \"x\")\n", directory))
+        assertThat(compilationError("forged := solvik::io::File(solvik::io::Channel.bytes(), \"x\")\n", directory))
                 .contains("SOL-T001")
-                .contains("the constructor of 'File' is private");
-        assertThat(compilationError("channel := File.openReadChannel(\"x\")\n", directory))
+                .contains("the constructor of 'solvik::io::File' is private");
+        assertThat(compilationError("channel := solvik::io::File.openReadChannel(\"x\")\n", directory))
                 .contains("SOL-T001")
-                .contains("method 'openReadChannel' of File is private");
+                .contains("method 'openReadChannel' of solvik::io::File is private");
     }
 
     @Test
@@ -394,38 +394,38 @@ class BundledFileExecutionTest {
         Map<String, String> plain = transpile("value := 1\n", directory);
         assertThat(plain).doesNotContainKey(GeneratedNames.IO_SOURCE_PATH);
         assertThat(PackagedLibrary.programFiles(plain)).containsExactly("Solvik$Program.java");
-        assertThat(plain).doesNotContainKeys("File.java", "ByteReader.java", "ByteWriter.java");
+        assertThat(plain).doesNotContainKeys("solvik/io/File.java", "solvik/io/ByteReader.java", "solvik/io/ByteWriter.java");
 
         Path fileDirectory = Files.createDirectories(directory.resolve("file"));
         Map<String, String> withFile = transpile("""
-                file := File.openWrite("unused.tmp")
+                file := solvik::io::File.openWrite("unused.tmp")
                 file.close()
-                cleaned := File.delete("unused.tmp")
+                cleaned := solvik::io::File.delete("unused.tmp")
                 """, fileDirectory);
-        assertThat(withFile).containsKeys(GeneratedNames.IO_SOURCE_PATH, "File.java",
-                "Channel.java", "IoError.java");
+        assertThat(withFile).containsKeys(GeneratedNames.IO_SOURCE_PATH, "solvik/io/File.java",
+                "solvik/io/Channel.java", "solvik/io/IoError.java");
         // The wrappers are not mentioned by this program, so they stay unemitted.
-        assertThat(withFile).doesNotContainKeys("ByteReader.java", "ByteWriter.java");
+        assertThat(withFile).doesNotContainKeys("solvik/io/ByteReader.java", "solvik/io/ByteWriter.java");
 
         Path readerDirectory = Files.createDirectories(directory.resolve("reader"));
         Map<String, String> withReader = transpile("""
-                reader := ByteReader(Channel.bytes())
+                reader := solvik::io::ByteReader(solvik::io::Channel.bytes())
                 reader.close()
                 """, readerDirectory);
-        assertThat(withReader).containsKeys("ByteReader.java", "Channel.java");
-        assertThat(withReader).doesNotContainKeys("File.java", "ByteWriter.java");
+        assertThat(withReader).containsKeys("solvik/io/ByteReader.java", "solvik/io/Channel.java");
+        assertThat(withReader).doesNotContainKeys("solvik/io/File.java", "solvik/io/ByteWriter.java");
     }
 
     @Test
     @DisplayName("the public File class names no JDK stream or path type")
     void file_public_shape_is_solvik_only(@TempDir Path directory) throws Exception {
         Map<String, String> files = transpile("""
-                file := File.openWrite("unused.tmp")
+                file := solvik::io::File.openWrite("unused.tmp")
                 file.close()
-                cleaned := File.delete("unused.tmp")
+                cleaned := solvik::io::File.delete("unused.tmp")
                 """, directory);
 
-        assertThat(files.get("File.java"))
+        assertThat(files.get("solvik/io/File.java"))
                 .contains("public static File openRead(String path)")
                 .contains("public static File openWrite(String path)")
                 .contains("public static File openAppend(String path)")

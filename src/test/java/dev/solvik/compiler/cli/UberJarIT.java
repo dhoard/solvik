@@ -81,13 +81,13 @@ class UberJarIT {
                 }
                 mut id: solvik::util::UUID? = solvik::util::UUID.parse("0190F2A4-7B3C-7A1D-8E2F-3C4D5E6F7A8B")
                 if id != Null {
-                    TextWriter(Stdio.stdout()).writeLine((map.size()) .. (" ") .. (stack.empty()) .. (" ") .. (list.get(0)))
-                    TextWriter(Stdio.stdout()).writeLine((id.toString()) .. (" ") .. (id.timestamp()) .. (" ") .. (id.compareTo(id) == 0))
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((map.size()) .. (" ") .. (stack.empty()) .. (" ") .. (list.get(0)))
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((id.toString()) .. (" ") .. (id.timestamp()) .. (" ") .. (id.compareTo(id) == 0))
                 }
                 task := SumTask()
                 thread := solvik::concurrency::Thread.start(task)
                 thread.await()
-                TextWriter(Stdio.stdout()).writeLine((task.value()) .. (" ") .. (thread.isAlive()))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((task.value()) .. (" ") .. (thread.isAlive()))
                 """, StandardCharsets.UTF_8);
         Process process = new ProcessBuilder(
                 Path.of(System.getProperty("java.home"), "bin", "java").toString(),
@@ -138,7 +138,7 @@ class UberJarIT {
                 }
 
                 p := Point(7)
-                TextWriter(Stdio.stdout()).writeLine((p.toString()) .. (" ") .. (p.type()))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((p.toString()) .. (" ") .. (p.type()))
                 """, StandardCharsets.UTF_8);
 
         Process process = new ProcessBuilder(
@@ -188,7 +188,7 @@ class UberJarIT {
 
         Path source = directory.resolve("checked.sol");
         Files.writeString(source, """
-                TextWriter(Stdio.stdout()).writeLine(("must not run") .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("must not run") .. "")
                 exit(7)
                 """, StandardCharsets.UTF_8);
 

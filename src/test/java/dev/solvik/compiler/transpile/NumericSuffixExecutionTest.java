@@ -60,17 +60,17 @@ class NumericSuffixExecutionTest {
     void a_suffix_matches_its_conversion_constructor(@TempDir Path directory)
             throws Exception {
         String output = run("""
-                TextWriter(Stdio.stdout()).writeLine((1B) .. (" ") .. (Byte(1)))
-                TextWriter(Stdio.stdout()).writeLine((1S) .. (" ") .. (Short(1)))
-                TextWriter(Stdio.stdout()).writeLine((1I) .. (" ") .. (Integer(1)))
-                TextWriter(Stdio.stdout()).writeLine((1L) .. (" ") .. (Long(1)))
-                TextWriter(Stdio.stdout()).writeLine((1F) .. (" ") .. (Float(1)))
-                TextWriter(Stdio.stdout()).writeLine((1.5F) .. (" ") .. (Float(1.5)))
-                TextWriter(Stdio.stdout()).writeLine((1D) .. (" ") .. (Double(1)))
-                TextWriter(Stdio.stdout()).writeLine((1.5D) .. (" ") .. (Double(1.5)))
-                TextWriter(Stdio.stdout()).writeLine((1BI) .. (" ") .. (BigInteger(1)))
-                TextWriter(Stdio.stdout()).writeLine((2BD) .. (" ") .. (BigDecimal(2)))
-                TextWriter(Stdio.stdout()).writeLine((1.50BD) .. (" ") .. (BigDecimal("1.50")))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1B) .. (" ") .. (Byte(1)))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1S) .. (" ") .. (Short(1)))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1I) .. (" ") .. (Integer(1)))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1L) .. (" ") .. (Long(1)))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1F) .. (" ") .. (Float(1)))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1.5F) .. (" ") .. (Float(1.5)))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1D) .. (" ") .. (Double(1)))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1.5D) .. (" ") .. (Double(1.5)))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1BI) .. (" ") .. (BigInteger(1)))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((2BD) .. (" ") .. (BigDecimal(2)))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1.50BD) .. (" ") .. (BigDecimal("1.50")))
                 """, directory);
 
         assertThat(output).isEqualTo("""
@@ -91,8 +91,8 @@ class NumericSuffixExecutionTest {
     @Test
     void a_suffix_decides_the_runtime_type(@TempDir Path directory) throws Exception {
         String output = run("""
-                TextWriter(Stdio.stdout()).writeLine((1B.type()) .. (" ") .. (1S.type()) .. (" ") .. (1I.type()) .. (" ") .. (1L.type()) .. (" ") .. (1F.type()) .. (" ") .. (1D.type()) .. (" ") .. (1BI.type()) .. (" ") .. (1BD.type()))
-                TextWriter(Stdio.stdout()).writeLine((1.type()) .. (" ") .. (1.5.type()))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1B.type()) .. (" ") .. (1S.type()) .. (" ") .. (1I.type()) .. (" ") .. (1L.type()) .. (" ") .. (1F.type()) .. (" ") .. (1D.type()) .. (" ") .. (1BI.type()) .. (" ") .. (1BD.type()))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1.type()) .. (" ") .. (1.5.type()))
                 """, directory);
 
         assertThat(output).isEqualTo("""
@@ -106,8 +106,8 @@ class NumericSuffixExecutionTest {
             throws Exception {
         String output = run("""
                 minimum := -128B
-                TextWriter(Stdio.stdout()).writeLine((-128B) .. (" ") .. (-32768S) .. (" ") .. (-2147483648I) .. (" ") .. (-9223372036854775808L))
-                TextWriter(Stdio.stdout()).writeLine((minimum.type()) .. (" ") .. (-1.5BD) .. (" ") .. (-1.5F))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((-128B) .. (" ") .. (-32768S) .. (" ") .. (-2147483648I) .. (" ") .. (-9223372036854775808L))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((minimum.type()) .. (" ") .. (-1.5BD) .. (" ") .. (-1.5F))
                 """, directory);
 
         assertThat(output).isEqualTo("""
@@ -120,8 +120,8 @@ class NumericSuffixExecutionTest {
     void suffixed_operands_promote_like_their_carriers(@TempDir Path directory)
             throws Exception {
         String output = run("""
-                TextWriter(Stdio.stdout()).writeLine((1B + 1B) .. (" ") .. (1L + 1) .. (" ") .. (1F + 1) .. (" ") .. (1BD + 1BD) .. (" ") .. (1BI * 2BI))
-                TextWriter(Stdio.stdout()).writeLine((10L / 3L) .. (" ") .. (10L % 3L) .. (" ") .. (1BD == 1BD) .. (" ") .. (1BD == 1.0BD))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1B + 1B) .. (" ") .. (1L + 1) .. (" ") .. (1F + 1) .. (" ") .. (1BD + 1BD) .. (" ") .. (1BI * 2BI))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((10L / 3L) .. (" ") .. (10L % 3L) .. (" ") .. (1BD == 1BD) .. (" ") .. (1BD == 1.0BD))
                 """, directory);
 
         // BigDecimal equality is boxed equality, so the scale is part of the value (§4).
@@ -132,7 +132,7 @@ class NumericSuffixExecutionTest {
     void big_number_suffixes_reach_java_methods(@TempDir Path directory)
             throws Exception {
         String output = run("""
-                TextWriter(Stdio.stdout()).writeLine((1BI.pow(3)) .. (" ") .. (12BI.gcd(18BI)) .. (" ") .. (1.50BD.scale()) .. (" ") .. (2BD.add(1BD)) .. (" ") .. (1.50BD.stripTrailingZeros()))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1BI.pow(3)) .. (" ") .. (12BI.gcd(18BI)) .. (" ") .. (1.50BD.scale()) .. (" ") .. (2BD.add(1BD)) .. (" ") .. (1.50BD.stripTrailingZeros()))
                 """, directory);
 
         assertThat(output).isEqualTo("1 6 2 3 1.5\n");
@@ -145,19 +145,19 @@ class NumericSuffixExecutionTest {
                 b := Byte(7)
                 switch b {
                     case 7B {
-                        TextWriter(Stdio.stdout()).writeLine(("seven") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("seven") .. "")
                     }
                     default {
-                        TextWriter(Stdio.stdout()).writeLine(("other") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("other") .. "")
                     }
                 }
                 n := 1
                 switch n {
                     case 1I {
-                        TextWriter(Stdio.stdout()).writeLine(("one") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("one") .. "")
                     }
                     default {
-                        TextWriter(Stdio.stdout()).writeLine(("other") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("other") .. "")
                     }
                 }
                 """, directory);
@@ -173,7 +173,7 @@ class NumericSuffixExecutionTest {
                 bytes := Byte[2] {-128B, 127B}
                 floats := Float[1] {1.5F}
                 decimals := BigDecimal[1] {1.50BD}
-                TextWriter(Stdio.stdout()).writeLine((longs[0]) .. (" ") .. (longs[1]) .. (" ") .. (bytes[0]) .. (" ") .. (bytes[1]) .. (" ") .. (floats[0]) .. (" ") .. (decimals[0]))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((longs[0]) .. (" ") .. (longs[1]) .. (" ") .. (bytes[0]) .. (" ") .. (bytes[1]) .. (" ") .. (floats[0]) .. (" ") .. (decimals[0]))
                 """, directory);
 
         assertThat(output).isEqualTo("1 2 -128 127 1.5 1.50\n");
@@ -189,7 +189,7 @@ class NumericSuffixExecutionTest {
                 e := 1D
                 f := 1BI
                 g := 1.50BD
-                TextWriter(Stdio.stdout()).writeLine((a) .. (b) .. (c) .. (d) .. (e) .. (f) .. (g))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((a) .. (b) .. (c) .. (d) .. (e) .. (f) .. (g))
                 """).get("Solvik$Program.java");
 
         assertThat(java).contains("(byte) 1", "(short) 1", "1L", "1f", "1d",
@@ -203,7 +203,7 @@ class NumericSuffixExecutionTest {
                 n := 1
                 switch n {
                     case 1I {
-                        TextWriter(Stdio.stdout()).writeLine(("one") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("one") .. "")
                     }
                 }
                 """).get("Solvik$Program.java");

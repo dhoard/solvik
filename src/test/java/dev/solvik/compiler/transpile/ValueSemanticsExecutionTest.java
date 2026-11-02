@@ -66,10 +66,10 @@ class ValueSemanticsExecutionTest {
     void negative_literals_render_through_the_object_carrier(@TempDir Path directory)
             throws Exception {
         String output = run("""
-                TextWriter(Stdio.stdout()).writeLine((-1 .. "x") .. (" ") .. ("y" .. -2))
-                TextWriter(Stdio.stdout()).writeLine((String(-1)) .. (" ") .. (String(-1.5)) .. (" ") .. (String(-1L)))
-                TextWriter(Stdio.stdout()).writeLine((-1) .. (" ") .. (-2.5))
-                TextWriter(Stdio.stdout()).writeLine(((0 - 1) .. "z") .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((-1 .. "x") .. (" ") .. ("y" .. -2))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((String(-1)) .. (" ") .. (String(-1.5)) .. (" ") .. (String(-1L)))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((-1) .. (" ") .. (-2.5))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(((0 - 1) .. "z") .. "")
                 """, directory);
 
         assertThat(output).isEqualTo("-1x y-2\n-1 -1.5 -1\n-1 -2.5\n-1z\n");
@@ -79,14 +79,14 @@ class ValueSemanticsExecutionTest {
     @DisplayName("=== on scalars compares values, so no cache size can change the answer")
     void scalar_identity_is_value_identity(@TempDir Path directory) throws Exception {
         String output = run("""
-                TextWriter(Stdio.stdout()).writeLine((Byte(7) === Byte(7)) .. (" ") .. (Byte(100) === Byte(100)))
-                TextWriter(Stdio.stdout()).writeLine((Byte(7) === Byte(100)) .. "")
-                TextWriter(Stdio.stdout()).writeLine((1 === 1) .. (" ") .. (1.0 === 1.0) .. (" ") .. (1 === 2))
-                TextWriter(Stdio.stdout()).writeLine(("a" === "a") .. (" ") .. ("a" === "b"))
-                TextWriter(Stdio.stdout()).writeLine((true === true) .. (" ") .. (true === false))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Byte(7) === Byte(7)) .. (" ") .. (Byte(100) === Byte(100)))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Byte(7) === Byte(100)) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1 === 1) .. (" ") .. (1.0 === 1.0) .. (" ") .. (1 === 2))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("a" === "a") .. (" ") .. ("a" === "b"))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((true === true) .. (" ") .. (true === false))
                 first := 1
                 second := 1
-                TextWriter(Stdio.stdout()).writeLine((first === second) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((first === second) .. "")
                 """, directory);
 
         assertThat(output).isEqualTo("""
@@ -105,7 +105,7 @@ class ValueSemanticsExecutionTest {
         String output = run("""
                 left := Integer[1] {1}
                 right := Integer[1] {1}
-                TextWriter(Stdio.stdout()).writeLine((left === left) .. (" ") .. (left === right) .. (" ") .. (left == right))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((left === left) .. (" ") .. (left === right) .. (" ") .. (left == right))
 
                 type Point {
                     x := 0
@@ -117,7 +117,7 @@ class ValueSemanticsExecutionTest {
 
                 p := Point()
                 q := Point()
-                TextWriter(Stdio.stdout()).writeLine((p === p) .. (" ") .. (p === q) .. (" ") .. (p == q))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((p === p) .. (" ") .. (p === q) .. (" ") .. (p == q))
                 """, directory);
 
         // Arrays and user types are mutable objects: `==` and `===` are both identity for them,
@@ -132,13 +132,13 @@ class ValueSemanticsExecutionTest {
                 left := Integer?[2] {1}
                 right := Integer?[2] {1}
                 alias := left
-                TextWriter(Stdio.stdout()).writeLine((left == alias) .. (" ") .. (left != right) .. (" ") .. (left.equals(right)))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((left == alias) .. (" ") .. (left != right) .. (" ") .. (left.equals(right)))
                 nested := Integer?[][1] {left}
                 other := Integer?[][1] {left}
-                TextWriter(Stdio.stdout()).writeLine((nested == nested) .. (" ") .. (nested == other))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((nested == nested) .. (" ") .. (nested == other))
                 values := Any[2] {left, right}
-                TextWriter(Stdio.stdout()).writeLine((values[0] == values[0]) .. (" ") .. (values[0].equals(values[1])))
-                TextWriter(Stdio.stdout()).writeLine((left == Null) .. (" ") .. (Null == left) .. (" ") .. (Null == Null))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((values[0] == values[0]) .. (" ") .. (values[0].equals(values[1])))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((left == Null) .. (" ") .. (Null == left) .. (" ") .. (Null == Null))
                 """, directory);
 
         assertThat(output).isEqualTo("""
@@ -153,11 +153,11 @@ class ValueSemanticsExecutionTest {
     @DisplayName("equal numbers hash alike whatever their carrier or scale")
     void hashing_agrees_with_widened_equality(@TempDir Path directory) throws Exception {
         String output = run("""
-                TextWriter(Stdio.stdout()).writeLine((1 == 1.0) .. (" ") .. (1.hashCode() == 1.0.hashCode()))
-                TextWriter(Stdio.stdout()).writeLine((Byte(1).hashCode() == 1.hashCode()) .. (" ") .. (Byte(1) == 1))
-                TextWriter(Stdio.stdout()).writeLine((1.50.hashCode() == 1.5.hashCode()) .. (" ") .. (1.50 == 1.5))
-                TextWriter(Stdio.stdout()).writeLine((2.hashCode() == 2.0.hashCode()) .. "")
-                TextWriter(Stdio.stdout()).writeLine((1.hashCode() == 2.hashCode()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1 == 1.0) .. (" ") .. (1.hashCode() == 1.0.hashCode()))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Byte(1).hashCode() == 1.hashCode()) .. (" ") .. (Byte(1) == 1))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1.50.hashCode() == 1.5.hashCode()) .. (" ") .. (1.50 == 1.5))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((2.hashCode() == 2.0.hashCode()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1.hashCode() == 2.hashCode()) .. "")
                 """, directory);
 
         // `==` promotes like Java's primitive comparison, while `hashCode` is Java's boxed hash:
@@ -175,10 +175,10 @@ class ValueSemanticsExecutionTest {
     @DisplayName("a BigDecimal renders without scientific notation and keeps its written scale")
     void decimals_render_in_plain_form(@TempDir Path directory) throws Exception {
         String output = run("""
-                TextWriter(Stdio.stdout()).writeLine((BigDecimal("1e3")) .. (" ") .. (BigDecimal("1e-3")) .. (" ") .. (BigDecimal("1.50")))
-                TextWriter(Stdio.stdout()).writeLine((1.0 / 4) .. (" ") .. (0.1 + 0.2))
-                TextWriter(Stdio.stdout()).writeLine((BigDecimal("1e3") .. " and " .. BigDecimal("2.500")) .. "")
-                TextWriter(Stdio.stdout()).writeLine((String(BigDecimal("1e3"))) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((BigDecimal("1e3")) .. (" ") .. (BigDecimal("1e-3")) .. (" ") .. (BigDecimal("1.50")))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1.0 / 4) .. (" ") .. (0.1 + 0.2))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((BigDecimal("1e3") .. " and " .. BigDecimal("2.500")) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((String(BigDecimal("1e3"))) .. "")
                 """, directory);
 
         assertThat(output).isEqualTo("""

@@ -50,25 +50,25 @@ class ExceptionTest {
     void the_clause_shapes_are_accepted() {
         assertAccepted("""
                 try {
-                    TextWriter(Stdio.stdout()).writeLine(("body") .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("body") .. "")
                 } catch (e: Exception) {
-                    TextWriter(Stdio.stdout()).writeLine((e.getCode()) .. (" ") .. (e.getMessage()))
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((e.getCode()) .. (" ") .. (e.getMessage()))
                 }
                 """);
         assertAccepted("""
                 try {
-                    TextWriter(Stdio.stdout()).writeLine(("body") .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("body") .. "")
                 } finally {
-                    TextWriter(Stdio.stdout()).writeLine(("cleanup") .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("cleanup") .. "")
                 }
                 """);
         assertAccepted("""
                 try {
-                    TextWriter(Stdio.stdout()).writeLine(("body") .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("body") .. "")
                 } catch (e: Exception) {
-                    TextWriter(Stdio.stdout()).writeLine(("handled") .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("handled") .. "")
                 } finally {
-                    TextWriter(Stdio.stdout()).writeLine(("cleanup") .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("cleanup") .. "")
                 }
                 """);
     }
@@ -78,11 +78,11 @@ class ExceptionTest {
     void exception_is_a_built_in_value_type() {
         assertAccepted("""
                 raised := Exception(4001, "denied")
-                TextWriter(Stdio.stdout()).writeLine((raised.getCode()) .. (" ") .. (raised.getMessage()))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((raised.getCode()) .. (" ") .. (raised.getMessage()))
                 mut optional: Exception? = Null
                 optional = raised
                 if optional != Null {
-                    TextWriter(Stdio.stdout()).writeLine((optional.getCode()) .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((optional.getCode()) .. "")
                 }
                 """);
     }
@@ -100,7 +100,7 @@ class ExceptionTest {
     @Test
     @DisplayName("a try statement needs a catch or a finally clause")
     void a_try_needs_a_clause() {
-        assertRejected("try {\n    TextWriter(Stdio.stdout()).writeLine((\"x\") .. \"\")\n}\n", Parser.EXPECTED_TOKEN);
+        assertRejected("try {\n    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((\"x\") .. \"\")\n}\n", Parser.EXPECTED_TOKEN);
     }
 
     @Test
@@ -108,11 +108,11 @@ class ExceptionTest {
     void a_second_catch_is_rejected() {
         assertRejected("""
                 try {
-                    TextWriter(Stdio.stdout()).writeLine(("x") .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("x") .. "")
                 } catch (e: Exception) {
-                    TextWriter(Stdio.stdout()).writeLine(("a") .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("a") .. "")
                 } catch (other: Exception) {
-                    TextWriter(Stdio.stdout()).writeLine(("b") .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("b") .. "")
                 }
                 """, Parser.EXPECTED_TOKEN);
     }
@@ -122,16 +122,16 @@ class ExceptionTest {
     void the_catch_type_is_exception() {
         assertRejected("""
                 try {
-                    TextWriter(Stdio.stdout()).writeLine(("x") .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("x") .. "")
                 } catch (e: Integer) {
-                    TextWriter(Stdio.stdout()).writeLine(("y") .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("y") .. "")
                 }
                 """, TypeChecker.CATCH_TYPE);
         assertRejected("""
                 try {
-                    TextWriter(Stdio.stdout()).writeLine(("x") .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("x") .. "")
                 } catch (e: Exception?) {
-                    TextWriter(Stdio.stdout()).writeLine(("y") .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("y") .. "")
                 }
                 """, TypeChecker.CATCH_TYPE);
     }
@@ -143,7 +143,7 @@ class ExceptionTest {
                 try {
                     raise Exception(1, "x")
                 } catch (e: Exception) {
-                    TextWriter(Stdio.stdout()).writeLine((e.getCode()) .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((e.getCode()) .. "")
                 }
                 """);
         assertRejected("""
@@ -157,9 +157,9 @@ class ExceptionTest {
                 try {
                     raise Exception(1, "x")
                 } catch (e: Exception) {
-                    TextWriter(Stdio.stdout()).writeLine((e.getCode()) .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((e.getCode()) .. "")
                 }
-                TextWriter(Stdio.stdout()).writeLine((e.getCode()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((e.getCode()) .. "")
                 """, TypeChecker.TYPE_ERROR);
     }
 
@@ -181,16 +181,16 @@ class ExceptionTest {
     @Test
     @DisplayName("Exception takes exactly an Integer code and a String message")
     void the_constructor_arguments_are_checked() {
-        assertRejected("TextWriter(Stdio.stdout()).writeLine((Exception(1)) .. \"\")\n", TypeChecker.TYPE_ERROR);
-        assertRejected("TextWriter(Stdio.stdout()).writeLine((Exception(\"4001\", \"denied\")) .. \"\")\n", TypeChecker.TYPE_ERROR);
-        assertRejected("TextWriter(Stdio.stdout()).writeLine((Exception(1, Null)) .. \"\")\n", TypeChecker.TYPE_ERROR);
+        assertRejected("solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Exception(1)) .. \"\")\n", TypeChecker.TYPE_ERROR);
+        assertRejected("solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Exception(\"4001\", \"denied\")) .. \"\")\n", TypeChecker.TYPE_ERROR);
+        assertRejected("solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Exception(1, Null)) .. \"\")\n", TypeChecker.TYPE_ERROR);
         assertRejected("""
                 func maybeCode() -> Integer? { return Null }
-                TextWriter(Stdio.stdout()).writeLine((Exception(maybeCode(), "denied")) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Exception(maybeCode(), "denied")) .. "")
                 """, TypeChecker.NULL_UNSAFE);
         assertRejected("""
                 func maybeText() -> String? { return Null }
-                TextWriter(Stdio.stdout()).writeLine((Exception(4001, maybeText())) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Exception(4001, maybeText())) .. "")
                 """, TypeChecker.NULL_UNSAFE);
     }
 
@@ -199,12 +199,12 @@ class ExceptionTest {
     void the_members_are_functions() {
         assertRejected("""
                 func describe(e: Exception) {
-                    TextWriter(Stdio.stdout()).writeLine((e.code) .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((e.code) .. "")
                 }
                 """, TypeChecker.TYPE_ERROR);
         assertRejected("""
                 func describe(e: Exception) {
-                    TextWriter(Stdio.stdout()).writeLine((e.getCode(1)) .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((e.getCode(1)) .. "")
                 }
                 """, TypeChecker.TYPE_ERROR);
     }
@@ -215,7 +215,7 @@ class ExceptionTest {
         assertRejected("""
                 func fail() {
                     raise Exception(1, "x")
-                    TextWriter(Stdio.stdout()).writeLine(("unreachable") .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("unreachable") .. "")
                 }
                 """, TypeChecker.UNREACHABLE);
         assertAccepted("""
@@ -235,7 +235,7 @@ class ExceptionTest {
                     } catch (e: Exception) {
                         raise e
                     }
-                    TextWriter(Stdio.stdout()).writeLine(("unreachable") .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("unreachable") .. "")
                 }
                 """, TypeChecker.UNREACHABLE);
         // A finally that can complete normally leaves an exit through the try body.
@@ -244,7 +244,7 @@ class ExceptionTest {
                     try {
                         raise Exception(1, "x")
                     } finally {
-                        TextWriter(Stdio.stdout()).writeLine(("cleanup") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("cleanup") .. "")
                     }
                 }
                 """);
@@ -270,7 +270,7 @@ class ExceptionTest {
         assertAccepted("""
                 for item in Integer[2] {1, 2} {
                     try {
-                        TextWriter(Stdio.stdout()).writeLine((item) .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((item) .. "")
                     } finally {
                         if item == 1 {
                             continue
@@ -293,10 +293,10 @@ class ExceptionTest {
     void clauses_must_share_the_closing_line() {
         Diagnostics result = diagnostics("""
                 try {
-                    TextWriter(Stdio.stdout()).writeLine(("x") .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("x") .. "")
                 }
                 catch (e: Exception) {
-                    TextWriter(Stdio.stdout()).writeLine(("y") .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("y") .. "")
                 }
                 """);
         assertThat(result.all()).extracting(diagnostic -> diagnostic.code())

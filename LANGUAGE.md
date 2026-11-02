@@ -44,7 +44,7 @@ module geometry {
 }
 
 origin := geometry::Point(0, 0)
-TextWriter(Stdio.stdout()).writeLine((geometry::area(2, 3)) .. (" ") .. (origin.x))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((geometry::area(2, 3)) .. (" ") .. (origin.x))
 ```
 
 - Top-level statements in the entry file execute in source order inside the generated program entry point.
@@ -60,13 +60,13 @@ TextWriter(Stdio.stdout()).writeLine((geometry::area(2, 3)) .. (" ") .. (origin.
 message := "a"
 \ .. "b"
 \ .. "c"
-TextWriter(Stdio.stdout()).writeLine((message))          // abc
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((message))          // abc
 
 mut total := 0
 total = 1
 \ + 2
 \ + 3
-TextWriter(Stdio.stdout()).writeLine((total))            // 6
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((total))            // 6
 ```
 
 ## 2. Values, types, and nullability
@@ -301,7 +301,7 @@ visitor := Visitors()
 visitor.visit()
 Visitors.reset()
 Visitors.limit = 5
-TextWriter(Stdio.stdout()).writeLine((Visitors.report()))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Visitors.report()))
 ```
 
 ```solvik
@@ -418,28 +418,28 @@ Public Java instance methods on built-in `BigInteger` and `BigDecimal` remain av
 
 ```solvik
 name := "Solvik"
-TextWriter(Stdio.stdout()).writeLine("Hello, " .. name)
-TextWriter(Stdio.stdout()).writeLine("missing=" .. Null)
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("Hello, " .. name)
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("missing=" .. Null)
 ```
 
 There are **no output built-ins**. Text output is ordinary standard-library API use through
-`TextWriter` (§11.6), constructed over a writable `Channel`:
+`solvik::io::TextWriter` (§11.6), constructed over a writable `solvik::io::Channel`:
 
 ```solvik
-out := TextWriter(Stdio.stdout())
+out := solvik::io::TextWriter(solvik::io::Stdio.stdout())
 out.write("no terminator is added")
-out.writeLine("")                         // exactly one TextWriter.LINE_ENDING
+out.writeLine("")                         // exactly one solvik::io::TextWriter.EOL
 ```
 
-`writeLine(text)` writes `text` followed by `TextWriter.LINE_ENDING`, the platform's line
+`writeLine(text)` writes `text` followed by `solvik::io::TextWriter.EOL`, the platform's line
 terminator (`"\n"` on POSIX systems, `"\r\n"` on Windows), read once at type initialization.
-`write(text)` writes the text's UTF-8 bytes and translates nothing: a `"\n"` inside `text` stays
+`write(text)` writes the text's UTF-8 bytes, adds no terminator, and translates nothing: a `"\n"` inside `text` stays
 `"\n"` on every platform. A program that needs a fixed terminator writes it explicitly, for
 example `out.write(text .. "\n")`. `Null` renders as `null` (lowercase **text**, not lowercase
 Solvik syntax), arrays render as `[a, b]`, and `BigDecimal` renders using plain notation and
 preserves scale; concatenation and `String(value)` use that same rendering. Neither writer
-function returns a value. `TextWriter.LINE_ENDING` is a public immutable static `String`, so
-`writer.LINE_ENDING` is invalid and assigning it is `SOL-T010` (§3.4, §13.2).
+function returns a value. `solvik::io::TextWriter.EOL` is a public immutable static `String`, so
+`writer.EOL` is invalid and assigning it is `SOL-T010` (§3.4, §13.2).
 
 ## 5. Array types, values, and nullability
 
@@ -536,13 +536,13 @@ while remaining > 0 {
 }
 
 if remaining == 0 {
-    TextWriter(Stdio.stdout()).writeLine(("done"))
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("done"))
 } else {
-    TextWriter(Stdio.stdout()).writeLine(("pending"))
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("pending"))
 }
 
 for item in String[2] {"A", "B"} {
-    TextWriter(Stdio.stdout()).writeLine((item))
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((item))
 }
 ```
 
@@ -561,7 +561,7 @@ label = "ready"
 
 if label != Null {
     // A soundly proven non-null label is usable as String here.
-    TextWriter(Stdio.stdout()).writeLine((label.size()))
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((label.size()))
 }
 ```
 
@@ -571,9 +571,9 @@ When type narrowing is implemented, it must operate on expression/binding identi
 
 ```solvik
 switch status {
-    case "ok" { TextWriter(Stdio.stdout()).writeLine(("accepted")) }
-    case regex "ERR-[0-9]+" { TextWriter(Stdio.stdout()).writeLine(("error code")) }
-    default { TextWriter(Stdio.stdout()).writeLine(("other")) }
+    case "ok" { solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("accepted")) }
+    case regex "ERR-[0-9]+" { solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("error code")) }
+    default { solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("other")) }
 }
 ```
 
@@ -598,18 +598,18 @@ func check(limit: Integer) {
     if limit < 0 {
         raise Exception(Codes.Denied, "negative limit")
     }
-    TextWriter(Stdio.stdout()).writeLine(("limit ") .. (limit))
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("limit ") .. (limit))
 }
 
 try {
     check(-1)
 } catch (error: Exception) {
-    TextWriter(Stdio.stdout()).writeLine((error))                        // [4001] negative limit
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((error))                        // [4001] negative limit
     if error.getCode() == Codes.Denied {
-        TextWriter(Stdio.stdout()).writeLine(("denied: ") .. (error.getMessage()))
+        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("denied: ") .. (error.getMessage()))
     }
 } finally {
-    TextWriter(Stdio.stdout()).writeLine(("done"))
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("done"))
 }
 ```
 
@@ -665,7 +665,7 @@ func missing() -> String? {
 }
 
 func noValue() {
-    TextWriter(Stdio.stdout()).writeLine(("side effect"))
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("side effect"))
 }
 ```
 
@@ -698,7 +698,7 @@ type Counter {
 
 counter := Counter()
 counter.increment()
-TextWriter(Stdio.stdout()).writeLine((counter.get()))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((counter.get()))
 ```
 
 - Types use composition; user types do not inherit concrete classes.
@@ -724,7 +724,7 @@ type Holder<T> {
 }
 
 box := Holder(41)
-TextWriter(Stdio.stdout()).writeLine((box.hasValue()))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((box.hasValue()))
 ```
 
 Nullability composes with generic parameters: `T` is non-null where the type parameter's declared contract requires a non-null value, and `T?` explicitly permits `Null`. Generic constraint and Java erasure validation must not confuse nullable and non-nullable representations. User-generic type argument inference remains constructor-based unless separately revised; native bindings may name type arguments as already supported.
@@ -745,7 +745,7 @@ trait Task {
 type Job implements Task {
     pub func Job() {}
     pub func run() {
-        TextWriter(Stdio.stdout()).writeLine(("working"))
+        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("working"))
     }
 }
 ```
@@ -781,7 +781,7 @@ module geometry {
     }
 }
 
-TextWriter(Stdio.stdout()).writeLine((geometry::origin().x))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((geometry::origin().x))
 ```
 
 - `module` declares namespaces; `::` selects a module-qualified member. `.` selects an instance or type member.
@@ -807,7 +807,7 @@ module jdk {
     }
 }
 
-TextWriter(Stdio.stdout()).writeLine((jdk::Math.abs(-3)))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((jdk::Math.abs(-3)))
 ```
 
 An explicit, typed collection binding might be:
@@ -862,21 +862,15 @@ The compiler packages standard-library `.sol` resources, loaded into every progr
 | `solvik::concurrency` | `Task` | `java.lang.Runnable` |
 | `solvik::concurrency` | `Thread` | Java virtual-thread adapter |
 | `solvik::util` | `UUID` | Solvik source with JDK bindings |
-| top level (no import) | `Channel` | Solvik declaration with bundled native bindings |
-| top level (no import) | `Stdio` | Solvik static-only declaration with bundled native bindings |
-| top level (no import) | `TextReader` | Solvik declaration with bundled native bindings |
-| top level (no import) | `TextWriter` | Solvik declaration with bundled native bindings |
-| top level (no import) | `ByteReader` | Solvik source over a borrowed `Channel` |
-| top level (no import) | `ByteWriter` | Solvik source over a borrowed `Channel` |
-| top level (no import) | `File` | Solvik source with bundled filesystem bindings |
-| top level (no import) | `IoError` | Solvik static-only code namespace for I/O failures |
+| `solvik::io` | `Channel`, `Stdio`, `TextReader`, `TextWriter`, `ByteReader`, `ByteWriter`, `File`, `IoError` | Solvik declarations with bundled native or filesystem bindings, plus Solvik-only wrappers |
 
 The standard library is not exempt from the revised type system. Its `.sol` files must migrate away from `var` and lowercase `null`, add all required initializers, and accurately specify nullable values returned by Java APIs. Packaged resources remain declaration-only; importing them as ordinary file paths is not how standard-library registration works.
 
-The I/O types are declared at the top level (no module), so their names are available without
-qualification exactly like the built-in scalar types. A program is not required to import them.
-Only a packaged type a program actually mentions is emitted into the generated Java, so a program
-that performs no I/O carries neither the I/O types nor their binding adapter.
+The I/O types are ordinary packaged module types. A program names them through their full
+`solvik::io` path, such as `solvik::io::TextWriter`, exactly as it names `solvik::collections::Map`.
+It does not import them, and an unqualified reference does not resolve. Only a packaged type a
+program actually mentions is emitted into the generated Java, so a program that performs no I/O
+carries neither the I/O types nor their binding adapter.
 
 ### 11.4 Application classpath
 
@@ -893,22 +887,26 @@ The packaged `solvik::concurrency::Task` and `Thread` interfaces remain based on
 ### 11.6 Bundled native declarations and standard I/O
 
 Solvik's public standard-library types are `.sol` declarations. The inherently platform-specific
-operations of `Channel`, `Stdio`, `TextReader`, and `TextWriter` are **bundled native declarations**:
+operations of `solvik::io::Channel`, `solvik::io::Stdio`, `solvik::io::TextReader`, and `solvik::io::TextWriter` are **bundled native declarations**:
 
 ```solvik
-type TextWriter {
-    static native func lineSeparator() -> String
-    static pub LINE_ENDING := lineSeparator()
+module solvik {
+    module io {
+        pub type TextWriter {
+            static native func lineSeparator() -> String
+            static pub EOL := lineSeparator()
 
-    pub native func TextWriter(channel: Channel)
-    pub native func write(text: String)
+            pub native func TextWriter(channel: Channel)
+            pub native func write(text: String)
 
-    pub func writeLine(text: String) {
-        write(text .. LINE_ENDING)
+            pub func writeLine(text: String) {
+                write(text .. EOL)
+            }
+
+            pub native func flush()
+            pub native func close()
+        }
     }
-
-    pub native func flush()
-    pub native func close()
 }
 ```
 
@@ -931,42 +929,43 @@ type TextWriter {
   reached. It is compiler-emitted Java that uses the JDK and the program's generated `Exception`,
   not an installed runtime, and its `$` name is not a Solvik identifier.
 
-**Standard I/O.** `Channel` is an opaque byte endpoint with `read`, `write`, `writeAll`, `flush`,
-`close`, `isOpen`, `canRead`, and `canWrite`; `Channel.bytes()` returns a new duplex in-memory
-channel whose writes append and whose reads consume from the front. `Stdio` exposes the three
+**Standard I/O.** `solvik::io::Channel` is an opaque byte endpoint with `read`, `write`, `writeAll`, `flush`,
+`close`, `isOpen`, `canRead`, and `canWrite`; `solvik::io::Channel.bytes()` returns a new duplex in-memory
+channel whose writes append and whose reads consume from the front. `solvik::io::Stdio` exposes the three
 currently assigned standard channels and setters that replace one binding after validating that the
-replacement is open and has the required direction. `TextReader` decodes strict UTF-8 and returns
+replacement is open and has the required direction. `solvik::io::TextReader` decodes strict UTF-8 and returns
 each line without its LF, CRLF, or CR terminator: `""` for an empty line, the final unterminated
-line at end of input, and `Null` only when no characters remain. `TextWriter` encodes strict UTF-8,
+line at end of input, and `Null` only when no characters remain. `solvik::io::TextWriter` encodes strict UTF-8,
 writes all bytes or raises, flushes after each successful write, and never translates line
-separators. Readers and writers borrow their channel: `close()` releases only the reader or writer
+separators. `write(text)` adds no terminator; `writeLine(text)` writes `text` followed by the
+published `solvik::io::TextWriter.EOL` value. Readers and writers borrow their channel: `close()` releases only the reader or writer
 and never closes the channel. The original standard channels are protected; closing one raises an
 I/O error rather than closing a process handle.
 
-**File and byte I/O.** `File.openRead(path)`, `File.openWrite(path)`, and `File.openAppend(path)`
+**solvik::io::File and byte I/O.** `solvik::io::File.openRead(path)`, `solvik::io::File.openWrite(path)`, and `solvik::io::File.openAppend(path)`
 open an owned single-direction file channel; `openWrite` creates or truncates, `openAppend` creates
-or appends, and `openRead` requires an existing file. A `File` exposes that channel through
-`channel()`, reports `path()` and `isOpen()`, and `close()` closes the owned channel. `File.exists`
-and `File.delete` are static operations; `delete` returns `false` for an already-absent path and
-raises `IoError.Io` for a directory rather than removing it. Paths
+or appends, and `openRead` requires an existing file. A `solvik::io::File` exposes that channel through
+`channel()`, reports `path()` and `isOpen()`, and `close()` closes the owned channel. `solvik::io::File.exists`
+and `solvik::io::File.delete` are static operations; `delete` returns `false` for an already-absent path and
+raises `solvik::io::IoError.Io` for a directory rather than removing it. Paths
 are ordinary JVM filesystem paths in the process working directory: there is no sandbox, no
-automatic parent creation, and no symlink policy beyond the JVM's own. `ByteReader(channel)` reads
-`Byte[]` chunks with the same EOF (`Null`) and length rules as `Channel.read`; `ByteWriter(channel)`
-writes every byte through `Channel.writeAll`, and `flush` and `close` delegate to the channel.
-Both wrappers borrow: closing one never closes its channel. A closed `File`, `ByteReader`, or
-`ByteWriter` raises `IoError.Closed`; a read on a write-only or a write on a read-only channel
-raises `IoError.Unsupported`. `File` and a borrowed channel are independent: closing the channel
-directly is visible to every alias, while `File.close()` remains a harmless owned close.
+automatic parent creation, and no symlink policy beyond the JVM's own. `solvik::io::ByteReader(channel)` reads
+`Byte[]` chunks with the same EOF (`Null`) and length rules as `solvik::io::Channel.read`; `solvik::io::ByteWriter(channel)`
+writes every byte through `solvik::io::Channel.writeAll`, and `flush` and `close` delegate to the channel.
+Both wrappers borrow: closing one never closes its channel. A closed `solvik::io::File`, `solvik::io::ByteReader`, or
+`solvik::io::ByteWriter` raises `solvik::io::IoError.Closed`; a read on a write-only or a write on a read-only channel
+raises `solvik::io::IoError.Unsupported`. `solvik::io::File` and a borrowed channel are independent: closing the channel
+directly is visible to every alias, while `solvik::io::File.close()` remains a harmless owned close.
 
-**I/O failures.** `IoError` publishes the codes carried by the one `Exception` type:
+**I/O failures.** `solvik::io::IoError` publishes the codes carried by the one `Exception` type:
 
 | Constant | Code | Meaning |
 | --- | --- | --- |
-| `IoError.Io` | 5001 | a read, write, flush, or close failed |
-| `IoError.Closed` | 5002 | the channel, reader, or writer is closed |
-| `IoError.Unsupported` | 5003 | the channel has the wrong direction, or a standard channel was closed |
-| `IoError.Encoding` | 5004 | malformed UTF-8 input or an unencodable string |
-| `IoError.InvalidArgument` | 5005 | a non-positive read length or an invalid write range |
+| `solvik::io::IoError.Io` | 5001 | a read, write, flush, or close failed |
+| `solvik::io::IoError.Closed` | 5002 | the channel, reader, or writer is closed |
+| `solvik::io::IoError.Unsupported` | 5003 | the channel has the wrong direction, or a standard channel was closed |
+| `solvik::io::IoError.Encoding` | 5004 | malformed UTF-8 input or an unencodable string |
+| `solvik::io::IoError.InvalidArgument` | 5005 | a non-positive read length or an invalid write range |
 
 An I/O failure is a raised `Exception`, so `try`/`catch` recovers from it and `getCode()` dispatches
 the category. It is not a `SOL-Rxxx` runtime abort.
@@ -1044,8 +1043,8 @@ CLI statuses stay `0` on success, `1` for compilation failure or runtime abort, 
 | `Map.get(...) -> V` when Java can return null | `Map.get(...) -> V?` |
 | Immutable `value` field with no initializer | Explicitly initialized field, possibly `value: T? = Null` |
 | `a.size()` on an array | `a.size`: the length is a read-only member, not a function |
-| `print(...)` / `println(...)` | Removed entirely. Write `TextWriter(Stdio.stdout()).write(...)` / `.writeLine(...)`; a multi-value line is one concatenation, e.g. `writeLine(a .. b)` |
-| a fixed `"\n"` assumed as the output terminator | `TextWriter.writeLine` appends the platform terminator `TextWriter.LINE_ENDING`; write a fixed terminator explicitly through `write` |
+| `print(...)` / `println(...)` | Removed entirely. Write `solvik::io::TextWriter(solvik::io::Stdio.stdout()).write(...)` / `.writeLine(...)`; a multi-value line is one concatenation, e.g. `writeLine(a .. b)` |
+| a fixed `"\n"` assumed as the output terminator | `solvik::io::TextWriter.writeLine` appends the platform terminator `solvik::io::TextWriter.EOL`; write a fixed terminator explicitly through `write` |
 | `try`, `catch`, `finally`, `raise` used as identifiers | Reserved keywords (§7.4) |
 | `type Exception` (or any declaration named `Exception`) | Reserved: the built-in exception type (§7.4) |
 
@@ -1069,7 +1068,7 @@ This specification keeps the existing exclusion of concrete class inheritance, s
 
 Exception handling is part of the language (§7.4): one unchecked `Exception` with an `Integer` code and a `String` message, `raise`, and `try`/`catch`/`finally`. User-defined exception types, an `Any` payload on `Exception`, a second catchable type, catchable `SOL-Rxxx` aborts, catchable Java exceptions from native calls, and `try` as an expression are **not** introduced. General union types, safe-navigation operators (`?.`), implicit default values, automatic JAR-binding generation, and non-null constructor-required-field syntax are **not** silently introduced by this revision.
 
-Filesystem access is limited to the `File` operations in §11.6. Directories, recursive deletion, rename/copy, metadata, permissions, timestamps, file size, temporary-file helpers, path joining/normalization, seeking, truncation at an offset, `fsync`/locking, memory mapping, sockets, pipes, processes, console control, buffered byte writers, nonblocking I/O, timeouts, and cancellation remain future work.
+Filesystem access is limited to the `solvik::io::File` operations in §11.6. Directories, recursive deletion, rename/copy, metadata, permissions, timestamps, file size, temporary-file helpers, path joining/normalization, seeking, truncation at an offset, `fsync`/locking, memory mapping, sockets, pipes, processes, console control, buffered byte writers, nonblocking I/O, timeouts, and cancellation remain future work.
 
 ## 15. Acceptance tests for the revision
 
@@ -1088,20 +1087,20 @@ maybeEmpty? := Null                 // Any?
 nothing := Null                     // Null
 
 // VALID null-safe operations
-TextWriter(Stdio.stdout()).writeLine("" .. Null)
-TextWriter(Stdio.stdout()).writeLine("" .. (Null == Null))
-TextWriter(Stdio.stdout()).writeLine(String(Null))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("" .. Null)
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("" .. (Null == Null))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(String(Null))
 
 // VALID standard I/O
-out := TextWriter(Stdio.stdout())
+out := solvik::io::TextWriter(solvik::io::Stdio.stdout())
 out.writeLine("hello")
 out.close()
-memory := Channel.bytes()
+memory := solvik::io::Channel.bytes()
 memory.writeAll(Byte[2] {65, 66})
-reader := TextReader(memory)
+reader := solvik::io::TextReader(memory)
 first := reader.readLine()                       // "AB"
 reader.close()
-term := TextWriter.LINE_ENDING                  // immutable platform terminator
+term := solvik::io::TextWriter.EOL                  // immutable platform terminator
 
 // VALID static initialization
 type StaticProbe {
@@ -1114,15 +1113,15 @@ type StaticProbe {
 seen := StaticProbe.valueNow()                  // block runs once, before the call
 
 // VALID file and byte I/O
-file := File.openWrite("example.bin")           // creates or truncates
-bytes := ByteWriter(file.channel())
+file := solvik::io::File.openWrite("example.bin")           // creates or truncates
+bytes := solvik::io::ByteWriter(file.channel())
 bytes.write(Byte[2] {1, 2})
 bytes.close()
 file.close()
-readBack := File.openRead("example.bin")
-chunk := ByteReader(readBack.channel()).read(2)
+readBack := solvik::io::File.openRead("example.bin")
+chunk := solvik::io::ByteReader(readBack.channel()).read(2)
 readBack.close()
-deleted := File.delete("example.bin")
+deleted := solvik::io::File.delete("example.bin")
 
 // VALID arrays
 values := Integer[2] {1, 2}
@@ -1133,14 +1132,14 @@ optionalArray: Integer[2]? = Null
 try {
     raise Exception(4001, "denied")
 } catch (error: Exception) {
-    TextWriter(Stdio.stdout()).writeLine((error.getCode()) .. (" ") .. (error.getMessage()))
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((error.getCode()) .. (" ") .. (error.getMessage()))
 } finally {
-    TextWriter(Stdio.stdout()).writeLine(("done"))
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("done"))
 }
 try {
-    TextWriter(Stdio.stdout()).writeLine(("cleanup only"))
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("cleanup only"))
 } finally {
-    TextWriter(Stdio.stdout()).writeLine(("done"))
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("done"))
 }
 ```
 
@@ -1159,16 +1158,16 @@ try {
 // values := Integer[2] {1, Null} // non-null element cannot be Null
 // Null()                         // Null is not a constructor
 // missing := null                // removed lowercase literal
-// try { TextWriter(Stdio.stdout()).writeLine("1") } // a try needs a catch or a finally
+// try { solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("1") } // a try needs a catch or a finally
 // raise Null                     // Null is not an exception
 // raise 1                        // only an Exception can be raised
 // catch (e: Integer) { }         // Exception is the only catchable type (§7.4)
 // func f() -> Integer { try { return 1 } finally { return 2 } } // SOL-T017
 // native func nope() -> Integer  // SOL-T001: only a packaged type may declare native
-// w := TextWriter(Stdio.stdout()); w.LINE_ENDING        // SOL-T001: static member via instance
-// TextWriter.LINE_ENDING = "x"                          // SOL-T010: immutable static field
-// forged := File(Channel.bytes(), "x")                  // SOL-T001: the File constructor is private
-// File.openReadChannel("x")                             // SOL-T001: a type-private binding
+// w := solvik::io::TextWriter(solvik::io::Stdio.stdout()); w.EOL        // SOL-T001: static member via instance
+// solvik::io::TextWriter.EOL = "x"                          // SOL-T010: immutable static field
+// forged := solvik::io::File(solvik::io::Channel.bytes(), "x")                  // SOL-T001: the solvik::io::File constructor is private
+// solvik::io::File.openReadChannel("x")                             // SOL-T001: a type-private binding
 // type Bad { static { return } }                         // SOL-T005: a static block has no return
 ```
 

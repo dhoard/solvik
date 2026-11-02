@@ -91,11 +91,11 @@ class StaticMemberTest {
                 second := Counter()
                 firstTotal := first.add(1)
                 secondTotal := second.add(2)
-                TextWriter(Stdio.stdout()).writeLine((Counter.kind) .. (" ") .. (Counter.limit) .. (" ") .. (firstTotal) .. (" ") .. (secondTotal))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Counter.kind) .. (" ") .. (Counter.limit) .. (" ") .. (firstTotal) .. (" ") .. (secondTotal))
                 thirdTotal := first.add(3)
                 Counter.limit = 20
                 Counter.reset()
-                TextWriter(Stdio.stdout()).writeLine((Counter.report()) .. (" ") .. (Counter.limit) .. (" ") .. (thirdTotal))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Counter.report()) .. (" ") .. (Counter.limit) .. (" ") .. (thirdTotal))
                 """);
     }
 
@@ -116,7 +116,7 @@ class StaticMemberTest {
                     }
                 }
                 stats::Counter.reset()
-                TextWriter(Stdio.stdout()).writeLine((stats::Counter.next()) .. (" ") .. (stats::Counter.label))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((stats::Counter.next()) .. (" ") .. (stats::Counter.label))
                 """);
     }
 
@@ -128,7 +128,7 @@ class StaticMemberTest {
                     static pub doubled := base + base
                     pub func Settings() { }
                 }
-                TextWriter(Stdio.stdout()).writeLine((Settings.doubled) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Settings.doubled) .. "")
                 """);
     }
 
@@ -141,7 +141,7 @@ class StaticMemberTest {
                     static func twice(value: Integer) -> Integer { return value + value }
                     pub func Settings() { }
                 }
-                TextWriter(Stdio.stdout()).writeLine((Settings.doubled) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Settings.doubled) .. "")
                 """);
     }
 
@@ -154,7 +154,7 @@ class StaticMemberTest {
                     static pub func of(value: Integer) -> Node { return Node(value) }
                     pub func get() -> Integer { return value }
                 }
-                TextWriter(Stdio.stdout()).writeLine((Node.of(7).get()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Node.of(7).get()) .. "")
                 """);
     }
 
@@ -186,14 +186,14 @@ class StaticMemberTest {
 
     @Test
     void private_static_members_are_unreachable_from_outside_the_declaring_type() {
-        assertRejected(COUNTER + "TextWriter(Stdio.stdout()).writeLine((Counter.total) .. \"\")\n", TypeChecker.TYPE_ERROR);
+        assertRejected(COUNTER + "solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Counter.total) .. \"\")\n", TypeChecker.TYPE_ERROR);
         assertRejected("""
                 type Hidden {
                     pub func Hidden() { }
                     static func value() -> Integer { return 1 }
                     static total := 0
                 }
-                TextWriter(Stdio.stdout()).writeLine((Hidden.value()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Hidden.value()) .. "")
                 """, TypeChecker.TYPE_ERROR);
         assertRejected(COUNTER + "Counter.total = 1\n", TypeChecker.TYPE_ERROR);
     }
@@ -202,11 +202,11 @@ class StaticMemberTest {
     void static_members_are_not_reached_through_an_instance() {
         assertRejected(COUNTER + """
                 counter := Counter()
-                TextWriter(Stdio.stdout()).writeLine((counter.label) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((counter.label) .. "")
                 """, TypeChecker.TYPE_ERROR);
         assertRejected(COUNTER + """
                 counter := Counter()
-                TextWriter(Stdio.stdout()).writeLine((counter.report()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((counter.report()) .. "")
                 """, TypeChecker.TYPE_ERROR);
         assertRejected(COUNTER + """
                 counter := Counter()
@@ -216,35 +216,35 @@ class StaticMemberTest {
 
     @Test
     void a_type_name_does_not_reach_instance_members() {
-        assertRejected(COUNTER + "TextWriter(Stdio.stdout()).writeLine((Counter.total) .. \"\")\n", TypeChecker.TYPE_ERROR);
-        assertRejected(COUNTER + "TextWriter(Stdio.stdout()).writeLine((Counter.add(1)) .. \"\")\n", TypeChecker.TYPE_ERROR);
+        assertRejected(COUNTER + "solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Counter.total) .. \"\")\n", TypeChecker.TYPE_ERROR);
+        assertRejected(COUNTER + "solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Counter.add(1)) .. \"\")\n", TypeChecker.TYPE_ERROR);
         assertRejected("""
                 type Point {
                     pub x := 0
                     pub func Point() { }
                     static pub func origin() -> Point { return Point() }
                 }
-                TextWriter(Stdio.stdout()).writeLine((Point.x) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Point.x) .. "")
                 """, TypeChecker.TYPE_ERROR);
         assertRejected("""
                 type Point {
                     pub x := 0
                     pub func Point() { }
                 }
-                TextWriter(Stdio.stdout()).writeLine((Point.x) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Point.x) .. "")
                 """, TypeChecker.TYPE_ERROR);
         assertRejected("""
                 type Point {
                     pub func Point() { }
                     pub func size() -> Integer { return 0 }
                 }
-                TextWriter(Stdio.stdout()).writeLine((Point.size()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Point.size()) .. "")
                 """, TypeChecker.TYPE_ERROR);
         assertRejected("""
                 type Point {
                     pub func Point() { }
                 }
-                TextWriter(Stdio.stdout()).writeLine((Point.Point()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Point.Point()) .. "")
                 """, TypeChecker.TYPE_ERROR);
     }
 
@@ -304,7 +304,7 @@ class StaticMemberTest {
                     pub func Box(value: T) { self.value = value }
                     pub func get() -> T? { return value }
                 }
-                TextWriter(Stdio.stdout()).writeLine((Box(1).get()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Box(1).get()) .. "")
                 """);
     }
 
@@ -317,7 +317,7 @@ class StaticMemberTest {
                         static pub func max(a: Integer, b: Integer) -> Integer
                     }
                 }
-                TextWriter(Stdio.stdout()).writeLine((jdk::Math.abs(-2)) .. (" ") .. (jdk::Math.max(1, 2)))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((jdk::Math.abs(-2)) .. (" ") .. (jdk::Math.max(1, 2)))
                 """);
     }
 

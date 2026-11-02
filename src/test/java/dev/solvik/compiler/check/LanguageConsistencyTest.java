@@ -31,10 +31,10 @@ class LanguageConsistencyTest {
     @Test
     @DisplayName("LANGUAGE.md §5: an array's length is the immutable member size")
     void array_length_is_the_immutable_size_member() {
-        accepted("values := Integer[2] {1, 2}\nTextWriter(Stdio.stdout()).writeLine((values.size) .. \"\")");
-        accepted("values := Integer[2] {1, 2}\nTextWriter(Stdio.stdout()).writeLine((values.size .. \" items\") .. \"\")");
-        accepted("parts := \"a,b\".split(\",\")\nTextWriter(Stdio.stdout()).writeLine((parts.size) .. \"\")");
-        assertThat(check("values := Integer[2] {1, 2}\nTextWriter(Stdio.stdout()).writeLine((values.size()) .. \"\")").all())
+        accepted("values := Integer[2] {1, 2}\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((values.size) .. \"\")");
+        accepted("values := Integer[2] {1, 2}\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((values.size .. \" items\") .. \"\")");
+        accepted("parts := \"a,b\".split(\",\")\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((parts.size) .. \"\")");
+        assertThat(check("values := Integer[2] {1, 2}\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((values.size()) .. \"\")").all())
                 .extracting(d -> d.code()).containsExactly(TypeChecker.TYPE_ERROR);
         assertThat(check("values := Integer[2] {1, 2}\nvalues.size = 3").all())
                 .extracting(d -> d.code()).containsExactly(TypeChecker.IMMUTABLE_MEMBER);
@@ -42,8 +42,8 @@ class LanguageConsistencyTest {
 
     @Test
     void boolean_literals_and_variables_have_the_same_conversion_contract() {
-        accepted("TextWriter(Stdio.stdout()).writeLine((Boolean(true)) .. (Boolean(false)) .. (Boolean(\"true\")))");
-        accepted("flag := true\nTextWriter(Stdio.stdout()).writeLine((Boolean(flag)) .. \"\")");
+        accepted("solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Boolean(true)) .. (Boolean(false)) .. (Boolean(\"true\")))");
+        accepted("flag := true\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Boolean(flag)) .. \"\")");
     }
 
     @ParameterizedTest
@@ -87,12 +87,12 @@ class LanguageConsistencyTest {
 
     @ParameterizedTest
     @ValueSource(strings = {
-            "TextWriter(Stdio.stdout()).writeLine((nothing()) .. \"\")", "TextWriter(Stdio.stdout()).write((nothing()) .. \"\")", "TextWriter(Stdio.stdout()).writeLine((\"x\" .. nothing()) .. \"\")",
-            "TextWriter(Stdio.stdout()).writeLine((nothing() .. \"x\") .. \"\")", "x := nothing()",
+            "solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((nothing()) .. \"\")", "solvik::io::TextWriter(solvik::io::Stdio.stdout()).write((nothing()) .. \"\")", "solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((\"x\" .. nothing()) .. \"\")",
+            "solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((nothing() .. \"x\") .. \"\")", "x := nothing()",
             "mut x: Integer? = Null\nx = nothing()", "x := Any[1] {nothing()}",
-            "func take(x: Any) {}\ntake(nothing())", "TextWriter(Stdio.stdout()).writeLine((nothing().type()) .. \"\")",
-            "TextWriter(Stdio.stdout()).writeLine((1.equals(nothing())) .. \"\")", "TextWriter(Stdio.stdout()).writeLine((String(nothing())) .. \"\")",
-            "TextWriter(Stdio.stdout()).writeLine((nothing() == Null) .. \"\")"
+            "func take(x: Any) {}\ntake(nothing())", "solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((nothing().type()) .. \"\")",
+            "solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1.equals(nothing())) .. \"\")", "solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((String(nothing())) .. \"\")",
+            "solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((nothing() == Null) .. \"\")"
     })
     void void_calls_are_rejected_in_every_value_context(String use) {
         assertThat(check("func nothing() {}\n" + use).all()).extracting(d -> d.code())
@@ -101,7 +101,7 @@ class LanguageConsistencyTest {
 
     @Test
     void void_calls_remain_valid_statements() {
-        accepted("func nothing() {}\nnothing()\nTextWriter(Stdio.stdout()).writeLine(\"\")\nTextWriter(Stdio.stdout()).write(\"\")\nexit()");
+        accepted("func nothing() {}\nnothing()\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(\"\")\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).write(\"\")\nexit()");
     }
 
     @ParameterizedTest
@@ -142,7 +142,7 @@ class LanguageConsistencyTest {
                         return other.has(self.value) && self.has(other.value)
                     }
                 }
-                TextWriter(Stdio.stdout()).writeLine((Item(1).equals(Item(1))) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Item(1).equals(Item(1))) .. "")
                 """);
     }
 
@@ -153,7 +153,7 @@ class LanguageConsistencyTest {
                 type Bar { pub func Bar() {} }
                 x := Foo()
                 y := Bar()
-                TextWriter(Stdio.stdout()).writeLine((x == y) .. (" ") .. (x.equals(y)))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((x == y) .. (" ") .. (x.equals(y)))
                 """);
     }
 
@@ -195,12 +195,12 @@ class LanguageConsistencyTest {
 
     @Test
     void small_integral_indexes_work_but_nonliteral_widening_is_not_assignment() {
-        accepted("values := Integer[1] {1}\nTextWriter(Stdio.stdout()).writeLine((values[Short(0)]) .. \"\")\nvalues[Short(0)] = 2");
-        assertThat(check("values := Integer[1] {1}\nTextWriter(Stdio.stdout()).writeLine((values[Long(0)]) .. \"\")").all())
+        accepted("values := Integer[1] {1}\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((values[Short(0)]) .. \"\")\nvalues[Short(0)] = 2");
+        assertThat(check("values := Integer[1] {1}\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((values[Long(0)]) .. \"\")").all())
                 .extracting(d -> d.code()).contains(TypeChecker.TYPE_ERROR);
         assertThat(check("value := 1\nvalues: Long[1] = Long[1] {value}").all())
                 .extracting(d -> d.code()).contains(TypeChecker.TYPE_ERROR);
-        assertThat(check("TextWriter(Stdio.stdout()).writeLine((2147483648) .. \"\")").all()).extracting(d -> d.code())
+        assertThat(check("solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((2147483648) .. \"\")").all()).extracting(d -> d.code())
                 .contains(TypeChecker.STATIC_FAILURE);
     }
 

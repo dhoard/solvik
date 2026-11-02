@@ -97,12 +97,12 @@ class GeneratedOutputOptimizationTest {
         String minimal = program("""
                 mut total := 1 + 2
                 total = total * 3
-                TextWriter(Stdio.stdout()).writeLine(("total=") .. (total))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("total=") .. (total))
                 """);
         String reachingMore = program("""
                 items := Integer[3] {1, 2}
                 count := 2
-                TextWriter(Stdio.stdout()).writeLine((items[0]) .. (count / count))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((items[0]) .. (count / count))
                 exit(0)
                 """);
 
@@ -122,7 +122,7 @@ class GeneratedOutputOptimizationTest {
     void array_size_member_reads_the_carrier_length() {
         String java = program("""
                 values := Integer[3] {1, 2, 3}
-                TextWriter(Stdio.stdout()).writeLine((values.size) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((values.size) .. "")
                 """);
         // A member read is a direct List.size() call: no support member, helper, or runtime type.
         assertThat(java).contains(
@@ -134,15 +134,15 @@ class GeneratedOutputOptimizationTest {
     void emits_only_reachable_support_members() {
         String java = program("""
                 func show(value: Any) {
-                    TextWriter(Stdio.stdout()).writeLine((value .. "!") .. "")
-                    TextWriter(Stdio.stdout()).writeLine((value.equals(value)) .. "")
-                    TextWriter(Stdio.stdout()).writeLine((value === "!") .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((value .. "!") .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((value.equals(value)) .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((value === "!") .. "")
                 }
                 text := "42"
                 count := 2
                 items := Integer[3] {7}
-                TextWriter(Stdio.stdout()).writeLine((Integer(text)) .. (items[0]) .. (count / count) .. (count % count))
-                TextWriter(Stdio.stdout()).writeLine((text.type()) .. (text.split(",").size) .. (text.hashCode()))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Integer(text)) .. (items[0]) .. (count / count) .. (count % count))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((text.type()) .. (text.split(",").size) .. (text.hashCode()))
                 show(items)
                 exit(0)
                 """);
@@ -180,7 +180,7 @@ class GeneratedOutputOptimizationTest {
                         static pub func abs(value: Integer) -> Integer
                     }
                 }
-                TextWriter(Stdio.stdout()).writeLine((jdk::Math.abs(-3)) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((jdk::Math.abs(-3)) .. "")
                 """);
 
         assertThat(java).contains("public static RuntimeException fail(",
@@ -194,7 +194,7 @@ class GeneratedOutputOptimizationTest {
         // proves no group is emitted as Java that does not compile.
         Outcome outcome = run("""
                 func show(v: Any) {
-                    TextWriter(Stdio.stdout()).writeLine((v === "x") .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((v === "x") .. "")
                 }
                 text := "12"
                 n := 3
@@ -204,13 +204,13 @@ class GeneratedOutputOptimizationTest {
                 dec := BigDecimal("1.50")
                 dec2 := BigDecimal("3")
                 items := Integer[4] {1}
-                TextWriter(Stdio.stdout()).writeLine((Byte(text)) .. (Short(text)) .. (Integer(text)) .. (Long(text)) .. (Float(text)) .. (Double(text)) .. (BigInteger(text)) .. (BigDecimal(text)) .. (Boolean("true")))
-                TextWriter(Stdio.stdout()).writeLine((n / n) .. (n % n) .. (big / big2) .. (big % big2) .. (dec / dec2))
-                TextWriter(Stdio.stdout()).writeLine((items) .. (items .. "x") .. (items.equals(items)) .. (items.type()))
-                TextWriter(Stdio.stdout()).writeLine((text.hashCode()) .. (text.substring(1)) .. (text.substring(0, 1)) .. (text.split("2").size) .. (items.size) .. (items[0]))
-                TextWriter(Stdio.stdout()).writeLine((n == n) .. (n === n) .. (fraction == n) .. (1.5 == 1.5) .. (1.5 != 2.5) .. (fraction))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Byte(text)) .. (Short(text)) .. (Integer(text)) .. (Long(text)) .. (Float(text)) .. (Double(text)) .. (BigInteger(text)) .. (BigDecimal(text)) .. (Boolean("true")))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((n / n) .. (n % n) .. (big / big2) .. (big % big2) .. (dec / dec2))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((items) .. (items .. "x") .. (items.equals(items)) .. (items.type()))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((text.hashCode()) .. (text.substring(1)) .. (text.substring(0, 1)) .. (text.split("2").size) .. (items.size) .. (items[0]))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((n == n) .. (n === n) .. (fraction == n) .. (1.5 == 1.5) .. (1.5 != 2.5) .. (fraction))
                 longs := 4L
-                TextWriter(Stdio.stdout()).writeLine((longs / 2L) .. (longs % 2L))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((longs / 2L) .. (longs % 2L))
                 show(text)
                 exit(0)
                 """, directory);
@@ -241,7 +241,7 @@ class GeneratedOutputOptimizationTest {
                 byteOffset := Byte(2)
                 items[offset] = "x"
                 items[0] ..= "!"
-                TextWriter(Stdio.stdout()).writeLine((items[offset]) .. (items[byteOffset]) .. (items[1]))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((items[offset]) .. (items[byteOffset]) .. (items[1]))
                 """);
 
         assertThat(java).contains("items.get(offset)", "items.set(offset, \"x\");",
@@ -259,11 +259,11 @@ class GeneratedOutputOptimizationTest {
                 items[offset] = "x"
                 items[0] ..= "!"
                 offset = offset + 1
-                TextWriter(Stdio.stdout()).writeLine((items[shortOffset]) .. (items[1]) .. (items[offset - 1]))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((items[shortOffset]) .. (items[1]) .. (items[offset - 1]))
                 grid := Integer[][2] { Integer[2] {1, 2}, Integer[2] {3, 4} }
-                TextWriter(Stdio.stdout()).writeLine((grid[1][0]) .. (grid[0][1]))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((grid[1][0]) .. (grid[0][1]))
                 filled := Integer[2] { }
-                TextWriter(Stdio.stdout()).writeLine((filled[0]) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((filled[0]) .. "")
                 """, directory);
 
         assertThat(outcome.failure()).isNull();
@@ -280,7 +280,7 @@ class GeneratedOutputOptimizationTest {
                 count := 1
                 flag := false
                 items := Integer[2] {1, 2}
-                TextWriter(Stdio.stdout()).write((text) .. (count) .. (items[0]) .. (-count) .. (!flag) .. (1.5))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).write((text) .. (count) .. (items[0]) .. (-count) .. (!flag) .. (1.5))
                 """);
         assertThat(pure).contains("System.out.print(text + count + items.get(0)"
                         + " + (-java.util.Objects.requireNonNull(count).intValue()) + !(flag) + 1.5d);")
@@ -291,7 +291,7 @@ class GeneratedOutputOptimizationTest {
                     return 1
                 }
                 count := 1
-                TextWriter(Stdio.stdout()).write((count) .. (value()))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).write((count) .. (value()))
                 """);
         assertThat(acting).contains("final Integer $solvikPrint0 = count;",
                         "final Integer $solvikPrint1 = value();",
@@ -305,11 +305,11 @@ class GeneratedOutputOptimizationTest {
         Outcome outcome = run("""
                 count := 1
                 flag := true
-                TextWriter(Stdio.stdout()).writeLine((count .. 2) .. (flag .. "x") .. (count) .. (flag))
-                TextWriter(Stdio.stdout()).write((1) .. (2))
-                TextWriter(Stdio.stdout()).writeLine("")
-                TextWriter(Stdio.stdout()).writeLine((null) .. (null))
-                TextWriter(Stdio.stdout()).writeLine((count .. count) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((count .. 2) .. (flag .. "x") .. (count) .. (flag))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).write((1) .. (2))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((null) .. (null))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((count .. count) .. "")
                 """, directory);
 
         assertThat(outcome.failure()).isNull();
@@ -325,7 +325,7 @@ class GeneratedOutputOptimizationTest {
                 negative := -7
                 same := Double(2.5)
                 text := String(10)
-                TextWriter(Stdio.stdout()).writeLine((sum) .. (doubled) .. (negative) .. (same) .. (text))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((sum) .. (doubled) .. (negative) .. (same) .. (text))
                 """);
 
         assertThat(java).contains("Integer sum = (2 + 3);", "Double doubled = (2d * 2.5d);",

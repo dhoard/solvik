@@ -51,7 +51,7 @@ class StringMethodTest {
                 ends := text.endsWith(" ")
                 replaced := text.replace("a", "z")
                 parts := text.split(",")
-                TextWriter(Stdio.stdout()).writeLine((size) .. (stripped) .. (left) .. (right) .. (upper) .. (lower) .. (part) .. (range) .. (at) .. (has) .. (starts) .. (ends) .. (replaced) .. (parts.size))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((size) .. (stripped) .. (left) .. (right) .. (upper) .. (lower) .. (part) .. (range) .. (at) .. (has) .. (starts) .. (ends) .. (replaced) .. (parts.size))
                 """);
     }
 
@@ -60,10 +60,10 @@ class StringMethodTest {
         assertAccepted("""
                 parts := "a,b".split(",")
                 for part in parts {
-                    TextWriter(Stdio.stdout()).writeLine((part.toUpperCase()) .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((part.toUpperCase()) .. "")
                 }
                 first := parts[0]
-                TextWriter(Stdio.stdout()).writeLine((first.size()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((first.size()) .. "")
                 parts[0] = "changed"
                 """);
     }
@@ -71,7 +71,7 @@ class StringMethodTest {
     @Test
     void string_methods_chain() {
         assertAccepted("""
-                TextWriter(Stdio.stdout()).writeLine((" a b ".strip().split(" ")[1].toUpperCase()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((" a b ".strip().split(" ")[1].toUpperCase()) .. "")
                 """);
     }
 
@@ -79,31 +79,31 @@ class StringMethodTest {
     void wrong_arguments_are_rejected() {
         assertRejected("""
                 text := "abc"
-                TextWriter(Stdio.stdout()).writeLine((text.substring()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((text.substring()) .. "")
                 """, TypeChecker.TYPE_ERROR);
         assertRejected("""
                 text := "abc"
-                TextWriter(Stdio.stdout()).writeLine((text.substring(1, 2, 3)) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((text.substring(1, 2, 3)) .. "")
                 """, TypeChecker.TYPE_ERROR);
         assertRejected("""
                 text := "abc"
-                TextWriter(Stdio.stdout()).writeLine((text.substring("1")) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((text.substring("1")) .. "")
                 """, TypeChecker.TYPE_ERROR);
         assertRejected("""
                 text := "abc"
-                TextWriter(Stdio.stdout()).writeLine((text.contains(1)) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((text.contains(1)) .. "")
                 """, TypeChecker.TYPE_ERROR);
         assertRejected("""
                 text := "abc"
-                TextWriter(Stdio.stdout()).writeLine((text.replace("a")) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((text.replace("a")) .. "")
                 """, TypeChecker.TYPE_ERROR);
         assertRejected("""
                 text := "abc"
-                TextWriter(Stdio.stdout()).writeLine((text.strip(1)) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((text.strip(1)) .. "")
                 """, TypeChecker.TYPE_ERROR);
         assertRejected("""
                 text := "abc"
-                TextWriter(Stdio.stdout()).writeLine((text.unknownMethod()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((text.unknownMethod()) .. "")
                 """, TypeChecker.TYPE_ERROR);
     }
 
@@ -112,31 +112,31 @@ class StringMethodTest {
     void a_non_string_receiver_is_rejected() {
         assertRejected("""
                 count := 1
-                TextWriter(Stdio.stdout()).writeLine((count.strip()) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((count.strip()) .. "")
                 """, TypeChecker.TYPE_ERROR);
         assertRejected("""
                 items := String[1] {"a"}
-                TextWriter(Stdio.stdout()).writeLine((items.split(",")) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((items.split(",")) .. "")
                 """, TypeChecker.TYPE_ERROR);
     }
 
     @Test
     @DisplayName("a literal substring or split that cannot work is a compile error")
     void literal_text_failures_are_compile_errors() {
-        assertRejected("TextWriter(Stdio.stdout()).writeLine((\"abc\".substring(5)) .. \"\")", TypeChecker.STATIC_FAILURE);
-        assertRejected("TextWriter(Stdio.stdout()).writeLine((\"abc\".substring(2, 1)) .. \"\")", TypeChecker.STATIC_FAILURE);
-        assertRejected("TextWriter(Stdio.stdout()).writeLine((\"abc\".substring(-1)) .. \"\")", TypeChecker.STATIC_FAILURE);
-        assertRejected("TextWriter(Stdio.stdout()).writeLine((\"abc\".substring(0, 9)) .. \"\")", TypeChecker.STATIC_FAILURE);
-        assertRejected("TextWriter(Stdio.stdout()).writeLine((\"abc\".split(\"\")) .. \"\")", TypeChecker.STATIC_FAILURE);
+        assertRejected("solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((\"abc\".substring(5)) .. \"\")", TypeChecker.STATIC_FAILURE);
+        assertRejected("solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((\"abc\".substring(2, 1)) .. \"\")", TypeChecker.STATIC_FAILURE);
+        assertRejected("solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((\"abc\".substring(-1)) .. \"\")", TypeChecker.STATIC_FAILURE);
+        assertRejected("solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((\"abc\".substring(0, 9)) .. \"\")", TypeChecker.STATIC_FAILURE);
+        assertRejected("solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((\"abc\".split(\"\")) .. \"\")", TypeChecker.STATIC_FAILURE);
     }
 
     @Test
     @DisplayName("indices at the boundaries are accepted")
     void boundary_indices_are_accepted() {
-        assertAccepted("TextWriter(Stdio.stdout()).writeLine((\"abc\".substring(0)) .. \"\")");
-        assertAccepted("TextWriter(Stdio.stdout()).writeLine((\"abc\".substring(3)) .. \"\")");
-        assertAccepted("TextWriter(Stdio.stdout()).writeLine((\"abc\".substring(0, 0)) .. \"\")");
-        assertAccepted("TextWriter(Stdio.stdout()).writeLine((\"abc\".substring(0, 3)) .. \"\")");
+        assertAccepted("solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((\"abc\".substring(0)) .. \"\")");
+        assertAccepted("solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((\"abc\".substring(3)) .. \"\")");
+        assertAccepted("solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((\"abc\".substring(0, 0)) .. \"\")");
+        assertAccepted("solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((\"abc\".substring(0, 3)) .. \"\")");
     }
 
     @Test
@@ -145,12 +145,12 @@ class StringMethodTest {
         assertAccepted("""
                 text := "abc"
                 index := 9
-                TextWriter(Stdio.stdout()).writeLine((text.substring(index)) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((text.substring(index)) .. "")
                 """);
         assertAccepted("""
                 text := "abc"
                 separator := ""
-                TextWriter(Stdio.stdout()).writeLine((text.split(separator)) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((text.split(separator)) .. "")
                 """);
     }
 }

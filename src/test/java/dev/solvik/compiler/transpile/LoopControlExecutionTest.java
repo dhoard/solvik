@@ -74,9 +74,9 @@ class LoopControlExecutionTest {
                     if n > 4 {
                         break
                     }
-                    TextWriter(Stdio.stdout()).writeLine((n) .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((n) .. "")
                 }
-                TextWriter(Stdio.stdout()).writeLine(("after ") .. (n))
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("after ") .. (n))
                 """, directory);
 
         assertThat(output).isEqualTo("1\n3\n4\nafter 5\n");
@@ -96,7 +96,7 @@ class LoopControlExecutionTest {
                     }
                     sum = sum + item
                 }
-                TextWriter(Stdio.stdout()).writeLine((sum) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((sum) .. "")
                 """, directory);
 
         assertThat(output).isEqualTo("8\n");
@@ -113,14 +113,14 @@ class LoopControlExecutionTest {
                             if item == 2 {
                                 break
                             }
-                            TextWriter(Stdio.stdout()).writeLine(("arm ") .. (item))
+                            solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("arm ") .. (item))
                         }
                         default {
-                            TextWriter(Stdio.stdout()).writeLine(("never") .. "")
+                            solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("never") .. "")
                         }
                     }
                 }
-                TextWriter(Stdio.stdout()).writeLine(("left the loop") .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("left the loop") .. "")
                 """, directory);
 
         assertThat(output).isEqualTo("arm 1\nleft the loop\n");
@@ -137,13 +137,13 @@ class LoopControlExecutionTest {
                             if item == 2 {
                                 continue
                             }
-                            TextWriter(Stdio.stdout()).writeLine(("arm ") .. (item))
+                            solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("arm ") .. (item))
                         }
                         default {
-                            TextWriter(Stdio.stdout()).writeLine(("never") .. "")
+                            solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("never") .. "")
                         }
                     }
-                    TextWriter(Stdio.stdout()).writeLine(("after arm ") .. (item))
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("after arm ") .. (item))
                 }
                 """, directory);
 
@@ -161,7 +161,7 @@ class LoopControlExecutionTest {
                         if column > 2 {
                             break
                         }
-                        TextWriter(Stdio.stdout()).writeLine((row .. ":" .. column) .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((row .. ":" .. column) .. "")
                     }
                 }
                 """, directory);
@@ -191,7 +191,7 @@ class LoopControlExecutionTest {
                     }
                 }
 
-                TextWriter(Stdio.stdout()).writeLine((Finder().firstAbove(4)) .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Finder().firstAbove(4)) .. "")
                 """, directory);
 
         assertThat(output).isEqualTo("5\n");
@@ -203,12 +203,12 @@ class LoopControlExecutionTest {
                 items := Integer[3] {1, 2, 3}
                 for item in items {
                     if item == 2 {
-                        TextWriter(Stdio.stdout()).writeLine(("skip") .. "")
+                        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("skip") .. "")
                         break
                     }
-                    TextWriter(Stdio.stdout()).writeLine((item) .. "")
+                    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((item) .. "")
                 }
-                TextWriter(Stdio.stdout()).writeLine(("done") .. "")
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("done") .. "")
                 """, directory);
 
         assertThat(output).isEqualTo("1\nskip\ndone\n");
