@@ -32,8 +32,9 @@ class EmbeddedBindingsTest {
 
     /** Every collection resource, in the sorted path order the packaged scan uses. */
     private static final List<String> COLLECTION_RESOURCES = List.of(
-            "solvik/collection/Iterator.sol", "solvik/collection/List.sol",
-            "solvik/collection/Map.sol", "solvik/collection/Stack.sol");
+            "solvik/collection/Collection.sol", "solvik/collection/Iterator.sol",
+            "solvik/collection/List.sol", "solvik/collection/Map.sol",
+            "solvik/collection/Set.sol", "solvik/collection/Stack.sol");
     /** The collection resources that bind a Java class, in the same order. */
     private static final List<String> RESOURCES = List.of(
             "solvik/collection/List.sol", "solvik/collection/Map.sol", "solvik/collection/Stack.sol");
@@ -104,6 +105,52 @@ class EmbeddedBindingsTest {
         for (String resource : RESOURCES) {
             assertThat(packagedType(resource).isTrait()).as(resource).isFalse();
         }
+    }
+
+    @Test
+    @DisplayName("the enumeration views are generic native traits that publish the protocol")
+    void the_enumeration_views_publish_the_iteration_protocol() throws Exception {
+        Ast.TypeDecl set = packagedType("solvik/collection/Set.sol");
+        assertThat(set.isTrait()).isTrue();
+        assertThat(set.name()).isEqualTo("Set");
+        assertThat(set.nativeClass()).isEqualTo("java.util.Set");
+        assertThat(set.typeParameters()).containsExactly("T");
+        assertThat(set.methods()).extracting(Ast.FuncDecl::name)
+                .containsExactly("size", "isEmpty", "contains", "iterator");
+        assertThat(set.methods()).allMatch(Ast.FuncDecl::isPublic);
+
+        // A native member binds one exact Java interface, so the value view needs its own trait:
+        // HashMap.keySet() returns a java.util.Set and HashMap.values() a java.util.Collection.
+        Ast.TypeDecl collection = packagedType("solvik/collection/Collection.sol");
+        assertThat(collection.isTrait()).isTrue();
+        assertThat(collection.name()).isEqualTo("Collection");
+        assertThat(collection.nativeClass()).isEqualTo("java.util.Collection");
+        assertThat(collection.typeParameters()).containsExactly("T");
+        assertThat(collection.methods()).extracting(Ast.FuncDecl::name)
+                .containsExactly("size", "isEmpty", "contains", "iterator");
+        assertThat(collection.methods()).allMatch(Ast.FuncDecl::isPublic);
+    }
+
+    @Test
+    @DisplayName("the map declares the key and value views and keeps its other members")
+    void the_map_declares_its_enumeration_members() throws Exception {
+        Ast.TypeDecl map = packagedType("solvik/collection/Map.sol");
+
+        assertThat(map.isTrait()).isFalse();
+        assertThat(map.methods()).extracting(Ast.FuncDecl::name)
+                .containsExactly("Map", "put", "get", "removeValue", "containsKey", "containsValue",
+                        "keys", "values", "size", "isEmpty", "clear", "toString");
+        assertThat(map.methods()).filteredOn(method -> method.name().equals("keys"))
+                .allMatch(method -> "keySet".equals(method.nativeName()));
+        assertThat(map.methods()).filteredOn(method -> method.name().equals("values"))
+                .allMatch(method -> "values".equals(method.nativeName()));
+        // The read contracts that enumeration must not change.
+        assertThat(map.methods()).filteredOn(method -> method.name().equals("get"))
+                .allMatch(method -> method.returnType() != null
+                        && method.returnType().nullable());
+        assertThat(map.methods()).filteredOn(method -> method.name().equals("removeValue"))
+                .allMatch(method -> method.returnType() != null
+                        && method.returnType().nullable());
     }
 
     @Test

@@ -1358,7 +1358,9 @@ out.writeLine("alias in include: " .. desk::bump(Ticket(3)).id .. " "
 // The standard library needs no include: every `.sol` file the compiler packages under
 // src/main/resources is part of every program, loaded before the program's own files.
 // Map.sol, Stack.sol, and List.sol declare `solvik::collection` over java.util.HashMap,
-// java.util.Stack, and java.util.ArrayList; UUID.sol declares the Solvik-authored
+// java.util.Stack, and java.util.ArrayList; Iterator.sol, Set.sol, and Collection.sol declare the
+// iteration protocol and the two views a map publishes (`keys()` and `values()`), over
+// java.util.Iterator, java.util.Set, and java.util.Collection; UUID.sol declares the Solvik-authored
 // `solvik::util::UUID` below. There are no `java::collections` or HashMap aliases, and the
 // names stay qualified: `Map` alone is never in scope.
 
@@ -1479,7 +1481,8 @@ if firstItem != Null && secondItem != Null && thirdItem != Null {
 
 // 7. `for ... in` over a collection: a type participates by declaring
 // `pub func iterator() -> solvik::collection::Iterator<X>`, and the loop name is bound to `X`
-// (never `X?`). `List` and `Stack` declare it; `Map` does not, because an entry has no Solvik type.
+// (never `X?`). `List`, `Stack`, and a map's key and value views declare it; `Map` itself does not,
+// because a map entry has no Solvik type.
 iterationList := solvik::collection::List<Integer>()
 iterationList.add(4)
 iterationList.add(5)
@@ -1530,6 +1533,27 @@ for value in ticker {
     tickerTotal = tickerTotal + value
 }
 out.writeLine("protocol: " .. tickerTotal)
+
+// A map is enumerated through its two views: `keys()` is a `solvik::collection::Set<K>` and
+// `values()` a `solvik::collection::Collection<V>`, and both publish the same protocol, so the loop
+// names are `K` and `V`. They are the JDK's live views, not copies, and a java.util.HashMap has no
+// defined order, so the corpus prints order-free totals. Entry-wise iteration is still rejected:
+// `for entry in scores` needs a map-entry type the language does not have.
+iterationScores := solvik::collection::Map<String, Integer>()
+iterationScores.put("north", 3)
+iterationScores.put("south", 4)
+mut keyLetters := 0
+for region in iterationScores.keys() {
+    keyLetters = keyLetters + region.size()
+}
+mut scoreTotal := 0
+for amount in iterationScores.values() {
+    scoreTotal = scoreTotal + amount
+}
+out.writeLine("map iteration: " .. iterationScores.keys().size() .. " "
+    .. iterationScores.values().size() .. " " .. iterationScores.keys().contains("north") .. " "
+    .. iterationScores.values().contains(4) .. " " .. iterationScores.keys().isEmpty() .. " "
+    .. iterationScores.values().isEmpty() .. " " .. keyLetters + scoreTotal)
 
 /*
  * solvik::util::UUID (value type in Solvik)
@@ -2277,6 +2301,8 @@ exit()  // bare exit(); `exit(1)` above is the code form
 //   an exit code literal outside 0..255 (T001)
 //   an invalid, unsupported, or ambiguous native binding (T013)
 //   `choose(Null)` where two unrelated nullable overloads are equally good (T014)
+//   `for entry in map` over a `Map` (T001): a map entry has no Solvik type, so a map is enumerated
+//     through its `keys()` and `values()` views (§7, §11.3)
 //   overloads that differ only by return type, or erase to the same Java signature (T001)
 //   a nullable value used where a value is required (T015): `text.size()` on a `String?`, `n + 1`
 //     on an `Integer?`, indexing or iterating a nullable array, a nullable condition or switch

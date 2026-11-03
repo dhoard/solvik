@@ -44,9 +44,11 @@ class UberJarIT {
     void ships_individual_standard_library_bindings() throws IOException {
         try (JarFile jar = new JarFile(JAR.toFile())) {
             assertThat(jar.stream().map(entry -> entry.getName()).filter(name -> name.endsWith(".sol")))
-                    .containsExactlyInAnyOrder("solvik/collection/Iterator.sol",
+                    .containsExactlyInAnyOrder("solvik/collection/Collection.sol",
+                            "solvik/collection/Iterator.sol",
                             "solvik/collection/Map.sol", "solvik/collection/Stack.sol",
-                            "solvik/collection/List.sol", "solvik/concurrency/Task.sol",
+                            "solvik/collection/List.sol", "solvik/collection/Set.sol",
+                            "solvik/concurrency/Task.sol",
                             "solvik/concurrency/Thread.sol", "solvik/util/UUID.sol",
                             "solvik/io/Channel.sol", "solvik/io/Stdio.sol",
                             "solvik/io/TextReader.sol", "solvik/io/TextWriter.sol",

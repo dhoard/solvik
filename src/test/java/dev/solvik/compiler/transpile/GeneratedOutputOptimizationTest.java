@@ -239,6 +239,47 @@ class GeneratedOutputOptimizationTest {
     }
 
     @Test
+    @DisplayName("the map's key and value views are reached through the map, with no support member")
+    void the_enumeration_views_follow_the_map_that_names_them() {
+        assertThat(transpile("""
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("plain") .. "")
+                """)).doesNotContainKeys("solvik/collection/Set.java",
+                        "solvik/collection/Collection.java");
+
+        Map<String, String> map = transpile("""
+                scores := solvik::collection::Map<String, Integer>()
+                scores.put("ann", 10)
+                mut letters := 0
+                for name in scores.keys() {
+                    letters = letters + name.size()
+                }
+                for score in scores.values() {
+                    letters = letters + score
+                }
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((letters) .. "")
+                """);
+
+        // Map.sol names both views, so reaching the map reaches the traits it declares. Each view
+        // is the JDK's own live view converted by its trait's $of factory inside Map.java, and the
+        // loop guards the non-null result with the existing §11.1 support member.
+        assertThat(map).containsKeys("solvik/collection/Set.java",
+                "solvik/collection/Collection.java");
+        assertThat(map.get("solvik/collection/Map.java")).contains(
+                "public Set<K> keys() {", "return Set.$of(this.$delegate.keySet());",
+                "public Collection<V> values() {",
+                "return Collection.$of(this.$delegate.values());");
+        assertThat(map.get("Solvik$Program.java")).contains(
+                "for (Iterator<String> $it1 = Solvik$Program.checkedResult(scores.keys()).iterator();",
+                "for (Iterator<Integer> $it", "= Solvik$Program.checkedResult(scores.values())")
+                .doesNotContain("Solvik$Program.iterator", "$of(");
+        assertThat(map.get("solvik/collection/Set.java"))
+                .contains("public Iterator<T> iterator()",
+                        "Iterator.$of(this.delegate.iterator())");
+        assertThat(map.get("solvik/collection/Collection.java"))
+                .contains("Iterator.$of(this.delegate.iterator())");
+    }
+
+    @Test
     @DisplayName("a sync monitor expression is evaluated once")
     void a_sync_monitor_is_evaluated_once() {
         String java = program("""

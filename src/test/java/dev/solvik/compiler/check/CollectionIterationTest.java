@@ -149,6 +149,61 @@ class CollectionIterationTest {
     }
 
     @Test
+    @DisplayName("a map's key and value views iterate with the map's own type arguments")
+    void map_views_iterate_with_the_map_type_arguments() {
+        Checked keys = assertAccepted("""
+                scores := solvik::collection::Map<String, Integer>()
+                scores.put("ann", 10)
+                mut letters := 0
+                for name in scores.keys() {
+                    letters = name.size()
+                }
+                """);
+        assertThat(loopType(keys)).isEqualTo(SolvikType.STRING);
+
+        Checked values = assertAccepted("""
+                scores := solvik::collection::Map<String, Integer>()
+                scores.put("ann", 10)
+                mut total := 0
+                for score in scores.values() {
+                    total = score + 1
+                }
+                """);
+        assertThat(loopType(values)).isEqualTo(SolvikType.INTEGER);
+    }
+
+    @Test
+    @DisplayName("a nullable map instantiation keeps nullable keys and values")
+    void nullable_map_views_stay_nullable() {
+        Checked keys = assertAccepted("""
+                scores := solvik::collection::Map<String?, Integer?>()
+                mut last: String? = Null
+                for name in scores.keys() {
+                    last = name
+                }
+                """);
+        assertThat(loopType(keys)).isEqualTo(SolvikType.STRING.asNullable());
+
+        Checked values = assertAccepted("""
+                scores := solvik::collection::Map<String?, Integer?>()
+                mut last: Integer? = Null
+                for score in scores.values() {
+                    last = score
+                }
+                """);
+        assertThat(loopType(values)).isEqualTo(SolvikType.INTEGER.asNullable());
+    }
+
+    @Test
+    @DisplayName("a map still needs a key or value view before it can be iterated")
+    void entry_wise_map_iteration_is_still_rejected() {
+        assertRejected("""
+                scores := solvik::collection::Map<String, Integer>()
+                for entry in scores { }
+                """, TypeChecker.TYPE_ERROR);
+    }
+
+    @Test
     @DisplayName("the error names arrays and the protocol")
     void a_non_iterable_value_is_rejected_with_the_protocol_message() {
         Checked checked = check("""

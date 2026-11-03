@@ -181,6 +181,29 @@ class NativeBindingTest {
     }
 
     @Test
+    @DisplayName("a native trait's own member result converts with $of, not a raw Java interface")
+    void a_native_trait_member_converts_its_generic_trait_result() {
+        Map<String, String> files = new SolvikCompiler("t.sol").transpile("""
+                module bound {
+                    pub trait View<T> native "java.util.List" {
+                        pub func iterator() -> solvik::collection::Iterator<T>
+                    }
+                }
+                """);
+
+        // LANGUAGE.md §11.1: a native member whose declared result is a generic native trait
+        // converts through that trait's $of factory. The member of a native trait's generated
+        // adapter takes the same rule as a native type's member; before this case the adapter
+        // returned the raw java.util.Iterator and the generated Java did not compile.
+        assertThat(files.get("bound/View.java")).contains(
+                "public interface View<T>",
+                "public final class $Adapter<T> implements View<T>",
+                "public Iterator<T> iterator()",
+                "Iterator.$of(this.delegate.iterator())")
+                .doesNotContain("return this.delegate.iterator();");
+    }
+
+    @Test
     @DisplayName("a parameterized return with no declared Solvik type stays unmatched")
     void an_unmappable_parameterized_return_is_rejected() {
         rejected("""
