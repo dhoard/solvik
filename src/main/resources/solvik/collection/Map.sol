@@ -20,6 +20,14 @@ module solvik {
 
             pub func containsValue(value: Any) -> Boolean
 
+            // HashMap.keySet() and HashMap.values() are live views, not copies, and both publish
+            // the iteration protocol (§7, §11.3), so a map can be enumerated by key or by value.
+            // The two members need distinct declaration types because a native member binds one
+            // exact Java interface: java.util.Set for keySet, java.util.Collection for values.
+            pub func keys() -> Set<K> native "keySet"
+
+            pub func values() -> Collection<V> native "values"
+
             pub func size() -> Integer
 
             pub func isEmpty() -> Boolean

@@ -576,12 +576,13 @@ for item in String[2] {"A", "B"} {
 - `for ... in` iterates an **array** or any value whose type declares the iteration protocol:
   `pub func iterator() -> solvik::collection::Iterator<X>` with no parameters. The loop name is
   bound to `X` — the type argument of that declared return — so a `solvik::collection::List<Integer>`
-  yields `Integer`, not `Integer?`, and a `List<String?>` yields `String?` (§11.3). `List` and
-  `Stack` declare the protocol; `Map` does not, because a map entry has no Solvik type. A type that
-  is neither an array nor a protocol implementor is `SOL-T001`, and a nullable operand is
-  `SOL-T015` until it is narrowed. The protocol is ordinary library surface: a user `type` or
-  `trait` participates by declaring the member itself, and the loop calls that member once and then
-  the iterator's `hasNext()` and `next()`.
+  yields `Integer`, not `Integer?`, and a `List<String?>` yields `String?` (§11.3). `List`, `Stack`,
+  and a `Map`'s key and value views declare the protocol. `Map` itself does not, because a map entry
+  has no Solvik type: a map is enumerated through `map.keys()` (a `Set<K>`) and `map.values()` (a
+  `Collection<V>`) (§11.3). A type that is neither an array nor a protocol implementor is
+  `SOL-T001`, and a nullable operand is `SOL-T015` until it is narrowed. The protocol is ordinary
+  library surface: a user `type` or `trait` participates by declaring the member itself, and the
+  loop calls that member once and then the iterator's `hasNext()` and `next()`.
 - `break` and `continue` target the innermost loop, not a `switch`.
 - `try`, `catch`, `finally`, and `raise` handle exceptions (§7.4). A `try` statement is a statement,
   not an expression, so it produces no value.
@@ -1026,8 +1027,10 @@ The compiler packages standard-library `.sol` resources, loaded into every progr
 | Namespace | Type | Java or Solvik implementation |
 | --- | --- | --- |
 | `solvik::collection` | `Iterator<T>` | `java.util.Iterator`, the `for ... in` protocol |
-| `solvik::collection` | `Map<K, V>` | `java.util.HashMap` |
 | `solvik::collection` | `List<T>` | `java.util.ArrayList` |
+| `solvik::collection` | `Map<K, V>` | `java.util.HashMap` |
+| `solvik::collection` | `Set<T>` | `java.util.Set`, the view `Map.keys()` returns |
+| `solvik::collection` | `Collection<T>` | `java.util.Collection`, the view `Map.values()` returns |
 | `solvik::collection` | `Stack<T>` | `java.util.Stack` |
 | `solvik::concurrency` | `Task` | `java.lang.Runnable` |
 | `solvik::concurrency` | `Thread` | Java virtual-thread adapter |
@@ -1037,8 +1040,16 @@ The compiler packages standard-library `.sol` resources, loaded into every progr
 The standard library is not exempt from the revised type system. Its `.sol` files must migrate away from `var` and lowercase `null`, add all required initializers, and accurately specify nullable values returned by Java APIs. Packaged resources remain declaration-only; including them as ordinary file paths is not how standard-library registration works.
 
 `solvik::collection::List` and `Stack` publish the iteration protocol of §7 through
-`iterator()`, so `for value in items` reads every element with the element's own type. `Map` does
-not publish it: iteration would need an entry type that has no Solvik representation yet.
+`iterator()`, so `for value in items` reads every element with the element's own type. A `Map` is
+enumerated through its two views: `keys()` returns a `solvik::collection::Set<K>` and `values()` a
+`solvik::collection::Collection<V>`, so `for key in map.keys()` binds `K` and
+`for value in map.values()` binds `V` (nullable when the instantiation is). Both views are the
+map's own live views — not copies — and both publish the protocol. They are two types because a
+native member binds one exact Java interface — `HashMap.keySet()` returns a `java.util.Set` and
+`HashMap.values()` a `java.util.Collection`. A `java.util.HashMap` defines no iteration order, so
+no program may depend on one. `Map` itself publishes no `iterator()`: an entry type has no Solvik
+representation yet, so entry-wise iteration (`for entry in map`) is `SOL-T001`; a program reads a
+pair by iterating `keys()` and calling `get(key)`.
 
 The I/O types are ordinary packaged module types. A program names them through their full
 `solvik::io` path, such as `solvik::io::TextWriter`, exactly as it names `solvik::collection::Map`.
@@ -1320,6 +1331,22 @@ values := Integer[2] {1, 2}
 optionalValues := Integer?[2] {}
 optionalArray: Integer[2]? = Null
 
+// VALID map enumeration: a map is read through its key and value views (§7, §11.3)
+scores := solvik::collection::Map<String, Integer>()
+scores.put("ann", 10)
+for name in scores.keys() {                   // name: String
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(name)
+}
+for score in scores.values() {                 // score: Integer
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(score .. "")
+}
+keyCount := scores.keys().size()
+valueCount := scores.values().size()
+hasAnn := scores.keys().contains("ann")
+hasTen := scores.values().contains(10)
+keysEmpty := scores.keys().isEmpty()
+valuesEmpty := scores.values().isEmpty()
+
 // VALID exception handling
 try {
     raise Exception(4001, "denied")
@@ -1359,6 +1386,7 @@ try {
 // w := solvik::io::TextWriter(solvik::io::Stdio.stdout()); w.EOL        // SOL-T001: static member via instance
 // solvik::io::TextWriter.EOL = "x"                          // SOL-T010: immutable static field
 // forged := solvik::io::File(solvik::io::Channel.bytes(), "x")                  // SOL-T001: the solvik::io::File constructor is private
+// for entry in scores { }                                               // SOL-T001: a map entry has no Solvik type
 // solvik::io::File.openReadChannel("x")                             // SOL-T001: a type-private binding
 // type Bad { static { return } }                         // SOL-T005: a static block has no return
 ```

@@ -114,6 +114,7 @@ class ExampleCorpusTest {
                 "static before=\n",
                 "iteration: 15 ab 1\n",
                 "protocol: 5\n",
+                "map iteration: 2 2 true true false false 17\n",
                 "type body: 3 2 root\n",
                 "static mention=\n",
                 "static ordered=field-block:field\n",

@@ -599,9 +599,7 @@ public final class JavaLowerer {
                         javaMethod.getName(), List.of(), arguments, javaReturn);
                 members.add(new JDecl.Method(Set.of(JDecl.Modifier.PUBLIC), List.of(), javaReturn,
                         GeneratedNames.javaIdentifier(method.name()), parameters,
-                        List.of(returned == SolvikType.VOID
-                                ? new JStmt.ExpressionStatement(invocation)
-                                : new JStmt.Return(invocation)),
+                        List.of(nativeResult(returned, javaReturn, invocation)),
                         List.of(new JDecl.Annotation(
                                 JType.Declared.of("java.lang", "Override"), List.of()))));
             }
@@ -609,6 +607,28 @@ public final class JavaLowerer {
                     Set.of(JDecl.Modifier.PUBLIC, JDecl.Modifier.FINAL), TRAIT_ADAPTER,
                     declaration.typeParameters(), null, List.of(traitType), members, List.of());
             return List.of(factory, adapter);
+        }
+
+        /**
+         * The statement a native member emits for its Java result ({@code LANGUAGE.md} §11.1).
+         *
+         * <p>Both native paths share it — the member of a native type and the member of a native
+         * trait's generated {@code $Adapter} — so a declared generic-native-trait result is always
+         * converted through that trait's {@code $of} factory and never returned as a raw Java
+         * interface object.
+         */
+        private JStmt nativeResult(SolvikType returned, JType javaReturn, JExpr invocation) {
+            if (returned == SolvikType.VOID) {
+                return new JStmt.ExpressionStatement(invocation);
+            }
+            if (adaptsNativeTrait(returned)) {
+                // The Java interface object must become a Solvik value; the trait's generated
+                // factory is the one conversion, so no cast or unchecked call is emitted.
+                return new JStmt.Return(new JExpr.Call(null,
+                        JTypes.generated(returned.userName()), TRAIT_FACTORY, List.of(),
+                        List.of(invocation), javaReturn));
+            }
+            return new JStmt.Return(invocation);
         }
 
         JDecl.Constructor constructor(Ast.FuncDecl constructor, boolean isPublic, boolean generic) {
@@ -774,21 +794,13 @@ public final class JavaLowerer {
                         ? null : field("this", "$delegate", javaClass);
                 invocation = new JExpr.Call(receiver, javaClass, method.getName(), List.of(),
                         arguments, javaReturn);
-                if (returned == SolvikType.VOID) {
-                    tryBody.add(new JStmt.ExpressionStatement(invocation));
-                } else if (selfReturn) {
+                if (selfReturn) {
                     JType.Declared owner = classType();
                     tryBody.add(new JStmt.Return(new JExpr.New(
                             generic ? owner.withArguments(List.of(JType.Wildcard.any())) : owner,
                             List.of(invocation), owner)));
-                } else if (adaptsNativeTrait(returned)) {
-                    // The Java interface object must become a Solvik value; the trait's generated
-                    // factory is the one conversion, so no cast or unchecked call is emitted.
-                    tryBody.add(new JStmt.Return(new JExpr.Call(null,
-                            JTypes.generated(returned.userName()), TRAIT_FACTORY, List.of(),
-                            List.of(invocation), javaReturn)));
                 } else {
-                    tryBody.add(new JStmt.Return(invocation));
+                    tryBody.add(nativeResult(returned, javaReturn, invocation));
                 }
             }
             JType exceptionType = JTypes.EXCEPTION;

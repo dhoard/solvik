@@ -164,7 +164,7 @@ Java.
 
 | Namespace | Types |
 | --- | --- |
-| `solvik::collection` | `List`, `Map`, `Stack` |
+| `solvik::collection` | `List`, `Map`, `Stack`, and the `Map` views `Set`, `Collection`; `Iterator` is the `for ... in` protocol |
 | `solvik::concurrency` | `Task`, `Thread` — `Thread.start` starts a virtual thread; `await()` and `await(milliseconds)` join it |
 | `solvik::util` | `UUID` — version 7 (RFC 9562), written in Solvik rather than bound to Java |
 | `solvik::io` | `Channel`, `Stdio`, `TextReader`, `TextWriter`, `ByteReader`, `ByteWriter`, `File`, `IoError` |

@@ -42,3 +42,8 @@ not an authoritative source of requirements; verify details against `PROJECT.md`
   `synchronized` statement so release is the JVM's; the user-type/array monitor rule (`SOL-T019`,
   nullable `SOL-T015`), the five typed-IR seams, the `terminates` arm, the active shape tests, and the
   `GeneratedOutputOptimizationTest` `@Test` trap.
+- [Map enumeration and the trait-owner `$of` conversion](memory/map-enumeration.md) — `Map.keys()` /
+  `values()` over two packaged native traits (`Set<T>`, `Collection<T>`) and why they must be two,
+  the live-view and unordered-iteration rules, the textual-reachability consequence, the
+  `traitAdapter`/`nativeMember` result conversion now shared as `Unit.nativeResult`, the
+  `checkedResult` loop guard, and why entry-wise iteration stays deferred.

@@ -299,9 +299,11 @@ scanning the code source the compiler class was loaded from — a class director
 sorted path order:
 
 ```text
+solvik/collection/Collection.sol # solvik::collection::Collection<T>, java.util.Collection interface
 solvik/collection/Iterator.sol # solvik::collection::Iterator<T>, java.util.Iterator interface
 solvik/collection/List.sol     # solvik::collection::List<T>, java.util.ArrayList
 solvik/collection/Map.sol      # solvik::collection::Map<K,V>, java.util.HashMap
+solvik/collection/Set.sol      # solvik::collection::Set<T>, java.util.Set interface
 solvik/collection/Stack.sol    # solvik::collection::Stack<T>, java.util.Stack
 solvik/concurrency/Task.sol    # solvik::concurrency::Task, java.lang.Runnable interface
 solvik/concurrency/Thread.sol  # solvik::concurrency::Thread, virtual java.lang.Thread adapter
@@ -512,7 +514,11 @@ The unified lowering path applies these type-directed rules:
   support member takes part. A generic native trait is emitted as a Solvik interface with
   `static $of(java.util.Iterator<T>)` and a nested `$Adapter<T>` that delegates to the JDK
   iterator, so the native member that returns one converts it at the declaration
-  (`Iterator.$of(this.$delegate.iterator())`) instead of at every call site.
+  (`Iterator.$of(this.$delegate.iterator())`) instead of at every call site. That conversion is
+  part of every native member's result handling, so a native *trait*'s own member takes the same
+  rule as a native type's member: `Set.iterator()` and `Collection.iterator()` convert their JDK
+  iterators the same way, and `Map.keys()`/`values()` convert the JDK's views with
+  `Set.$of(...)`/`Collection.$of(...)` at the map member.
 
 For example, `solvik::io::TextWriter(solvik::io::Stdio.stdout()).write("hello")` becomes
 `new TextWriter(Stdio.stdout()).write("hello");`, and
