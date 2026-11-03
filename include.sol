@@ -1,8 +1,17 @@
-// include.sol — imported by example.sol. It contributes declarations only.
+// include.sol — included by example.sol. It contributes declarations only.
 //
 // A module groups type and function names. Inside the module the short name works; outside it a
 // declaration is reachable as `showcase::Name` when it says `pub`. Otherwise it is private to
 // the module, including other files that reopen `module showcase`.
+//
+// Aliases are file-local: the block below is visible to this file's declarations and to no other
+// file, so `example.sol` writes `showcase::Ticket` (or its own alias). An alias names an existing
+// canonical symbol and adds no type, no package, and no generated Java.
+
+alias {
+    showcase::Ticket LocalTicket
+    showcase LocalBoard
+}
 
 module showcase {
 
@@ -60,6 +69,12 @@ module showcase {
         return "ticket " .. ticket
     }
 
+    // The file-local aliases in use inside the file that declares them: a type alias constructs
+    // and annotates `showcase::Ticket`, and a module alias names `showcase::nextAfter`.
+    pub func bump(value: LocalTicket) -> LocalTicket {
+        return LocalTicket(LocalBoard::nextAfter(value.id))
+    }
+
     pub func nextAfter(value: Integer) -> Integer {
         return value + 1
     }
@@ -99,7 +114,7 @@ module showcase {
     }
 
     // A declared `equals` compares the wrapped Java objects, and a declared `hashCode` is the Java
-    // hash, so a value of this binding works as a key in `solvik::collections::Map`. Operator `==`
+    // hash, so a value of this binding works as a key in `solvik::collection::Map`. Operator `==`
     // on these values stays reference identity.
     pub type Amount native "java.math.BigInteger" {
         pub func Amount(text: String)

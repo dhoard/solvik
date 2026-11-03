@@ -108,7 +108,7 @@ class ArrayTypeSpellingTest {
                 numbers := Integer[2] {1, 2}
                 grid := Integer[][2] { Integer[2] {1, 2}, Integer[2] {3, 4} }
                 solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Job().count(numbers)) .. (" ") .. (Box("x").first(String[1] {"x"})) .. (" ") .. (flatten(grid)))
-                lists := solvik::collections::List<Integer[]>()
+                lists := solvik::collection::List<Integer[]>()
                 lists.add(grid[0])
                 mut stored: Integer[]? = lists.get(0)
                 if stored != Null {

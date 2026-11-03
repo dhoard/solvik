@@ -44,8 +44,9 @@ class UberJarIT {
     void ships_individual_standard_library_bindings() throws IOException {
         try (JarFile jar = new JarFile(JAR.toFile())) {
             assertThat(jar.stream().map(entry -> entry.getName()).filter(name -> name.endsWith(".sol")))
-                    .containsExactlyInAnyOrder("solvik/collections/Map.sol", "solvik/collections/Stack.sol",
-                            "solvik/collections/List.sol", "solvik/concurrency/Task.sol",
+                    .containsExactlyInAnyOrder("solvik/collection/Iterator.sol",
+                            "solvik/collection/Map.sol", "solvik/collection/Stack.sol",
+                            "solvik/collection/List.sol", "solvik/concurrency/Task.sol",
                             "solvik/concurrency/Thread.sol", "solvik/util/UUID.sol",
                             "solvik/io/Channel.sol", "solvik/io/Stdio.sol",
                             "solvik/io/TextReader.sol", "solvik/io/TextWriter.sol",
@@ -58,7 +59,7 @@ class UberJarIT {
     @Test
     @DisplayName("runs every packaged standard-library type from the standalone jar")
     void runs_the_packaged_standard_library(@TempDir Path directory) throws Exception {
-        Path source = directory.resolve("collections.sol");
+        Path source = directory.resolve("collection.sol");
         Files.writeString(source, """
                 type SumTask implements solvik::concurrency::Task {
                     mut result := 0
@@ -67,14 +68,14 @@ class UberJarIT {
                     pub func value() -> Integer { return result }
                 }
 
-                map := solvik::collections::Map<String, Integer>()
+                map := solvik::collection::Map<String, Integer>()
                 map.put("answer", 42)
-                stack := solvik::collections::Stack<Integer>()
+                stack := solvik::collection::Stack<Integer>()
                 mut answer: Integer? = map.get("answer")
                 if answer != Null {
                     stack.push(answer)
                 }
-                list := solvik::collections::List<Integer>()
+                list := solvik::collection::List<Integer>()
                 mut top: Integer? = stack.pop()
                 if top != Null {
                     list.add(top)

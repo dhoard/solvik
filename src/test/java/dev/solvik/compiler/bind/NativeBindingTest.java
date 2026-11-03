@@ -70,30 +70,30 @@ class NativeBindingTest {
     @DisplayName("standard-library types are loaded from the compiler's own resources")
     void the_embedded_bindings_are_importable() {
         Map<String, String> files = new SolvikCompiler("t.sol").transpile("""
-                map := solvik::collections::Map<String, Integer>()
+                map := solvik::collection::Map<String, Integer>()
                 map.put("a", 1)
                 solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((map.size()) .. "")
-                stack := solvik::collections::Stack<Integer>()
+                stack := solvik::collection::Stack<Integer>()
                 stack.push(2)
                 solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((stack.pop()) .. "")
-                list := solvik::collections::List<String>()
+                list := solvik::collection::List<String>()
                 list.add("x")
                 solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((list.get(0)) .. "")
                 """);
 
-        assertThat(files).containsKeys("solvik/collections/Map.java",
-                "solvik/collections/Stack.java", "solvik/collections/List.java", "Solvik$Program.java");
-        assertThat(files.get("solvik/collections/Map.java"))
-                .contains("package solvik.collections;")
+        assertThat(files).containsKeys("solvik/collection/Map.java",
+                "solvik/collection/Stack.java", "solvik/collection/List.java", "Solvik$Program.java");
+        assertThat(files.get("solvik/collection/Map.java"))
+                .contains("package solvik.collection;")
                 .contains("HashMap<K, V>");
-        assertThat(files.get("solvik/collections/Stack.java")).contains("java.util.Stack<T>");
-        assertThat(files.get("solvik/collections/List.java")).contains("ArrayList<T>");
+        assertThat(files.get("solvik/collection/Stack.java")).contains("java.util.Stack<T>");
+        assertThat(files.get("solvik/collection/List.java")).contains("ArrayList<T>");
     }
 
     @Test
     void the_embedded_map_has_no_hashmap_compatibility_alias() {
         assertThatThrownBy(() -> new SolvikCompiler("t.sol").transpile("""
-                map := solvik::collections::HashMap()
+                map := solvik::collection::HashMap()
                 """))
                 .isInstanceOf(SolvikCompiler.CompilationFailure.class)
                 .hasMessageContaining("HashMap");
@@ -130,6 +130,65 @@ class NativeBindingTest {
         rejected("""
                 trait BadDefault native "java.lang.Runnable" {
                     pub func run() -> String { return "not void" }
+                }
+                """, JavaBinding.INVALID_BINDING);
+    }
+
+    /** A native trait over the JDK iterator, declared by the program so no packaged type is needed. */
+    private static final String SEQUENCE = """
+            module bound {
+                pub trait Sequence<T> native "java.util.Iterator" {
+                    pub func hasNext() -> Boolean
+                    pub func next() -> T
+                }
+
+                pub type Box<T> native "java.util.ArrayList" {
+                    pub func Box()
+                    pub func add(item: T)
+                    pub func iterator() -> Sequence<T>
+                }
+            }
+            """;
+
+    @Test
+    @DisplayName("a native trait takes type parameters and a member may return one with arguments")
+    void a_parameterized_native_return_is_bound() {
+        // The packaged library also names java.util.Iterator, so this self-contained binding is
+        // checked on its own: a second declaration of the same Java interface is ambiguous, and the
+        // packaged one wins for a program that uses it.
+        accepted(SEQUENCE);
+    }
+
+    @Test
+    @DisplayName("a generic native trait is a Solvik interface with a generated $of adapter")
+    void a_generic_native_trait_emits_the_adapter_and_converts_its_results() {
+        Map<String, String> files = new SolvikCompiler("t.sol").transpile("""
+                box := solvik::collection::List<Integer>()
+                box.add(1)
+                sequence := box.iterator()
+                """);
+
+        // A Solvik Boolean cannot override Java's primitive hasNext(), so the trait interface is
+        // Solvik-owned and $of is the one Java-to-Solvik conversion.
+        assertThat(files.get("solvik/collection/Iterator.java")).contains(
+                "public interface Iterator<T>",
+                "Boolean hasNext();",
+                "static <T> Iterator<T> $of(java.util.Iterator<T> delegate)",
+                "final class $Adapter<T> implements Iterator<T>");
+        assertThat(files.get("solvik/collection/List.java")).contains(
+                "public Iterator<T> iterator()",
+                "Iterator.$of(this.$delegate.iterator())");
+    }
+
+    @Test
+    @DisplayName("a parameterized return with no declared Solvik type stays unmatched")
+    void an_unmappable_parameterized_return_is_rejected() {
+        rejected("""
+                module bound {
+                    pub type Box<T> native "java.util.ArrayList" {
+                        pub func Box()
+                        pub func raw() -> Any native "iterator"
+                    }
                 }
                 """, JavaBinding.INVALID_BINDING);
     }
@@ -242,7 +301,7 @@ class NativeBindingTest {
     void an_unknown_embedded_module_is_reported() {
         Diagnostics diagnostics = new Diagnostics();
         ProgramLoader.Loaded loaded = new ProgramLoader(diagnostics)
-                .loadSource("import \"java:nope\"\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1) .. \"\")", "t.sol");
+                .loadSource("include { \"java:nope\" }\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1) .. \"\")", "t.sol");
         assertThat(diagnostics.all()).extracting(d -> d.code()).contains(ProgramLoader.MISSING_FILE);
         assertThat(loaded.programFileNames()).contains("t.sol");
     }

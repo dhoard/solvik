@@ -130,6 +130,134 @@ class GeneratedOutputOptimizationTest {
                 .doesNotContain("Solvik$Runtime", "Support routines");
     }
 
+    @Test
+    @DisplayName("a sync block is one Java synchronized statement over the existing value")
+    void sync_lowers_to_a_java_synchronized_statement() {
+        String guard = """
+                type Guard {
+                    pub mut hits := 0
+                    pub func Guard() { }
+                    pub func hit() { hits = hits + 1 }
+                }
+                """;
+        String plain = program(guard + """
+                guard := Guard()
+                guard.hit()
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("hits=") .. (guard.hits))
+                """);
+        String guarded = program(guard + """
+                guard := Guard()
+                sync guard {
+                    guard.hit()
+                }
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("hits=") .. (guard.hits))
+                """);
+
+        // Release is Java's own behavior, so the only difference from the same program without
+        // `sync` is the statement itself: no helper, wrapper, lock object, or try/finally is emitted.
+        String statement = "        synchronized (guard) {\n"
+                + "            guard.hit();\n"
+                + "        }\n";
+        assertThat(guarded).contains(statement);
+        assertThat(guarded.replace(statement, "        guard.hit();\n")).isEqualTo(plain);
+        assertThat(guarded).doesNotContain("Solvik$Runtime");
+    }
+
+    @Test
+    @DisplayName("a collection loop calls the iterator the declared protocol returns")
+    void a_collection_loop_calls_the_declared_protocol() {
+        String java = program("""
+                items := solvik::collection::List<Integer>()
+                items.add(7)
+                mut total := 0
+                for value in items {
+                    total = total + value
+                }
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("total: ") .. (total))
+                """);
+
+        // One iterator per loop, then the JDK's own hasNext()/next() through the Solvik trait: no
+        // helper, no per-element allocation, and no cast around the element.
+        assertThat(java).contains(
+                "$loop0: for (Iterator<Integer> $it1 = items.iterator(); $it1.hasNext(); ) {",
+                "Integer value = $it1.next();")
+                .doesNotContain("$Adapter", "$of(", "Solvik$Program.iterator");
+        // An array loop keeps the enhanced-for shape it has always had.
+        String array = program("""
+                mut total := 0
+                for value in Integer[2] {1, 2} {
+                    total = total + value
+                }
+                """);
+        assertThat(array).contains("for (Integer value : Arrays.<Integer>asList(1, 2)) {");
+    }
+
+    @Test
+    @DisplayName("a generic type iterates its own type variable")
+    void a_generic_type_iterates_its_own_type_variable() {
+        String box = transpile("""
+                type Box<T> {
+                    pub items := solvik::collection::List<T>()
+
+                    pub func Box(seed: T) {
+                        items.add(seed)
+                    }
+
+                    pub func count() -> Integer {
+                        mut seen := 0
+                        for value in self.items {
+                            seen = seen + 1
+                        }
+                        return seen
+                    }
+                }
+                box := Box(1)
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("box: ") .. (box.count()))
+                """).get("Box.java");
+
+        assertThat(box).contains(
+                "for (Iterator<T> $it1 = this.items.iterator(); $it1.hasNext(); ) {",
+                "T value = $it1.next();");
+    }
+
+    @Test
+    @DisplayName("the iterator type is emitted only for a program that reaches a collection")
+    void the_iterator_type_follows_the_packaged_type_that_names_it() {
+        assertThat(transpile("""
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("plain") .. "")
+                """)).doesNotContainKey("solvik/collection/Iterator.java");
+
+        Map<String, String> constructs = transpile("""
+                items := solvik::collection::List<Integer>()
+                items.add(1)
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("size: ") .. (items.size()))
+                """);
+        // List.sol names the protocol type, so reaching the collection reaches the trait it declares.
+        assertThat(constructs).containsKey("solvik/collection/Iterator.java");
+        // Iteration adds no support member: the adapter lives in the reached trait file.
+        assertThat(constructs.get("Solvik$Program.java")).doesNotContain("Iterator", "checkedResult");
+    }
+
+    @Test
+    @DisplayName("a sync monitor expression is evaluated once")
+    void a_sync_monitor_is_evaluated_once() {
+        String java = program("""
+                type Guard {
+                    pub func Guard() { }
+                    pub func hit() { }
+                }
+                func pick(guard: Guard) -> Guard { return guard }
+                guard := Guard()
+                sync pick(guard) {
+                    guard.hit()
+                }
+                """);
+
+        // The monitor is lowered once into the statement, so one call site reaches `pick`.
+        assertThat(java).containsPattern("synchronized \\(Solvik\\$Program\\.pick\\(.*\\)\\) \\{");
+        assertThat(java.split("Solvik\\$Program\\.pick\\(", -1)).hasSize(2);
+    }
+
     @DisplayName("only the reachable support members are emitted, with what they need")
     void emits_only_reachable_support_members() {
         String java = program("""

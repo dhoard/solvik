@@ -1,8 +1,8 @@
-// solvik::collections::Map — java.util.HashMap exposed as Map.
-// Loaded from the compiler JAR; declares one native type in solvik::collections.
+// solvik::collection::Map — java.util.HashMap exposed as Map.
+// Loaded from the compiler JAR; declares one native type in solvik::collection.
 
 module solvik {
-    module collections {
+    module collection {
         // java.util.HashMap<K, V> — key/value map.
         pub type Map<K, V> native "java.util.HashMap" {
 

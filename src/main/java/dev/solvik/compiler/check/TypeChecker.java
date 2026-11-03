@@ -117,6 +117,26 @@ public final class TypeChecker {
      * instead of silently changing what the {@code return} was for.
      */
     public static final String FINALLY_RETURN = "SOL-T017";
+    /**
+     * An {@code alias} entry that cannot be resolved or that would change name resolution (§3).
+     *
+     * <p>A target must name exactly one visible module, type, or trait by its canonical name, and
+     * a local alias name may not repeat within its file or take a name the file can already reach.
+     */
+    public static final String INVALID_ALIAS = "SOL-T018";
+    /**
+     * A {@code sync} monitor whose identity a program does not own ({@code LANGUAGE.md} §7.5).
+     *
+     * <p>Boxed numeric carriers and interned strings have cached or shared identity, and {@code Any}
+     * cannot rule that out, so a monitor could be shared with unrelated code that never agreed to be
+     * locked. A user type or an array is a value this program allocated.
+     */
+    public static final String MONITOR_TYPE = "SOL-T019";
+    /**
+     * The packaged iteration protocol: a type iterates when it declares
+     * {@code pub func iterator() -> solvik::collection::Iterator<Element>} ({@code LANGUAGE.md} §7).
+     */
+    public static final String ITERATOR_TYPE = "solvik::collection::Iterator";
 
     private final Diagnostics diagnostics;
     private final ClassLoader nativeLoader;
@@ -134,14 +154,32 @@ public final class TypeChecker {
     private final IdentityHashMap<Ast.CallExpr, Method> javaMathCalls =
             new IdentityHashMap<>();
     private final IdentityHashMap<Ast.Expr, SolvikType> expressionTypes = new IdentityHashMap<>();
+    /**
+     * The canonical type each written type resolved to, keyed by node identity.
+     *
+     * <p>Code generation reads this record instead of re-reading a written spelling, so an aliased
+     * type name emits exactly the canonical Java type its target names.
+     */
+    private final IdentityHashMap<Ast.TypeRef, SolvikType> resolvedTypes = new IdentityHashMap<>();
     private final IdentityHashMap<Ast.VarStmt, SolvikType> variableTypes = new IdentityHashMap<>();
     /** Arguments already checked while fixing a pending construction, so they are not reported twice. */
     private final IdentityHashMap<Ast.Expr, SolvikType> prechecked = new IdentityHashMap<>();
+    /** The substituted {@code Iterator<Element>} type each non-array {@code for} statement iterates. */
+    private final IdentityHashMap<Ast.ForStmt, SolvikType> iterationProtocols =
+            new IdentityHashMap<>();
     private final IdentityHashMap<Ast.Node, Binding> bindings = new IdentityHashMap<>();
     /** Name references and calls that mean {@code self.<name>} (§3, "Member names"). */
     private final IdentityHashMap<Ast.Node, String> implicitMembers = new IdentityHashMap<>();
     /** Full module paths and their first source positions; repeated blocks reopen the namespace. */
     private final Map<String, SourcePos> declaredModules = new LinkedHashMap<>();
+    /**
+     * File-local alias tables: the local spelling a source file may write, and its canonical target.
+     *
+     * <p>Keyed by the display name of the source that declared the aliases, which is the same name
+     * {@link SourcePos#file()} records on every node of that file. Two files may use the same local
+     * spelling for unrelated targets; a reference is resolved against the file that writes it.
+     */
+    private final Map<String, Map<String, String>> aliasesByFile = new LinkedHashMap<>();
     /** The module whose body is being checked, or {@code null} at the top level. */
     private String currentModule;
     /** The qualified name of the type body being checked, or {@code null} outside a type. */
@@ -240,8 +278,10 @@ public final class TypeChecker {
         TypeChecker checker = new TypeChecker(diagnostics, loader, standardLibraryModules,
                 trustedTypes);
         checker.run(program);
-        return new Result(checker.expressionTypes, checker.variableTypes, checker.returnTypes,
-                checker.fieldTypes, checker.bindings, checker.implicitMembers,
+        return new Result(checker.expressionTypes, checker.resolvedTypes,
+                checker.variableTypes, checker.returnTypes,
+                checker.fieldTypes, checker.iterationProtocols,
+                checker.bindings, checker.implicitMembers,
                 checker.functionCalls, checker.constructions, checker.nativeBindings,
                 checker.userTypes.entrySet().stream().filter(e -> e.getValue() != null
                         && e.getValue().declaration().nativeClass() != null)
@@ -253,9 +293,11 @@ public final class TypeChecker {
 
     /** Types recorded per node, keyed by identity. */
     public record Result(IdentityHashMap<Ast.Expr, SolvikType> expressionTypes,
+                         IdentityHashMap<Ast.TypeRef, SolvikType> typeReferenceTypes,
                          IdentityHashMap<Ast.VarStmt, SolvikType> variableTypes,
                          IdentityHashMap<Ast.FuncDecl, SolvikType> functionReturnTypes,
                          IdentityHashMap<Ast.FieldDecl, SolvikType> fieldTypes,
+                         IdentityHashMap<Ast.ForStmt, SolvikType> iterationProtocols,
                          IdentityHashMap<Ast.Node, Binding> bindings,
                          IdentityHashMap<Ast.Node, String> implicitMembers,
                          IdentityHashMap<Ast.Node, String> functionCalls,
@@ -328,6 +370,24 @@ public final class TypeChecker {
 
         public SolvikType typeOf(Ast.Expr expression) {
             return expressionTypes.get(expression);
+        }
+
+        /**
+         * The substituted {@code solvik::collection::Iterator<Element>} type a non-array
+         * {@code for ... in} iterates, or {@code null} for an array loop.
+         */
+        public SolvikType iterationProtocolOf(Ast.ForStmt statement) {
+            return iterationProtocols.get(statement);
+        }
+
+        /**
+         * The canonical type a written type resolved to, or {@code null} when it was not resolved.
+         *
+         * <p>This is what keeps code generation faithful to name resolution: an alias in source
+         * contributes no Java spelling of its own.
+         */
+        public SolvikType typeOf(Ast.TypeRef type) {
+            return typeReferenceTypes.get(type);
         }
 
         public SolvikType typeOf(Ast.VarStmt declaration) {
@@ -433,6 +493,7 @@ public final class TypeChecker {
         List<DeclaredType> declared = declare(program);
         List<DeclaredFunction> declaredFunctions = declareFunctions(program);
         if (!checkNamespace(declared, declaredFunctions)) return;
+        buildAliasTables(program, declared, declaredFunctions);
         nameTraitDefaultBridges(declared);
         for (DeclaredFunction entry : declaredFunctions) {
             functions.computeIfAbsent(entry.qualifiedName(), ignored -> new ArrayList<>())
@@ -445,8 +506,8 @@ public final class TypeChecker {
                 error(INVALID_TYPE_NAME, type.pos(),
                         "a type name must start with an uppercase letter, found '" + type.name() + "'");
             }
-            userTypes.put(entry.qualifiedName(), null); // reserve before fields are resolved
         }
+        indexDeclarations(declared); // every name is known before any type is built
         for (DeclaredType entry : declared) {
             currentModule = entry.module();
             userTypes.put(entry.qualifiedName(), buildTypeInfo(entry.declaration(), entry.qualifiedName()));
@@ -470,6 +531,35 @@ public final class TypeChecker {
         checkPublicSurface(declared, declaredFunctions);
         currentModule = null;
         checkStatements(program.statements());
+    }
+
+    /**
+     * Indexes every declared type's syntax before any type is built (§8.1).
+     *
+     * <p>A type's fields and signatures resolve while that type is built, so without an index a
+     * type body sees only the declarations indexed before it: a packaged type's arguments, a module
+     * type, and a type declared later in the file would look undeclared. The pass reads syntax only
+     * and reports nothing, so it neither reorders nor duplicates diagnostics. Building a type
+     * replaces its entry with the same data plus inferred field types, so the index and the built
+     * view cannot drift in method ownership or type parameters.
+     */
+    private void indexDeclarations(List<DeclaredType> declared) {
+        for (DeclaredType entry : declared) {
+            Ast.TypeDecl type = entry.declaration();
+            Map<String, List<Ast.FuncDecl>> methods = new LinkedHashMap<>();
+            for (Ast.FuncDecl method : type.methods()) {
+                methodOwners.putIfAbsent(method, entry.qualifiedName());
+                methods.computeIfAbsent(method.name(), ignored -> new ArrayList<>()).add(method);
+            }
+            Map<String, Ast.FieldDecl> fields = new LinkedHashMap<>();
+            for (Ast.FieldDecl field : type.fields()) {
+                fields.putIfAbsent(field.name(), field);
+            }
+            // Field types are inferred by the owning type's build, so this entry exposes the
+            // declarations without pretending their types are known yet.
+            userTypes.put(entry.qualifiedName(), new TypeInfo(entry.qualifiedName(), type,
+                    Map.of(), methods, type.typeParameters(), fields));
+        }
     }
 
     /** A type declaration together with the module that holds it ({@code null} at top level). */
@@ -518,6 +608,105 @@ public final class TypeChecker {
             }
         }
         return valid;
+    }
+
+    /**
+     * Builds and validates one alias table per source file (§3, "Aliases").
+     *
+     * <p>Canonical declarations are collected first, so a target is looked up in the merged symbol
+     * table and never through another alias: an alias names a symbol, not another spelling. Every
+     * entry is checked before any body is resolved, because aliases are file-wide and order
+     * independent inside their file.
+     *
+     * <p>Strict visibility policy: the alias block is file-level, which is outside every module, so
+     * a target inside a module must be {@code pub}. Uses then resolve to the canonical target and
+     * pass the ordinary visibility check unchanged, so an alias can never widen access. A name
+     * declared inside a module still wins over a file alias there, because the enclosing module is
+     * searched first; only top-level declarations can collide with an alias name.
+     */
+    private void buildAliasTables(Ast.Program program, List<DeclaredType> types,
+            List<DeclaredFunction> functions) {
+        Map<String, Ast.TypeDecl> typeDeclarations = new LinkedHashMap<>();
+        for (DeclaredType entry : types) {
+            typeDeclarations.putIfAbsent(entry.qualifiedName(), entry.declaration());
+        }
+        Set<String> functionNames = new HashSet<>();
+        for (DeclaredFunction entry : functions) {
+            functionNames.add(entry.qualifiedName());
+        }
+        Set<String> fileLevelNames = new HashSet<>();
+        for (DeclaredType entry : types) {
+            if (entry.module() == null) {
+                fileLevelNames.add(entry.qualifiedName());
+            }
+        }
+        for (DeclaredFunction entry : functions) {
+            if (entry.module() == null) {
+                fileLevelNames.add(entry.qualifiedName());
+            }
+        }
+        for (String module : declaredModules.keySet()) {
+            if (!module.contains("::")) {
+                fileLevelNames.add(module);
+            }
+        }
+        Map<String, Set<String>> declaredLocals = new HashMap<>();
+        for (Ast.AliasDecl alias : program.aliases()) {
+            String file = alias.namePos().file() == null ? "" : alias.namePos().file();
+            Map<String, String> table =
+                    aliasesByFile.computeIfAbsent(file, ignored -> new LinkedHashMap<>());
+            String local = alias.localName();
+            boolean valid = true;
+            // Every local name is recorded, valid or not, so a duplicate is always reported and a
+            // failed entry cannot make a later duplicate look unique.
+            if (!declaredLocals.computeIfAbsent(file, ignored -> new HashSet<>()).add(local)) {
+                error(INVALID_ALIAS, alias.namePos(), "alias '" + local
+                        + "' is already declared in this file; each local alias name is declared"
+                        + " once");
+                valid = false;
+            }
+            if (SolvikType.named(local) != null) {
+                error(INVALID_ALIAS, alias.namePos(), "'" + local
+                        + "' is a built-in type; an alias cannot take its name");
+                valid = false;
+            } else if ("solvik".equals(local)) {
+                error(INVALID_ALIAS, alias.namePos(), "'solvik' is the reserved standard-library"
+                        + " root module; an alias cannot take its name");
+                valid = false;
+            } else if (BUILT_IN_FUNCTIONS.contains(local)) {
+                error(INVALID_ALIAS, alias.namePos(), "'" + local + "' is a built-in function;"
+                        + " an alias cannot take its name");
+                valid = false;
+            } else if (fileLevelNames.contains(local)) {
+                error(INVALID_ALIAS, alias.namePos(), "'" + local + "' is already declared at file"
+                        + " level; an alias cannot shadow it");
+                valid = false;
+            }
+            String target = alias.target();
+            Ast.TypeDecl declaration = typeDeclarations.get(target);
+            if (declaration != null) {
+                String module = moduleOf(target);
+                if (module != null && !declaration.isPublic()) {
+                    error(INVALID_ALIAS, alias.targetPos(), "alias target '" + target
+                            + "' is private to module '" + module + "'; declare it 'pub' or name"
+                            + " it by its canonical path inside the module");
+                    valid = false;
+                }
+            } else if (declaredModules.containsKey(target)) {
+                // A module alias needs no visibility check: a module path is always reachable.
+            } else if (functionNames.contains(target)) {
+                error(INVALID_ALIAS, alias.targetPos(), "alias target '" + target + "' is a"
+                        + " function; an alias names a module, type, or trait");
+                valid = false;
+            } else {
+                error(INVALID_ALIAS, alias.targetPos(), "unknown alias target '" + target
+                        + "'; write an existing module, type, or trait by its canonical name");
+                valid = false;
+            }
+            if (valid) {
+                table.put(local, target);
+            }
+        }
     }
 
     /**
@@ -752,7 +941,7 @@ public final class TypeChecker {
                     error(TYPE_ERROR, method.pos(),
                             "a constructor cannot be 'static'; it initializes one instance");
                 }
-            } else if (resolveUserName(method.name()) != null) {
+            } else if (resolveUserName(method.name(), method.pos()) != null) {
                 error(TYPE_ERROR, method.pos(),
                         "a function's name may not match a type name (§3)");
             }
@@ -1094,8 +1283,14 @@ public final class TypeChecker {
             Ast.TypeDecl declaration = entry.declaration();
             currentModule = entry.module();
             if (declaration.isTrait()) {
-                if (!declaration.typeParameters().isEmpty()) {
-                    error(TYPE_ERROR, declaration.pos(), "traits cannot declare type parameters");
+                // A native trait names a Java interface, so its parameters are the interface's own.
+                // A Solvik-bodied trait keeps the restriction: its defaults and bridges cannot
+                // express generic substitution (§9).
+                if (!declaration.typeParameters().isEmpty()
+                        && declaration.nativeClass() == null) {
+                    error(TYPE_ERROR, declaration.pos(),
+                            "a Solvik trait cannot declare type parameters; only a native trait"
+                                    + " binding may");
                 }
                 if (!declaration.implementedTraits().isEmpty()) {
                     error(TYPE_ERROR, declaration.pos(), "trait inheritance is not supported");
@@ -1393,14 +1588,50 @@ public final class TypeChecker {
     }
 
     /**
+     * Expands the leading segment of a written reference through the referring file's alias table.
+     *
+     * <p>Expansion happens once, before canonical lookup: an alias target is itself canonical, so
+     * the result is never expanded again and aliases cannot chain. A reference in a file with no
+     * aliases, or one whose leading segment is not an alias, is returned unchanged.
+     *
+     * @param written the spelling as written at the reference
+     * @param pos     the reference position, whose file selects the alias environment
+     */
+    private String expandAlias(String written, SourcePos pos) {
+        if (pos == null || pos.file() == null) {
+            return written;
+        }
+        Map<String, String> table = aliasesByFile.get(pos.file());
+        if (table == null || table.isEmpty()) {
+            return written;
+        }
+        int separator = written.indexOf("::");
+        String leading = separator < 0 ? written : written.substring(0, separator);
+        String target = table.get(leading);
+        if (target == null) {
+            return written;
+        }
+        return separator < 0 ? target : target + written.substring(separator);
+    }
+
+    /** The canonical module a file alias names, or {@code null} when the name is not one. */
+    private String aliasModule(String written, SourcePos pos) {
+        String expanded = expandAlias(written, pos);
+        return !expanded.equals(written) && declaredModules.containsKey(expanded)
+                ? expanded : null;
+    }
+
+    /**
      * The declared function a written name refers to, or {@code null} when nothing matches.
      *
-     * <p>The enclosing module is searched first, then the top level, so a module function
-     * shadows a global one of the same name inside its own module (§2, "Modules").
+     * <p>The enclosing module is searched first, then a file alias, then the top level, so a module
+     * function shadows both an alias and a global function of the same name inside its own module
+     * (§2, "Modules").
      */
-    private String resolveFunctionName(String written) {
+    private String resolveFunctionName(String written, SourcePos pos) {
         if (written.contains("::")) {
-            return functions.containsKey(written) ? written : null;
+            String expanded = expandAlias(written, pos);
+            return functions.containsKey(expanded) ? expanded : null;
         }
         if (currentModule != null) {
             String scoped = qualifiedName(currentModule, written);
@@ -1408,7 +1639,8 @@ public final class TypeChecker {
                 return scoped;
             }
         }
-        return functions.containsKey(written) ? written : null;
+        String expanded = expandAlias(written, pos);
+        return functions.containsKey(expanded) ? expanded : null;
     }
 
     /**
@@ -1497,12 +1729,14 @@ public final class TypeChecker {
     /**
      * The declared type a written name refers to, or {@code null} when nothing matches.
      *
-     * <p>Inside a module the enclosing module is searched first, then the top level; a written
-     * {@code geometry::Point} is looked up as-is (§2, "Modules").
+     * <p>Inside a module the enclosing module is searched first, then a file alias, then the top
+     * level; a qualified spelling has its leading segment expanded through the referring file's
+     * aliases before it is looked up (§2, "Modules", §3 "Aliases").
      */
-    private String resolveUserName(String written) {
+    private String resolveUserName(String written, SourcePos pos) {
         if (written.contains("::")) {
-            return userTypes.containsKey(written) ? written : null;
+            String expanded = expandAlias(written, pos);
+            return userTypes.containsKey(expanded) ? expanded : null;
         }
         if (currentModule != null) {
             String scoped = qualifiedName(currentModule, written);
@@ -1510,14 +1744,19 @@ public final class TypeChecker {
                 return scoped;
             }
         }
-        return userTypes.containsKey(written) ? written : null;
+        String expanded = expandAlias(written, pos);
+        return userTypes.containsKey(expanded) ? expanded : null;
     }
 
     private SolvikType resolveType(Ast.TypeRef type) {
-        return switch (type) {
+        SolvikType resolved = switch (type) {
             case Ast.TypeRef.Array array -> resolveArrayType(array);
             case Ast.TypeRef.Named named -> resolveNamedType(named);
         };
+        if (resolved != null) {
+            resolvedTypes.put(type, resolved);
+        }
+        return resolved;
     }
 
     /**
@@ -1579,7 +1818,7 @@ public final class TypeChecker {
                     + type.name() + "' of its generic type");
             return SolvikType.ANY;
         }
-        String nativeKey = resolveUserName(type.name());
+        String nativeKey = resolveUserName(type.name(), type.pos());
         TypeInfo nativeInfo = nativeKey == null ? null : userTypes.get(nativeKey);
         if (nativeInfo != null && nativeInfo.declaration().nativeClass() != null) {
             requireVisibleType(nativeKey, type.pos());
@@ -1603,7 +1842,7 @@ public final class TypeChecker {
         if (typeParameters.contains(type.name())) {
             return SolvikType.variable(type.name());
         }
-        String key = resolveUserName(type.name());
+        String key = resolveUserName(type.name(), type.pos());
         if (key != null) {
             requireVisibleType(key, type.pos());
             List<String> declared = userTypes.get(key) == null
@@ -1624,7 +1863,7 @@ public final class TypeChecker {
 
     /** Reports why a written type name did not resolve (§2, "Modules"). */
     private void reportUnknownType(Ast.TypeRef.Named type) {
-        String written = type.name();
+        String written = expandAlias(type.name(), type.pos());
         int separator = written.indexOf("::");
         if (separator < 0) {
             error(TYPE_ERROR, type.pos(), "unknown type '" + written + "'");
@@ -1688,13 +1927,18 @@ public final class TypeChecker {
             case Ast.ForStmt forStmt -> {
                 SolvikType iterable = requireNonNull(checkExpression(forStmt.iterable()),
                         forStmt.iterable().pos(), "for...in iteration");
-                if (!iterable.isArray()) {
-                    error(TYPE_ERROR, forStmt.pos(),
-                            "for...in iterates an array, found " + iterable);
+                SolvikType element;
+                if (iterable.isArray()) {
+                    element = iterable.element();
+                } else {
+                    SolvikType protocol = iterationProtocol(forStmt, iterable);
+                    // The protocol reports its own failure; Any keeps one error from cascading into
+                    // every use of the loop name.
+                    element = protocol == null ? SolvikType.ANY : protocol.arguments().getFirst();
                 }
                 Scope outer = scope;
                 scope = new Scope(outer, ordinals);
-                bindings.put(forStmt, scope.declare(forStmt.name(), iterable.element()));
+                bindings.put(forStmt, scope.declare(forStmt.name(), element));
                 loopDepth++;
                 checkBlock(forStmt.body()); // the body is a block, and therefore a scope (§3)
                 loopDepth--;
@@ -1702,6 +1946,7 @@ public final class TypeChecker {
             }
             case Ast.SwitchStmt switchStmt -> checkSwitch(switchStmt);
             case Ast.TryStmt tryStmt -> checkTry(tryStmt);
+            case Ast.SyncStmt syncStmt -> checkSync(syncStmt);
             case Ast.RaiseStmt raise -> checkRaise(raise);
             case Ast.ReturnStmt returnStmt -> {
                 if (inStaticInitializer) {
@@ -1738,6 +1983,71 @@ public final class TypeChecker {
             }
             case Ast.BlockStmt block -> checkBlock(block.body());
         }
+    }
+
+    /**
+     * The iteration protocol a non-array {@code for ... in} operand's type declares (§7, §11.3).
+     *
+     * <p>A type participates by declaring {@code pub func iterator()} with no parameters whose
+     * return type is {@code solvik::collection::Iterator<Element>}. The declared return type is
+     * resolved in its own type's module and type-parameter context, then substituted with the
+     * operand's own type arguments, so {@code List<Integer>} iterates {@code Integer} and
+     * {@code List<String?>} iterates {@code String?}. Every other operand is rejected with the same
+     * failure meaning an array-only rule had, reworded to name the protocol.
+     *
+     * @return the substituted iterator type, or {@code null} after reporting the rejection
+     */
+    private SolvikType iterationProtocol(Ast.ForStmt statement, SolvikType iterable) {
+        TypeInfo info = iterable.kind() == SolvikType.Kind.USER
+                ? userTypes.get(iterable.userName()) : null;
+        Ast.FuncDecl member = info == null ? null
+                : info.methods().getOrDefault("iterator", List.of()).stream()
+                        .filter(candidate -> candidate.isPublic() && !candidate.isStatic()
+                                && candidate.params().isEmpty()
+                                && !candidate.isConstructor(info.declaration().name()))
+                        .findFirst().orElse(null);
+        boolean arityMatches = info != null
+                && info.parameters().size() == iterable.arguments().size();
+        SolvikType declared = member == null || !arityMatches
+                ? null : declaredMemberReturnType(info, member);
+        SolvikType returned = declared == null ? null
+                : declared.substitute(argumentMapping(info.parameters(), iterable.arguments()));
+        if (returned != null && !returned.isNullable()
+                && returned.kind() == SolvikType.Kind.USER
+                && ITERATOR_TYPE.equals(returned.userName())
+                && returned.arguments().size() == 1) {
+            iterationProtocols.put(statement, returned);
+            return returned;
+        }
+        error(TYPE_ERROR, statement.pos(), "for...in iterates an array or a type that declares"
+                + " 'pub func iterator() -> " + ITERATOR_TYPE + "<Element>', found " + iterable);
+        return null;
+    }
+
+    /**
+     * A member's declared return type, resolved in its own type's context.
+     *
+     * <p>The recorded type is preferred: it is what the owner's own check resolved, so a loop does
+     * not resolve the same written type twice and cannot duplicate that signature's diagnostics. A
+     * type declared later in the program has not been checked yet, so its signature is resolved here
+     * in the owner's module and type-parameter context.
+     */
+    private SolvikType declaredMemberReturnType(TypeInfo info, Ast.FuncDecl member) {
+        SolvikType recorded = returnTypes.get(member);
+        if (recorded != null) {
+            return recorded;
+        }
+        return declaredReturnType(member, moduleOf(info.qualifiedName()), info.parameters());
+    }
+
+    /** The mapping of a type's declared parameters to the type arguments at one use site. */
+    private static Map<String, SolvikType> argumentMapping(List<String> parameters,
+            List<SolvikType> arguments) {
+        Map<String, SolvikType> mapping = new HashMap<>();
+        for (int index = 0; index < parameters.size(); index++) {
+            mapping.put(parameters.get(index), arguments.get(index));
+        }
+        return mapping;
     }
 
     /**
@@ -1778,6 +2088,33 @@ public final class TypeChecker {
             error(TYPE_ERROR, raise.exception().pos(),
                     "only an Exception can be raised, found " + raised);
         }
+    }
+
+    /**
+     * Checks {@code sync monitor { ... }} (§7.5).
+     *
+     * <p>The monitor is a non-null value whose identity this program owns: a user type or an
+     * array. A nullable monitor is reported as the ordinary missing-value failure (§7.1) rather
+     * than a second time as a monitor-kind failure. The body is a block, so it is its own scope and
+     * adds no rule of its own: {@code return}, {@code break}, {@code continue}, and {@code raise}
+     * keep exactly the meaning they have in a bare block.
+     */
+    private void checkSync(Ast.SyncStmt syncStmt) {
+        Ast.Expr monitor = syncStmt.monitor();
+        SolvikType written = checkExpression(monitor);
+        boolean nullable = written != null && written.isNullable();
+        SolvikType held = requireNonNull(written, monitor.pos(), "a 'sync' monitor");
+        if (!nullable && held != null && !isMonitorType(held)) {
+            error(MONITOR_TYPE, monitor.pos(), "cannot synchronize on " + held
+                    + "; a 'sync' monitor must be a non-null user type or array, whose identity"
+                    + " this program owns (§7.5)");
+        }
+        checkBlock(syncStmt.body());
+    }
+
+    /** Whether a value's identity is the program's to lock (§7.5). */
+    private static boolean isMonitorType(SolvikType type) {
+        return type.kind() == SolvikType.Kind.USER || type.kind() == SolvikType.Kind.ARRAY;
     }
 
     /**
@@ -2233,6 +2570,7 @@ public final class TypeChecker {
             case Ast.ContinueStmt ignored -> "'continue'";
             case Ast.RaiseStmt ignored -> "'raise'";
             case Ast.TryStmt ignored -> "a 'try' statement that always leaves";
+            case Ast.SyncStmt ignored -> "a 'sync' statement that always leaves";
             default -> "a statement that always leaves";
         };
     }
@@ -2243,7 +2581,9 @@ public final class TypeChecker {
      * <p>{@code return}, {@code break}, {@code continue}, and {@code raise} never complete
      * normally. A {@code try} statement completes normally only if a clause it can fall out of does:
      * a {@code finally} that always leaves runs after every path, and a {@code catch} that always
-     * leaves handles the one way its {@code try} body can still fail. The generated Java inherits the
+     * leaves handles the one way its {@code try} body can still fail. A {@code sync} statement
+     * completes normally exactly when its block does, because the monitor is released on the way
+     * out rather than by a statement that could be skipped. The generated Java inherits the
      * same rule from {@code javac}, so this is a diagnostic improvement, not a lowering decision.
      */
     private static boolean terminates(Ast.Stmt statement) {
@@ -2255,6 +2595,7 @@ public final class TypeChecker {
             case Ast.TryStmt attempt -> terminates(attempt.body())
                     && (attempt.catcher() == null || terminates(attempt.catcher().body()))
                     && (attempt.finallyBody() == null || terminates(attempt.finallyBody()));
+            case Ast.SyncStmt guarded -> terminates(guarded.body());
             default -> false;
         };
     }
@@ -2455,6 +2796,10 @@ public final class TypeChecker {
             return SolvikType.ANY;
         }
         if (!info.fields().containsKey(member.name())) {
+            if (!inDeclaringType(target.userName())
+                    && info.declared.containsKey(member.name())) {
+                return reportUnresolvedField(target.userName(), member.name(), member.pos());
+            }
             error(TYPE_ERROR, member.pos(),
                     "type " + target + " has no field '" + member.name() + "'");
             return SolvikType.ANY;
@@ -2511,7 +2856,7 @@ public final class TypeChecker {
             case Ast.QualifiedNameExpr qualified -> qualified.qualifiedName();
             default -> null;
         };
-        return written == null ? null : resolveUserName(written);
+        return written == null ? null : resolveUserName(written, expression.pos());
     }
 
     /** Whether the current body belongs to the type named by {@code qualifiedName}. */
@@ -2530,17 +2875,36 @@ public final class TypeChecker {
                     "type " + typeName + " has no field '" + member.name() + "'");
             return SolvikType.ANY;
         }
+        SolvikType fieldType = info.fields().get(member.name());
         if (!declared.isStatic()) {
             error(TYPE_ERROR, member.pos(), "field '" + member.name() + "' of " + typeName
                     + " is an instance member; read it from a value of type " + typeName);
-            return info.fields().get(member.name());
+            return fieldType == null ? SolvikType.ANY : fieldType;
         }
         if (!declared.isPublic() && !inDeclaringType(typeName)) {
             error(TYPE_ERROR, member.pos(), "static field '" + member.name() + "' of " + typeName
                     + " is private; declare it 'static pub' to read it from outside");
             return SolvikType.ANY;
         }
-        return info.fields().get(member.name());
+        if (fieldType == null && !inDeclaringType(typeName)) {
+            return reportUnresolvedField(typeName, member.name(), member.pos());
+        }
+        return fieldType;
+    }
+
+    /**
+     * Reports a field whose type belongs to a type that has not been built yet (§8.1).
+     *
+     * <p>A field's type is inferred while its own type is built, so reading it from another type's
+     * field initializer would make the program's meaning depend on declaration order. The read is
+     * rejected with the dependency named instead of being resolved to a guessed type.
+     */
+    private SolvikType reportUnresolvedField(String owner, String field, SourcePos pos) {
+        error(TYPE_ERROR, pos, "field '" + field + "' of type " + owner
+                + " cannot be read while " + currentTypeName + " is being built: another type's"
+                + " fields are known only after its own body is checked, so read this field from a"
+                + " function body instead");
+        return SolvikType.ANY;
     }
 
     /** Checks {@code Type.field = value}, a static field write (§3, static members). */
@@ -2647,15 +3011,17 @@ public final class TypeChecker {
      * target of a construction call, which {@link #checkCall} handles before reaching this point.
      */
     private SolvikType checkQualifiedName(Ast.QualifiedNameExpr qualified) {
-        String key = qualified.qualifiedName();
+        String key = expandAlias(qualified.qualifiedName(), qualified.pos());
+        String module = moduleOf(key);
         if (userTypes.containsKey(key)) {
             error(TYPE_ERROR, qualified.pos(), "'" + key
                     + "' is a type or function name; call it with " + key + "(...)");
-        } else if (!declaredModules.containsKey(qualified.module())) {
-            error(TYPE_ERROR, qualified.pos(), "unknown module '" + qualified.module() + "'");
+        } else if (module == null || !declaredModules.containsKey(module)) {
+            error(TYPE_ERROR, qualified.pos(),
+                    "unknown module '" + (module == null ? key : module) + "'");
         } else {
-            error(TYPE_ERROR, qualified.pos(), "module '" + qualified.module()
-                    + "' declares no type or function '" + qualified.name() + "'");
+            error(TYPE_ERROR, qualified.pos(), "module '" + module
+                    + "' declares no type or function '" + simpleName(key) + "'");
         }
         return SolvikType.ANY;
     }
@@ -2718,9 +3084,14 @@ public final class TypeChecker {
             if (member != null) {
                 return member;
             }
+            String aliasedModule = aliasModule(name.name(), name.pos());
             if (staticContext && "self".equals(name.name())) {
                 error(TYPE_ERROR, name.pos(),
                         "a static function has no 'self'; declare the value as a parameter");
+            } else if (aliasedModule != null) {
+                error(TYPE_ERROR, name.pos(), "alias '" + name.name() + "' names module '"
+                        + aliasedModule + "'; name a member with " + name.name()
+                        + "::Type or " + name.name() + "::function()");
             } else {
                 error(TYPE_ERROR, name.pos(), "unknown name '" + name.name() + "'");
             }
@@ -3172,7 +3543,7 @@ public final class TypeChecker {
         if (call.callee() instanceof Ast.TypeApplyExpr application) {
             String written = application.target() instanceof Ast.NameExpr name ? name.name()
                     : ((Ast.QualifiedNameExpr) application.target()).qualifiedName();
-            String key = resolveUserName(written);
+            String key = resolveUserName(written, application.pos());
             TypeInfo info = key == null ? null : userTypes.get(key);
             if (info == null || info.declaration().nativeClass() == null) {
                 error(WRITTEN_TYPE_ARGUMENT, application.pos(),
@@ -3185,7 +3556,7 @@ public final class TypeChecker {
             return checkNamedCall(call, name);
         }
         if (call.callee() instanceof Ast.QualifiedNameExpr qualified) {
-            String key = qualified.qualifiedName();
+            String key = expandAlias(qualified.qualifiedName(), qualified.pos());
             if (userTypes.containsKey(key)) {
                 return checkConstruction(call, key);
             }
@@ -3426,7 +3797,7 @@ public final class TypeChecker {
     private SolvikType checkNamedCall(Ast.CallExpr call, Ast.NameExpr callee) {
         String name = callee.name();
         List<Ast.Expr> arguments = call.arguments();
-        String constructed = resolveUserName(name);
+        String constructed = resolveUserName(name, callee.pos());
         if (constructed != null) {
             return checkConstruction(call, constructed);
         }
@@ -3456,7 +3827,7 @@ public final class TypeChecker {
                 };
             }
             default -> {
-                String functionName = resolveFunctionName(name);
+                String functionName = resolveFunctionName(name, callee.pos());
                 List<Ast.FuncDecl> overloads = functionName == null
                         ? List.of() : functions.getOrDefault(functionName, List.of());
                 if (overloads.isEmpty()) {
@@ -3464,8 +3835,13 @@ public final class TypeChecker {
                     if (memberCall != null) {
                         return memberCall;
                     }
+                    String aliasedModule = aliasModule(name, callee.pos());
                     String qualified = moduleOfDeclaredType(name);
-                    if (qualified != null) {
+                    if (aliasedModule != null) {
+                        error(TYPE_ERROR, callee.pos(), "alias '" + name + "' names module '"
+                                + aliasedModule + "'; name a member with " + name
+                                + "::Type(...) or " + name + "::function(...)");
+                    } else if (qualified != null) {
                         error(TYPE_ERROR, callee.pos(), "type '" + name + "' is declared in a "
                                 + "module; write " + qualified + " instead");
                     } else {

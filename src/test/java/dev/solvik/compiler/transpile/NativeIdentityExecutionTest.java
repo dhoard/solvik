@@ -70,11 +70,11 @@ class NativeIdentityExecutionTest {
     @Test
     void a_packaged_binding_reports_the_name_it_was_constructed_with(@TempDir Path directory) throws Exception {
         String output = output("""
-                scores := solvik::collections::Map<String, Integer>()
+                scores := solvik::collection::Map<String, Integer>()
                 scores.put("ann", 10)
                 solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((scores.type()) .. (" ") .. (scores.size()) .. (" ") .. (scores.get("ann")))
 
-                plain := solvik::collections::Stack()
+                plain := solvik::collection::Stack()
                 plain.push(3)
                 solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((plain.type()) .. (" ") .. (plain.pop()))
                 """, directory);
@@ -188,7 +188,7 @@ class NativeIdentityExecutionTest {
                 owed := nat::Amount("1000")
                 paid := nat::Amount("1000")
                 other := nat::Amount("2000")
-                ledger := solvik::collections::Map<nat::Amount, Integer>()
+                ledger := solvik::collection::Map<nat::Amount, Integer>()
                 ledger.put(owed, 7)
                 solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((owed.equals(paid)) .. (" ") .. (owed.hashCode() == paid.hashCode()))
                 solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((ledger.get(paid)) .. (" ") .. (ledger.get(other)) .. (" ") .. (ledger.size()))

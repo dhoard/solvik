@@ -28,7 +28,10 @@ public final class Parser {
     public static final String INVALID_STATEMENT = "SOL-P003";
     public static final String INVALID_DECLARATION = "SOL-P004";
     public static final String ARRAY_SPELLING = "SOL-P005";
-    /** Syntax this revision removed: the {@code var} keyword and the lowercase {@code null} literal. */
+    /**
+     * Syntax this revision removed: the {@code var} keyword, the lowercase {@code null} literal, and
+     * the {@code import} declarations replaced by {@code include} and {@code alias} (§10.1, §10.2).
+     */
     public static final String REMOVED_SYNTAX = "SOL-P006";
     /** A binding, field, or array-type spelling that does not follow the declaration grammar (§3). */
     public static final String DECLARATION_FORM = "SOL-P007";
@@ -60,13 +63,18 @@ public final class Parser {
         List<Ast.FuncDecl> functions = new ArrayList<>();
         List<Ast.Stmt> statements = new ArrayList<>();
         List<Ast.ModuleDecl> modules = new ArrayList<>();
-        List<Ast.ImportDecl> imports = new ArrayList<>();
+        List<Ast.IncludeDecl> includes = new ArrayList<>();
+        List<Ast.AliasDecl> aliases = new ArrayList<>();
         while (!check(TokenKind.EOF)) {
             if (match(TokenKind.NEWLINE) || match(TokenKind.SEMICOLON)) {
                 continue;
             }
-            if (check(TokenKind.IMPORT)) {
-                imports.add(parseImportDecl());
+            if (check(TokenKind.INCLUDE)) {
+                includes.addAll(parseIncludeBlock());
+            } else if (check(TokenKind.ALIAS)) {
+                aliases.addAll(parseAliasBlock());
+            } else if (check(TokenKind.IMPORT)) {
+                reportRemovedImport();
             } else if (check(TokenKind.MODULE)) {
                 modules.add(parseModuleDecl());
             } else if (check(TokenKind.TYPE) || check(TokenKind.TRAIT)) {
@@ -86,22 +94,209 @@ public final class Parser {
                 consumeTerminators();
             }
         }
-        return new Ast.Program(types, functions, statements, modules, imports, start);
+        return new Ast.Program(types, functions, statements, modules, includes, aliases, start);
     }
 
     // ------------------------------------------------------------ declarations
 
     /**
-     * Parses {@code import "path"} (§3, "Source files").
+     * Parses an {@code include { "path.sol" ... }} block (§3, "Source files").
      *
-     * <p>The path is a string literal, kept exactly as written; the loader resolves it, because a
-     * single source compiled from memory has no directory to resolve against.
+     * <p>The block is mandatory, even for one entry, and entries are separated by a newline or
+     * {@code ;}: an entry may follow {@code &#123;} directly, and a separator may follow the last
+     * entry before {@code &#125;}. Paths are string literals kept exactly as written; the loader
+     * resolves them, because a single source compiled from memory has no directory to resolve
+     * against. Commas are not separators, and adjacent entries need one.
      */
-    private Ast.ImportDecl parseImportDecl() {
-        Token keyword = expect(TokenKind.IMPORT, "expected 'import'");
-        Token path = expect(TokenKind.STRING_LITERAL,
-                "expected a quoted file path after 'import'");
-        return new Ast.ImportDecl(path.value(), keyword.pos());
+    private List<Ast.IncludeDecl> parseIncludeBlock() {
+        Token keyword = advance(); // 'include'
+        List<Ast.IncludeDecl> entries = new ArrayList<>();
+        if (!check(TokenKind.LBRACE)) {
+            errorAt(EXPECTED_TOKEN, peek().pos(),
+                    "'include' requires a block: write include { \"path.sol\" }, found "
+                            + peek());
+            recoverEntry();
+            return entries;
+        }
+        advance();
+        int before = diagnostics.size();
+        boolean separated = true;   // an entry may follow '{' without a separator
+        while (!check(TokenKind.RBRACE) && !check(TokenKind.EOF)) {
+            if (match(TokenKind.NEWLINE) || match(TokenKind.SEMICOLON)) {
+                separated = true;
+                continue;
+            }
+            if (check(TokenKind.COMMA)) {
+                reportCommaNotSeparator();
+                advance();
+                separated = true;
+                continue;
+            }
+            requireSeparator(separated, "include");
+            if (check(TokenKind.STRING_LITERAL)) {
+                Token path = advance();
+                entries.add(new Ast.IncludeDecl(path.value(), path.pos()));
+            } else {
+                errorAt(EXPECTED_TOKEN, peek().pos(),
+                        "an include entry is a quoted file path, found " + peek());
+                recoverEntry();
+            }
+            separated = false;
+        }
+        expect(TokenKind.RBRACE, "expected '}' to close the include block");
+        if (entries.isEmpty() && diagnostics.size() == before) {
+            errorAt(DECLARATION_FORM, keyword.pos(),
+                    "an include block names at least one file: write include { \"path.sol\" }");
+        }
+        return entries;
+    }
+
+    /**
+     * Parses an {@code alias { module::Type Name ... }} block (§3, "Source files").
+     *
+     * <p>Each entry writes the canonical target first and the file-local name second, and entries
+     * follow the same newline/{@code ;} separator rules as an include block.
+     */
+    private List<Ast.AliasDecl> parseAliasBlock() {
+        Token keyword = advance(); // 'alias'
+        List<Ast.AliasDecl> entries = new ArrayList<>();
+        if (!check(TokenKind.LBRACE)) {
+            errorAt(EXPECTED_TOKEN, peek().pos(),
+                    "'alias' requires a block: write alias { module::Type Name }, found " + peek());
+            recoverEntry();
+            return entries;
+        }
+        advance();
+        int before = diagnostics.size();
+        boolean separated = true;
+        while (!check(TokenKind.RBRACE) && !check(TokenKind.EOF)) {
+            if (match(TokenKind.NEWLINE) || match(TokenKind.SEMICOLON)) {
+                separated = true;
+                continue;
+            }
+            if (check(TokenKind.COMMA)) {
+                reportCommaNotSeparator();
+                advance();
+                separated = true;
+                continue;
+            }
+            requireSeparator(separated, "alias");
+            Ast.AliasDecl entry = parseAliasEntry();
+            if (entry != null) {
+                entries.add(entry);
+            }
+            separated = false;
+        }
+        expect(TokenKind.RBRACE, "expected '}' to close the alias block");
+        if (entries.isEmpty() && diagnostics.size() == before) {
+            errorAt(DECLARATION_FORM, keyword.pos(),
+                    "an alias block names at least one target: write alias { module::Type Name }");
+        }
+        return entries;
+    }
+
+    /** One {@code qualified-name IDENTIFIER} entry, or {@code null} after reporting a failure. */
+    private Ast.AliasDecl parseAliasEntry() {
+        if (!check(TokenKind.IDENTIFIER)) {
+            errorAt(EXPECTED_TOKEN, peek().pos(),
+                    "an alias entry is a qualified target followed by a local name, found "
+                            + peek());
+            recoverEntry();
+            return null;
+        }
+        Token first = advance();
+        StringBuilder target = new StringBuilder(first.lexeme());
+        while (match(TokenKind.COLON_COLON)) {
+            if (!check(TokenKind.IDENTIFIER)) {
+                errorAt(EXPECTED_TOKEN, peek().pos(),
+                        "expected a name after '::', found " + peek());
+                recoverEntry();
+                return null;
+            }
+            target.append("::").append(advance().lexeme());
+        }
+        if (!check(TokenKind.IDENTIFIER)) {
+            errorAt(EXPECTED_TOKEN, peek().pos(),
+                    "expected a local alias name after the target, found " + peek());
+            recoverEntry();
+            return null;
+        }
+        Token local = advance();
+        return new Ast.AliasDecl(target.toString(), local.lexeme(), first.pos(), local.pos());
+    }
+
+    /** Reports an adjacent entry, which the grammar requires to be separated. */
+    private void requireSeparator(boolean separated, String block) {
+        if (separated) {
+            return;
+        }
+        errorAt(EXPECTED_TOKEN, peek().pos(), block
+                + " entries are separated by a newline or ';', found " + peek());
+    }
+
+    /** Reports a comma inside a block, where only a newline or {@code ;} separates entries. */
+    private void reportCommaNotSeparator() {
+        errorAt(EXPECTED_TOKEN, peek().pos(),
+                "a comma is not an entry separator; separate entries with a newline or ';'");
+    }
+
+    /**
+     * Rejects the removed {@code import} spelling, naming both replacements.
+     *
+     * <p>It is reported once and skipped, so a file that still imports does not also produce a
+     * cascade of statement and declaration errors.
+     */
+    private void reportRemovedImport() {
+        Token keyword = advance(); // 'import'
+        errorAt(REMOVED_SYNTAX, keyword.pos(), "'import' was replaced: include source files with"
+                + " 'include { \"path.sol\" }' and name existing symbols with"
+                + " 'alias { module::Type Name }'");
+        if (check(TokenKind.LBRACE)) {
+            skipBracedBlock();
+        } else {
+            recoverEntry();
+        }
+    }
+
+    /**
+     * Rejects an {@code include} or {@code alias} block outside a file's top level.
+     *
+     * <p>The keyword and its braced block are skipped, so the enclosing module, type, or function
+     * body keeps its own closing brace and reports at most this one placement error.
+     */
+    private void recoverFileLevelBlock() {
+        Token keyword = advance();
+        errorAt(INVALID_DECLARATION, keyword.pos(), "'" + keyword.lexeme()
+                + "' is a file-level declaration; move the block outside the enclosing body");
+        if (check(TokenKind.LBRACE)) {
+            skipBracedBlock();
+        }
+        synchronize();
+    }
+
+    /** Skips a balanced {@code { ... }} block, starting at its opening brace. */
+    private void skipBracedBlock() {
+        int depth = 0;
+        do {
+            Token token = advance();
+            if (token.kind() == TokenKind.LBRACE) {
+                depth++;
+            } else if (token.kind() == TokenKind.RBRACE) {
+                depth--;
+            }
+        } while (depth > 0 && !check(TokenKind.EOF));
+    }
+
+    /**
+     * Skips to the next entry boundary: the newline, {@code ;}, {@code &#125;}, or end of input.
+     *
+     * <p>The boundary itself is left for the caller, so a block loop still sees its closing brace.
+     */
+    private void recoverEntry() {
+        while (!check(TokenKind.EOF) && !check(TokenKind.NEWLINE)
+                && !check(TokenKind.SEMICOLON) && !check(TokenKind.RBRACE)) {
+            advance();
+        }
     }
 
     /**
@@ -135,6 +330,8 @@ public final class Parser {
                 synchronize();
             } else if (startsMethod()) {
                 functions.add(parseFuncDecl(false));
+            } else if (check(TokenKind.INCLUDE) || check(TokenKind.ALIAS)) {
+                recoverFileLevelBlock();
             } else {
                 errorAt(INVALID_DECLARATION, peek().pos(),
                         "a module holds type, function, and nested module declarations");
@@ -219,6 +416,8 @@ public final class Parser {
                 errorAt(INVALID_DECLARATION, peek().pos(),
                         "'static' identifies type members; it cannot be applied to a type declaration");
                 synchronize();
+            } else if (check(TokenKind.INCLUDE) || check(TokenKind.ALIAS)) {
+                recoverFileLevelBlock();
             } else {
                 errorAt(INVALID_DECLARATION, peek().pos(),
                         "a type body contains field and function declarations");
@@ -529,6 +728,11 @@ public final class Parser {
             advance();
             return parseStatement();
         }
+        if (check(TokenKind.INCLUDE) || check(TokenKind.ALIAS)) {
+            SourcePos pos = peek().pos();
+            recoverFileLevelBlock();
+            return new Ast.BlockStmt(List.of(), pos);
+        }
         if (check(TokenKind.MUT) && (lookahead(1) == TokenKind.IDENTIFIER
                 || lookahead(1) == TokenKind.VAR)) {
             advance(); // 'mut' makes the declared binding assignable
@@ -570,6 +774,9 @@ public final class Parser {
         }
         if (check(TokenKind.RAISE)) {
             return parseRaiseStatement();
+        }
+        if (check(TokenKind.SYNC)) {
+            return parseSyncStatement();
         }
         if (check(TokenKind.LBRACE)) {
             SourcePos pos = peek().pos();
@@ -821,6 +1028,18 @@ public final class Parser {
     }
 
     /**
+     * Parses {@code sync monitor { ... }} (§7.5).
+     *
+     * <p>As with {@code while}, the monitor is an unparenthesized expression and the block must
+     * open on the same line: outside a delimiter a newline ends the statement (§1).
+     */
+    private Ast.Stmt parseSyncStatement() {
+        Token syncKeyword = expect(TokenKind.SYNC, "expected 'sync'");
+        Ast.Expr monitor = parseExpression();
+        return new Ast.SyncStmt(monitor, parseBlock(), syncKeyword.pos());
+    }
+
+    /**
      * Reports a {@code catch} or {@code finally} that starts a new line (§1, §7.4).
      *
      * <p>Outside a delimiter a newline ends the statement, so a clause must share the line of the
@@ -881,7 +1100,19 @@ public final class Parser {
     // ------------------------------------------------------------- expressions
 
     public Ast.Expr parseExpression() {
-        return parseDisjunction();
+        return parseConcatenation();
+    }
+
+    // `..` is the loosest operator (LANGUAGE.md §4.3). Concatenation renders values that are
+    // already fully evaluated, so arithmetic, comparisons, and conditions need no parentheses
+    // when they are rendered. `("id:" .. n) == "id:5"` is the one grouping that still matters.
+    private Ast.Expr parseConcatenation() {
+        Ast.Expr left = parseDisjunction();
+        while (check(TokenKind.CONCAT)) {
+            Token op = advance();
+            left = new Ast.BinaryExpr(left, op.lexeme(), parseDisjunction(), op.pos());
+        }
+        return left;
     }
 
     private Ast.Expr parseDisjunction() {
@@ -912,18 +1143,9 @@ public final class Parser {
     }
 
     private Ast.Expr parseComparison() {
-        Ast.Expr left = parseConcatenation();
+        Ast.Expr left = parseAdditive();
         while (check(TokenKind.LT) || check(TokenKind.LE) || check(TokenKind.GT)
                 || check(TokenKind.GE)) {
-            Token op = advance();
-            left = new Ast.BinaryExpr(left, op.lexeme(), parseConcatenation(), op.pos());
-        }
-        return left;
-    }
-
-    private Ast.Expr parseConcatenation() {
-        Ast.Expr left = parseAdditive();
-        while (check(TokenKind.CONCAT)) {
             Token op = advance();
             left = new Ast.BinaryExpr(left, op.lexeme(), parseAdditive(), op.pos());
         }

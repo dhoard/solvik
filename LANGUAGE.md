@@ -22,10 +22,17 @@ The intended changes are:
 
 ## 1. Program structure
 
-A `.sol` entry file contains imports, declarations, module blocks, and executable top-level statements:
+A `.sol` entry file contains `include` blocks, `alias` blocks, declarations, module blocks, and
+executable top-level statements:
 
 ```solvik
-import "include.sol"
+include {
+    "include.sol"
+}
+
+alias {
+    geometry::Point Point
+}
 
 module geometry {
     pub type Point {
@@ -43,16 +50,17 @@ module geometry {
     }
 }
 
-origin := geometry::Point(0, 0)
-solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((geometry::area(2, 3)) .. (" ") .. (origin.x))
+origin := Point(0, 0)
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(geometry::area(2, 3) .. " " .. origin.x)
 ```
 
 - Top-level statements in the entry file execute in source order inside the generated program entry point.
-- Imported files contribute **declarations only**; executable top-level statements in imports are an error (`SOL-I003`).
-- `import "relative/path.sol"` imports a **file**, not a module. Paths resolve relative to the importing file. Transitive imports are supported; the same physical file is loaded once; cycles are rejected (`SOL-I001`–`SOL-I004`).
+- Included files contribute **declarations only**; executable top-level statements in an included file are an error (`SOL-I003`).
+- `include { "relative/path.sol" }` adds **files**, not modules, to the compilation graph. Paths resolve relative to the file that writes them. Includes are transitive; the same physical file is loaded once; cycles are rejected (`SOL-I001`–`SOL-I004`). The block is required even for one path, and entries are separated by a newline or `;` (§10.1).
+- `alias { module::Type LocalName }` binds a **file-local** spelling for an existing canonical module, type, or trait. An alias adds no nominal identity and never crosses a file boundary (§10.2).
 - Files declare their own module blocks. A file path does not determine its namespace.
 - Compiler-packaged Solvik standard-library resources are automatically loaded before user files; their names remain fully qualified.
-- A newline normally ends a statement; semicolons are allowed when multiple statements occupy one line. Parenthesized argument lists and other delimited constructs may span lines.
+- A newline normally ends a statement; semicolons are allowed when multiple statements occupy one line. Parenthesized argument lists and other delimited constructs may span lines. An `include` or `alias` block follows the same rule: an entry may follow `{` directly, and a separator may precede `}`.
 - Braces delimit blocks. There is no whitespace-sensitive indentation grammar.
 - A statement may also be continued explicitly. When the first non-blank character of the line after a newline is `\`, that marker cancels the newline and the statement continues on the marker's line. The marker is layout, not program text; inside a delimited construct it is unnecessary — though harmless — because a newline there is already layout. Blank lines and comments may stand between the newline and the marker, so one marker continues the statement across every newline since its last line. A marker never cancels a semicolon, and a `\` that is not the first non-blank character of a continuation line is `SOL-L006`.
 
@@ -60,13 +68,13 @@ solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((geometry::area(2, 
 message := "a"
 \ .. "b"
 \ .. "c"
-solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((message))          // abc
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(message)          // abc
 
 mut total := 0
 total = 1
 \ + 2
 \ + 3
-solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((total))            // 6
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(total)            // 6
 ```
 
 ## 2. Values, types, and nullability
@@ -301,7 +309,7 @@ visitor := Visitors()
 visitor.visit()
 Visitors.reset()
 Visitors.limit = 5
-solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((Visitors.report()))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(Visitors.report())
 ```
 
 ```solvik
@@ -369,17 +377,33 @@ A suffix fixes the literal's type even in a typed array. Unsuffixed numeric arra
 
 From lowest to highest precedence:
 
-1. `||`
-2. `&&`
-3. `==`, `!=`, `===`
-4. `<`, `<=`, `>`, `>=`
-5. `..`
+1. `..`
+2. `||`
+3. `&&`
+4. `==`, `!=`, `===`
+5. `<`, `<=`, `>`, `>=`
 6. `+`, `-`
 7. `*`, `/`, `%`
 8. Unary `-`, `!`
 9. Postfix calls `()`, member access `.`, and indexing `[]`
 
-Grouping parentheses override precedence. Evaluation is left-to-right as defined by the language; `&&` and `||` short-circuit. Java lowering must preserve exactly-once evaluation and exception/side-effect order.
+`..` is the loosest operator because concatenation renders values that are already fully evaluated: a
+condition, comparison, or arithmetic expression is an operand without grouping.
+
+```solvik
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("total: " .. 1 + 2 * 3 .. " ok: " .. count > 0)
+```
+
+Grouping parentheses override precedence, and grouping is required when a concatenation is itself an
+operand, such as when rendered text is compared:
+
+```solvik
+if ("id:" .. id) == "id:7" {
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("match")
+}
+```
+
+Evaluation is left-to-right as defined by the language; `&&` and `||` short-circuit. Java lowering must preserve exactly-once evaluation and exception/side-effect order.
 
 ### 4.4 Arithmetic and conversion
 
@@ -536,19 +560,28 @@ while remaining > 0 {
 }
 
 if remaining == 0 {
-    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("done"))
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("done")
 } else {
-    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("pending"))
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("pending")
 }
 
 for item in String[2] {"A", "B"} {
-    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((item))
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(item)
 }
 ```
 
 - Conditions require non-null `Boolean`. There is no truthiness and no implicit conversion from `Boolean?`.
 - `if`, `else if`, and `else` follow standard block-based control flow.
 - `while`, `for ... in`, `break`, and `continue` preserve existing semantics.
+- `for ... in` iterates an **array** or any value whose type declares the iteration protocol:
+  `pub func iterator() -> solvik::collection::Iterator<X>` with no parameters. The loop name is
+  bound to `X` — the type argument of that declared return — so a `solvik::collection::List<Integer>`
+  yields `Integer`, not `Integer?`, and a `List<String?>` yields `String?` (§11.3). `List` and
+  `Stack` declare the protocol; `Map` does not, because a map entry has no Solvik type. A type that
+  is neither an array nor a protocol implementor is `SOL-T001`, and a nullable operand is
+  `SOL-T015` until it is narrowed. The protocol is ordinary library surface: a user `type` or
+  `trait` participates by declaring the member itself, and the loop calls that member once and then
+  the iterator's `hasNext()` and `next()`.
 - `break` and `continue` target the innermost loop, not a `switch`.
 - `try`, `catch`, `finally`, and `raise` handle exceptions (§7.4). A `try` statement is a statement,
   not an expression, so it produces no value.
@@ -561,7 +594,7 @@ label = "ready"
 
 if label != Null {
     // A soundly proven non-null label is usable as String here.
-    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((label.size()))
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(label.size())
 }
 ```
 
@@ -571,9 +604,9 @@ When type narrowing is implemented, it must operate on expression/binding identi
 
 ```solvik
 switch status {
-    case "ok" { solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("accepted")) }
-    case regex "ERR-[0-9]+" { solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("error code")) }
-    default { solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("other")) }
+    case "ok" { solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("accepted") }
+    case regex "ERR-[0-9]+" { solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("error code") }
+    default { solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("other") }
 }
 ```
 
@@ -598,18 +631,18 @@ func check(limit: Integer) {
     if limit < 0 {
         raise Exception(Codes.Denied, "negative limit")
     }
-    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("limit ") .. (limit))
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("limit " .. limit)
 }
 
 try {
     check(-1)
 } catch (error: Exception) {
-    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((error))                        // [4001] negative limit
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(error)                        // [4001] negative limit
     if error.getCode() == Codes.Denied {
-        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("denied: ") .. (error.getMessage()))
+        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("denied: " .. error.getMessage())
     }
 } finally {
-    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("done"))
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("done")
 }
 ```
 
@@ -650,6 +683,37 @@ reports `SOL-R013` with the raised code and message and exits `1`.
 anywhere a statement is, and a function declares nothing about what it may raise. Java checked
 exceptions stay mapped to `SOL-R011` at the native-call boundary (§11.2).
 
+### 7.5 Synchronization
+
+```solvik
+sync guard {
+    count = count + 1
+}
+```
+
+`sync monitor { ... }` runs the block while holding the monitor's Java monitor. It is a statement, not
+an expression, and produces no value.
+
+- The monitor is an ordinary expression, and it must be a **non-null user type or array**: a value
+  whose identity this program owns. `Integer` and the other numeric types, `String`, `Boolean`,
+  `Null`, `Any`, `Number`, and `Exception` are rejected (`SOL-T019`), because a boxed or interned
+  value may be cached or shared and a monitor could then be held by code that never agreed to it. A
+  nullable monitor is the ordinary missing-value failure (`SOL-T015`); narrow it first with a null
+  check (§7.1).
+- The block is a block: it is its own scope, and `return`, `break`, `continue`, and `raise` mean
+  exactly what they mean in a bare block. The monitor is released on every way out — normal
+  completion, `return`, `break`, `continue`, `raise`, a `SOL-Rxxx` abort, and `exit()` — because the
+  semantics are Java's `synchronized` statement. There is no `lock()`/`unlock()` pair to write and no
+  `finally` to remember.
+- A `sync` block on a monitor the current thread already holds runs (Java monitors are reentrant).
+  Two threads taking different monitors in opposite orders can deadlock. The language detects
+  neither deadlock nor starvation, and it promises no fairness.
+- `sync` is a reserved word (§13.1) and a statement only: there is no `sync` function or type
+  modifier, so a whole-object lock is written `sync self { ... }` where that is what is wanted.
+- As with `if` and `while`, the block opens on the same line as the monitor expression (§1).
+- `sync` adds no thread, task, or scheduling behavior. Concurrency itself is `solvik::concurrency`
+  (§11.5); `await()` on a started task is still the point at which its writes become visible.
+
 ## 8. Functions, constructors, and generics
 
 ```solvik
@@ -665,7 +729,7 @@ func missing() -> String? {
 }
 
 func noValue() {
-    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("side effect"))
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("side effect")
 }
 ```
 
@@ -698,7 +762,7 @@ type Counter {
 
 counter := Counter()
 counter.increment()
-solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((counter.get()))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(counter.get())
 ```
 
 - Types use composition; user types do not inherit concrete classes.
@@ -707,6 +771,8 @@ solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((counter.get()))
 - Code in one concrete type may access private members of another value of the **same** type.
 - Fields are immutable after construction unless declared `mut`. Constructor-time writes retain the existing special construction rule; they must never leave a field without an initialized value or violate its nullability.
 - A user type derives from `Any` conceptually and may implement traits.
+- A type body resolves names against the whole program, so declaration order decides nothing: a field initializer may construct any declared type (a module type, a packaged type, or a type declared later in the file), and a field or method signature may name any declared type. Written type arguments remain limited to native bindings (§8.2, §11).
+- One ordering exception remains, and it is rejected rather than guessed: a field initializer cannot read another type's field, because that field's type is inferred while its own type is checked. Read such a field from a function body instead. Static field and `static { }` evaluation order is the separate runtime contract of §3.4.
 
 ### 8.2 Generic types
 
@@ -724,7 +790,7 @@ type Holder<T> {
 }
 
 box := Holder(41)
-solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((box.hasValue()))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(box.hasValue())
 ```
 
 Nullability composes with generic parameters: `T` is non-null where the type parameter's declared contract requires a non-null value, and `T?` explicitly permits `Null`. Generic constraint and Java erasure validation must not confuse nullable and non-nullable representations. User-generic type argument inference remains constructor-based unless separately revised; native bindings may name type arguments as already supported.
@@ -745,12 +811,14 @@ trait Task {
 type Job implements Task {
     pub func Job() {}
     pub func run() {
-        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("working"))
+        solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("working")
     }
 }
 ```
 
-- A trait contains public instance functions only, with no fields, constructors, static methods, type parameters, or trait inheritance under the current contract.
+- A trait contains public instance functions only, with no fields, constructors, static methods,
+  type parameters, or trait inheritance under the current contract. A native trait binding over a
+  Java interface is the one exception for type parameters (§11.1).
 - Bodyless functions are required contracts. A function with a body is a default implementation.
 - The default sees `self` as the declaring trait; it can call the trait's contract and `Any` methods but cannot access implementing-type-only fields.
 - A concrete public implementation overrides a matching default and works through concrete and trait-typed references.
@@ -767,7 +835,7 @@ pub func delayMs(attempt: Integer) -> Long {
 
 `Trait.method(self, args...)` selects that trait's default body instead of virtual dispatch. The explicit source-level `self` is omitted from the Java call. Module-qualified traits use the complete name (for example, `network::Retry.delayMs`).
 
-## 10. Modules, visibility, and imports
+## 10. Modules, visibility, includes, and aliases
 
 ```solvik
 module geometry {
@@ -781,18 +849,107 @@ module geometry {
     }
 }
 
-solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((geometry::origin().x))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(geometry::origin().x)
 ```
 
 - `module` declares namespaces; `::` selects a module-qualified member. `.` selects an instance or type member.
 - Module paths map to Java packages; module functions compile into package-local generated functions holders as defined by the Java backend.
-- Module blocks may be reopened in the same or different explicitly imported files. Equal full module paths merge; nested blocks merge recursively.
+- Module blocks may be reopened in the same or different explicitly included files. Equal full module paths merge; nested blocks merge recursively.
 - Declaration privacy is at the containing **module** or declaring **type**, not the physical source file.
 - Outside access requires `pub`. A public signature may not expose a private type.
-- Types, child modules, and functions share a checked namespace. Duplicate declarations and cross-kind conflicts are errors; legitimate function overloads follow the signature rules.
+- Types, child modules, and functions share a checked namespace. Duplicate declarations and cross-kind conflicts are errors; legitimate function overloads follow the signature rules. A duplicate fully qualified type is an error regardless of which files declare it, and an alias never rescues the conflict.
 - User source cannot open the compiler-reserved root `solvik` module. Only compiler-packaged resources can contribute to it.
 - `java.*` names remain restricted by Java package rules; any remapping must remain deterministic and consistent with the backend contract.
-- Importing a file does not implicitly import short names. Qualified standard-library names remain required.
+- Including a file does not bring its short names into scope. Qualified standard-library names remain required.
+
+### 10.1 Source files and `include`
+
+`include` adds **files** to the compilation graph. It is not textual substitution, and it does not name
+a module: a file's own `module` blocks decide which namespaces its declarations join, and one file
+may declare several unrelated or nested modules.
+
+```solvik
+include {
+    "models.sol"
+    "parsers.sol"; "formatters.sol"
+    ;
+    "models.sol";            // the same physical file again: loaded once
+}
+
+include { "extras.sol" }     // a one-entry block on one line
+```
+
+- The block is **required**, even for one path. `include "a.sol"` is not a declaration form.
+- Paths are quoted string literals, resolved relative to the file that writes the block, and followed
+  transitively. The same physical file is loaded once, including through diamond graphs and different
+  relative spellings; a cycle is a compile-time error (`SOL-I004`) that names the cycle.
+- Entries are separated by a **newline or `;`**, mixed and repeated arbitrarily. An entry may follow
+  `{` directly, and a separator may follow the last entry before `}`. Commas are not separators.
+- An empty block is rejected. Blank lines and comments between entries are layout.
+- `include` is a file-level block only: it is not allowed inside a module, type, or function body.
+  Blocks may appear anywhere at file level and may interleave with declarations; their effect is
+  file-wide and order independent.
+- Only the **entry file** executes top-level statements; an included file contributes declarations.
+- A missing path (`SOL-I001`), an absolute path (`SOL-I002`), and statements in an included file
+  (`SOL-I003`) are reported against the offending entry, naming the file it came from.
+- The removed `import "path"` and `import { ... }` spellings are rejected with `SOL-P006`, naming the
+  `include` and `alias` replacements.
+- Compiler-packaged standard-library resources are registered by the compiler, not by `include`.
+  User code never includes them; their canonical names are already available.
+- A program compiled from memory (not from a file path) has no directory to resolve includes against,
+  so it reports `SOL-I001` while still allowing aliases to already-loaded standard-library symbols.
+- The compilation cache depends on the text of every transitively included file, so editing any of
+  them produces a fresh compile.
+
+### 10.2 File-local aliases
+
+`alias` binds a convenient spelling to an **existing canonical** module, type, or trait. The target
+is written first and the local name second; there is no `as`, `=`, or `use` in an entry.
+
+```solvik
+alias {
+    foo::bar::Parser Parser
+    foo::bar::Formatter Fmt; foo::bar fb
+}
+
+parser := Parser()
+other := fb::Parser()
+```
+
+- The block is **required**, even for one entry, and follows the same newline/`;` separator rules as
+  `include`. An empty block is rejected, and `alias foo::bar::Parser Parser` without braces is not a
+  declaration form.
+- A target must name a **module**, a **type**, or a **trait** by its canonical fully qualified name.
+  Functions, generic specializations, wildcard imports, re-exports, member-access aliases (`.`), and
+  aliases-of-aliases are not supported. A module alias still reaches that module's public functions
+  through a qualified path (`fb::makeParser()`); a type alias works everywhere its type is written
+  (construction, parameters, returns, `?`, arrays, type arguments, static members); a trait alias
+  works in `implements` and in the `Trait.default(self, ...)` form.
+- **Scope is the source file**, not the merged module namespace. Two files may declare the same local
+  spelling for unrelated targets without collision, and the source file of each *reference* decides
+  which alias environment is consulted. An alias in an included file never reaches the including
+  file, and an alias in the including file never reaches an included file. File aliases are never
+  added to the canonical symbol table, to Java packages, or to generated classes.
+- Alias blocks are file-wide and **order independent**: an alias may be declared after the code that
+  uses it, and a file may declare several blocks.
+- Resolution for an **unqualified** name is: a local variable or parameter (never a type or module),
+  then a declaration of the enclosing module, then a file alias, then a top-level declaration. A name
+  declared inside a module therefore wins over a file alias of the same spelling there, while the
+  alias still applies outside that module.
+- Resolution for a **qualified** name expands only its leading segment once, before canonical lookup:
+  `fb::Parser` becomes `foo::bar::Parser`. A canonical path that does not begin with a local alias is
+  unchanged. Alias targets are canonical, so expansion never chains.
+- All metadata, overload selection, and generated Java use the **canonical** target. A type alias
+  emits exactly the Java type its target names; a module alias emits calls into the canonical module;
+  no wrapper type, extra class, or extra package is produced.
+- Visibility is not widened: an alias may only name a symbol visible at file level — a top-level
+  declaration or a `pub` module member — and each use then passes the ordinary visibility check on the
+  canonical target. A private module type stays reachable only by its canonical name inside its own
+  module. An alias never makes a private symbol publicly accessible.
+- Rejected with `SOL-T018`, positioned at the target or the local name: a missing target, an unknown
+  target, a function target, a target private to its module, a local name declared twice in one file
+  (even with the same target), and a local name that is a built-in type, the built-in function `exit`,
+  the reserved `solvik` root, or a top-level type, function, or module name.
 
 ## 11. Java interoperability and native bindings
 
@@ -807,7 +964,7 @@ module jdk {
     }
 }
 
-solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((jdk::Math.abs(-3)))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(jdk::Math.abs(-3))
 ```
 
 An explicit, typed collection binding might be:
@@ -838,6 +995,18 @@ The nullable return on `get` matters: Java `HashMap.get` can return `null`. A Ja
 - `native "javaName"` on a member maps a Solvik-facing name to another Java member name.
 - Resolution is performed at compile time against exactly the configured JDK and application classpath; invalid or ambiguous signatures are errors (`SOL-T013`).
 - Native bindings preserve existing generic arity and Java erasure restrictions.
+- A native `trait` may declare type parameters; they name the Java interface's own parameters, as in
+  `solvik::collection::Iterator<T>` over `java.util.Iterator<E>`. A `trait` written in Solvik cannot
+  declare them (§9), because its default bodies and bridges cannot express generic substitution.
+- A generic native trait is represented by its own Solvik interface instead of extending the Java
+  interface: a Solvik `Boolean` result cannot override a Java primitive `boolean`, and an object
+  from the Java API never implements the Solvik interface. A native member whose declared result is
+  such a trait converts it through the compiler-generated `$of` factory, so no cast, reflection, or
+  runtime lookup takes part.
+- A type participates in iteration by declaring `iterator()` itself (§7). Writing a generic native
+  trait in an `implements` clause with arguments, such as `implements solvik::collection::Iterator<Integer>`,
+  is not supported: trait implementation matches the trait's declared member types without
+  substituting those arguments.
 - A Java return value may be ignored by a binding declaration without `->`, preserving the statement-only convention.
 - Method calls must preserve Java argument evaluation order and exception behavior.
 - Java-null acceptance for parameters is represented by nullable Solvik parameter types; unannotated Java APIs do not implicitly override Solvik's explicit nullability.
@@ -856,19 +1025,24 @@ The compiler packages standard-library `.sol` resources, loaded into every progr
 
 | Namespace | Type | Java or Solvik implementation |
 | --- | --- | --- |
-| `solvik::collections` | `Map<K, V>` | `java.util.HashMap` |
-| `solvik::collections` | `List<T>` | `java.util.ArrayList` |
-| `solvik::collections` | `Stack<T>` | `java.util.Stack` |
+| `solvik::collection` | `Iterator<T>` | `java.util.Iterator`, the `for ... in` protocol |
+| `solvik::collection` | `Map<K, V>` | `java.util.HashMap` |
+| `solvik::collection` | `List<T>` | `java.util.ArrayList` |
+| `solvik::collection` | `Stack<T>` | `java.util.Stack` |
 | `solvik::concurrency` | `Task` | `java.lang.Runnable` |
 | `solvik::concurrency` | `Thread` | Java virtual-thread adapter |
 | `solvik::util` | `UUID` | Solvik source with JDK bindings |
 | `solvik::io` | `Channel`, `Stdio`, `TextReader`, `TextWriter`, `ByteReader`, `ByteWriter`, `File`, `IoError` | Solvik declarations with bundled native or filesystem bindings, plus Solvik-only wrappers |
 
-The standard library is not exempt from the revised type system. Its `.sol` files must migrate away from `var` and lowercase `null`, add all required initializers, and accurately specify nullable values returned by Java APIs. Packaged resources remain declaration-only; importing them as ordinary file paths is not how standard-library registration works.
+The standard library is not exempt from the revised type system. Its `.sol` files must migrate away from `var` and lowercase `null`, add all required initializers, and accurately specify nullable values returned by Java APIs. Packaged resources remain declaration-only; including them as ordinary file paths is not how standard-library registration works.
+
+`solvik::collection::List` and `Stack` publish the iteration protocol of §7 through
+`iterator()`, so `for value in items` reads every element with the element's own type. `Map` does
+not publish it: iteration would need an entry type that has no Solvik representation yet.
 
 The I/O types are ordinary packaged module types. A program names them through their full
-`solvik::io` path, such as `solvik::io::TextWriter`, exactly as it names `solvik::collections::Map`.
-It does not import them, and an unqualified reference does not resolve. Only a packaged type a
+`solvik::io` path, such as `solvik::io::TextWriter`, exactly as it names `solvik::collection::Map`.
+It does not include them, and an unqualified reference does not resolve. Only a packaged type a
 program actually mentions is emitted into the generated Java, so a program that performs no I/O
 carries neither the I/O types nor their binding adapter.
 
@@ -883,6 +1057,10 @@ Classpath entries are explicit readable JAR files, not directories, wildcards, a
 ### 11.5 Concurrency
 
 The packaged `solvik::concurrency::Task` and `Thread` interfaces remain based on explicit task objects (not closures). `Thread.start(Task)` uses Java 25 virtual threads, `await()` maps to `join`, and `await(milliseconds: Long)` maps to timed `join`. Existing timeouts, interruption handling, and Java memory-visibility guarantees remain in force. Introducing nullable types does not change Java's `join` visibility semantics.
+
+Shared state is protected with a `sync` statement (§7.5), which holds a Java monitor and releases it
+on every way out of its block. `Task` and `Thread` provide no locking of their own, and a task's
+plain reads and writes are visible to the thread that joined it, exactly as `join` promises.
 
 ### 11.6 Bundled native declarations and standard I/O
 
@@ -996,20 +1174,24 @@ the category. It is not a `SOL-Rxxx` runtime abort.
   declaration costs no generated source and pulls in no binding support.
 - Generated classes do not inherit from user classes. Traits emit Java interfaces; native declarations emit adapters or interface bridges.
 - Modules emit Java packages. Static fields/methods emit Java static members; instance and type-member calls retain their ownership distinction.
+- A file alias emits no Java of its own: the checker records the canonical symbol each reference
+  selected, so an aliased type name produces exactly the class, `implements` entry, parameter, and
+  return type its target names, and a module alias produces the canonical package's call. No alias
+  creates a wrapper class, an extra package, a field, or a runtime object.
 - Intrinsics needed for rendering, conversions, exceptions, and diagnostics are generated into the program only as required. No external Solvik runtime library is introduced.
 - For identical compiler version, source inputs, classpath, and options, emitted source must be deterministic.
 - Prefer clean, readable, conventional Java rather than shortest-text output. Runtime performance remains higher priority than appearance.
 
 ## 13. Diagnostics, failures, and compatibility
 
-The compiler reports file, line, column, and useful source context for lexical, syntax, type, and import errors. Existing diagnostic families remain:
+The compiler reports file, line, column, and useful source context for lexical, syntax, type, and include errors. Existing diagnostic families remain:
 
 | Family | Purpose |
 | --- | --- |
 | `SOL-L001`–`SOL-L007` | Lexing, strings, escapes, numeric suffixes, continuation markers |
-| `SOL-P001`–`SOL-P004` | Parsing and declaration placement |
-| `SOL-T001`–`SOL-T017` | Types, scopes, visibility, mutability, generics, bindings, overloads, exceptions |
-| `SOL-I001`–`SOL-I004` | Imports and packaged-resource restrictions |
+| `SOL-P001`–`SOL-P008` | Parsing, declaration placement, array spelling, removed syntax, bindings, type form |
+| `SOL-T001`–`SOL-T019` | Types, scopes, visibility, mutability, generics, bindings, overloads, exceptions, aliases, monitors |
+| `SOL-I001`–`SOL-I004` | Includes and packaged-resource restrictions |
 | `SOL-R001`–`SOL-R013` | Defined runtime errors, exception failures, and native-call failures |
 
 New nullability and declaration failures must receive precise diagnostics. Preserve existing codes where the failure meaning is unchanged; introduce new stable codes, rather than reusing unrelated codes, when necessary. Do not claim an exact new code until it has been assigned in the compiler and test suite.
@@ -1020,8 +1202,15 @@ Exception handling assigns these codes (§7.4):
 | --- | --- |
 | `SOL-T016` | A `catch` clause whose written type is not `Exception` |
 | `SOL-T017` | A `return` inside a `finally` block |
+| `SOL-T018` | An `alias` target that cannot be resolved or a local alias name that collides (§10.2) |
 | `SOL-R012` | A negative exception code was constructed |
 | `SOL-R013` | An exception reached the top of the program uncaught |
+
+Synchronization assigns one code (§7.5):
+
+| Code | Meaning |
+| --- | --- |
+| `SOL-T019` | A `sync` monitor whose identity the program does not own |
 
 CLI statuses stay `0` on success, `1` for compilation failure or runtime abort, and `2` for invalid CLI usage.
 
@@ -1046,6 +1235,9 @@ CLI statuses stay `0` on success, `1` for compilation failure or runtime abort, 
 | `print(...)` / `println(...)` | Removed entirely. Write `solvik::io::TextWriter(solvik::io::Stdio.stdout()).write(...)` / `.writeLine(...)`; a multi-value line is one concatenation, e.g. `writeLine(a .. b)` |
 | a fixed `"\n"` assumed as the output terminator | `solvik::io::TextWriter.writeLine` appends the platform terminator `solvik::io::TextWriter.EOL`; write a fixed terminator explicitly through `write` |
 | `try`, `catch`, `finally`, `raise` used as identifiers | Reserved keywords (§7.4) |
+| `sync` used as an identifier | Reserved keyword for the synchronization statement (§7.5) |
+| `import "path"`, `import { ... }` | Replaced by `include { ... }` and `alias { ... }` (§10.1, §10.2) |
+| a binding, parameter, or type named `include` or `alias` | Reserved keywords for the new blocks (§10.1, §10.2) |
 | `type Exception` (or any declaration named `Exception`) | Reserved: the built-in exception type (§7.4) |
 
 The previously supported late type fixation of an uninitialized slot is **removed**. The type of every binding is known at its declaration. `foo? := Null` is nullable `Any?`, not an invitation to infer `foo`'s type later.
@@ -1088,7 +1280,7 @@ nothing := Null                     // Null
 
 // VALID null-safe operations
 solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("" .. Null)
-solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("" .. (Null == Null))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("" .. Null == Null)
 solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(String(Null))
 
 // VALID standard I/O
@@ -1132,14 +1324,14 @@ optionalArray: Integer[2]? = Null
 try {
     raise Exception(4001, "denied")
 } catch (error: Exception) {
-    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((error.getCode()) .. (" ") .. (error.getMessage()))
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(error.getCode() .. " " .. error.getMessage())
 } finally {
-    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("done"))
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("done")
 }
 try {
-    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("cleanup only"))
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("cleanup only")
 } finally {
-    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("done"))
+    solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("done")
 }
 ```
 
@@ -1171,4 +1363,4 @@ try {
 // type Bad { static { return } }                         // SOL-T005: a static block has no return
 ```
 
-End-to-end validation must compile and run generated Java with Java 25 and no Solvik runtime on the generated-program classpath. Tests must cover native methods returning unexpected Java null, nullable array elements, overload collisions caused by nullable erasure, read/write safety, constructor-initialized immutable fields, and the existing regression corpus. The revised `example.sol`, imports, standard-library `.sol` resources, `JAVA_BACKEND.md`, CLI documentation, golden source tests, and compiler diagnostics must all be updated together when implementing the language change.
+End-to-end validation must compile and run generated Java with Java 25 and no Solvik runtime on the generated-program classpath. Tests must cover native methods returning unexpected Java null, nullable array elements, overload collisions caused by nullable erasure, read/write safety, constructor-initialized immutable fields, and the existing regression corpus. The revised `example.sol`, includes and aliases, standard-library `.sol` resources, `JAVA_BACKEND.md`, CLI documentation, golden source tests, and compiler diagnostics must all be updated together when implementing the language change.

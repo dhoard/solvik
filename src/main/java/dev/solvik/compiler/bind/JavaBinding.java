@@ -166,9 +166,43 @@ public record JavaBinding(Class<?> javaClass, Map<Ast.FuncDecl, Executable> memb
         if (type instanceof TypeVariable<?> variable) {
             return mapping.get(variable);
         }
+        if (type instanceof ParameterizedType generic) {
+            return mappedParameterized(generic, mapping, resolveJavaClass);
+        }
         if (!(type instanceof Class<?> clazz)) return null;
         SolvikType builtin = JavaTypes.of(clazz);
         return builtin == null ? resolveJavaClass.apply(clazz) : builtin;
+    }
+
+    /**
+     * A parameterized Java type named by a declared binding, with its arguments mapped.
+     *
+     * <p>Only a class or interface a packaged declaration already names has a Solvik
+     * representation: {@code java.util.Iterator<E>} maps to the declaring native trait with each
+     * argument mapped by the same rule, so {@code E} substituted with {@code Integer} yields
+     * {@code solvik::collection::Iterator<Integer>}. A raw class with no declared name, a wildcard,
+     * or an argument with no representation maps to {@code null}, which the caller reports as an
+     * unmatched signature rather than a guess.
+     */
+    private static SolvikType mappedParameterized(ParameterizedType generic,
+            Map<TypeVariable<?>, SolvikType> mapping,
+            Function<Class<?>, SolvikType> resolveJavaClass) {
+        if (!(generic.getRawType() instanceof Class<?> raw)) {
+            return null;
+        }
+        SolvikType base = mapped(raw, mapping, resolveJavaClass);
+        if (base == null || base.kind() != SolvikType.Kind.USER) {
+            return null;
+        }
+        List<SolvikType> arguments = new ArrayList<>();
+        for (Type argument : generic.getActualTypeArguments()) {
+            SolvikType mappedArgument = mapped(argument, mapping, resolveJavaClass);
+            if (mappedArgument == null) {
+                return null;
+            }
+            arguments.add(mappedArgument);
+        }
+        return SolvikType.user(base.userName(), arguments);
     }
 
     /** Substitute inherited Java class variables, not merely variables with coincident names. */

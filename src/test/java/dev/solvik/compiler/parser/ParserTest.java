@@ -265,11 +265,29 @@ class ParserTest {
         void follows_the_settled_precedence_table() {
             assertThat(render(expression("2 + 3 * 4"))).isEqualTo("(2+(3*4))");
             assertThat(render(expression("a + b .. c"))).isEqualTo("((a+b)..c)");
-            assertThat(render(expression("a .. b == c"))).isEqualTo("((a..b)==c)");
-            assertThat(render(expression("a == b && c != d"))).isEqualTo("((a==b)&&(c!=d))");
             assertThat(render(expression("a || b && c"))).isEqualTo("(a||(b&&c))");
+            assertThat(render(expression("a == b && c != d"))).isEqualTo("((a==b)&&(c!=d))");
             assertThat(render(expression("-a * b"))).isEqualTo("((-a)*b)");
             assertThat(render(expression("!a || b"))).isEqualTo("((!a)||b)");
+        }
+
+        @Test
+        @DisplayName("`..` is the loosest operator, so rendering needs no grouping")
+        void concatenation_is_the_loosest_operator() {
+            assertThat(render(expression("a .. b == c"))).isEqualTo("(a..(b==c))");
+            assertThat(render(expression("a == b .. c"))).isEqualTo("((a==b)..c)");
+            assertThat(render(expression("a .. b && c"))).isEqualTo("(a..(b&&c))");
+            assertThat(render(expression("a && b .. c"))).isEqualTo("((a&&b)..c)");
+            assertThat(render(expression("a || b .. c"))).isEqualTo("((a||b)..c)");
+            assertThat(render(expression("a .. b + c"))).isEqualTo("(a..(b+c))");
+            assertThat(render(expression("a .. b .. c"))).isEqualTo("((a..b)..c)");
+        }
+
+        @Test
+        @DisplayName("grouping still compares a concatenation")
+        void parentheses_still_override_concatenation() {
+            assertThat(render(expression("(a .. b) == c"))).isEqualTo("((a..b)==c)");
+            assertThat(render(expression("a .. (b .. c)"))).isEqualTo("(a..(b..c))");
         }
 
         @Test
@@ -338,7 +356,7 @@ class ParserTest {
         @DisplayName("type arguments and an array size may span lines")
         void type_arguments_and_array_sizes_may_span_lines() {
             Ast.Program program = parse("""
-                    lists := solvik::collections::List<
+                    lists := solvik::collection::List<
                         String
                     >()
                     values := Integer[

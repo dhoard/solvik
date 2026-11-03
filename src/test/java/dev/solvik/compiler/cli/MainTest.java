@@ -597,7 +597,9 @@ class MainTest {
     @DisplayName("a failed check deletes its scratch entry too")
     void check_deletes_its_scratch_entry_after_a_failure() throws Exception {
         Path source = write("scratch-fail.sol", """
-                import "absent.sol"
+                include {
+                    "absent.sol"
+                }
 
                 value := 1
                 """);
@@ -624,8 +626,8 @@ class MainTest {
     }
 
     @Test
-    @DisplayName("check rejects an error in an imported file and names that file")
-    void check_reports_errors_in_an_imported_file() throws Exception {
+    @DisplayName("check rejects an error in an included file and names that file")
+    void check_reports_errors_in_an_included_file() throws Exception {
         write("lib-bad.sol", """
                 module lib {
                     pub func broken() -> Integer {
@@ -634,7 +636,9 @@ class MainTest {
                 }
                 """);
         Path source = write("uses-lib.sol", """
-                import "lib-bad.sol"
+                include {
+                    "lib-bad.sol"
+                }
 
                 value := lib::broken()
                 """);
@@ -649,8 +653,8 @@ class MainTest {
     }
 
     @Test
-    @DisplayName("check follows imports transitively and checks the whole program")
-    void check_follows_transitive_imports() throws Exception {
+    @DisplayName("check follows includes transitively and checks the whole program")
+    void check_follows_transitive_includes() throws Exception {
         write("deep.sol", """
                 module deep {
                     pub func broken() -> Integer {
@@ -658,10 +662,12 @@ class MainTest {
                     }
                 }
                 """);
-        // mid.sol imports deep.sol but never calls the broken function, so only a whole-program check
-        // can reach the error.
+        // mid.sol includes deep.sol but never calls the broken function, so only a whole-program
+        // check can reach the error.
         write("mid.sol", """
-                import "deep.sol"
+                include {
+                    "deep.sol"
+                }
 
                 module mid {
                     pub func value() -> Integer {
@@ -670,7 +676,9 @@ class MainTest {
                 }
                 """);
         Path source = write("transitive.sol", """
-                import "mid.sol"
+                include {
+                    "mid.sol"
+                }
 
                 value := mid::value()
                 """);
@@ -681,10 +689,12 @@ class MainTest {
     }
 
     @Test
-    @DisplayName("check reports a missing import before compiling anything")
-    void check_reports_a_missing_import() throws Exception {
-        Path source = write("missing-import.sol", """
-                import "absent.sol"
+    @DisplayName("check reports a missing include before compiling anything")
+    void check_reports_a_missing_include() throws Exception {
+        Path source = write("missing-include.sol", """
+                include {
+                    "absent.sol"
+                }
 
                 value := 1
                 """);
@@ -695,8 +705,8 @@ class MainTest {
     }
 
     @Test
-    @DisplayName("check sees a change in an imported file, not just the entry file")
-    void check_notices_a_changed_import() throws Exception {
+    @DisplayName("check sees a change in an included file, not just the entry file")
+    void check_notices_a_changed_include() throws Exception {
         Path library = write("lib-edit.sol", """
                 module lib {
                     pub func value() -> Integer {
@@ -705,7 +715,9 @@ class MainTest {
                 }
                 """);
         Path source = write("uses-edit.sol", """
-                import "lib-edit.sol"
+                include {
+                    "lib-edit.sol"
+                }
 
                 result := lib::value()
                 """);

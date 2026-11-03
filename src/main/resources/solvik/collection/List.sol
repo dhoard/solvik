@@ -1,8 +1,8 @@
-// solvik::collections::List — java.util.ArrayList exposed as List.
-// Loaded from the compiler JAR; declares one native type in solvik::collections.
+// solvik::collection::List — java.util.ArrayList exposed as List.
+// Loaded from the compiler JAR; declares one native type in solvik::collection.
 
 module solvik {
-    module collections {
+    module collection {
         // java.util.ArrayList<T> — growable list exposed under the name `List`.
         pub type List<T> native "java.util.ArrayList" {
 
@@ -30,6 +30,10 @@ module solvik {
             pub func indexOf(item: Any) -> Integer
 
             pub func clear()
+
+            // The iteration protocol (§7, §11.3): `for value in items` binds `value` to `T`, because
+            // java.util.ArrayList.iterator never yields a null for a non-null element type.
+            pub func iterator() -> Iterator<T>
 
             pub func toString() -> String
         }

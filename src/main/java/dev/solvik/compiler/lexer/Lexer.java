@@ -66,13 +66,16 @@ public final class Lexer {
             Map.entry("pub", TokenKind.PUB),
             Map.entry("module", TokenKind.MODULE),
             Map.entry("import", TokenKind.IMPORT),
+            Map.entry("include", TokenKind.INCLUDE),
+            Map.entry("alias", TokenKind.ALIAS),
             Map.entry("native", TokenKind.NATIVE),
             Map.entry("mut", TokenKind.MUT),
             Map.entry("static", TokenKind.STATIC),
             Map.entry("try", TokenKind.TRY),
             Map.entry("catch", TokenKind.CATCH),
             Map.entry("finally", TokenKind.FINALLY),
-            Map.entry("raise", TokenKind.RAISE));
+            Map.entry("raise", TokenKind.RAISE),
+            Map.entry("sync", TokenKind.SYNC));
 
     private final String source;
     private final Diagnostics diagnostics;

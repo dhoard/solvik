@@ -30,9 +30,13 @@ import org.junit.jupiter.api.io.TempDir;
  */
 class EmbeddedBindingsTest {
 
-    /** The collection bindings, in the sorted path order the packaged scan uses. */
+    /** Every collection resource, in the sorted path order the packaged scan uses. */
+    private static final List<String> COLLECTION_RESOURCES = List.of(
+            "solvik/collection/Iterator.sol", "solvik/collection/List.sol",
+            "solvik/collection/Map.sol", "solvik/collection/Stack.sol");
+    /** The collection resources that bind a Java class, in the same order. */
     private static final List<String> RESOURCES = List.of(
-            "solvik/collections/List.sol", "solvik/collections/Map.sol", "solvik/collections/Stack.sol");
+            "solvik/collection/List.sol", "solvik/collection/Map.sol", "solvik/collection/Stack.sol");
     private static final String UUID_RESOURCE = "solvik/util/UUID.sol";
     private static final String TASK_RESOURCE = "solvik/concurrency/Task.sol";
     private static final String THREAD_RESOURCE = "solvik/concurrency/Thread.sol";
@@ -55,7 +59,8 @@ class EmbeddedBindingsTest {
                 Ast.Program program = new Parser(new Lexer(source, diagnostics, resource).tokenize(),
                         diagnostics).parseProgram();
                 assertThat(diagnostics.all()).isEmpty();
-                assertThat(program.imports()).isEmpty();
+                assertThat(program.includes()).isEmpty();
+            assertThat(program.aliases()).isEmpty();
                 assertThat(program.statements()).isEmpty();
                 assertThat(program.types()).isEmpty();
                 assertThat(program.functions()).isEmpty();
@@ -65,12 +70,12 @@ class EmbeddedBindingsTest {
                 assertThat(root.types()).isEmpty();
                 assertThat(root.functions()).isEmpty();
                 assertThat(root.modules()).hasSize(1);
-                Ast.ModuleDecl collections = root.modules().getFirst();
-                assertThat(collections.name()).isEqualTo("collections");
-                assertThat(collections.functions()).isEmpty();
-                assertThat(collections.modules()).isEmpty();
-                assertThat(collections.types()).hasSize(1);
-                Ast.TypeDecl binding = collections.types().getFirst();
+                Ast.ModuleDecl collection = root.modules().getFirst();
+                assertThat(collection.name()).isEqualTo("collection");
+                assertThat(collection.functions()).isEmpty();
+                assertThat(collection.modules()).isEmpty();
+                assertThat(collection.types()).hasSize(1);
+                Ast.TypeDecl binding = collection.types().getFirst();
                 assertThat(binding.name()).isEqualTo(names.get(i));
                 assertThat(binding.nativeClass()).isEqualTo(targets.get(i));
                 assertThat(binding.isPublic()).isTrue();
@@ -84,14 +89,32 @@ class EmbeddedBindingsTest {
     }
 
     @Test
+    @DisplayName("the iterator resource declares the one generic native trait the loop reads")
+    void the_iterator_resource_declares_the_iteration_protocol() throws Exception {
+        Ast.TypeDecl iterator = packagedType("solvik/collection/Iterator.sol");
+
+        assertThat(iterator.isTrait()).isTrue();
+        assertThat(iterator.name()).isEqualTo("Iterator");
+        assertThat(iterator.nativeClass()).isEqualTo("java.util.Iterator");
+        assertThat(iterator.typeParameters()).containsExactly("T");
+        assertThat(iterator.methods()).extracting(Ast.FuncDecl::name)
+                .containsExactly("hasNext", "next");
+        assertThat(iterator.methods()).allMatch(Ast.FuncDecl::isPublic);
+        // A native type binding must target a class; the iterator is an interface, so it is a trait.
+        for (String resource : RESOURCES) {
+            assertThat(packagedType(resource).isTrait()).as(resource).isFalse();
+        }
+    }
+
+    @Test
     void concurrency_resources_declare_the_exact_public_surface() throws Exception {
-        Ast.TypeDecl task = concurrencyType(TASK_RESOURCE);
+        Ast.TypeDecl task = packagedType(TASK_RESOURCE);
         assertThat(task.name()).isEqualTo("Task");
         assertThat(task.isTrait()).isTrue();
         assertThat(task.nativeClass()).isEqualTo("java.lang.Runnable");
         assertThat(task.methods()).extracting(Ast.FuncDecl::name).containsExactly("run");
 
-        Ast.TypeDecl thread = concurrencyType(THREAD_RESOURCE);
+        Ast.TypeDecl thread = packagedType(THREAD_RESOURCE);
         assertThat(thread.name()).isEqualTo("Thread");
         assertThat(thread.isTrait()).isFalse();
         assertThat(thread.nativeClass()).isEqualTo("java.lang.Thread");
@@ -103,7 +126,8 @@ class EmbeddedBindingsTest {
                 .map(method -> method.params().size()).toList()).containsExactly(0, 1);
     }
 
-    private Ast.TypeDecl concurrencyType(String resource) throws Exception {
+    /** The one declared type of a packaged resource that opens exactly one nested module. */
+    private Ast.TypeDecl packagedType(String resource) throws Exception {
         try (var stream = getClass().getResourceAsStream("/" + resource)) {
             assertThat(stream).describedAs(resource).isNotNull();
             String source = new String(stream.readAllBytes(), StandardCharsets.UTF_8);
@@ -111,12 +135,14 @@ class EmbeddedBindingsTest {
             Ast.Program program = new Parser(new Lexer(source, diagnostics, resource).tokenize(),
                     diagnostics).parseProgram();
             assertThat(diagnostics.all()).describedAs("%s", diagnostics.format(resource)).isEmpty();
+            assertThat(program.modules()).describedAs(resource).hasSize(1);
             Ast.ModuleDecl root = program.modules().getFirst();
             assertThat(root.name()).isEqualTo("solvik");
-            Ast.ModuleDecl concurrency = root.modules().getFirst();
-            assertThat(concurrency.name()).isEqualTo("concurrency");
-            assertThat(concurrency.types()).hasSize(1);
-            return concurrency.types().getFirst();
+            assertThat(root.modules()).describedAs(resource).hasSize(1);
+            Ast.ModuleDecl nested = root.modules().getFirst();
+            assertThat(resource).contains("/" + nested.name() + "/");
+            assertThat(nested.types()).describedAs(resource).hasSize(1);
+            return nested.types().getFirst();
         }
     }
 
@@ -130,7 +156,8 @@ class EmbeddedBindingsTest {
             Ast.Program program = new Parser(new Lexer(source, diagnostics, UUID_RESOURCE).tokenize(),
                     diagnostics).parseProgram();
             assertThat(diagnostics.all()).describedAs("%s", diagnostics.format(UUID_RESOURCE)).isEmpty();
-            assertThat(program.imports()).isEmpty();
+            assertThat(program.includes()).isEmpty();
+            assertThat(program.aliases()).isEmpty();
             assertThat(program.statements()).isEmpty();
             assertThat(program.types()).isEmpty();
             assertThat(program.functions()).isEmpty();
@@ -158,7 +185,7 @@ class EmbeddedBindingsTest {
         Diagnostics diagnostics = new Diagnostics();
         ProgramLoader.Loaded loaded = new ProgramLoader(diagnostics).loadSource("""
                 mut id: solvik::util::UUID? = solvik::util::UUID.parse("0190f2a4-7b3c-7a1d-8e2f-3c4d5e6f7a8b")
-                scores := solvik::collections::Map<String, Integer>()
+                scores := solvik::collection::Map<String, Integer>()
                 if id != Null {
                     scores.put("ann", id.toString().size())
                     solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((scores.get("ann")) .. (" ") .. (id.timestamp()))
@@ -167,11 +194,11 @@ class EmbeddedBindingsTest {
         assertThat(diagnostics.all()).describedAs("%s", diagnostics.format("t.sol")).isEmpty();
         assertThat(loaded.fileNames()).endsWith("t.sol");
         assertThat(new SolvikCompiler("t.sol").transpile(loaded)).containsKeys(
-                        "solvik/collections/Map.java", "solvik/util/UUID.java",
+                        "solvik/collection/Map.java", "solvik/util/UUID.java",
                         "Solvik$Program.java")
                 // Only a reached packaged type is emitted; the program never mentions these.
-                .doesNotContainKeys("solvik/collections/Stack.java",
-                        "solvik/collections/List.java");
+                .doesNotContainKeys("solvik/collection/Stack.java",
+                        "solvik/collection/List.java");
     }
 
     @Test
@@ -180,7 +207,8 @@ class EmbeddedBindingsTest {
         Diagnostics diagnostics = new Diagnostics();
         ProgramLoader.Loaded loaded = new ProgramLoader(diagnostics).loadSource("solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1) .. \"\")\n", "t.sol");
         assertThat(diagnostics.all()).describedAs("%s", diagnostics.format("t.sol")).isEmpty();
-        assertThat(loaded.fileNames()).startsWith(RESOURCES.toArray(String[]::new)).endsWith("t.sol");
+        assertThat(loaded.fileNames()).startsWith(COLLECTION_RESOURCES.toArray(String[]::new))
+                .endsWith("t.sol");
         assertThat(loaded.fileNames()).contains(UUID_RESOURCE);
         assertThat(loaded.sources().keySet()).containsExactlyElementsOf(loaded.fileNames());
         assertThat(loaded.standardLibraryModules()).isNotEmpty();
@@ -209,13 +237,13 @@ class EmbeddedBindingsTest {
     }
 
     @Test
-    @DisplayName("an import names a file: a packaged name is not one, and neither is a resource path")
-    void an_import_is_a_file_path() {
-        for (String written : List.of("solvik::collections::Map", "solvik/collections/Map.sol",
-                "solvik:collections:Map", "java:collections", "not/registered.sol")) {
+    @DisplayName("an include names a file: a packaged name is not one, and neither is a resource path")
+    void an_include_is_a_file_path() {
+        for (String written : List.of("solvik::collection::Map", "solvik/collection/Map.sol",
+                "solvik:collection:Map", "java:collections", "not/registered.sol")) {
             Diagnostics diagnostics = new Diagnostics();
             ProgramLoader.Loaded loaded = new ProgramLoader(diagnostics)
-                    .loadSource("import \"" + written + "\"\n", "t.sol");
+                    .loadSource("include { \"" + written + "\" }\n", "t.sol");
             assertThat(diagnostics.all()).describedAs(written).singleElement().satisfies(diagnostic -> {
                 assertThat(diagnostic.code()).isEqualTo(ProgramLoader.MISSING_FILE);
                 assertThat(diagnostic.message()).contains(written);
@@ -228,12 +256,12 @@ class EmbeddedBindingsTest {
     @Test
     @DisplayName("a packaged resource cannot be reached as a file, even by its own path")
     void a_local_file_cannot_reopen_a_packaged_namespace(@TempDir Path directory) throws Exception {
-        Path local = directory.resolve("solvik/collections/Map.sol");
+        Path local = directory.resolve("solvik/collection/Map.sol");
         Files.createDirectories(local.getParent());
-        Files.writeString(local, "module solvik { module collections { pub type Map { "
+        Files.writeString(local, "module solvik { module collection { pub type Map { "
                 + "pub func Map() { } } } }\n");
         Path entry = directory.resolve("app.sol");
-        Files.writeString(entry, "import \"solvik/collections/Map.sol\"\n");
+        Files.writeString(entry, "include { \"solvik/collection/Map.sol\" }\n");
         Diagnostics diagnostics = new Diagnostics();
         ProgramLoader.Loaded loaded = new ProgramLoader(diagnostics).load(entry);
         assertThat(diagnostics.all()).isEmpty();
@@ -258,7 +286,7 @@ class EmbeddedBindingsTest {
     @Test
     @DisplayName("a packaged type is still named by its full path: nothing brings short names in")
     void packaged_types_stay_qualified() {
-        for (String written : List.of("Map()", "collections::Map()", "util::UUID()",
+        for (String written : List.of("Map()", "collection::Map()", "util::UUID()",
                 "UUID()", "Map<String, Integer>()", "TextWriter(Stdio.stdout())",
                 "Channel.bytes()", "io::TextWriter(io::Stdio.stdout())")) {
             assertThatThrownBy(() -> new SolvikCompiler("t.sol").transpile(
@@ -267,8 +295,8 @@ class EmbeddedBindingsTest {
                     .isInstanceOf(SolvikCompiler.CompilationFailure.class);
         }
         assertThat(new SolvikCompiler("t.sol").transpile(
-                "value := solvik::collections::Map<String, Integer>()\n"))
-                .containsKey("solvik/collections/Map.java");
+                "value := solvik::collection::Map<String, Integer>()\n"))
+                .containsKey("solvik/collection/Map.java");
         assertThat(new SolvikCompiler("t.sol").transpile(
                 "out := solvik::io::TextWriter(solvik::io::Stdio.stdout())\n"))
                 .containsKeys("solvik/io/TextWriter.java", "solvik/io/Stdio.java",
@@ -305,12 +333,12 @@ class EmbeddedBindingsTest {
     void user_code_cannot_reopen_the_standard_library_even_with_a_bundled_looking_filename() {
         String source = """
                 module solvik {
-                    module collections {
+                    module collection {
                         pub type Fake { pub func Fake() { } }
                     }
                 }
                 """;
-        for (String name : List.of("t.sol", "solvik/collections/Map.sol")) {
+        for (String name : List.of("t.sol", "solvik/collection/Map.sol")) {
             assertThatThrownBy(() -> new SolvikCompiler(name).transpile(source))
                     .isInstanceOf(SolvikCompiler.CompilationFailure.class)
                     .hasMessageContaining(TypeChecker.TYPE_ERROR).hasMessageContaining("reserved");
@@ -318,10 +346,10 @@ class EmbeddedBindingsTest {
     }
 
     @Test
-    void imported_user_files_cannot_reopen_the_standard_library(@TempDir Path directory) throws Exception {
-        Files.writeString(directory.resolve("fake.sol"), "module solvik { module collections { } }\n");
+    void included_user_files_cannot_reopen_the_standard_library(@TempDir Path directory) throws Exception {
+        Files.writeString(directory.resolve("fake.sol"), "module solvik { module collection { } }\n");
         Path entry = directory.resolve("app.sol");
-        Files.writeString(entry, "import \"fake.sol\"\n");
+        Files.writeString(entry, "include { \"fake.sol\" }\n");
         Diagnostics diagnostics = new Diagnostics();
         ProgramLoader.Loaded loaded = new ProgramLoader(diagnostics).load(entry);
         assertThat(diagnostics.all()).isEmpty();
@@ -362,7 +390,7 @@ class EmbeddedBindingsTest {
 
         Ast.Program program = loaded.program();
         Ast.Program forged = new Ast.Program(program.types(), program.functions(), program.statements(),
-                List.of(copy), program.imports(), program.pos());
+                List.of(copy), program.includes(), program.aliases(), program.pos());
         Diagnostics diagnostics = new Diagnostics();
         TypeChecker.check(forged, diagnostics, ClassLoader.getPlatformClassLoader(),
                 loaded.standardLibraryModules(), loaded.packagedTypes());
@@ -384,9 +412,9 @@ class EmbeddedBindingsTest {
 
     @Test
     void packaged_resources_remain_declaration_only() throws Exception {
-        for (String source : List.of("solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1) .. \"\")\n", "import \"solvik/collections/Map.sol\"\n")) {
+        for (String source : List.of("solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1) .. \"\")\n", "include { \"solvik/collection/Map.sol\" }\n")) {
             assertThat(loadWithReplacedResource(RESOURCES.getFirst(), source))
-                    .contains(ProgramLoader.STATEMENTS_IN_IMPORT, RESOURCES.getFirst());
+                    .contains(ProgramLoader.STATEMENTS_IN_INCLUDED_FILE, RESOURCES.getFirst());
         }
     }
 

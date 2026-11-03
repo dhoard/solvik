@@ -43,7 +43,7 @@ artifacts.
 | User `type` | generated `public final class` | No inheritance or interface imposed by Solvik. |
 | Native `type … native "…"` | generated final adapter over a Java class | Composition, not inheritance; exported members only. |
 | `trait` | generated `public interface` | Bodyless functions are abstract; bodies are Java defaults; concrete types use `implements`. |
-| Native `trait … native "…"` | generated interface extending the Java interface | Exact bodyless bindings plus source-provided defaults. |
+| Native `trait … native "…"` | generated interface extending the Java interface; a generic one is a Solvik-owned interface with a `$of` adapter | Exact bodyless bindings plus source-provided defaults. A generic native trait cannot extend the Java interface, because a Solvik `Boolean` result cannot override a Java primitive `boolean`. |
 | `Null` | Java `null` at value sites | The singleton type has one value; a declaration whose type is `Null` uses `Object` as its carrier. |
 | `module` `m` | Java package `m` | Types are `m.Type`; functions are `m.Solvik$Functions`. |
 | top-level declarations | package `solvik` | `solvik.Solvik$Program` holds `main`, functions, and helpers. |
@@ -75,12 +75,25 @@ provenance that grants it, and that provenance comes from where the source was
 loaded from, never from a filename.
 
 Module blocks are reopened namespaces, not file-owned containers. The loader keeps
-all imported declarations and their source positions; the checker resolves members
+all included declarations and their source positions; the checker resolves members
 by full module path across those blocks. The transpiler combines bare functions
 from every block/file into one `<package>/Solvik$Functions.java` and emits each
-qualified type once. Nested module paths merge recursively; repeated imports do not
+qualified type once. Nested module paths merge recursively; repeated includes do not
 duplicate definitions. Module-private helpers are visible across files in that same
 module, while outside access still requires `pub`.
+
+An `alias` block is a file-local convenience and never a Java construct. The checker builds one
+alias table per source file (keyed by the `SourcePos.file()` of each entry), expands the leading
+segment of a written reference once, and records the canonical symbol it selected. Code generation
+consumes those records — `TypeChecker.Result.typeOf(Ast.TypeRef)`, `functionTargetOf`,
+`staticOwnerOf`, `typeOf(Ast.Expr)` — so an aliased type name emits exactly the canonical Java type
+its target names, and a module alias emits calls into the canonical module's package. No alias
+produces a wrapper class, an extra package, a field, or a runtime object. Two files may use one
+spelling for unrelated targets because references resolve against their own file's table.
+
+Solvik's `include` and `alias` blocks are source-level declarations and have nothing to do with the
+`import` directives of generated Java files: the renderer still emits ordinary single-type Java
+imports, and Java's own import syntax is unaffected.
 
 Before building type metadata or emitting Java, the checker validates a shared
 module/type/function namespace. Module blocks and same-name functions with distinct
@@ -173,7 +186,7 @@ module bindings {
 The compiler resolves the Java signatures at compile time (no reflective dispatch),
 generates a nominal final adapter in the declaring module's package, and shares one
 binding pipeline for packaged standard-library types (for example,
-`solvik::collections::List`) and user-authored
+`solvik::collection::List`) and user-authored
 `.sol` files. `native "otherName"` selects or renames a Java
 overload; a declaration without a return type discards the Java result and is
 statement-only.
@@ -190,7 +203,7 @@ module jdk {
         static pub func sqrt(value: Double) -> Double
     }
 }
-solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((jdk::Math.abs(-3)) .. " " .. (jdk::Math.sqrt(81.0)))
+solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(jdk::Math.abs(-3) .. " " .. jdk::Math.sqrt(81.0))
 ```
 
 A native type that exports only static functions is generated without a delegate
@@ -247,9 +260,12 @@ the adapter, and every public `solvik::io::File` signature names Solvik types on
 A declared non-null result is checked at the boundary: the call is wrapped in
 `Solvik$Program.checked(value)`, which aborts with `SOL-R008` when the Java member
 produced `null` anyway. A nullable result is passed through unchanged, and a carrier
-that cannot be null (a Java primitive) is not wrapped. Array contents returned by a
-binding are not scanned: `LANGUAGE.md` §11.1 permits deferring that validation, and the
-current backend performs no per-element check.
+that cannot be null (a Java primitive) is not wrapped. A result that carries type
+arguments uses the type-preserving `Solvik$Program.checkedResult(value)` instead, so
+recovering a parameterized Solvik type takes no unchecked cast; it aborts with the same
+diagnostic, and the `Object`-typed form stays unchanged for every other carrier. Array
+contents returned by a binding are not scanned: `LANGUAGE.md` §11.1 permits deferring that
+validation, and the current backend performs no per-element check.
 
 A member call on a value of a binding is emitted as a direct call on the adapter only
 when the binding **declares** that instance member. An undeclared `type()`,
@@ -270,11 +286,11 @@ delegate is never stored where the adapter type is expected.
 A Solvik module path maps to a Java package, including nested modules
 (`shapes::solids` → `shapes.solids`); because Java forbids user classes in `java.*`,
 user-authored root `java` maps to `solvik.java`. The packaged standard library uses
-`solvik::collections` and `solvik::util`, generating Java packages
-`solvik.collections` and `solvik.util`. Program files may not declare root
+`solvik::collection` and `solvik::util`, generating Java packages
+`solvik.collection` and `solvik.util`. Program files may not declare root
 `solvik`. See `LANGUAGE.md` §10–§12 for the complete surface.
 
-### Standard-library resources: packaged, always loaded, never imported
+### Standard-library resources: packaged, always loaded, never included
 
 The standard library is a set of `.sol` resources packaged with the compiler under
 `src/main/resources`. `ProgramLoader.packagedResources()` discovers them by
@@ -283,27 +299,29 @@ scanning the code source the compiler class was loaded from — a class director
 sorted path order:
 
 ```text
-solvik/collections/List.sol    # solvik::collections::List<T>, java.util.ArrayList
-solvik/collections/Map.sol     # solvik::collections::Map<K,V>, java.util.HashMap
-solvik/collections/Stack.sol   # solvik::collections::Stack<T>, java.util.Stack
+solvik/collection/Iterator.sol # solvik::collection::Iterator<T>, java.util.Iterator interface
+solvik/collection/List.sol     # solvik::collection::List<T>, java.util.ArrayList
+solvik/collection/Map.sol      # solvik::collection::Map<K,V>, java.util.HashMap
+solvik/collection/Stack.sol    # solvik::collection::Stack<T>, java.util.Stack
 solvik/concurrency/Task.sol    # solvik::concurrency::Task, java.lang.Runnable interface
 solvik/concurrency/Thread.sol  # solvik::concurrency::Thread, virtual java.lang.Thread adapter
 solvik/util/UUID.sol           # solvik::util::UUID, written in Solvik over Long, System, SecureRandom
 ```
 
-All of them are loaded into every program, before the entry file and its imports,
-and no import names them. Each declares its namespaces with ordinary
+All of them are loaded into every program, before the entry file and its includes,
+and no include names them. Each declares its namespaces with ordinary
 `module solvik { module … { } }` blocks; the resource path is a packaging location
 and decides nothing about those namespaces. A resource is **declaration-only**: an
-import or a top-level statement in one is a `SOL-I003` error, and a listed resource
-that cannot be read is a loader error rather than a skipped file.
+include block or a top-level statement in one is a `SOL-I003` error, and a listed
+resource that cannot be read is a loader error rather than a skipped file.
 
-An import is always a relative file path. `import "solvik::collections::Map"` and
-`import "solvik/collections/Map.sol"` look for files with those names and fail with
+An include path is always a relative file path. `include { "solvik::collection::Map" }` and
+`include { "solvik/collection/Map.sol" }` look for files with those names and fail with
 `SOL-I001`; packaged resources are not reachable as files, and there is no
-namespace-import syntax, retired spelling, or allowlist of import names in the
-loader. Imports do not bring short names into scope either: callers write
-`solvik::collections::Map`.
+namespace form, retired spelling, or allowlist of paths in the loader. Includes do
+not bring short names into scope either: callers write
+`solvik::collection::Map`. An `alias` block may name a packaged type, and it emits
+the same Java as the canonical path.
 
 Provenance and generation:
 
@@ -329,8 +347,8 @@ Provenance and generation:
 
 To add another standard-library type, create a declaration-only resource under
 `src/main/resources` with one or more native types and let it declare the
-namespace it wants (for example `module solvik { module collections { … } }`).
-There is no import list, alias table, or registration step: the next compile picks
+namespace it wants (for example `module solvik { module collection { … } }`).
+There is no include list, alias table, or registration step: the next compile picks
 it up in every program. Extend the structural resource test, the load-order and
 provenance tests, and the packaged-JAR test, and update the resource table in
 `LANGUAGE.md`. Run a clean build after relocating resources so stale copies cannot
@@ -477,6 +495,24 @@ The unified lowering path applies these type-directed rules:
   own `getCode()` plus a `toString()` that renders `[code] message`. Its constructor
   rejects a negative code with `SOL-R012`, so a code computed at run time is checked
   once, where the value is built.
+- **Synchronization:** `sync monitor { ... }` lowers to one Java `synchronized (monitor) { ... }`
+  statement over the existing Solvik value, so the JVM enters and releases the monitor on every way
+  out — normal completion, `return`, `break`, `continue`, `throw`, and the generated exit and abort
+  throwables. The value is not wrapped, no support member takes part in the release, and no
+  `try`/`finally` is emitted. An array monitor synchronizes on its `List` carrier, and the monitor
+  expression is lowered once, into the statement. `GeneratedOutputOptimizationTest` pins the shape:
+  the same program without `sync` differs only by that statement.
+- **Iteration:** an array keeps Java's enhanced `for` over its `List` carrier. Any other operand
+  must declare the protocol `pub func iterator() -> solvik::collection::Iterator<X>`; the loop is
+  desugared to one `JStmt.For` the renderer emits as
+  `for (Iterator<X> $itN = operand.iterator(); $itN.hasNext(); ) { X name = $itN.next(); ... }`.
+  The operand is lowered into the loop header, so it is evaluated once; the element declaration is
+  the body's first statement, so each iteration has a fresh immutable binding; the label stays the
+  loop's own, so `break`/`continue` are the existing ones. Nothing is allocated per element, and no
+  support member takes part. A generic native trait is emitted as a Solvik interface with
+  `static $of(java.util.Iterator<T>)` and a nested `$Adapter<T>` that delegates to the JDK
+  iterator, so the native member that returns one converts it at the declaration
+  (`Iterator.$of(this.$delegate.iterator())`) instead of at every call site.
 
 For example, `solvik::io::TextWriter(solvik::io::Stdio.stdout()).write("hello")` becomes
 `new TextWriter(Stdio.stdout()).write("hello");`, and
@@ -646,8 +682,8 @@ shape; `MainTest` covers class-initialization failure reporting.
 `StaticMemberExecutionTest` compiles and runs static user and native members through
 the unified backend.
 `EmbeddedBindingsTest` checks each packaged resource's declarations, that they load
-first and need no import, that the packaged set is the resource tree, that imports
-are file paths, and the declaration-only and missing-resource diagnostics;
+first and need no include, that the packaged set is the resource tree, that include
+paths are file paths, and the declaration-only and missing-resource diagnostics;
 `UberJarIT` checks the packaged `.sol` set inside `target/solvik.jar` and runs the
 library and user bindings from the standalone JAR. JDK-only programs still
 compile with `javac --release 25` and an empty dependency classpath; programs using

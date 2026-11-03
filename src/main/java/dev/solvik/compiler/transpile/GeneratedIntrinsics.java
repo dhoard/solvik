@@ -148,6 +148,7 @@ public final class GeneratedIntrinsics {
         registry.put("toBoolean", List.of(toBoolean()));
         registry.put("required", List.of(required()));
         registry.put("checked", List.of(checked()));
+        registry.put("checkedResult", List.of(checkedResult()));
         registry.put("conversion", List.of(conversion()));
         registry.put("isIntegerText", patternTextMembers("isIntegerText", "INTEGER_TEXT",
                 "[+-]?[0-9]+"));
@@ -704,6 +705,28 @@ public final class GeneratedIntrinsics {
                         new JStmt.Return(value)));
     }
 
+    /**
+     * The type-preserving form of {@link #checked()}, for a result that carries type arguments.
+     *
+     * <p>{@code checked} returns {@code Object}, so recovering a parameterized Solvik type from it
+     * would take an unchecked cast — a warning the generated Java cannot carry. This member returns
+     * its own argument type instead, so the same {@code SOL-R008} guard applies to a generic native
+     * result without a cast. Only a native result with type arguments reaches it; every other
+     * carrier keeps the {@code checked} call site byte for byte.
+     */
+    private static JDecl.Method checkedResult() {
+        JType variable = new JType.TypeVariable("T");
+        JExpr value = name("value", variable);
+        return new JDecl.Method(PUBLIC_STATIC, List.of("T"), variable, "checkedResult",
+                List.of(parameter(variable, "value")),
+                List.of(ifStatement(isNull(value), new JStmt.Throw(call(null,
+                        JTypes.programClass(), "fail", JTypes.RUNTIME_EXCEPTION,
+                        str("SOL-R008"),
+                        str("a null value was used where a value is required"))), null),
+                        new JStmt.Return(value)),
+                List.of());
+    }
+
     private static JDecl.Method required() {
         JExpr value = name("value", OBJECT);
         return method(PRIVATE_STATIC, JTypes.VOID, "required",
@@ -965,6 +988,10 @@ public final class GeneratedIntrinsics {
                     collectType(catcher.type(), into);
                     collectStatement(catcher.body(), into);
                 }
+            }
+            case JStmt.Synchronized guarded -> {
+                collectExpr(guarded.monitor(), into);
+                collectStatement(guarded.body(), into);
             }
             case JStmt.SuperCall call -> call.arguments().forEach(a -> collectExpr(a, into));
             case JStmt.Break ignored -> { }

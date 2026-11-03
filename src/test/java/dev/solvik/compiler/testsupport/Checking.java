@@ -41,6 +41,6 @@ public final class Checking {
         List<Ast.ModuleDecl> modules = new ArrayList<>(packaged.modules());
         modules.addAll(program.modules());
         return new Ast.Program(types, functions, program.statements(), modules,
-                program.imports(), program.pos());
+                program.includes(), program.aliases(), program.pos());
     }
 }

@@ -177,4 +177,19 @@ public sealed interface JStmt {
             Objects.requireNonNull(body, "catch body");
         }
     }
+
+    /**
+     * A {@code synchronized} statement: holds {@code monitor}'s Java monitor for the whole body.
+     *
+     * <p>The release is the Java statement's own behavior on every way out — normal completion,
+     * {@code return}, {@code break}, {@code continue}, and {@code throw} — so no support member and
+     * no generated {@code finally} takes part in it. Java monitors are reentrant, so a nested
+     * statement on the same value runs instead of deadlocking (§7.5).
+     */
+    record Synchronized(JExpr monitor, JStmt body) implements JStmt {
+        public Synchronized {
+            Objects.requireNonNull(monitor, "monitor");
+            Objects.requireNonNull(body, "body");
+        }
+    }
 }

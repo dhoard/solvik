@@ -26,7 +26,7 @@ public final class CacheKey {
     }
 
     /**
-     * A stable key for a program loaded from an entry file and its imports.
+     * A stable key for a program loaded from an entry file and its includes.
      *
      * <p>{@code keepSources} is part of the key: an entry that retains generated Java is a different
      * artifact from one that does not, so the two never share a directory.

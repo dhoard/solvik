@@ -126,12 +126,12 @@ class BundledIoExecutionTest {
     void close_is_shared_by_aliases(@TempDir Path directory) throws Exception {
         String output = run("""
                 channel := solvik::io::Channel.bytes()
-                alias := channel
+                secondHandle := channel
                 channel.close()
-                alias.close()
+                secondHandle.close()
                 solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("open=" .. channel.isOpen())
                 try {
-                    ignored := alias.read(1)
+                    ignored := secondHandle.read(1)
                 } catch (error: Exception) {
                     solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine("closed=" .. (error.getCode() == solvik::io::IoError.Closed))
                 }
