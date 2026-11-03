@@ -179,7 +179,7 @@ class UuidLibraryExecutionTest {
     @DisplayName("generated ids are unique and usable as Map keys")
     void generated_ids_are_unique(@TempDir Path directory) throws Exception {
         String output = run("""
-                ids := solvik::collections::Map<String, Integer>()
+                ids := solvik::collection::Map<String, Integer>()
                 mut index := 0
                 mut malformed := 0
                 while index < 2000 {

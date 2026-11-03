@@ -113,6 +113,10 @@ class JavaLowererIrTest {
                         collectExpressions(List.of(catcher.body()), into);
                     }
                 }
+                case JStmt.Synchronized guarded -> {
+                    into.add(guarded.monitor());
+                    collectExpressions(List.of(guarded.body()), into);
+                }
                 case JStmt.SuperCall call -> into.addAll(call.arguments());
                 case JStmt.Break ignored -> { }
                 case JStmt.Continue ignored -> { }

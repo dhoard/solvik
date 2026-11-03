@@ -35,32 +35,34 @@ import java.util.stream.Stream;
  * "Source files" and §11, "Standard library").
  *
  * <p>Every {@code .sol} file the compiler packages under its own resources belongs to every
- * program. Nothing imports them, and their paths say nothing about the namespaces they declare:
+ * program. Nothing includes them, and their paths say nothing about the namespaces they declare:
  * a file's own {@code module} blocks decide that. They are loaded first, so a program is resolved
  * against them before its own files are read, and a new file under {@code src/main/resources} is
  * part of the language as soon as the compiler is built — there is no list to register it in.
  *
- * <p>An {@code import "path"} names a <em>file</em>, resolved relative to the file that writes it,
- * taken literally, and followed transitively. A file contributes its declarations; only the entry
- * file contributes statements, so the execution order stays the source order of one file. A file
- * reached twice is loaded once, and a cycle is reported rather than silently tolerated: it has no
- * meaning here, and naming it is more useful than the partial program a cycle would produce.
+ * <p>An {@code include { "path.sol" }} entry names a <em>file</em>, resolved relative to the file
+ * that writes it, taken literally, and followed transitively. A file contributes its declarations;
+ * only the entry file contributes statements, so the execution order stays the source order of one
+ * file. A file reached twice is loaded once, and a cycle is reported rather than silently tolerated:
+ * it has no meaning here, and naming it is more useful than the partial program a cycle would
+ * produce. An included file may include further files, and may declare {@code alias} blocks, which
+ * stay local to the file that writes them.
  *
  * <p>Provenance is what separates the two kinds of source. The loader records the identity of every
  * module block parsed from a packaged resource, and only those may open the reserved {@code solvik}
- * root module: an imported file that writes {@code module solvik { … }} is rejected by the checker
+ * root module: an included file that writes {@code module solvik { … }} is rejected by the checker
  * even when its names look bundled.
  */
 public final class ProgramLoader {
 
-    /** A missing imported file (§3, "Source files"). */
+    /** A missing included file (§3, "Source files"). */
     public static final String MISSING_FILE = "SOL-I001";
-    /** An import written as an absolute path. */
+    /** An include path written as an absolute path. */
     public static final String ABSOLUTE_PATH = "SOL-I002";
-    /** An imported file, or a packaged resource, that holds something other than declarations. */
-    public static final String STATEMENTS_IN_IMPORT = "SOL-I003";
-    /** An import that closes a cycle: a file reached again while it is still being loaded. */
-    public static final String IMPORT_CYCLE = "SOL-I004";
+    /** An included file, or a packaged resource, that holds something other than declarations. */
+    public static final String STATEMENTS_IN_INCLUDED_FILE = "SOL-I003";
+    /** An include that closes a cycle: a file reached again while it is still being loaded. */
+    public static final String INCLUDE_CYCLE = "SOL-I004";
 
     /**
      * A loaded program together with diagnostics, cache inputs and packaged-module provenance.
@@ -222,10 +224,10 @@ public final class ProgramLoader {
     }
 
     /**
-     * Loads the packaged library, then {@code entry} and the files it imports.
+     * Loads the packaged library, then {@code entry} and the files it includes.
      *
      * <p>Loading never throws for a program's own mistakes: a missing file, an absolute path, or
-     * statements in an imported file are recorded as diagnostics, and the caller decides what to do
+     * statements in an included file are recorded as diagnostics, and the caller decides what to do
      * with them. The returned program holds whatever could be loaded, so its sources can still be
      * rendered against the failures.
      */
@@ -246,7 +248,7 @@ public final class ProgramLoader {
                 standardLibraryModules, packagedTypes, packagedTypeSources);
     }
 
-    /** In-memory compilation sees the packaged library, but has no filesystem import base. */
+    /** In-memory compilation sees the packaged library, but has no filesystem include base. */
     public Loaded loadSource(String source, String fileName) {
         Path entry = Path.of(fileName).toAbsolutePath().normalize();
         String name = DiagnosticReporter.displayName(entry);
@@ -255,10 +257,10 @@ public final class ProgramLoader {
         Ast.Program program = new Parser(new Lexer(source, diagnostics, name).tokenize(), diagnostics)
                 .parseProgram();
         programs.put(entry, program);
-        for (Ast.ImportDecl declaration : program.imports()) {
+        for (Ast.IncludeDecl declaration : program.includes()) {
             diagnostics.error(MISSING_FILE, declaration.pos(),
-                    "an import names a file, resolved from the importing file's directory; run the "
-                            + "compiler on a file path to use imports (found '"
+                    "an include names a file, resolved from the including file's directory; run "
+                            + "the compiler on a file path to use includes (found '"
                             + declaration.path() + "')");
         }
         return new Loaded(merge(entry), sourcesByName(), List.copyOf(displayNames().keySet()),
@@ -272,7 +274,7 @@ public final class ProgramLoader {
      * Reads every packaged {@code .sol} resource, in path order, before any program file.
      *
      * <p>A packaged resource is declaration-only: it declares types, functions, and modules, and
-     * imports nothing, because it is not a file a program can reach. Its module blocks are recorded
+     * includes nothing, because it is not a file a program can reach. Its module blocks are recorded
      * as packaged, which is what permits the reserved {@code solvik} root namespace (§11).
      */
     private void loadPackagedLibrary() {
@@ -297,13 +299,15 @@ public final class ProgramLoader {
             Ast.Program program = new Parser(new Lexer(source, diagnostics, resource).tokenize(),
                     diagnostics).parseProgram();
             programs.put(key, program);
-            if (!program.imports().isEmpty()) {
-                diagnostics.error(STATEMENTS_IN_IMPORT, program.imports().getFirst().pos(),
-                        "packaged library '" + resource + "' imports a file; a packaged resource"
-                                + " declares its own modules and imports nothing");
+            if (!program.includes().isEmpty()) {
+                diagnostics.error(STATEMENTS_IN_INCLUDED_FILE,
+                        program.includes().getFirst().pos(),
+                        "packaged library '" + resource + "' includes a file; a packaged resource"
+                                + " declares its own modules and includes nothing");
             }
             if (!program.statements().isEmpty()) {
-                diagnostics.error(STATEMENTS_IN_IMPORT, program.statements().getFirst().pos(),
+                diagnostics.error(STATEMENTS_IN_INCLUDED_FILE,
+                        program.statements().getFirst().pos(),
                         "packaged library '" + resource + "' may declare types and functions but hold"
                                 + " no top-level statements");
             }
@@ -388,7 +392,7 @@ public final class ProgramLoader {
 
     private void loadFile(Path file, boolean entry) {
         if (loaded.containsKey(file) || !loading.add(file)) {
-            return;   // already loaded: a diamond import loads the file once
+            return;   // already loaded: a diamond include loads the file once
         }
         stack.addLast(file);
         try {
@@ -406,12 +410,13 @@ public final class ProgramLoader {
                     .parseProgram();
             programs.put(file, program);
             if (!entry && !program.statements().isEmpty()) {
-                diagnostics.error(STATEMENTS_IN_IMPORT, program.statements().getFirst().pos(),
-                        "'" + name + "' is imported, so it may declare types and functions but hold no "
-                                + "top-level statements");
+                diagnostics.error(STATEMENTS_IN_INCLUDED_FILE,
+                        program.statements().getFirst().pos(),
+                        "'" + name + "' is included, so it may declare types and functions but hold"
+                                + " no top-level statements");
             }
-            for (Ast.ImportDecl declaration : program.imports()) {
-                loadImport(file, declaration);
+            for (Ast.IncludeDecl declaration : program.includes()) {
+                loadInclude(file, declaration);
             }
         } finally {
             // The load stack describes the files being loaded right now, including after a failure.
@@ -420,7 +425,7 @@ public final class ProgramLoader {
         }
     }
 
-    private void loadImport(Path importer, Ast.ImportDecl declaration) {
+    private void loadInclude(Path includer, Ast.IncludeDecl declaration) {
         Path written;
         try {
             written = Path.of(declaration.path());
@@ -431,13 +436,13 @@ public final class ProgramLoader {
         }
         if (written.isAbsolute()) {
             diagnostics.error(ABSOLUTE_PATH, declaration.pos(),
-                    "an import path is relative to the importing file, found '"
+                    "an include path is relative to the including file, found '"
                             + declaration.path() + "'");
             return;
         }
-        Path resolved = importer.getParent() == null
+        Path resolved = includer.getParent() == null
                 ? written.toAbsolutePath().normalize()
-                : importer.getParent().resolve(written).toAbsolutePath().normalize();
+                : includer.getParent().resolve(written).toAbsolutePath().normalize();
         if (!Files.isRegularFile(resolved)) {
             diagnostics.error(MISSING_FILE, declaration.pos(), "no such file: '"
                     + declaration.path() + "' resolved to '" + DiagnosticReporter.displayName(resolved)
@@ -446,7 +451,8 @@ public final class ProgramLoader {
         }
         Path target = normalize(resolved);
         if (stack.contains(target)) {
-            diagnostics.error(IMPORT_CYCLE, declaration.pos(), "import cycle: " + cyclePath(target));
+            diagnostics.error(INCLUDE_CYCLE, declaration.pos(),
+                    "include cycle: " + cyclePath(target));
             return;
         }
         loadFile(target, false);
@@ -481,20 +487,30 @@ public final class ProgramLoader {
         List<Ast.TypeDecl> types = new ArrayList<>();
         List<Ast.FuncDecl> functions = new ArrayList<>();
         List<Ast.ModuleDecl> modules = new ArrayList<>();
+        List<Ast.AliasDecl> aliases = new ArrayList<>();
         SourcePos start = SourcePos.START;
         for (Ast.Program program : programs.values()) {
             types.addAll(program.types());
             functions.addAll(program.functions());
             modules.addAll(program.modules());
+            aliases.addAll(program.aliases());
             start = program.pos();
         }
-        return new Ast.Program(types, functions, List.of(), modules, List.of(), start);
+        return new Ast.Program(types, functions, List.of(), modules, List.of(), aliases, start);
     }
 
+    /**
+     * The merged program: every file's declarations, include resolution already done.
+     *
+     * <p>Alias declarations keep the source position that names the file writing them, which is
+     * what lets the checker keep one file's aliases out of another file. Includes are dropped
+     * because the loader has already followed them; only the entry file's statements remain.
+     */
     private Ast.Program merge(Path entry) {
         List<Ast.TypeDecl> types = new ArrayList<>();
         List<Ast.FuncDecl> functions = new ArrayList<>();
         List<Ast.ModuleDecl> modules = new ArrayList<>();
+        List<Ast.AliasDecl> aliases = new ArrayList<>();
         List<Ast.Stmt> statements = new ArrayList<>();
         SourcePos start = programs.get(entry) == null ? SourcePos.START : programs.get(entry).pos();
         for (Map.Entry<Path, Ast.Program> file : programs.entrySet()) {
@@ -502,11 +518,13 @@ public final class ProgramLoader {
             types.addAll(program.types());
             functions.addAll(program.functions());
             modules.addAll(program.modules());
+            aliases.addAll(program.aliases());
             if (file.getKey().equals(entry)) {
                 statements.addAll(program.statements());
             }
         }
-        return new Ast.Program(types, functions, statements, modules, List.of(), start);
+        return new Ast.Program(types, functions, statements, modules,
+                List.of(), aliases, start);
     }
 
     /** Packaged resources keep their classpath path; files keep the name a diagnostic shows. */

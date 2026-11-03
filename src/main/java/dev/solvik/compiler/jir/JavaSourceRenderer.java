@@ -197,6 +197,10 @@ public final class JavaSourceRenderer {
                         collectStatement(attempt.finallyBody(), referenced);
                     }
                 }
+                case JStmt.Synchronized guarded -> {
+                    collectExpr(guarded.monitor(), referenced);
+                    collectStatement(guarded.body(), referenced);
+                }
                 case JStmt.Break ignored -> { }
                 case JStmt.Continue ignored -> { }
             }
@@ -536,6 +540,13 @@ public final class JavaSourceRenderer {
                     out.append(";\n");
                 }
                 case JStmt.Try attempt -> renderTry(attempt);
+                case JStmt.Synchronized guarded -> {
+                    appendIndent();
+                    out.append("synchronized (");
+                    renderExpr(guarded.monitor(), PREC_ASSIGN);
+                    out.append(") ");
+                    renderBody(guarded.body());
+                }
             }
         }
 

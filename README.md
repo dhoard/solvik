@@ -50,7 +50,8 @@ Ada: 35 credits
   type-checked before a single class file is written.
 - **Java without the ceremony.** Signature-based function, method, and constructor overloading;
   nominal traits with required functions and stateless defaults; modules that map to Java packages;
-  generics; `switch` with regex cases; exceptions with stable codes.
+  `include` blocks for multi-file programs and file-local `alias` blocks for convenient spellings and
+  short module names; generics; `switch` with regex cases; exceptions with stable codes.
 - **Ordinary Java bindings.** Bundled `native` declarations resolve against real Java classes at
   compile time, so standard I/O, files, collections, and concurrency are library types rather than
   built-in syntax. Only packaged library sources may declare `native` members.
@@ -96,8 +97,8 @@ java -jar target/solvik.jar run app.sol
 ## Example program
 
 `example.sol` is the language corpus: an example program that exercises every implemented construct,
-with `include.sol` and `include-extra.sol` supplying imported declarations, including a diamond
-import. Running it prints a transcript of the language surface:
+with `include.sol` and `include-extra.sol` supplying included declarations, a diamond include, and
+file-local aliases. Running it prints a transcript of the language surface:
 
 ```bash
 ./solvik run example.sol
@@ -118,8 +119,8 @@ The command word is required and must be the first positional argument; global o
 either side of it. A source file whose path is exactly a command word must be spelled as a path
 (`./run`, `./check`).
 
-`check` is a one-off compile. It checks the whole program — the entry file, every file it imports
-transitively, and the packaged standard library — so a diagnostic in an imported file fails the
+`check` is a one-off compile. It checks the whole program — the entry file, every file it includes
+transitively, and the packaged standard library — so a diagnostic in an included file fails the
 check and is reported against that file. Nothing is executed: a program that writes output, calls
 `exit`, or would abort at run time still checks successfully. Generated Java and classes go into a
 temporary, randomly keyed entry under the cache root, which is deleted when the check ends, so a
@@ -139,8 +140,8 @@ same JARs are used to resolve bindings, to compile the generated Java, and to ru
 ## How it works
 
 1. `ProgramLoader` loads the packaged standard library — every `.sol` resource in the compiler's own
-   resources — and then the entry file and the files it imports, transitively. An import names a
-   file; only a packaged resource may declare the reserved `solvik` root namespace.
+   resources — and then the entry file and the files its `include` blocks name, transitively. An
+   include names a file; only a packaged resource may declare the reserved `solvik` root namespace.
 2. `Lexer` and `Parser` produce the AST in `Ast`.
 3. `TypeChecker` resolves names, validates modules and signatures, resolves bundled `native`
    declarations against the compiler's binding registry, and records a type for every expression and
@@ -158,12 +159,12 @@ rendered with the offending source line and a caret.
 ## Standard library
 
 The standard library is packaged as `.sol` sources inside the compiler jar, so every program sees
-it without an import, and only the types a program actually reaches are emitted into the generated
+it without an include, and only the types a program actually reaches are emitted into the generated
 Java.
 
 | Namespace | Types |
 | --- | --- |
-| `solvik::collections` | `List`, `Map`, `Stack` |
+| `solvik::collection` | `List`, `Map`, `Stack` |
 | `solvik::concurrency` | `Task`, `Thread` — `Thread.start` starts a virtual thread; `await()` and `await(milliseconds)` join it |
 | `solvik::util` | `UUID` — version 7 (RFC 9562), written in Solvik rather than bound to Java |
 | `solvik::io` | `Channel`, `Stdio`, `TextReader`, `TextWriter`, `ByteReader`, `ByteWriter`, `File`, `IoError` |
@@ -177,7 +178,8 @@ src/main/resources/solvik/               packaged standard library (.sol sources
                                          program)
 src/test/java/                           unit, language-consistency, and execution tests
 example.sol                              example program: exercises every implemented construct
-include.sol, include-extra.sol           imported declarations used by example.sol
+include.sol, include-extra.sol           included declarations and file-local aliases used by
+                                         example.sol
 solvik                                   launcher script (builds and runs target/solvik.jar)
 pom.xml                                  Maven build; ./mvnw is the wrapper
 LANGUAGE.md                              language guide (authoritative)

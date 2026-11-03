@@ -196,6 +196,7 @@ public final class JavaIrValidator {
                     validateStatement(attempt.finallyBody(), where);
                 }
             }
+            case JStmt.Synchronized guarded -> validateStatement(guarded.body(), where);
             case JStmt.SuperCall ignored -> { }
             case JStmt.ExpressionStatement ignored -> { }
             case JStmt.Return ignored -> { }

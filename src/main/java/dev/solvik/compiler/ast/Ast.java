@@ -96,33 +96,56 @@ public final class Ast {
      * @param functions  top-level function declarations outside any module, in source order
      * @param statements top-level statements, in source order; these are what execute
      * @param modules   {@code module} blocks, in source order; blocks of one name merge (§2)
-     * @param imports   {@code import} declarations, in source order; the loader resolves them
+     * @param includes  {@code include} entries, in source order; the loader resolves them
+     * @param aliases   {@code alias} entries, in source order; each is local to its source file
      * @param pos       the position of the first token in the file
      */
     public record Program(List<TypeDecl> types, List<FuncDecl> functions,
                           List<Stmt> statements, List<ModuleDecl> modules,
-                          List<ImportDecl> imports, SourcePos pos) implements Node {
+                          List<IncludeDecl> includes, List<AliasDecl> aliases, SourcePos pos)
+            implements Node {
 
-        /** A program without modules or imports. */
+        /** A program without modules, includes, or aliases. */
         public Program(List<TypeDecl> types, List<FuncDecl> functions, List<Stmt> statements,
                 SourcePos pos) {
-            this(types, functions, statements, List.of(), List.of(), pos);
+            this(types, functions, statements, List.of(), List.of(), List.of(), pos);
         }
 
-        /** A program with modules but no imports. */
+        /** A program with modules but no includes or aliases. */
         public Program(List<TypeDecl> types, List<FuncDecl> functions, List<Stmt> statements,
                 List<ModuleDecl> modules, SourcePos pos) {
-            this(types, functions, statements, modules, List.of(), pos);
+            this(types, functions, statements, modules, List.of(), List.of(), pos);
         }
     }
 
     /**
-     * An {@code import "path"} declaration (§3, "Source files").
+     * One path inside an {@code include { ... }} block (§3, "Source files").
      *
-     * <p>The path is a string literal resolved relative to the file that writes it, and the imported
-     * file's declarations join this program. Only the entry file's statements execute.
+     * <p>The path is a string literal resolved relative to the file that writes the block, and the
+     * included file's declarations join this program. Only the entry file's statements execute.
      */
-    public record ImportDecl(String path, SourcePos pos) implements Node {
+    public record IncludeDecl(String path, SourcePos pos) implements Node {
+    }
+
+    /**
+     * One entry inside an {@code alias { ... }} block: a canonical target and a local name.
+     *
+     * <p>{@code target} is a fully qualified module, type, or trait name, and {@code localName} is
+     * the spelling this source file may use for it. Aliases are file-local conveniences: they add
+     * no nominal identity and never enter the merged module namespace.
+     *
+     * @param target    the canonical qualified name being aliased
+     * @param localName the file-local spelling
+     * @param targetPos the position of the target, where resolution problems are reported
+     * @param namePos   the position of the local name, where collisions are reported
+     */
+    public record AliasDecl(String target, String localName, SourcePos targetPos, SourcePos namePos)
+            implements Node {
+
+        @Override
+        public SourcePos pos() {
+            return targetPos;
+        }
     }
 
     /**
@@ -432,6 +455,20 @@ public final class Ast {
     public record BlockStmt(List<Stmt> body, SourcePos pos) implements Stmt {
     }
 
+    /**
+     * {@code sync monitor { ... }}: runs the block holding the monitor's Java monitor (§7.5).
+     *
+     * <p>The monitor is an ordinary expression and the block is a block, so the body is its own
+     * scope and {@code return}, {@code break}, {@code continue}, and {@code raise} mean exactly
+     * what they mean in a bare block. The monitor is released on every way out, so no release
+     * statement is written or generated.
+     *
+     * @param monitor the expression naming the non-null value whose identity is the monitor
+     * @param body    the guarded statements
+     */
+    public record SyncStmt(Expr monitor, List<Stmt> body, SourcePos pos) implements Stmt {
+    }
+
     // ----------------------------------------------------------- expressions
 
     public sealed interface Expr extends Node {
@@ -484,7 +521,7 @@ public final class Ast {
     /** A module-qualified name such as {@code geometry::Point}. */
     public record QualifiedNameExpr(String module, String name, SourcePos pos) implements Expr {
 
-        /** The qualified spelling, {@code geometry::Point} or {@code solvik::collections::Map}. */
+        /** The qualified spelling, {@code geometry::Point} or {@code solvik::collection::Map}. */
         public String qualifiedName() {
             return module.isEmpty() ? name : module + "::" + name;
         }

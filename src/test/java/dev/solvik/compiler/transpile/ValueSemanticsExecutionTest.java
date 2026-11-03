@@ -131,8 +131,8 @@ class ValueSemanticsExecutionTest {
         String output = run("""
                 left := Integer?[2] {1}
                 right := Integer?[2] {1}
-                alias := left
-                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((left == alias) .. (" ") .. (left != right) .. (" ") .. (left.equals(right)))
+                sameReference := left
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((left == sameReference) .. (" ") .. (left != right) .. (" ") .. (left.equals(right)))
                 nested := Integer?[][1] {left}
                 other := Integer?[][1] {left}
                 solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((nested == nested) .. (" ") .. (nested == other))

@@ -36,7 +36,10 @@ public enum TokenKind {
     CONTINUE("continue"),
     PUB("pub"),
     MODULE("module"),
+    /** Removed in favor of {@code include} and {@code alias}; kept so the parser can name them. */
     IMPORT("import"),
+    INCLUDE("include"),
+    ALIAS("alias"),
     NATIVE("native"),
     MUT("mut"),
     STATIC("static"),
@@ -44,6 +47,7 @@ public enum TokenKind {
     CATCH("catch"),
     FINALLY("finally"),
     RAISE("raise"),
+    SYNC("sync"),
 
     // Operators and punctuation (LANGUAGE.md §4 "Declarations", §4.3 precedence)
     ASSIGN("="),
@@ -99,6 +103,6 @@ public enum TokenKind {
     }
 
     public boolean isKeyword() {
-        return fixedText != null && ordinal() >= VAR.ordinal() && ordinal() <= RAISE.ordinal();
+        return fixedText != null && ordinal() >= VAR.ordinal() && ordinal() <= SYNC.ordinal();
     }
 }

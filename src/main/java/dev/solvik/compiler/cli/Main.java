@@ -36,11 +36,11 @@ import javax.tools.ToolProvider;
  * <p>Every invocation names a {@link Command}. Both commands transpile the source to Java and compile
  * it with the JDK compiler; {@code run} then executes the result, while {@code check} stops after the
  * compile so its exit status answers whether the file compiles at all. The program is the entry file
- * together with every file it imports, transitively, and the packaged standard library, so an error
- * anywhere in it fails both commands. {@code run} caches its artifacts under {@code ~/.cache/solvik/}
- * keyed by the loaded source text, the dependency classpath, the {@code --keep-sources} mode, and the
- * compiler build, so an unchanged program is neither transpiled nor compiled again — it is executed
- * straight from the cached class files. {@code check} is a one-off compile: it reads no cache entry,
+ * together with every file it includes, transitively, and the packaged standard library, so an
+ * error anywhere in it fails both commands. {@code run} caches its artifacts under
+ * {@code ~/.cache/solvik/} keyed by the loaded source text, the dependency classpath, the
+ * {@code --keep-sources} mode, and the compiler build, so an unchanged program is neither
+ * transpiled nor compiled again — it is executed straight from the cached class files. {@code check} is a one-off compile: it reads no cache entry,
  * publishes none, and deletes the scratch entry it used. The command word is required:
  * {@code solvik app.sol} without one is a usage error.
  *
@@ -189,8 +189,8 @@ public final class Main {
 
     /**
      * {@code check}: loads, transpiles, and compiles {@code fileName} exactly as {@code run} does,
-     * then stops. The program checked is the entry file with every file it imports, transitively, plus
-     * the packaged standard library, so a diagnostic in any of them fails the check.
+     * then stops. The program checked is the entry file with every file it includes, transitively,
+     * plus the packaged standard library, so a diagnostic in any of them fails the check.
      *
      * <p>A check is a one-off compile: it never runs the program, never reads or publishes a reusable
      * cache entry, and deletes the scratch entry it compiled into. The cache root is therefore left

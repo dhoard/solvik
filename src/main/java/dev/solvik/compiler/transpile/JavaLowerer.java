@@ -33,6 +33,11 @@ import java.util.Set;
  */
 public final class JavaLowerer {
 
+    /** The factory and nested type that turn a Java interface into a Solvik native-trait value. */
+    private static final String TRAIT_FACTORY = "$of";
+    private static final String TRAIT_ADAPTER = "$Adapter";
+    private static final String TRAIT_DELEGATE = "delegate";
+
     private final TypeChecker.Result types;
     private final Set<String> typeNames;
     /** Generated support members reached by every compilation unit lowered so far. */
@@ -208,12 +213,26 @@ public final class JavaLowerer {
     }
 
     private JDecl.CompilationUnit traitUnit(Ast.TypeDecl declaration, String qualifiedName) {
+        Unit unit = new Unit(moduleOf(qualifiedName), qualifiedName, List.of(), false);
         return new JDecl.CompilationUnit(packageOf(qualifiedName),
-                List.of(trait(declaration, qualifiedName, null)));
+                List.of(trait(unit, declaration, null, null, false)));
     }
 
-    private JDecl.ClassDecl trait(Ast.TypeDecl declaration, String qualifiedName, JType parent) {
-        Unit unit = new Unit(moduleOf(qualifiedName), qualifiedName, List.of(), false);
+    /**
+     * A trait interface, with its Java interface as parent when it can be inherited.
+     *
+     * <p>A native trait's type parameters name the Java interface's own parameters, so the emitted
+     * interface declares them. A plain Solvik trait cannot declare any (the checker rejects them),
+     * so this adds nothing for it.
+     *
+     * @param javaInterface        the Java interface a native trait exposes, or {@code null} for a
+     *                             Solvik-bodied trait
+     * @param adapter              the binding of a generic native trait, which is represented by its
+     *                             own Solvik interface and converts with {@code $of}; or {@code null}
+     * @param inheritJavaInterface whether the emitted interface extends {@code javaInterface}
+     */
+    private JDecl.ClassDecl trait(Unit unit, Ast.TypeDecl declaration, JType.Declared javaInterface,
+            JavaBinding adapter, boolean inheritJavaInterface) {
         List<JDecl.Member> members = new ArrayList<>();
         for (Ast.FuncDecl method : declaration.methods()) {
             if (method.hasBody()) {
@@ -223,10 +242,28 @@ public final class JavaLowerer {
             }
         }
         unit.addPatternFields(members, true);
-        List<JType> interfaces = parent == null ? List.of() : List.of(parent);
+        if (adapter != null) {
+            members.addAll(unit.traitAdapter(declaration, adapter, javaInterface));
+        }
+        List<JType> interfaces = inheritJavaInterface ? List.of(javaInterface) : List.of();
         return new JDecl.ClassDecl(JDecl.Kind.INTERFACE, Set.of(JDecl.Modifier.PUBLIC),
-                GeneratedNames.javaIdentifier(declaration.name()), List.of(), null, interfaces,
-                members, List.of());
+                GeneratedNames.javaIdentifier(declaration.name()), declaration.typeParameters(),
+                null, interfaces, members, List.of());
+    }
+
+    /**
+     * Whether a native trait is represented by a Solvik-owned interface instead of its Java one.
+     *
+     * <p>A type parameter is what decides it: the trait's members are then emitted with Solvik
+     * carriers inside that interface, and a Solvik {@code Boolean} cannot override Java's primitive
+     * {@code boolean}. So the Java interface cannot be the supertype, and the generated
+     * {@code $of} adapter is the only Java-to-Solvik conversion. A non-generic native trait keeps
+     * extending its Java interface, which is what lets a {@code solvik::concurrency::Task} be passed
+     * to a Java API expecting {@code Runnable}.
+     */
+    private static boolean adaptsNativeTrait(Ast.TypeDecl declaration) {
+        return declaration.isTrait() && declaration.nativeClass() != null
+                && !declaration.typeParameters().isEmpty();
     }
 
     /** Java warns on an intentional equals-only Solvik override unless the class owns the policy. */
@@ -256,8 +293,15 @@ public final class JavaLowerer {
         }
         if (declaration.isTrait()) {
             JType.Declared javaInterface = JTypes.declaredForClass(binding.javaClass());
+            // A generic native trait is a Solvik interface, not the Java one: a Solvik Boolean result
+            // cannot override a Java `boolean`, and a Java iterator object never implements the
+            // Solvik interface. The compiler-emitted `$of` adapter is the one conversion point.
+            Unit unit = new Unit(moduleOf(qualifiedName), qualifiedName,
+                    declaration.typeParameters(), false);
+            boolean adapted = adaptsNativeTrait(declaration);
             return new JDecl.CompilationUnit(packageOf(qualifiedName),
-                    List.of(trait(declaration, qualifiedName, javaInterface)));
+                    List.of(trait(unit, declaration, javaInterface, adapted ? binding : null,
+                            !adapted)));
         }
         Unit unit = new Unit(moduleOf(qualifiedName), qualifiedName,
                 declaration.typeParameters(), false);
@@ -498,6 +542,75 @@ public final class JavaLowerer {
                     List.of());
         }
 
+        /**
+         * The {@code $of} factory and the adapter type for a generic native trait.
+         *
+         * <p>A Java interface object is not a Solvik value: the Solvik interface is its own type, so
+         * exactly one compiler-generated type implements it by delegation. Its name contains
+         * {@code $}, which no Solvik identifier can spell, so it can never collide with a
+         * declaration; like the {@code $of} factory of a native-backed type it is emitted with the
+         * type that declares it.
+         */
+        List<JDecl.Member> traitAdapter(Ast.TypeDecl declaration, JavaBinding binding,
+                JType.Declared javaInterface) {
+            List<JType> variables = declaration.typeParameters().stream()
+                    .map(name -> (JType) new JType.TypeVariable(
+                            GeneratedNames.javaIdentifier(name)))
+                    .toList();
+            JType.Declared owner = classType();
+            JType.Declared traitType = owner.withArguments(variables);
+            JType.Declared delegateType = javaInterface.withArguments(variables);
+            JType.Declared adapterType = new JType.Declared(owner.packageName(),
+                    List.of(owner.name()), TRAIT_ADAPTER, variables);
+            JDecl.Method factory = new JDecl.Method(
+                    Set.of(JDecl.Modifier.PUBLIC, JDecl.Modifier.STATIC),
+                    declaration.typeParameters(), traitType, TRAIT_FACTORY,
+                    List.of(new JDecl.Parameter(delegateType, TRAIT_DELEGATE)),
+                    List.of(new JStmt.Return(new JExpr.New(adapterType,
+                            List.of(name(TRAIT_DELEGATE, delegateType)), traitType))),
+                    List.of());
+
+            List<JDecl.Member> members = new ArrayList<>();
+            members.add(JDecl.Field.of(Set.of(JDecl.Modifier.PRIVATE, JDecl.Modifier.FINAL),
+                    delegateType, TRAIT_DELEGATE));
+            members.add(new JDecl.Constructor(Set.of(),
+                    List.of(new JDecl.Parameter(delegateType, TRAIT_DELEGATE)),
+                    List.of(new JStmt.ExpressionStatement(assign(
+                            field("this", TRAIT_DELEGATE, delegateType),
+                            name(TRAIT_DELEGATE, delegateType), delegateType))),
+                    List.of()));
+            for (Ast.FuncDecl method : declaration.methods()) {
+                if (method.hasBody()) {
+                    continue; // a source default is inherited from the interface
+                }
+                if (!(binding.members().get(method) instanceof Method javaMethod)) {
+                    continue; // an unresolved binding is reported by the checker, never emitted
+                }
+                List<JDecl.Parameter> parameters = parameters(method);
+                List<JExpr> arguments = new ArrayList<>();
+                for (JDecl.Parameter parameter : parameters) {
+                    arguments.add(name(parameter.name(), parameter.type()));
+                }
+                SolvikType returned = types.functionReturnTypes().get(method);
+                JType javaReturn = returned == null || returned == SolvikType.VOID
+                        ? JTypes.VOID : JTypes.of(returned);
+                JExpr invocation = new JExpr.Call(
+                        field("this", TRAIT_DELEGATE, delegateType), delegateType,
+                        javaMethod.getName(), List.of(), arguments, javaReturn);
+                members.add(new JDecl.Method(Set.of(JDecl.Modifier.PUBLIC), List.of(), javaReturn,
+                        GeneratedNames.javaIdentifier(method.name()), parameters,
+                        List.of(returned == SolvikType.VOID
+                                ? new JStmt.ExpressionStatement(invocation)
+                                : new JStmt.Return(invocation)),
+                        List.of(new JDecl.Annotation(
+                                JType.Declared.of("java.lang", "Override"), List.of()))));
+            }
+            JDecl.ClassDecl adapter = new JDecl.ClassDecl(JDecl.Kind.CLASS,
+                    Set.of(JDecl.Modifier.PUBLIC, JDecl.Modifier.FINAL), TRAIT_ADAPTER,
+                    declaration.typeParameters(), null, List.of(traitType), members, List.of());
+            return List.of(factory, adapter);
+        }
+
         JDecl.Constructor constructor(Ast.FuncDecl constructor, boolean isPublic, boolean generic) {
             if (constructor.isNative()) {
                 return nativeConstructor(constructor, isPublic);
@@ -668,6 +781,12 @@ public final class JavaLowerer {
                     tryBody.add(new JStmt.Return(new JExpr.New(
                             generic ? owner.withArguments(List.of(JType.Wildcard.any())) : owner,
                             List.of(invocation), owner)));
+                } else if (adaptsNativeTrait(returned)) {
+                    // The Java interface object must become a Solvik value; the trait's generated
+                    // factory is the one conversion, so no cast or unchecked call is emitted.
+                    tryBody.add(new JStmt.Return(new JExpr.Call(null,
+                            JTypes.generated(returned.userName()), TRAIT_FACTORY, List.of(),
+                            List.of(invocation), javaReturn)));
                 } else {
                     tryBody.add(new JStmt.Return(invocation));
                 }
@@ -730,13 +849,45 @@ public final class JavaLowerer {
                     SolvikType iterable = types.typeOf(forStmt.iterable());
                     String label = "$loop" + tempCount++;
                     loopLabels.addLast(label);
-                    JStmt body = block(forStmt.body());
+                    if (iterable.isArray()) {
+                        JStmt body = block(forStmt.body());
+                        loopLabels.removeLast();
+                        yield new JStmt.ForEach(label, JTypes.of(iterable.element()),
+                                localName(forStmt, forStmt.name()), expr(forStmt.iterable()), body);
+                    }
+                    // A declared iteration protocol: hold the iterator the collection's own member
+                    // returns, ask it for each element, and give the loop name a fresh declaration
+                    // per iteration. The Java source is the same direct calls a hand-written
+                    // `while` would make; the only allocation is the one iterator per loop.
+                    SolvikType protocol = types.iterationProtocolOf(forStmt);
+                    if (protocol == null) {
+                        loopLabels.removeLast();
+                        throw new IllegalStateException("for ... in over " + iterable
+                                + " has no recorded iteration protocol");
+                    }
+                    JType.Declared iterator = declaredType(protocol);
+                    String iteratorName = "$it" + tempCount++;
+                    SolvikType element = types.bindingOf(forStmt).type();
+                    List<JStmt> body = new ArrayList<>();
+                    body.add(new JStmt.VarDecl(JTypes.of(element),
+                            localName(forStmt, forStmt.name()), false,
+                            new JExpr.Call(name(iteratorName, iterator), iterator, "next",
+                                    List.of(), List.of(), JTypes.of(element)), List.of()));
+                    body.addAll(statements(forStmt.body()));
                     loopLabels.removeLast();
-                    yield new JStmt.ForEach(label, JTypes.of(iterable.element()),
-                            localName(forStmt, forStmt.name()), expr(forStmt.iterable()), body);
+                    yield new JStmt.For(label,
+                            List.of(new JStmt.VarDecl(iterator, iteratorName, false,
+                                    new JExpr.Call(expr(forStmt.iterable()),
+                                            declaredType(iterable), "iterator", List.of(),
+                                            List.of(), iterator), List.of())),
+                            new JExpr.Call(name(iteratorName, iterator), iterator, "hasNext",
+                                    List.of(), List.of(), JTypes.of(SolvikType.BOOLEAN)),
+                            List.of(), new JStmt.Block(body));
                 }
                 case Ast.ReturnStmt returnStmt -> returned(returnStmt);
                 case Ast.TryStmt tryStmt -> tryStatement(tryStmt);
+                case Ast.SyncStmt syncStmt ->
+                        new JStmt.Synchronized(expr(syncStmt.monitor()), block(syncStmt.body()));
                 case Ast.RaiseStmt raise -> raised(raise);
                 case Ast.BlockStmt block -> new JStmt.Block(statements(block.body()));
             };
@@ -1455,6 +1606,13 @@ public final class JavaLowerer {
             if (!(carrier instanceof JType.Declared)) {
                 return invoked;
             }
+            if (!result.arguments().isEmpty()) {
+                // Recovering a parameterized type from an Object result would be an unchecked cast,
+                // so the guard returns its own argument type for this case.
+                noteIntrinsic("checkedResult");
+                return new JExpr.Call(null, JTypes.programClass(), "checkedResult", List.of(),
+                        List.of(invoked), carrier);
+            }
             noteIntrinsic("checked");
             return new JExpr.Cast(carrier, new JExpr.Call(null, JTypes.programClass(), "checked",
                     List.of(), List.of(invoked), JTypes.OBJECT));
@@ -1715,6 +1873,23 @@ public final class JavaLowerer {
                     : JTypes.generated(currentTypeName);
         }
 
+        /** Whether a returned type is a generic native trait, so the Java result must be adapted. */
+        private boolean adaptsNativeTrait(SolvikType type) {
+            if (type == null || type.kind() != SolvikType.Kind.USER) {
+                return false;
+            }
+            Ast.TypeDecl declaration = types.nativeDeclaration(type.userName());
+            return declaration != null && JavaLowerer.adaptsNativeTrait(declaration);
+        }
+
+        /** A Java declared type named by a Solvik user type, which is how every member call names it. */
+        private JType.Declared declaredType(SolvikType type) {
+            if (JTypes.of(type) instanceof JType.Declared declared) {
+                return declared;
+            }
+            throw new IllegalStateException("a member call needs a declared Java type, found " + type);
+        }
+
         private String localName(Ast.Node node, String fallback) {
             TypeChecker.Binding binding = types.bindingOf(node);
             if (binding == null) {
@@ -1737,6 +1912,10 @@ public final class JavaLowerer {
 
         /** The Solvik type a write position names, for the Java carrier this lowering needs. */
         SolvikType resolve(Ast.TypeRef type) {
+            SolvikType recorded = types.typeOf(type);
+            if (recorded != null) {
+                return recorded;
+            }
             return switch (type) {
                 case Ast.TypeRef.Array array -> {
                     Integer length = array.size() instanceof Ast.IntLit literal

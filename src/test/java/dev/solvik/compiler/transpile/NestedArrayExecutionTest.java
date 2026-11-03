@@ -56,8 +56,8 @@ class NestedArrayExecutionTest {
                 grid := Integer[][2] {Integer[2] {1, 2}, Integer[2] {3, 4}}
                 row := grid[0]
                 row[1] = 7
-                alias := grid
-                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((grid[0][1]) .. (" ") .. (row === grid[0]) .. (" ") .. (alias === grid) .. (" ") .. (row === grid[1]))
+                sameGrid := grid
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((grid[0][1]) .. (" ") .. (row === grid[0]) .. (" ") .. (sameGrid === grid) .. (" ") .. (row === grid[1]))
                 """);
         assertThat(output).isEqualTo("7 true true false\n");
     }

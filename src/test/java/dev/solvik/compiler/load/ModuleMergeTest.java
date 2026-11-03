@@ -84,7 +84,7 @@ class ModuleMergeTest {
     }
 
     @Test
-    void entry_and_two_imports_share_types_private_functions_and_nested_modules()
+    void entry_and_two_includes_share_types_private_functions_and_nested_modules()
             throws Exception {
         write("left.sol", """
                 module tools {
@@ -115,8 +115,8 @@ class ModuleMergeTest {
                 """);
         for (boolean reverse : new boolean[]{false, true}) {
             String entry = reverse ? "reverse.sol" : "app.sol";
-            write(entry, (reverse ? "import \"right.sol\"\nimport \"left.sol\"\n"
-                    : "import \"left.sol\"\nimport \"right.sol\"\n") + """
+            write(entry, (reverse ? "include { \"right.sol\" }\ninclude { \"left.sol\" }\n"
+                    : "include { \"left.sol\" }\ninclude { \"right.sol\" }\n") + """
                     module tools {
                         pub func sum() -> Integer { return answer() + Right().value() }
                     }
@@ -138,18 +138,26 @@ class ModuleMergeTest {
     }
 
     @Test
-    void repeated_and_diamond_imports_do_not_duplicate_merged_declarations()
+    void repeated_and_diamond_includes_do_not_duplicate_merged_declarations()
             throws Exception {
         write("shared.sol", "module common { pub func seed() -> Integer { return 2 } }");
-        write("left.sol", "import \"shared.sol\"\nmodule common {"
+        write("left.sol", "include { \"shared.sol\" }\nmodule common {"
                 + "pub func left() -> Integer { return seed() + 1 } }");
-        write("right.sol", "import \"./shared.sol\"\nmodule common {"
+        write("right.sol", "include { \"./shared.sol\" }\nmodule common {"
                 + "pub func right() -> Integer { return seed() + 2 } }");
         write("app.sol", """
-                import "left.sol"
-                import "right.sol"
-                import "shared.sol"
-                import "./shared.sol"
+                include {
+                    "left.sol"
+                }
+                include {
+                    "right.sol"
+                }
+                include {
+                    "shared.sol"
+                }
+                include {
+                    "./shared.sol"
+                }
                 solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((common::left()) .. (" ") .. (common::right()) .. (" ") .. (common::seed()))
                 """);
         assertThat(load("app.sol").programFileNames()).hasSize(4);
@@ -170,8 +178,12 @@ class ModuleMergeTest {
                 module first { module inner { pub func other() -> Integer { return value() } } }
                 """);
         write("app.sol", """
-                import "left.sol"
-                import "right.sol"
+                include {
+                    "left.sol"
+                }
+                include {
+                    "right.sol"
+                }
                 solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((first::inner::other()) .. (" ") .. (second::inner::other()))
                 """);
         assertThat(run(transpile("app.sol"), "separate")).isEqualTo("1 2\n");
@@ -197,8 +209,8 @@ class ModuleMergeTest {
             String first, String second, boolean reverse) throws Exception {
         write("left.sol", "module shared { " + first + " }");
         write("right.sol", "module shared { " + second + " }");
-        write("app.sol", reverse ? "import \"right.sol\"\nimport \"left.sol\""
-                : "import \"left.sol\"\nimport \"right.sol\"");
+        write("app.sol", reverse ? "include { \"right.sol\" }\ninclude { \"left.sol\" }"
+                : "include { \"left.sol\" }\ninclude { \"right.sol\" }");
         assertThat(failure("app.sol")).contains("SOL-T001", "shared::Entry", "left.sol", "right.sol",
                 "conflicts with", "declared at")
                 .containsPattern("declared at [^\\r\\n]*\\.sol:\\d+:\\d+");
@@ -208,7 +220,7 @@ class ModuleMergeTest {
     void distinct_function_signatures_merge_as_overloads() throws Exception {
         write("left.sol", "module shared { pub func value() -> Integer { return 1 } }");
         write("right.sol", "module shared { pub func value(n: Integer) -> Integer { return n } }");
-        write("app.sol", "import \"left.sol\"\nimport \"right.sol\"\n"
+        write("app.sol", "include { \"left.sol\" }\ninclude { \"right.sol\" }\n"
                 + "solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((shared::value()) .. (\" \") .. (shared::value(2)))");
         assertThat(run(transpile("app.sol"), "merged-overloads")).isEqualTo("1 2\n");
     }
@@ -239,7 +251,7 @@ class ModuleMergeTest {
                 }
                 """);
         write("right.sol", "module shared { type A {} type B {} }");
-        write("app.sol", "import \"left.sol\"\nimport \"right.sol\"");
+        write("app.sol", "include { \"left.sol\" }\ninclude { \"right.sol\" }");
         Diagnostics diagnostics = new Diagnostics();
         ProgramLoader.Loaded loaded = load("app.sol");
         // The packaged modules are approved by provenance, so only the two files conflict here.
@@ -266,7 +278,7 @@ class ModuleMergeTest {
                 }
                 """);
         write("right.sol", "module shared { pub func value() -> Integer { return secret() } }");
-        write("app.sol", "import \"left.sol\"\nimport \"right.sol\"\n" + outside);
+        write("app.sol", "include { \"left.sol\" }\ninclude { \"right.sol\" }\n" + outside);
         assertThat(failure("app.sol")).contains(TypeChecker.PRIVATE_DECLARATION);
     }
 
@@ -274,15 +286,15 @@ class ModuleMergeTest {
     void public_signatures_cannot_expose_private_types_from_another_module_file() throws Exception {
         write("left.sol", "module shared { type Hidden { pub func Hidden() {} } }");
         write("right.sol", "module shared { pub func leak() -> Hidden { return Hidden() } }");
-        write("app.sol", "import \"left.sol\"\nimport \"right.sol\"");
+        write("app.sol", "include { \"left.sol\" }\ninclude { \"right.sol\" }");
         assertThat(failure("app.sol")).contains(TypeChecker.PRIVATE_EXPOSURE, "shared::Hidden");
     }
 
     @Test
-    void module_reopening_does_not_discover_unimported_files() throws Exception {
+    void module_reopening_does_not_discover_unincluded_files() throws Exception {
         write("left.sol", "module shared { pub func value() -> Integer { return 1 } }");
-        write("unimported.sol", "module shared { pub func extra() -> Integer { return 2 } }");
-        write("app.sol", "import \"left.sol\"\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((shared::extra()) .. \"\")");
+        write("unincluded.sol", "module shared { pub func extra() -> Integer { return 2 } }");
+        write("app.sol", "include { \"left.sol\" }\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((shared::extra()) .. \"\")");
         assertThat(load("app.sol").programFileNames()).hasSize(2);
         assertThat(failure("app.sol")).contains("shared", "extra", "declares no type or function");
     }

@@ -1,8 +1,8 @@
-// solvik::collections::Stack — Stack binding.
-// Loaded from the compiler JAR; declares one native type in solvik::collections.
+// solvik::collection::Stack — Stack binding.
+// Loaded from the compiler JAR; declares one native type in solvik::collection.
 
 module solvik {
-    module collections {
+    module collection {
         // java.util.Stack<T> — last-in, first-out stack.
         pub type Stack<T> native "java.util.Stack" {
 
@@ -21,6 +21,9 @@ module solvik {
             pub func search(item: Any) -> Integer
 
             pub func size() -> Integer
+
+            // The iteration protocol (§7, §11.3): the loop reads the stack's own order, bottom to top.
+            pub func iterator() -> Iterator<T>
 
             pub func toString() -> String
         }

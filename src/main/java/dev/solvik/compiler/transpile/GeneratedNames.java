@@ -63,8 +63,8 @@ public final class GeneratedNames {
      * so a new support member cannot be added without reserving its name here.
      */
     private static final Set<String> SUPPORT_MEMBER_NAMES = Set.of(
-            "array", "checked", "concat", "conversion", "divide", "equal", "equalFloat",
-            "equalFloating", "equalIntegral", "exit", "fail", "hash", "identity",
+            "array", "checked", "checkedResult", "concat", "conversion", "divide", "equal",
+            "equalFloat", "equalFloating", "equalIntegral", "exit", "fail", "hash", "identity",
             "isDecimalText", "isFloatingText", "isIntegerText", "isScalar", "plainText", "render",
             "remainder", "required", "textIndex", "textSplit", "textSubstring", "toBigDecimal",
             "toBigInteger", "toBoolean", "toByte", "toDouble", "toFloat", "toInteger", "toLong",

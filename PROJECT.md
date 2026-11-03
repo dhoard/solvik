@@ -90,14 +90,14 @@ prettier output.
 
 `example.sol` must use and exercise **all** Solvik language constructs, syntax, and documented
 features — not a convenient subset. It is the executable inventory of the language surface:
-if Solvik can express it, `example.sol` (with `include.sol` for imported declarations)
+if Solvik can express it, `example.sol` (with `include.sol` for included declarations)
 demonstrates it, and `./solvik run example.sol` must run it end to end.
 
 - Adding or changing a language construct, syntax form, declaration kind, operator, literal
   form, standard-library type, or binding shape updates the corpus in the same change.
 - Prefer live, observable use over dead declarations: the construct should execute and its
   effect should be visible in the program's output or behavior where the language allows it.
-- `include.sol` exists to exercise imports and cross-file declarations; it is not a place to
+- `include.sol` exists to exercise includes, aliases, and cross-file declarations; it is not a place to
   park unused constructs.
 - Negative and diagnostic cases stay in the test suite; the corpus demonstrates valid language
   surface, while tests prove rejection and failure behavior.

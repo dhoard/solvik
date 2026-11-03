@@ -30,11 +30,11 @@ import org.junit.jupiter.api.io.TempDir;
 /**
  * Multi-file programs (LANGUAGE.md §3, "Source files").
  *
- * <p>An {@code import "path"} is relative to the file that writes it and contributes declarations
- * only; only the entry file's statements run. Modules merge by name across files.
+ * <p>An {@code include { "path.sol" }} block is relative to the file that writes it and contributes
+ * declarations only; only the entry file's statements run. Modules merge by name across files.
  */
-@DisplayName("imports and source files")
-class ImportTest {
+@DisplayName("includes and source files")
+class IncludeTest {
 
     @TempDir
     Path directory;
@@ -56,7 +56,7 @@ class ImportTest {
     }
 
     @Test
-    void an_imported_module_merges_with_the_entry_file() throws IOException {
+    void an_included_module_merges_with_the_entry_file() throws IOException {
         write("lib/shapes.sol", """
                 module shapes {
                     pub type Point {
@@ -69,7 +69,9 @@ class ImportTest {
                 }
                 """);
         write("app.sol", """
-                import "lib/shapes.sol"
+                include {
+                    "lib/shapes.sol"
+                }
 
                 module shapes {
                     pub func origin() -> Point {
@@ -89,7 +91,7 @@ class ImportTest {
     }
 
     @Test
-    void imports_are_transitive() throws IOException {
+    void includes_are_transitive() throws IOException {
         write("inner.sol", """
                 module inner {
                     pub func seven() -> Integer {
@@ -98,7 +100,9 @@ class ImportTest {
                 }
                 """);
         write("middle.sol", """
-                import "inner.sol"
+                include {
+                    "inner.sol"
+                }
 
                 module middle {
                     pub func doubled() -> Integer {
@@ -107,7 +111,9 @@ class ImportTest {
                 }
                 """);
         write("app.sol", """
-                import "middle.sol"
+                include {
+                    "middle.sol"
+                }
 
                 solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((middle::doubled()) .. (" ") .. (inner::seven()))
                 """);
@@ -122,9 +128,11 @@ class ImportTest {
     }
 
     @Test
-    void an_import_cycle_is_reported_with_its_path() throws IOException {
+    void an_include_cycle_is_reported_with_its_path() throws IOException {
         write("a.sol", """
-                import "b.sol"
+                include {
+                    "b.sol"
+                }
 
                 module a {
                     pub func fromB() -> Integer {
@@ -133,7 +141,9 @@ class ImportTest {
                 }
                 """);
         write("b.sol", """
-                import "a.sol"
+                include {
+                    "a.sol"
+                }
 
                 module b {
                     pub func value() -> Integer {
@@ -141,13 +151,13 @@ class ImportTest {
                     }
                 }
                 """);
-        write("app.sol", "import \"a.sol\"\n\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((a::fromB()) .. \"\")\n");
+        write("app.sol", "include { \"a.sol\" }\n\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((a::fromB()) .. \"\")\n");
 
         Diagnostics diagnostics = new Diagnostics();
         load("app.sol", diagnostics);
 
         assertThat(diagnostics.all()).singleElement().satisfies(diagnostic -> {
-            assertThat(diagnostic.code()).isEqualTo(ProgramLoader.IMPORT_CYCLE);
+            assertThat(diagnostic.code()).isEqualTo(ProgramLoader.INCLUDE_CYCLE);
             assertThat(diagnostic.pos().file()).isEqualTo(name("b.sol"));
             assertThat(diagnostic.message())
                     .contains(name("a.sol") + " -> " + name("b.sol") + " -> " + name("a.sol"));
@@ -157,15 +167,15 @@ class ImportTest {
     @Test
     @DisplayName("recursion is rejected: a.sol -> b.sol -> c.sol -> a.sol")
     void a_three_file_cycle_is_reported_with_the_whole_path() throws IOException {
-        write("a.sol", "import \"b.sol\"\n\nmodule a {\n    pub func one() -> Integer {\n        return 1\n    }\n}\n");
-        write("b.sol", "import \"c.sol\"\n\nmodule b {\n    pub func two() -> Integer {\n        return 2\n    }\n}\n");
-        write("c.sol", "import \"a.sol\"\n\nmodule c {\n    pub func three() -> Integer {\n        return 3\n    }\n}\n");
+        write("a.sol", "include { \"b.sol\" }\n\nmodule a {\n    pub func one() -> Integer {\n        return 1\n    }\n}\n");
+        write("b.sol", "include { \"c.sol\" }\n\nmodule b {\n    pub func two() -> Integer {\n        return 2\n    }\n}\n");
+        write("c.sol", "include { \"a.sol\" }\n\nmodule c {\n    pub func three() -> Integer {\n        return 3\n    }\n}\n");
 
         Diagnostics diagnostics = new Diagnostics();
         load("a.sol", diagnostics);
 
         assertThat(diagnostics.all()).singleElement().satisfies(diagnostic -> {
-            assertThat(diagnostic.code()).isEqualTo(ProgramLoader.IMPORT_CYCLE);
+            assertThat(diagnostic.code()).isEqualTo(ProgramLoader.INCLUDE_CYCLE);
             assertThat(diagnostic.pos().file()).isEqualTo(name("c.sol"));
             assertThat(diagnostic.message()).contains(name("a.sol") + " -> " + name("b.sol")
                     + " -> " + name("c.sol") + " -> " + name("a.sol"));
@@ -173,21 +183,21 @@ class ImportTest {
     }
 
     @Test
-    void a_file_that_imports_itself_is_a_cycle() throws IOException {
-        write("self.sol", "import \"self.sol\"\n\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1) .. \"\")\n");
+    void a_file_that_includes_itself_is_a_cycle() throws IOException {
+        write("self.sol", "include { \"self.sol\" }\n\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1) .. \"\")\n");
 
         Diagnostics diagnostics = new Diagnostics();
         load("self.sol", diagnostics);
 
         assertThat(diagnostics.all()).singleElement().satisfies(diagnostic -> {
-            assertThat(diagnostic.code()).isEqualTo(ProgramLoader.IMPORT_CYCLE);
+            assertThat(diagnostic.code()).isEqualTo(ProgramLoader.INCLUDE_CYCLE);
             assertThat(diagnostic.message()).contains(name("self.sol") + " -> " + name("self.sol"));
         });
     }
 
     @Test
     @DisplayName("a diamond is valid: app -> left, app -> right, left -> shared, right -> shared")
-    void a_diamond_import_is_loaded_once() throws IOException {
+    void a_diamond_include_is_loaded_once() throws IOException {
         write("shared.sol", """
                 module shared {
                     pub type Value {
@@ -199,9 +209,9 @@ class ImportTest {
                     }
                 }
                 """);
-        write("left.sol", "import \"shared.sol\"\n\nmodule left {\n    pub func make() -> shared::Value {\n        return shared::Value(1)\n    }\n}\n");
-        write("right.sol", "import \"shared.sol\"\n\nmodule right {\n    pub func make() -> shared::Value {\n        return shared::Value(2)\n    }\n}\n");
-        write("app.sol", "import \"left.sol\"\nimport \"right.sol\"\n\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((left::make().n) .. (\" \") .. (right::make().n))\n");
+        write("left.sol", "include { \"shared.sol\" }\n\nmodule left {\n    pub func make() -> shared::Value {\n        return shared::Value(1)\n    }\n}\n");
+        write("right.sol", "include { \"shared.sol\" }\n\nmodule right {\n    pub func make() -> shared::Value {\n        return shared::Value(2)\n    }\n}\n");
+        write("app.sol", "include { \"left.sol\" }\ninclude { \"right.sol\" }\n\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((left::make().n) .. (\" \") .. (right::make().n))\n");
 
         Diagnostics diagnostics = new Diagnostics();
         ProgramLoader.Loaded loaded = load("app.sol", diagnostics);
@@ -224,7 +234,9 @@ class ImportTest {
                 solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("must not run") .. "")
                 """);
         write("app.sol", """
-                import "lib.sol"
+                include {
+                    "lib.sol"
+                }
 
                 solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("entry ") .. (lib::value()))
                 """);
@@ -233,14 +245,14 @@ class ImportTest {
         load("app.sol", diagnostics);
 
         assertThat(diagnostics.all()).singleElement().satisfies(diagnostic -> {
-            assertThat(diagnostic.code()).isEqualTo(ProgramLoader.STATEMENTS_IN_IMPORT);
+            assertThat(diagnostic.code()).isEqualTo(ProgramLoader.STATEMENTS_IN_INCLUDED_FILE);
             assertThat(diagnostic.pos().file()).isEqualTo(name("lib.sol"));
         });
     }
 
     @Test
-    void a_missing_import_is_reported_against_the_importing_file() throws IOException {
-        write("app.sol", "import \"nope.sol\"\n\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1) .. \"\")\n");
+    void a_missing_include_is_reported_against_the_including_file() throws IOException {
+        write("app.sol", "include { \"nope.sol\" }\n\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1) .. \"\")\n");
 
         Diagnostics diagnostics = new Diagnostics();
         load("app.sol", diagnostics);
@@ -254,7 +266,7 @@ class ImportTest {
 
     @Test
     @DisplayName("an unreadable import is not left on the load stack for later cycle messages")
-    void an_unreadable_import_does_not_appear_in_a_later_cycle_path() throws IOException {
+    void an_unreadable_include_does_not_appear_in_a_later_cycle_path() throws IOException {
         Path unreadable = write("unreadable.sol", "type Hidden { }\n");
         assumeTrue(Files.getFileStore(unreadable)
                         .supportsFileAttributeView(PosixFileAttributeView.class),
@@ -264,13 +276,19 @@ class ImportTest {
                 "the current user ignores file permissions");
         try {
             write("a.sol", """
-                    import "unreadable.sol"
-                    import "c.sol"
+                    include {
+                        "unreadable.sol"
+                    }
+                    include {
+                        "c.sol"
+                    }
 
                     solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine(("a") .. "")
                     """);
             write("c.sol", """
-                    import "a.sol"
+                    include {
+                        "a.sol"
+                    }
                     """);
 
             Diagnostics diagnostics = new Diagnostics();
@@ -282,10 +300,10 @@ class ImportTest {
             // The failed read must not stay between a.sol and c.sol, or the reported cycle would
             // name a file that is not on the path at all.
             assertThat(diagnostics.all()).filteredOn(diagnostic -> diagnostic.code()
-                            .equals(ProgramLoader.IMPORT_CYCLE))
+                            .equals(ProgramLoader.INCLUDE_CYCLE))
                     .singleElement()
                     .satisfies(diagnostic -> assertThat(diagnostic.message())
-                            .isEqualTo("import cycle: " + name("a.sol") + " -> " + name("c.sol")
+                            .isEqualTo("include cycle: " + name("a.sol") + " -> " + name("c.sol")
                                     + " -> " + name("a.sol")));
         } finally {
             Files.setPosixFilePermissions(unreadable, PosixFilePermissions.fromString("rw-------"));
@@ -293,8 +311,8 @@ class ImportTest {
     }
 
     @Test
-    void an_absolute_import_path_is_rejected() throws IOException {
-        write("app.sol", "import \"/etc/passwd\"\n\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1) .. \"\")\n");
+    void an_absolute_include_path_is_rejected() throws IOException {
+        write("app.sol", "include { \"/etc/passwd\" }\n\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1) .. \"\")\n");
 
         Diagnostics diagnostics = new Diagnostics();
         load("app.sol", diagnostics);
@@ -316,7 +334,9 @@ class ImportTest {
                 }
                 """);
         write("app.sol", """
-                import "lib.sol"
+                include {
+                    "lib.sol"
+                }
 
                 leaked := shapes::Hidden()
                 """);
@@ -339,7 +359,7 @@ class ImportTest {
     @Test
     void a_diagnostic_names_the_file_it_came_from() throws IOException {
         write("lib.sol", "module lib {\n    pub func broken() -> Integer {\n        return \"text\"\n    }\n}\n");
-        write("app.sol", "import \"lib.sol\"\n\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((lib::broken()) .. \"\")\n");
+        write("app.sol", "include { \"lib.sol\" }\n\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((lib::broken()) .. \"\")\n");
 
         var out = new ByteArrayOutputStream();
         var err = new ByteArrayOutputStream();
@@ -358,10 +378,78 @@ class ImportTest {
     }
 
     @Test
-    void a_single_source_compilation_refuses_imports() {
-        assertThat(runFailure("import \"lib.sol\"\n\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1) .. \"\")\n"))
+    void a_single_source_compilation_refuses_includes() {
+        assertThat(runFailure("include { \"lib.sol\" }\n\nsolvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((1) .. \"\")\n"))
                 .contains(ProgramLoader.MISSING_FILE)
                 .contains("run the compiler on a file path");
+    }
+
+    @Test
+    @DisplayName("an included file may declare several unrelated and nested modules")
+    void a_file_may_declare_several_modules() throws IOException {
+        write("multi.sol", """
+                module one {
+                    module inner {
+                        pub type A {
+                            pub func A() { }
+
+                            pub func text() -> String {
+                                return "a"
+                            }
+                        }
+                    }
+                }
+
+                module two {
+                    pub type B {
+                        pub func B() { }
+
+                        pub func text() -> String {
+                            return "b"
+                        }
+                    }
+                }
+                """);
+        write("app.sol", """
+                include { "multi.sol" }
+
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((one::inner::A().text()) .. (" ") .. (two::B().text()))
+                """);
+
+        Diagnostics diagnostics = new Diagnostics();
+        ProgramLoader.Loaded loaded = load("app.sol", diagnostics);
+
+        assertThat(diagnostics.all()).isEmpty();
+        assertThat(run(loaded)).isEqualTo("a b\n");
+    }
+
+    @Test
+    @DisplayName("compact one-line blocks are valid and an alias is local to the entry file")
+    void compact_blocks_work_end_to_end() throws IOException {
+        write("lib.sol", """
+                module lib {
+                    pub type Value {
+                        pub n := 0
+
+                        pub func Value(n: Integer) {
+                            self.n = n
+                        }
+                    }
+                }
+                """);
+        write("app.sol", """
+                include { "lib.sol" }
+                alias { lib::Value V; lib place }
+
+                value := V(4)
+                solvik::io::TextWriter(solvik::io::Stdio.stdout()).writeLine((value.n) .. (" ") .. (place::Value(5).n))
+                """);
+
+        Diagnostics diagnostics = new Diagnostics();
+        ProgramLoader.Loaded loaded = load("app.sol", diagnostics);
+
+        assertThat(diagnostics.all()).isEmpty();
+        assertThat(run(loaded)).isEqualTo("4 5\n");
     }
 
     // ------------------------------------------------------------------ helpers
